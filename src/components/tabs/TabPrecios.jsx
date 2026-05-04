@@ -35,6 +35,9 @@ function buildDisplayPrice(arch, inp, fMoney2) {
 export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const dp = (arch && inp) ? buildDisplayPrice(arch, inp, fMoney2) : { price: calcs.displayPrice, suffix: calcs.displayPriceSuffix };
+	const priceSugLabel = arch === "ppu"
+		? "Precio mínimo sugerido · equiv. mensual (" + (inp ? (inp.firmasAsumidas ?? 5) : 5) + " f/mes asumidas)"
+		: "Precio mínimo sugerido · usuario / mes";
 	const VOLS = [5000, 10000, 20000, 50000, 100000, 200000];
 	return (
 		<div>
@@ -99,7 +102,7 @@ export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 							},
 						)}
 					>
-						Precio mínimo sugerido · usuario / mes
+						{priceSugLabel}
 					</div>
 					<div
 						style={Object.assign({}, mont(36), {

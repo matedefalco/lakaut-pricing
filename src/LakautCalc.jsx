@@ -8,6 +8,7 @@ import { engine } from "./engine/engine";
 import { KpiCard } from "./components/ui/KpiCard";
 import { Sec } from "./components/ui/Sec";
 import { PackFields } from "./components/ui/PackFields";
+import { NumInput } from "./components/ui/NumInput";
 import { Toggle } from "./components/ui/Toggle";
 import { TabCostos } from "./components/tabs/TabCostos";
 import { TabPrecios } from "./components/tabs/TabPrecios";
@@ -102,6 +103,16 @@ export default function LakautCalc() {
 	const ec = calcs.ebitda > 0 ? OK : calcs.ebitda > -10000 ? WN : ER;
 	const mc = calcs.margenPct > 30 ? OK : calcs.margenPct > 0 ? WN : ER;
 	const bc = isFinite(calcs.beUsuarios) ? OK : WN;
+
+	const scaleLabels = {
+		sub: "Suscripciones activas",
+		bolsa: "Packs vendidos",
+		ppu: "Certificados activos",
+		anual: "Contratos anuales activos",
+		free: "Usuarios activos",
+		hibrido: "Packs vendidos",
+	};
+	const scaleLabel = scaleLabels[cfg.arch] || "Usuarios activos";
 
 	const TABS = ["costos", "precios", "proyección", "break-even"];
 	const SECTIONS = [
@@ -342,6 +353,12 @@ export default function LakautCalc() {
 							>
 								<Sec title="Configuración del pack" />
 								<PackFields arch={cfg.arch} inp={inp} update={updInp} currency={currency} tc={tc} />
+								<NumInput
+									label={scaleLabel}
+									value={users}
+									onChange={setUsers}
+									suffix="usu"
+								/>
 								{cfg.arch === "free" && (
 									<div
 										style={{
