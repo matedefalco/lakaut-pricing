@@ -1515,6 +1515,7 @@ function SectionHeader({ title }) {
 
 function TabConfig({ costConfig, setCostConfig }) {
 	const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + r.v; }, 0);
+	const activosTotal = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	function updRow(key, i, field, val) {
 		setCostConfig(function (prev) {
 			return Object.assign({}, prev, {
