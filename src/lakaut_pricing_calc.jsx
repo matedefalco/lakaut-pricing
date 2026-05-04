@@ -1514,6 +1514,7 @@ function SectionHeader({ title }) {
 }
 
 function TabConfig({ costConfig, setCostConfig }) {
+	const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + r.v; }, 0);
 	function updRow(key, i, field, val) {
 		setCostConfig(function (prev) {
 			return Object.assign({}, prev, {
@@ -1723,11 +1724,8 @@ function TabConfig({ costConfig, setCostConfig }) {
 					</div>
 					<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 24, minWidth: 200 }}>
 						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>CF asignado al segmento Individuos</div>
-						<InlineNum
-							value={costConfig.cfSegmento}
-							decimals={0}
-							onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { cfSegmento: v }); }); }}
-						/>
+						<div style={Object.assign({}, mont(20), { color: GRAY })}>{fD(cfSegmento)}</div>
+						<div style={os(10, 400, GRAY)}>Derivado de la suma de Sueldos (RRHH)</div>
 					</div>
 				</div>
 			</div>
@@ -2229,14 +2227,13 @@ export default function LakautCalc() {
 		assetItems: ASSET_ITEMS,
 		cvCertItems: CV_CERT_ITEMS,
 		cvFirmaOtp: CV_FIRMA_OTP,
-		cfSegmento: 26024,
 	});
 
 	const costs = useMemo(function () {
 		const cfOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
 		const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 		const cfTotal = cfOps + cfAmort;
-		const cfSegmento = costConfig.cfSegmento;
+		const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + r.v; }, 0);
 		const cvCertBase = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
 		const activosTotal = cfAmort;
 		return {
