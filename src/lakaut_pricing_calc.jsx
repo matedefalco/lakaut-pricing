@@ -1800,7 +1800,7 @@ function TabConfig({ costConfig, setCostConfig }) {
 										<div style={os(10, 400, GRAY)}>Derivado de la suma de amortizaciones mensuales</div>
 									</td>
 									<td style={{ padding: "4px 10px", width: 130, textAlign: "right", fontFamily: "Courier New,monospace", fontSize: 13, color: GRAY }}>
-										{costs.activosTotal.toFixed(0)}
+										{activosTotal.toFixed(0)}
 									</td>
 								</tr>
 							</tbody>
