@@ -1,4 +1,4 @@
-import LakautCalc from "./lakaut_pricing_calc";
+import LakautCalc from "./LakautCalc";
 
 export default function App() {
 	return <LakautCalc />;
