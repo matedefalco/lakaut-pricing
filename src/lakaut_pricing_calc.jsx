@@ -44,57 +44,48 @@ function os(sz, w, col) {
 }
 
 // ─── Cost defaults (initial state values) ────────────────────────────────
-const CV_FIRMA_OTP = 0.1034;
+const CAPACIDAD_FIRMAS_ANUAL = 15785714285.7142857143;
 
 const FIXED_ITEMS = [
-	{ cat: "RRHH", item: "Sueldos IT", v: 96000 },
-	{ cat: "RRHH", item: "Sueldos Administración", v: 20000 },
-	{ cat: "Sop", item: "Licencia HSM", v: 2000 },
-	{ cat: "Inf", item: "Rack + jaula 2kva", v: 1800 },
-	{ cat: "Inf", item: "Internet ISP ×2", v: 900 },
-	{ cat: "Inf", item: "Google Workspace 50c", v: 350 },
-	{ cat: "Sop", item: "Soporte DC", v: 220 },
-	{ cat: "Inf", item: "Energía + UPS", v: 210 },
-	{ cat: "SW", item: "Twilio INC", v: 100 },
-	{ cat: "Ops", item: "Mensajería", v: 100 },
-	{ cat: "SW", item: "ChatGPT ×2", v: 80 },
-	{ cat: "SW", item: "Figma", v: 64 },
-	{ cat: "SW", item: "Mailchimp", v: 50 },
-	{ cat: "SW", item: "GitHub ×2", v: 48 },
-	{ cat: "SW", item: "Canva", v: 20 },
+	{ cat: "RRHH", item: "Sueldos IT", v: 96000, tipo: "indirecto" },
+	{ cat: "RRHH", item: "Sueldos Administración", v: 20000, tipo: "indirecto" },
+	{ cat: "Sop", item: "Licencia HSM", v: 2000, tipo: "directo" },
+	{ cat: "Inf", item: "Rack + jaula 2kva", v: 1800, tipo: "directo" },
+	{ cat: "Inf", item: "Internet ISP ×2", v: 900, tipo: "directo" },
+	{ cat: "Inf", item: "Google Workspace 50c", v: 350, tipo: "indirecto" },
+	{ cat: "Sop", item: "Soporte DC", v: 220, tipo: "directo" },
+	{ cat: "Inf", item: "Energía + UPS", v: 210, tipo: "directo" },
+	{ cat: "SW", item: "Twilio INC", v: 100, tipo: "directo" },
+	{ cat: "Ops", item: "Mensajería", v: 100, tipo: "indirecto" },
+	{ cat: "SW", item: "ChatGPT ×2", v: 80, tipo: "indirecto" },
+	{ cat: "SW", item: "Figma", v: 64, tipo: "indirecto" },
+	{ cat: "SW", item: "Mailchimp", v: 50, tipo: "indirecto" },
+	{ cat: "SW", item: "GitHub ×2", v: 48, tipo: "directo" },
+	{ cat: "SW", item: "Canva", v: 20, tipo: "indirecto" },
 ];
 const ASSET_ITEMS = [
-	{ item: "Notebooks ×9", amort: 2587.5, vida: 36 },
-	{ item: "HSM Hardware ×2", amort: 2586, vida: 60 },
-	{ item: "Cintas LTO ×60", amort: 575, vida: 12 },
-	{ item: "Dispositivo cinta LTO", amort: 208.33, vida: 12 },
-	{ item: "Firewall SW ×3", amort: 833.33, vida: 36 },
-	{ item: "Servidores contingencia", amort: 1388.89, vida: 36 },
+	{ item: "Notebooks ×9", amort: 2587.5, vida: 36, tipo: "indirecto" },
+	{ item: "HSM Hardware ×2", amort: 2586, vida: 60, tipo: "directo" },
+	{ item: "Cintas LTO ×60", amort: 575, vida: 12, tipo: "directo" },
+	{ item: "Dispositivo cinta LTO", amort: 208.33, vida: 12, tipo: "directo" },
+	{ item: "Firewall SW ×3", amort: 833.33, vida: 36, tipo: "directo" },
+	{ item: "Servidores contingencia", amort: 1388.89, vida: 36, tipo: "directo" },
 ];
 const CV_CERT_ITEMS = [
-	{ item: "Verificación DNI (RENAPER)", v: 0.0435 },
-	{ item: "Prueba de vida (RENAPER)", v: 0.0507 },
-	{ item: "Biometría Activa (Veriff)", v: 0.6 },
-	{ item: "Infra PKI / emisión", v: 0.8 },
-	{ item: "OTP SMS cert.", v: 0.006 },
+	{ item: "Verificación DNI (RENAPER)", v: 0.0435, tipo: "directo" },
+	{ item: "Prueba de vida (RENAPER)", v: 0.0507, tipo: "directo" },
+	{ item: "Biometría Activa (Veriff)", v: 0.6, tipo: "directo" },
+	{ item: "Infra PKI / emisión", v: 0.8, tipo: "directo" },
+	{ item: "OTP SMS cert.", v: 0.006, tipo: "directo" },
+	{ item: "Sello de competencia", v: 0.5, tipo: "directo" },
+];
+const CV_FIRMA_ITEMS = [
+	{ item: "OTP SMS (Twilio)", v: 0.1034, tipo: "directo" },
+	{ item: "Sello de tiempo RFC 3161", v: 0.1, tipo: "directo" },
 ];
 const SERVICES_DEF = {
-	cloudStorage: {
-		label: "Almacenamiento en nube",
-		costType: "firma",
-		cost: 0.05,
-	},
-	sellTimestamp: {
-		label: "Sello de tiempo RFC 3161",
-		costType: "firma",
-		cost: 0.1,
-	},
+	cloudStorage: { label: "Almacenamiento en nube", costType: "firma", cost: 0.05 },
 	mailCert: { label: "Mail certificado", costType: "user_mes", cost: 2.0 },
-	competenceStamp: {
-		label: "Sello de competencia",
-		costType: "cert",
-		cost: 0.5,
-	},
 };
 
 // ─── Pack definitions ──────────────────────────────────────────────────────
@@ -186,13 +177,15 @@ function fK(n) {
 
 // ─── Engine ────────────────────────────────────────────────────────────────
 function engine({ arch, inp, svc, users, costs }) {
-	const { activosTotal, cfSegmento, cvCertBase, cvFirmaOtp } = costs;
+	const { activosTotal, cfTotal, cfDirecto, cvCertBase, cvFirmaBase, capacidadFirmasAnual } = costs;
+	const infraPorFirma = capacidadFirmasAnual > 0 ? activosTotal / (capacidadFirmasAnual / 12) : 0;
 	let svcFirma = 0,
 		svcCert = 0,
 		svcUserMes = 0;
 	Object.keys(svc).forEach(function (k) {
 		if (!svc[k]) return;
 		const d = SERVICES_DEF[k];
+		if (!d) return;
 		if (d.costType === "firma") svcFirma += d.cost;
 		if (d.costType === "cert") svcCert += d.cost;
 		if (d.costType === "user_mes") svcUserMes += d.cost;
@@ -254,9 +247,7 @@ function engine({ arch, inp, svc, users, costs }) {
 		displayPriceSuffix = "/ pack (" + p + " meses)";
 	}
 
-	const firmasTotal = users * firmasMesUsr;
-	const infraPorFirma = firmasTotal > 0 ? activosTotal / firmasTotal : 0;
-	const cvFirmaUnit = cvFirmaOtp + infraPorFirma + svcFirma;
+	const cvFirmaUnit = cvFirmaBase + infraPorFirma + svcFirma;
 	const cvCertUnit = cvCertBase + svcCert;
 
 	const cvMes =
@@ -264,20 +255,20 @@ function engine({ arch, inp, svc, users, costs }) {
 	const margenUnit = revMes - cvMes;
 	const margenPct = revMes > 0 ? (margenUnit / revMes) * 100 : -100;
 	const beUsuarios =
-		margenUnit > 0 ? Math.ceil(cfSegmento / margenUnit) : Infinity;
+		margenUnit > 0 ? Math.ceil(cfDirecto / margenUnit) : Infinity;
 	const revTotal = revMes * users,
 		cvTotal = cvMes * users;
-	const ebitda = revTotal - cvTotal - cfSegmento;
+	const ebitda = revTotal - cvTotal - cfDirecto;
 	const ebitdaPct =
 		revTotal > 0 ? (ebitda / revTotal) * 100 : ebitda > 0 ? 100 : -100;
-	const priceSug = cvMes + cfSegmento / Math.max(users, 1);
+	const priceSug = cvMes + cfDirecto / Math.max(users, 1);
 
 	let acum = 0;
 	const proj = Array.from({ length: 24 }, function (_, i) {
 		const ramp = Math.min(1, 0.25 + i * 0.1);
 		const uM = Math.round(users * ramp);
 		const rM = revMes * uM,
-			cM = cvMes * uM + cfSegmento,
+			cM = cvMes * uM + cfDirecto,
 			eM = rM - cM;
 		acum += eM;
 		return {
@@ -327,7 +318,7 @@ function beCurveData(arch, inp, svc, currentUsers, costs) {
 			users: u,
 			EBITDA: Math.round(c.ebitda),
 			Revenue: Math.round(c.revTotal),
-			Costo: Math.round(c.cvTotal + costs.cfSegmento),
+			Costo: Math.round(c.cvTotal + costs.cfDirecto),
 		});
 	}
 	return points;
@@ -342,7 +333,7 @@ function priceSensData(arch, inp, svc, users, costs) {
 	const points = [];
 	for (let price = minPrice; price <= maxPrice; price += step) {
 		const margin = price - c0.cvMes;
-		const be = margin > 0 ? Math.ceil(costs.cfSegmento / margin) : null;
+		const be = margin > 0 ? Math.ceil(costs.cfDirecto / margin) : null;
 		points.push({
 			precio: parseFloat(price.toFixed(3)),
 			BE_usuarios: be ? Math.min(be, 500000) : null,
@@ -452,6 +443,22 @@ function KpiCard({ label, value, sub, accent }) {
 				</div>
 			)}
 		</div>
+	);
+}
+
+function InfoTooltip({ text }) {
+	const [show, setShow] = useState(false);
+	return (
+		<span style={{ position: "relative", display: "inline-block", marginLeft: 5, verticalAlign: "middle", cursor: "help" }}
+			onMouseEnter={function () { setShow(true); }}
+			onMouseLeave={function () { setShow(false); }}>
+			<span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", border: "1.5px solid " + GRAY, fontSize: 9, fontWeight: 700, color: GRAY, fontFamily: "'Open Sans',sans-serif", lineHeight: 1 }}>i</span>
+			{show && (
+				<div style={{ position: "absolute", bottom: "130%", left: "50%", transform: "translateX(-50%)", background: "#1e293b", color: WHITE, padding: "8px 10px", borderRadius: 8, fontSize: 11, width: 220, zIndex: 200, lineHeight: 1.5, pointerEvents: "none", whiteSpace: "normal", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+					{text}
+				</div>
+			)}
+		</span>
 	);
 }
 
@@ -699,6 +706,8 @@ const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: "#8b5cf6", Ops: OK };
 function TabCostos({ calcs, users, costConfig, costs }) {
 	const subtotalOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
 	const subtotalAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
+	const costoTotalMes = costs.cfDirecto + calcs.cvMes * users;
+	const costoPorUsuario = users > 0 ? costoTotalMes / users : 0;
 	return (
 		<div>
 			{/* CF fixed info banner */}
@@ -716,27 +725,31 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 			>
 				<div>
 					<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
-						CF total empresa / mes
+						CF directo / mes
+						<InfoTooltip text={"Suma de todos los costos fijos clasificados como Directo. Se usa para calcular EBITDA y break-even. CF total empresa: " + fD(costs.cfTotal)} />
 					</div>
-					<div style={Object.assign({}, mont(18), { color: BLUE })}>{fD(costs.cfTotal)}</div>
-				</div>
-				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
-					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
-						CF asignado segmento Individuos
-					</div>
-					<div style={Object.assign({}, mont(18), { color: GRAY })}>{fD(costs.cfSegmento)}</div>
+					<div style={Object.assign({}, mont(18), { color: BLUE })}>{fD(costs.cfDirecto)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
 					<div style={Object.assign({}, os(10, 700, WN), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CV por certificado
+						<InfoTooltip text={"Suma de todos los componentes de CV x Certificado (RENAPER, Veriff, PKI, OTP cert., Sello de competencia)."} />
 					</div>
 					<div style={Object.assign({}, mont(18), { color: WN })}>{fD2(calcs.cvCertUnit)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
 					<div style={Object.assign({}, os(10, 700, OK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CV por firma
+						<InfoTooltip text={"OTP SMS + Sello de tiempo RFC 3161 + infra por firma (activos ÷ capacidad anual ÷ 12). Fijo por firma, independiente del cliente."} />
 					</div>
 					<div style={Object.assign({}, mont(18), { color: OK })}>{fD2(calcs.cvFirmaUnit)}</div>
+				</div>
+				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
+					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
+						Costo / usuario / mes
+						<InfoTooltip text={"(CF directo + CV mensual × usuarios) ÷ usuarios. Costo de servir a un usuario promedio a la escala actual."} />
+					</div>
+					<div style={Object.assign({}, mont(18), { color: GRAY })}>{fD2(costoPorUsuario)}</div>
 				</div>
 			</div>
 
@@ -826,21 +839,25 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 					</div>
 					<table style={{ width: "100%", borderCollapse: "collapse" }}>
 						<tbody>
-							<tr style={{ background: "#fafafa" }}>
-								<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px" })}>OTP SMS (Twilio)</td>
-								<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-									{costConfig.cvFirmaOtp.toFixed(4)}
-								</td>
-							</tr>
+							{(costConfig.cvFirmaItems || []).map(function (r, i) {
+								return (
+									<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px" })}>{r.item}</td>
+										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+											{r.v.toFixed(4)}
+										</td>
+									</tr>
+								);
+							})}
 							<tr>
 								<td style={{ padding: "3px 6px" }}>
 									<span style={os(11, 400, BLACK)}>Infra activada</span>
 									<span style={Object.assign({}, os(10, 400, GRAY), { display: "block" })}>
-										{fK(costs.activosTotal)} ÷ {fK(users)}u × {fK(calcs.firmasMesUsr || 0)}f
+										{fD(costs.activosTotal)} ÷ ({fK(costs.capacidadFirmasAnual || 0)} / 12)
 									</span>
 								</td>
 								<td style={Object.assign({}, os(11, 400, BLUE), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-									{calcs.infraPorFirma.toFixed(4)}
+									{calcs.infraPorFirma.toFixed(6)}
 								</td>
 							</tr>
 							{calcs.svcUserMes > 0 && (
@@ -860,6 +877,23 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 						</tbody>
 					</table>
 				</div>
+			</div>
+
+			{/* Total costs summary */}
+			<div style={{ marginTop: 20, background: "#1e293b", borderRadius: 10, padding: "14px 18px", display: "flex", flexWrap: "wrap", gap: 24 }}>
+			<div>
+				<div style={Object.assign({}, os(10, 700, "#94a3b8"), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>Costo total / mes</div>
+				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fD(costoTotalMes)}</div>
+				<div style={Object.assign({}, os(10, 400, "#94a3b8"), { marginTop: 2 })}>CF {fD(costs.cfDirecto)} + CV {fD(calcs.cvMes * users)}</div>
+			</div>
+			<div style={{ borderLeft: "1px solid #334155", paddingLeft: 24 }}>
+				<div style={Object.assign({}, os(10, 700, "#94a3b8"), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>Costo / usuario</div>
+				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fD2(costoPorUsuario)}/mes</div>
+			</div>
+			<div style={{ borderLeft: "1px solid #334155", paddingLeft: 24 }}>
+				<div style={Object.assign({}, os(10, 700, "#94a3b8"), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CV / usuario</div>
+				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fD2(calcs.cvMes)}/mes</div>
+			</div>
 			</div>
 		</div>
 	);
@@ -956,7 +990,7 @@ function TabPrecios({ calcs, users, costs }) {
 					marginBottom: 10,
 				})}
 			>
-				Sensibilidad EBITDA por volumen · CF asignado: {fD(costs.cfSegmento)}/mes
+				Sensibilidad EBITDA por volumen · CF directo: {fD(costs.cfDirecto)}/mes
 			</div>
 			<table
 				style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
@@ -989,7 +1023,7 @@ function TabPrecios({ calcs, users, costs }) {
 					{VOLS.map(function (u, i) {
 						const r = calcs.revMes * u,
 							cv = calcs.cvMes * u,
-							e = r - cv - costs.cfSegmento;
+							e = r - cv - costs.cfDirecto;
 						const m = r > 0 ? (e / r) * 100 : -100;
 						const ec = e > 0 ? OK : e > -20000 ? WN : ER;
 						const act = u === users;
@@ -1542,16 +1576,28 @@ function TabConfig({ costConfig, setCostConfig }) {
 		});
 	}
 
+	const [saveOk, setSaveOk] = useState(false);
+	function handleSave() {
+		try { localStorage.setItem("lakaut_costConfig", JSON.stringify(costConfig)); } catch (e) {}
+		setSaveOk(true);
+		setTimeout(function () { setSaveOk(false); }, 2000);
+	}
 	const salaryRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat === "RRHH"; });
 	const opsRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat !== "RRHH"; });
 	const cfSalary = salaryRows.reduce(function (s, r) { return s + r.v; }, 0);
 	const cfOps = opsRows.reduce(function (s, r) { return s + r.v; }, 0);
 	const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	const cfTotal = cfSalary + cfOps + cfAmort;
+	const cfDirecto = costConfig.fixedItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.v; }, 0)
+		+ costConfig.assetItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.amort; }, 0);
 	const cvCertTotal = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
+	const cvFirmaTotal = (costConfig.cvFirmaItems || []).reduce(function (s, r) { return s + r.v; }, 0);
 
 	const thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "6px 10px", textAlign: "left", background: GRAY });
 	const thR = Object.assign({}, thStyle, { textAlign: "right" });
+	const tipoStyle = function (t) {
+		return { padding: "2px 5px", border: "1px solid " + BORD, borderRadius: 4, fontSize: 10, fontWeight: 700, fontFamily: "'Open Sans',sans-serif", cursor: "pointer", background: t === "directo" ? OKBG : "#fef3c7", color: t === "directo" ? OK : WN };
+	};
 
 	const inputText = {
 		width: "100%",
@@ -1605,6 +1651,7 @@ function TabConfig({ costConfig, setCostConfig }) {
 							<th style={thStyle}>Ítem</th>
 							<th style={Object.assign({}, thR, { width: 130 })}>Amort. / mes (USD)</th>
 							<th style={Object.assign({}, thR, { width: 90 })}>Vida útil (m)</th>
+							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
 					</thead>
@@ -1621,6 +1668,9 @@ function TabConfig({ costConfig, setCostConfig }) {
 									<td style={{ padding: "4px 6px", width: 90 }}>
 										<InlineNum value={r.vida} decimals={0} onChange={function (v) { updRow("assetItems", i, "vida", v); }} />
 									</td>
+									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
+										<button style={tipoStyle(r.tipo || "directo")} onClick={function () { updRow("assetItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "directo"}</button>
+									</td>
 									<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
 										<button style={delBtn} onClick={function () { removeRow("assetItems", i); }} title="Eliminar">×</button>
 									</td>
@@ -1634,7 +1684,7 @@ function TabConfig({ costConfig, setCostConfig }) {
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("assetItems", { item: "", amort: 0, vida: 36 }); }}>+ Agregar activo</button>
+				<button style={addBtn} onClick={function () { addRow("assetItems", { item: "", amort: 0, vida: 36, tipo: "directo" }); }}>+ Agregar activo</button>
 
 				{/* Sueldos */}
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "20px 0 8px" })}>
@@ -1645,6 +1695,7 @@ function TabConfig({ costConfig, setCostConfig }) {
 						<tr>
 							<th style={thStyle}>Ítem</th>
 							<th style={Object.assign({}, thR, { width: 150 })}>Monto / mes (USD)</th>
+							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
 					</thead>
@@ -1659,6 +1710,9 @@ function TabConfig({ costConfig, setCostConfig }) {
 									<td style={{ padding: "4px 6px", width: 150 }}>
 										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
 									</td>
+									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
+										<button style={tipoStyle(r.tipo || "indirecto")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "indirecto"}</button>
+									</td>
 									<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
 										<button style={delBtn} onClick={function () { removeRow("fixedItems", i); }} title="Eliminar">×</button>
 									</td>
@@ -1668,11 +1722,11 @@ function TabConfig({ costConfig, setCostConfig }) {
 						<tr style={{ background: BLUEL }}>
 							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal sueldos</td>
 							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfSalary)}</td>
-							<td />
+							<td colSpan={2} />
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0 }); }}>+ Agregar sueldo</button>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0, tipo: "indirecto" }); }}>+ Agregar sueldo</button>
 
 				{/* Costos fijos operativos */}
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "20px 0 8px" })}>
@@ -1684,6 +1738,7 @@ function TabConfig({ costConfig, setCostConfig }) {
 							<th style={Object.assign({}, thStyle, { width: 70 })}>Cat.</th>
 							<th style={thStyle}>Ítem</th>
 							<th style={Object.assign({}, thR, { width: 150 })}>Monto / mes (USD)</th>
+							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
 					</thead>
@@ -1705,6 +1760,9 @@ function TabConfig({ costConfig, setCostConfig }) {
 									<td style={{ padding: "4px 6px", width: 150 }}>
 										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
 									</td>
+									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
+										<button style={tipoStyle(r.tipo || "directo")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "directo"}</button>
+									</td>
 									<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
 										<button style={delBtn} onClick={function () { removeRow("fixedItems", i); }} title="Eliminar">×</button>
 									</td>
@@ -1712,14 +1770,13 @@ function TabConfig({ costConfig, setCostConfig }) {
 							);
 						})}
 						<tr style={{ background: BLUEL }}>
-							<td />
-							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal operativos</td>
+							<td /><td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal operativos</td>
 							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfOps)}</td>
-							<td />
+							<td colSpan={2} />
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0 }); }}>+ Agregar costo operativo</button>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0, tipo: "directo" }); }}>+ Agregar costo operativo</button>
 
 				{/* CF summary */}
 				<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", marginTop: 20 }}>
@@ -1727,10 +1784,10 @@ function TabConfig({ costConfig, setCostConfig }) {
 						<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CF Total empresa / mes</div>
 						<div style={Object.assign({}, mont(20), { color: BLUE })}>{fD(cfTotal)}</div>
 					</div>
-					<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 24, minWidth: 200 }}>
-						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>CF asignado al segmento Individuos</div>
-						<div style={Object.assign({}, mont(20), { color: GRAY })}>{fD(cfSegmento)}</div>
-						<div style={os(10, 400, GRAY)}>Derivado de la suma de Sueldos (RRHH)</div>
+					<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 24 }}>
+						<div style={Object.assign({}, os(10, 700, OK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CF Directo / mes</div>
+						<div style={Object.assign({}, mont(20), { color: OK })}>{fD(cfDirecto)}</div>
+						<div style={os(10, 400, GRAY)}>Usado en EBITDA y break-even</div>
 					</div>
 				</div>
 			</div>
@@ -1784,38 +1841,65 @@ function TabConfig({ costConfig, setCostConfig }) {
 						<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
 							CV × Firma ejecutada
 						</div>
-						<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 16 }}>
+						<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
 							<thead>
 								<tr>
 									<th style={thStyle}>Componente</th>
 									<th style={Object.assign({}, thR, { width: 130 })}>Costo (USD)</th>
+									<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
+									<th style={Object.assign({}, thStyle, { width: 28 })} />
 								</tr>
 							</thead>
 							<tbody>
-								<tr style={{ background: "#fafafa" }}>
-									<td style={Object.assign({}, os(12, 400, BLACK), { padding: "5px 10px" })}>OTP SMS (Twilio)</td>
-									<td style={{ padding: "4px 10px", width: 130 }}>
-										<InlineNum value={costConfig.cvFirmaOtp} decimals={4} onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { cvFirmaOtp: v }); }); }} />
-									</td>
-								</tr>
-								<tr>
-									<td style={{ padding: "5px 10px" }}>
-										<div style={os(12, 400, BLACK)}>Infra activada total (activos)</div>
-										<div style={os(10, 400, GRAY)}>Derivado de la suma de amortizaciones mensuales</div>
-									</td>
-									<td style={{ padding: "4px 10px", width: 130, textAlign: "right", fontFamily: "Courier New,monospace", fontSize: 13, color: GRAY }}>
-										{activosTotal.toFixed(0)}
-									</td>
+								{(costConfig.cvFirmaItems || []).map(function (r, i) {
+									return (
+										<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+											<td style={{ padding: "4px 6px" }}>
+												<input style={inputText} value={r.item} onChange={function (e) { updRow("cvFirmaItems", i, "item", e.target.value); }} />
+											</td>
+											<td style={{ padding: "4px 6px", width: 130 }}>
+												<InlineNum value={r.v} decimals={4} onChange={function (v) { updRow("cvFirmaItems", i, "v", v); }} />
+											</td>
+											<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
+												<button style={tipoStyle(r.tipo || "directo")} onClick={function () { updRow("cvFirmaItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "directo"}</button>
+											</td>
+											<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
+												<button style={delBtn} onClick={function () { removeRow("cvFirmaItems", i); }} title="Eliminar">×</button>
+											</td>
+										</tr>
+									);
+								})}
+								<tr style={{ background: OKBG }}>
+									<td style={Object.assign({}, os(11, 700, OK), { padding: "6px 10px" })}>Total CV firma</td>
+									<td style={Object.assign({}, os(12, 700, OK), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{cvFirmaTotal.toFixed(4)}</td>
+									<td colSpan={2} />
 								</tr>
 							</tbody>
 						</table>
-						<div style={{ background: OKBG, border: "1px solid " + OK + "44", borderRadius: 8, padding: "10px 14px" }}>
-							<div style={Object.assign({}, os(10, 700, OK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CV firma base (sin infra variable)</div>
-							<div style={Object.assign({}, mont(18), { color: OK })}>{costConfig.cvFirmaOtp.toFixed(4)} USD</div>
-							<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>La infra por firma se calcula al momento del análisis según las firmas comprometidas.</div>
+						<button style={addBtn} onClick={function () { addRow("cvFirmaItems", { item: "", v: 0, tipo: "directo" }); }}>+ Agregar componente</button>
+
+						{/* Capacidad de firmas */}
+						<div style={{ marginTop: 20, padding: "12px 14px", border: "1px solid " + BORD, borderRadius: 8, background: "#fafafa" }}>
+							<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Capacidad total de firmas / año (activos)</div>
+							<InlineNum
+								value={costConfig.capacidadFirmasAnual || CAPACIDAD_FIRMAS_ANUAL}
+								decimals={0}
+								onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { capacidadFirmasAnual: v }); }); }}
+							/>
+							<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 4 })}>Infra por firma = amort. mensual ÷ (capacidad ÷ 12)</div>
 						</div>
 					</div>
 				</div>
+			</div>
+
+			{/* Save button */}
+			<div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
+				<button
+					onClick={handleSave}
+					style={{ padding: "10px 28px", background: saveOk ? OK : BLUE, color: WHITE, border: "none", borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "background 0.3s" }}
+				>
+					{saveOk ? "Guardado" : "Guardar configuración"}
+				</button>
 			</div>
 		</div>
 	);
@@ -1867,6 +1951,8 @@ function Cotizadora({ costs }) {
 	const [freq, setFreq] = useState(null);
 	const [pay, setPay] = useState(null);
 	const [extra, setExtra] = useState([]);
+	const [tc, setTc] = useState(1150);
+	const [currency, setCurrency] = useState("USD");
 
 	function toggleExtra(k) {
 		setExtra(function (prev) {
@@ -2006,11 +2092,36 @@ function Cotizadora({ costs }) {
 		F: "#0891b2",
 	};
 
+	const fmtPrice = function (usd) {
+		if (currency === "ARS") return "$ " + Math.round(usd * tc).toLocaleString("es-AR");
+		return "USD " + usd.toFixed(2);
+	};
+
 	return (
 		<div>
-			<div style={Object.assign({}, os(11, 400, GRAY), { marginBottom: 20 })}>
-				Respondé las preguntas y el sistema te sugiere el plan más conveniente
-				según tu perfil de uso.
+			<div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
+				<div style={Object.assign({}, os(11, 400, GRAY), { flex: 1 })}>
+					Respondé las preguntas y el sistema te sugiere el plan más conveniente
+					según tu perfil de uso.
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+					{["USD", "ARS"].map(function (c) {
+						return (
+							<button key={c} onClick={function () { setCurrency(c); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1.5px solid " + (currency === c ? BLUE : BORD), background: currency === c ? BLUE : WHITE, color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
+						);
+					})}
+					{currency === "ARS" && (
+						<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+							<span style={os(11, 400, GRAY)}>TC:</span>
+							<input
+								type="number"
+								value={tc}
+								onChange={function (e) { setTc(Number(e.target.value) || 1); }}
+								style={{ width: 80, padding: "4px 8px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 12, color: BLACK }}
+							/>
+						</div>
+					)}
+				</div>
 			</div>
 
 			<div
@@ -2076,9 +2187,7 @@ function Cotizadora({ costs }) {
 								inp: r.inp,
 								svc: {
 									cloudStorage: false,
-									sellTimestamp: false,
 									mailCert: false,
-									competenceStamp: false,
 								},
 								users: 20000,
 								costs,
@@ -2113,11 +2222,16 @@ function Cotizadora({ costs }) {
 										<div
 											style={Object.assign({}, mont(22), {
 												color: col,
-												marginBottom: 4,
+												marginBottom: 2,
 											})}
 										>
 											{r.precio}
 										</div>
+										{currency === "ARS" && r.inp.precio > 0 && (
+											<div style={Object.assign({}, os(12, 700, col), { marginBottom: 4 })}>
+												{fmtPrice(r.inp.precio)} {PACKS[r.pack].arch === "anual" ? "/año" : PACKS[r.pack].arch === "bolsa" ? "único" : "/mes"}
+											</div>
+										)}
 										<div
 											style={Object.assign({}, os(12, 400, GRAY), {
 												marginBottom: 8,
@@ -2220,16 +2334,21 @@ export default function LakautCalc() {
 	const [tab, setTab] = useState("costos");
 	const [svc, setSvc] = useState({
 		cloudStorage: false,
-		sellTimestamp: false,
 		mailCert: false,
-		competenceStamp: false,
 	});
 	const [inp, setInp] = useState(PACKS.B.defaults);
-	const [costConfig, setCostConfig] = useState({
-		fixedItems: FIXED_ITEMS,
-		assetItems: ASSET_ITEMS,
-		cvCertItems: CV_CERT_ITEMS,
-		cvFirmaOtp: CV_FIRMA_OTP,
+	const [costConfig, setCostConfig] = useState(function () {
+		try {
+			const saved = localStorage.getItem("lakaut_costConfig");
+			if (saved) return JSON.parse(saved);
+		} catch (e) {}
+		return {
+			fixedItems: FIXED_ITEMS,
+			assetItems: ASSET_ITEMS,
+			cvCertItems: CV_CERT_ITEMS,
+			cvFirmaItems: CV_FIRMA_ITEMS,
+			capacidadFirmasAnual: CAPACIDAD_FIRMAS_ANUAL,
+		};
 	});
 
 	const costs = useMemo(function () {
@@ -2237,15 +2356,13 @@ export default function LakautCalc() {
 		const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 		const cfTotal = cfOps + cfAmort;
 		const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + r.v; }, 0);
-		const cvCertBase = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
+		const cfDirecto = costConfig.fixedItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.v; }, 0)
+			+ costConfig.assetItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.amort; }, 0);
+		const cvCertBase = costConfig.cvCertItems.filter(function (r) { return r.tipo !== "indirecto"; }).reduce(function (s, r) { return s + r.v; }, 0);
+		const cvFirmaBase = (costConfig.cvFirmaItems || []).filter(function (r) { return r.tipo !== "indirecto"; }).reduce(function (s, r) { return s + r.v; }, 0);
 		const activosTotal = cfAmort;
-		return {
-			cfTotal,
-			cfSegmento,
-			cvCertBase,
-			cvFirmaOtp: costConfig.cvFirmaOtp,
-			activosTotal,
-		};
+		const capacidadFirmasAnual = costConfig.capacidadFirmasAnual || CAPACIDAD_FIRMAS_ANUAL;
+		return { cfTotal, cfSegmento, cfDirecto, cvCertBase, cvFirmaBase, activosTotal, capacidadFirmasAnual };
 	}, [costConfig]);
 
 	const cfg = PACKS[family];
@@ -2538,67 +2655,26 @@ export default function LakautCalc() {
 									padding: 16,
 								}}
 							>
-								<Sec title="Variables de la empresa" />
+								<Sec title="Escala de análisis" />
 								<NumInput
 									label="Usuarios activos / mes"
 									value={users}
 									onChange={setUsers}
 									suffix="usu"
-									note="Escala para análisis de EBITDA y proyección"
+									note="Afecta EBITDA total y proyección de ingresos"
 								/>
-								<div
-									style={{
-										background: BLUEL,
-										borderRadius: 10,
-										padding: "10px 14px",
-										marginTop: 4,
-									}}
-								>
-									<div
-										style={Object.assign({}, os(10, 700, BLUE), {
-											textTransform: "uppercase",
-											letterSpacing: "0.5px",
-											marginBottom: 6,
-										})}
-									>
-										Costos fijos (lectura)
+								<div style={{ background: BLUEL, borderRadius: 10, padding: "10px 14px", marginTop: 4 }}>
+									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+										<span style={os(11, 400, GRAY)}>CF directo / mes</span>
+										<span style={Object.assign({}, os(11, 700, OK), { fontFamily: "Courier New,monospace" })}>{fD(costs.cfDirecto)}</span>
 									</div>
 									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-										<span style={os(11, 400, GRAY)}>CF total empresa</span>
-										<span style={Object.assign({}, os(11, 700, BLACK), { fontFamily: "Courier New,monospace" })}>
-											{fD(costs.cfTotal)}
-										</span>
+										<span style={os(11, 400, GRAY)}>CV firma / unidad</span>
+										<span style={Object.assign({}, os(11, 700, BLUE), { fontFamily: "Courier New,monospace" })}>USD {calcs.cvFirmaUnit.toFixed(4)}</span>
 									</div>
-									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-										<span style={os(11, 400, GRAY)}>CF sueldos (RRHH)</span>
-										<span style={Object.assign({}, os(11, 700, BLUE), { fontFamily: "Courier New,monospace" })}>
-											{fD(costs.cfSegmento)}
-										</span>
-									</div>
-									<div style={{ borderTop: "1px solid " + BORD, paddingTop: 6, marginTop: 2 }}>
-										<div
-											style={Object.assign({}, os(10, 700, BLUE), {
-												textTransform: "uppercase",
-												letterSpacing: "0.4px",
-												marginBottom: 2,
-											})}
-										>
-											Infra activada / firma
-										</div>
-										<div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-											<div style={Object.assign({}, mont(18), { color: BLUE })}>
-												USD {calcs.infraPorFirma.toFixed(2)}
-											</div>
-											<div style={os(10, 400, BLUE)}>
-												{fK(costs.activosTotal)} ÷ ({fK(users)}u×{fK(calcs.firmasMesUsr)}f)
-											</div>
-										</div>
-										<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>
-											CV firma total:{" "}
-											<strong style={{ color: BLACK }}>
-												USD {calcs.cvFirmaUnit.toFixed(4)}
-											</strong>
-										</div>
+									<div style={{ display: "flex", justifyContent: "space-between" }}>
+										<span style={os(11, 400, GRAY)}>Infra / firma</span>
+										<span style={Object.assign({}, os(11, 400, GRAY), { fontFamily: "Courier New,monospace" })}>USD {calcs.infraPorFirma.toFixed(6)}</span>
 									</div>
 								</div>
 							</div>
