@@ -44,7 +44,6 @@ function os(sz, w, col) {
 }
 
 // ─── Cost defaults (initial state values) ────────────────────────────────
-const ACTIVOS_TOTAL = 150545;
 const CV_FIRMA_OTP = 0.1034;
 
 const FIXED_ITEMS = [
@@ -1799,10 +1798,10 @@ function TabConfig({ costConfig, setCostConfig }) {
 								<tr>
 									<td style={{ padding: "5px 10px" }}>
 										<div style={os(12, 400, BLACK)}>Infra activada total (activos)</div>
-										<div style={os(10, 400, GRAY)}>Se divide por firmas comprometidas en cartera</div>
+										<div style={os(10, 400, GRAY)}>Derivado de la suma de amortizaciones mensuales</div>
 									</td>
-									<td style={{ padding: "4px 10px", width: 130 }}>
-										<InlineNum value={costConfig.activosTotal} decimals={0} onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { activosTotal: v }); }); }} />
+									<td style={{ padding: "4px 10px", width: 130, textAlign: "right", fontFamily: "Courier New,monospace", fontSize: 13, color: GRAY }}>
+										{costs.activosTotal.toFixed(0)}
 									</td>
 								</tr>
 							</tbody>
@@ -2230,7 +2229,6 @@ export default function LakautCalc() {
 		assetItems: ASSET_ITEMS,
 		cvCertItems: CV_CERT_ITEMS,
 		cvFirmaOtp: CV_FIRMA_OTP,
-		activosTotal: ACTIVOS_TOTAL,
 		cfSegmento: 26024,
 	});
 
@@ -2240,12 +2238,13 @@ export default function LakautCalc() {
 		const cfTotal = cfOps + cfAmort;
 		const cfSegmento = costConfig.cfSegmento;
 		const cvCertBase = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
+		const activosTotal = cfAmort;
 		return {
 			cfTotal,
 			cfSegmento,
 			cvCertBase,
 			cvFirmaOtp: costConfig.cvFirmaOtp,
-			activosTotal: costConfig.activosTotal,
+			activosTotal,
 		};
 	}, [costConfig]);
 
@@ -2279,9 +2278,9 @@ export default function LakautCalc() {
 
 	const TABS = ["costos", "precios", "proyección", "break-even"];
 	const SECTIONS = [
+		{ k: "configuración", label: "Configuración" },
 		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
-		{ k: "configuración", label: "Configuración" },
 	];
 
 	return (
@@ -2598,7 +2597,7 @@ export default function LakautCalc() {
 												USD {calcs.infraPorFirma.toFixed(2)}
 											</div>
 											<div style={os(10, 400, BLUE)}>
-												{fK(ACTIVOS_TOTAL)} ÷ {fK(firmasComp)}
+												{fK(costs.activosTotal)} ÷ {fK(firmasComp)}
 											</div>
 										</div>
 										<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>
