@@ -2,8 +2,39 @@ import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, os, mont
 import { makeMoney } from "../../utils/useMoney";
 import { fP, fK } from "../../utils/formatters";
 
-export function TabPrecios({ calcs, users, costs, currency, tc }) {
+function buildDisplayPrice(arch, inp, fMoney2) {
+	if (arch === "ppu") {
+		const fa = inp.firmasAsumidas || 5;
+		return {
+			price: "Cert " + fMoney2(inp.precioCert || 0) + " + " + fMoney2(inp.precioFirma || 0) + "/firma",
+			suffix: "(" + fa + " firmas/mes asumidas)",
+		};
+	}
+	if (arch === "anual") {
+		return {
+			price: fMoney2(inp.precio || 0),
+			suffix: "/año (" + fMoney2((inp.precio || 0) / 12) + "/mes)",
+		};
+	}
+	if (arch === "free") return { price: "USD 0", suffix: "(gratuito)" };
+	if (arch === "hibrido") {
+		const p = inp.periodo || 24;
+		return {
+			price: "Cert " + fMoney2(inp.precioCert || 0) + " + Bolsa " + fMoney2(inp.precio || 0),
+			suffix: "/ pack (" + p + "m)",
+		};
+	}
+	if (arch === "bolsa") {
+		const p = inp.periodo || 24;
+		return { price: fMoney2(inp.precio || 0), suffix: "/ pack (" + p + " meses)" };
+	}
+	// sub
+	return { price: fMoney2(inp.precio || 0), suffix: "/mes" };
+}
+
+export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
+	const dp = (arch && inp) ? buildDisplayPrice(arch, inp, fMoney2) : { price: calcs.displayPrice, suffix: calcs.displayPriceSuffix };
 	const VOLS = [5000, 10000, 20000, 50000, 100000, 200000];
 	return (
 		<div>
@@ -39,10 +70,10 @@ export function TabPrecios({ calcs, users, costs, currency, tc }) {
 							lineHeight: 1.1,
 						})}
 					>
-						{calcs.displayPrice}
+						{dp.price}
 					</div>
 					<div style={Object.assign({}, os(12, 400, GRAY), { marginTop: 6 })}>
-						{calcs.displayPriceSuffix}
+						{dp.suffix}
 					</div>
 					<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 8 })}>
 						Equivalente mensual: {fMoney2(calcs.revMes)} · CV: {fMoney2(calcs.cvMes)} ·

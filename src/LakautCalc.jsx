@@ -341,7 +341,7 @@ export default function LakautCalc() {
 								}}
 							>
 								<Sec title="Configuración del pack" />
-								<PackFields arch={cfg.arch} inp={inp} update={updInp} />
+								<PackFields arch={cfg.arch} inp={inp} update={updInp} currency={currency} tc={tc} />
 								{cfg.arch === "free" && (
 									<div
 										style={{
@@ -489,7 +489,7 @@ export default function LakautCalc() {
 										tc={tc}
 									/>
 								)}
-								{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} currency={currency} tc={tc} />}
+								{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} currency={currency} tc={tc} arch={cfg.arch} inp={inp} />}
 								{tab === "proyección" && <TabProyeccion proj={calcs.proj} beMes={calcs.beMes} calcs={calcs} costs={costs} currency={currency} tc={tc} />}
 								{tab === "break-even" && (
 									<TabBreakEven
