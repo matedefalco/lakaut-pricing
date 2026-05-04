@@ -43,11 +43,8 @@ function os(sz, w, col) {
 	};
 }
 
-// ─── Cost constants (fixed, not editable) ─────────────────────────────────
-const ACTIVOS_TOTAL = 150545; // total activos físicos activables
-const CF_TOTAL = 130121; // costo fijo mensual empresa
-const CF_SEGMENTO = Math.round(CF_TOTAL * 0.2); // 20% asignado a Individuos = 26,024
-const CV_CERT_BASE = 1.5007;
+// ─── Cost defaults (initial state values) ────────────────────────────────
+const ACTIVOS_TOTAL = 150545;
 const CV_FIRMA_OTP = 0.1034;
 
 const FIXED_ITEMS = [
@@ -189,8 +186,9 @@ function fK(n) {
 }
 
 // ─── Engine ────────────────────────────────────────────────────────────────
-function engine({ arch, inp, svc, users, firmasComp }) {
-	const infraPorFirma = firmasComp > 0 ? ACTIVOS_TOTAL / firmasComp : 0;
+function engine({ arch, inp, svc, users, firmasComp, costs }) {
+	const { activosTotal, cfSegmento, cvCertBase, cvFirmaOtp } = costs;
+	const infraPorFirma = firmasComp > 0 ? activosTotal / firmasComp : 0;
 	let svcFirma = 0,
 		svcCert = 0,
 		svcUserMes = 0;
@@ -201,8 +199,8 @@ function engine({ arch, inp, svc, users, firmasComp }) {
 		if (d.costType === "cert") svcCert += d.cost;
 		if (d.costType === "user_mes") svcUserMes += d.cost;
 	});
-	const cvFirmaUnit = CV_FIRMA_OTP + infraPorFirma + svcFirma;
-	const cvCertUnit = CV_CERT_BASE + svcCert;
+	const cvFirmaUnit = cvFirmaOtp + infraPorFirma + svcFirma;
+	const cvCertUnit = cvCertBase + svcCert;
 
 	let revMes = 0,
 		firmasMesUsr = 0,
@@ -264,20 +262,20 @@ function engine({ arch, inp, svc, users, firmasComp }) {
 	const margenUnit = revMes - cvMes;
 	const margenPct = revMes > 0 ? (margenUnit / revMes) * 100 : -100;
 	const beUsuarios =
-		margenUnit > 0 ? Math.ceil(CF_SEGMENTO / margenUnit) : Infinity;
+		margenUnit > 0 ? Math.ceil(cfSegmento / margenUnit) : Infinity;
 	const revTotal = revMes * users,
 		cvTotal = cvMes * users;
-	const ebitda = revTotal - cvTotal - CF_SEGMENTO;
+	const ebitda = revTotal - cvTotal - cfSegmento;
 	const ebitdaPct =
 		revTotal > 0 ? (ebitda / revTotal) * 100 : ebitda > 0 ? 100 : -100;
-	const priceSug = cvMes + CF_SEGMENTO / Math.max(users, 1);
+	const priceSug = cvMes + cfSegmento / Math.max(users, 1);
 
 	let acum = 0;
 	const proj = Array.from({ length: 24 }, function (_, i) {
 		const ramp = Math.min(1, 0.25 + i * 0.1);
 		const uM = Math.round(users * ramp);
 		const rM = revMes * uM,
-			cM = cvMes * uM + CF_SEGMENTO,
+			cM = cvMes * uM + cfSegmento,
 			eM = rM - cM;
 		acum += eM;
 		return {
@@ -316,35 +314,32 @@ function engine({ arch, inp, svc, users, firmasComp }) {
 }
 
 // ─── Break-even chart data: sweep users 0..3x, show EBITDA ────────────────
-function beCurveData(arch, inp, svc, firmasComp, currentUsers) {
+function beCurveData(arch, inp, svc, firmasComp, currentUsers, costs) {
 	const maxU = Math.max(currentUsers * 3, 150000);
 	const step = Math.max(Math.round(maxU / 40), 500);
 	const points = [];
 	for (let u = 0; u <= maxU; u += step) {
-		const c = engine({ arch, inp, svc, users: u, firmasComp });
+		const c = engine({ arch, inp, svc, users: u, firmasComp, costs });
 		points.push({
 			users: u,
 			EBITDA: Math.round(c.ebitda),
 			Revenue: Math.round(c.revTotal),
-			Costo: Math.round(c.cvTotal + CF_SEGMENTO),
+			Costo: Math.round(c.cvTotal + costs.cfSegmento),
 		});
 	}
 	return points;
 }
 
 // ─── Price sensitivity: sweep price, show BE users ────────────────────────
-function priceSensData(arch, inp, svc, firmasComp) {
-	const c0 = engine({ arch, inp, svc, users: 1, firmasComp });
-	const baseRev = c0.revMes;
+function priceSensData(arch, inp, svc, firmasComp, costs) {
+	const c0 = engine({ arch, inp, svc, users: 1, firmasComp, costs });
 	const minPrice = c0.cvMes * 0.5;
 	const maxPrice = c0.cvMes * 5 || 10;
 	const step = (maxPrice - minPrice) / 40;
 	const points = [];
 	for (let price = minPrice; price <= maxPrice; price += step) {
-		// Simulate changing the price
-		const adjRevMes = price;
-		const margin = adjRevMes - c0.cvMes;
-		const be = margin > 0 ? Math.ceil(CF_SEGMENTO / margin) : null;
+		const margin = price - c0.cvMes;
+		const be = margin > 0 ? Math.ceil(costs.cfSegmento / margin) : null;
 		points.push({
 			precio: parseFloat(price.toFixed(3)),
 			BE_usuarios: be ? Math.min(be, 500000) : null,
@@ -698,7 +693,9 @@ function ChartTip({ active, payload, label }) {
 
 // ─── TAB: Costos ──────────────────────────────────────────────────────────
 const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: "#8b5cf6", Ops: OK };
-function TabCostos({ calcs, firmasComp }) {
+function TabCostos({ calcs, firmasComp, costConfig, costs }) {
+	const subtotalOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
+	const subtotalAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	return (
 		<div>
 			{/* CF fixed info banner */}
@@ -710,332 +707,150 @@ function TabCostos({ calcs, firmasComp }) {
 					padding: "10px 14px",
 					marginBottom: 16,
 					display: "flex",
+					flexWrap: "wrap",
 					gap: 20,
 				}}
 			>
 				<div>
-					<div
-						style={Object.assign({}, os(10, 700, BLUE), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							marginBottom: 2,
-						})}
-					>
+					<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CF total empresa / mes
 					</div>
-					<div style={Object.assign({}, mont(18), { color: BLUE })}>
-						{fD(CF_TOTAL)}
-					</div>
+					<div style={Object.assign({}, mont(18), { color: BLUE })}>{fD(costs.cfTotal)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
-					<div
-						style={Object.assign({}, os(10, 700, GRAY), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							marginBottom: 2,
-						})}
-					>
-						CF asignado segmento Individuos (20%)
+					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
+						CF asignado segmento Individuos
 					</div>
-					<div style={Object.assign({}, mont(18), { color: GRAY })}>
-						{fD(CF_SEGMENTO)}
-					</div>
+					<div style={Object.assign({}, mont(18), { color: GRAY })}>{fD(costs.cfSegmento)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
-					<div
-						style={Object.assign({}, os(10, 700, WN), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							marginBottom: 2,
-						})}
-					>
+					<div style={Object.assign({}, os(10, 700, WN), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CV por certificado
 					</div>
-					<div style={Object.assign({}, mont(18), { color: WN })}>
-						{fD2(calcs.cvCertUnit)}
-					</div>
+					<div style={Object.assign({}, mont(18), { color: WN })}>{fD2(calcs.cvCertUnit)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
-					<div
-						style={Object.assign({}, os(10, 700, OK), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							marginBottom: 2,
-						})}
-					>
+					<div style={Object.assign({}, os(10, 700, OK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CV por firma
 					</div>
-					<div style={Object.assign({}, mont(18), { color: OK })}>
-						{fD2(calcs.cvFirmaUnit)}
-					</div>
+					<div style={Object.assign({}, mont(18), { color: OK })}>{fD2(calcs.cvFirmaUnit)}</div>
 				</div>
 			</div>
 
 			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
 				<div>
-					<div
-						style={Object.assign({}, os(11, 700, BLACK), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							marginBottom: 8,
-						})}
-					>
+					<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
 						Costos fijos operativos
 					</div>
 					<table style={{ width: "100%", borderCollapse: "collapse" }}>
 						<tbody>
-							{FIXED_ITEMS.map(function (r, i) {
+							{costConfig.fixedItems.map(function (r, i) {
 								return (
-									<tr
-										key={r.item}
-										style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}
-									>
+									<tr key={r.item} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
 										<td style={{ padding: "3px 6px" }}>
-											<span
-												style={Object.assign(
-													{},
-													os(9, 700, CAT_COLOR[r.cat] || GRAY),
-													{ marginRight: 4, textTransform: "uppercase" },
-												)}
-											>
+											<span style={Object.assign({}, os(9, 700, CAT_COLOR[r.cat] || GRAY), { marginRight: 4, textTransform: "uppercase" })}>
 												{r.cat}
 											</span>
 											<span style={os(11, 400, BLACK)}>{r.item}</span>
 										</td>
-										<td
-											style={Object.assign({}, os(11, 400, BLACK), {
-												padding: "3px 6px",
-												textAlign: "right",
-												fontFamily: "Courier New,monospace",
-											})}
-										>
+										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 											{fD(r.v)}
 										</td>
 									</tr>
 								);
 							})}
 							<tr style={{ background: BLUEL }}>
-								<td
-									style={Object.assign({}, os(11, 700, BLUE), {
-										padding: "5px 6px",
-									})}
-								>
-									Subtotal operativos
-								</td>
-								<td
-									style={Object.assign({}, os(11, 700, BLUE), {
-										padding: "5px 6px",
-										textAlign: "right",
-										fontFamily: "Courier New,monospace",
-									})}
-								>
-									USD 121,942
+								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px" })}>Subtotal operativos</td>
+								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+									{fD(subtotalOps)}
 								</td>
 							</tr>
 						</tbody>
 					</table>
-					<div
-						style={Object.assign({}, os(11, 700, BLACK), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							margin: "14px 0 8px",
-						})}
-					>
-						Activos físicos (amortización)
+					<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "14px 0 8px" })}>
+						Activos físicos (amortización mensual)
 					</div>
 					<table style={{ width: "100%", borderCollapse: "collapse" }}>
 						<tbody>
-							{ASSET_ITEMS.map(function (r, i) {
+							{costConfig.assetItems.map(function (r, i) {
 								return (
-									<tr
-										key={r.item}
-										style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}
-									>
+									<tr key={r.item} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
 										<td style={{ padding: "3px 6px" }}>
 											<span style={os(11, 400, BLACK)}>{r.item}</span>
-											<span
-												style={Object.assign({}, os(10, 400, GRAY), {
-													marginLeft: 4,
-												})}
-											>
-												({r.vida}m)
-											</span>
+											<span style={Object.assign({}, os(10, 400, GRAY), { marginLeft: 4 })}>({r.vida}m)</span>
 										</td>
-										<td
-											style={Object.assign({}, os(11, 400, BLACK), {
-												padding: "3px 6px",
-												textAlign: "right",
-												fontFamily: "Courier New,monospace",
-											})}
-										>
+										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 											{fD(r.amort)}
 										</td>
 									</tr>
 								);
 							})}
 							<tr style={{ background: BLUEL }}>
-								<td
-									style={Object.assign({}, os(11, 700, BLUE), {
-										padding: "5px 6px",
-									})}
-								>
-									Total amortización
-								</td>
-								<td
-									style={Object.assign({}, os(11, 700, BLUE), {
-										padding: "5px 6px",
-										textAlign: "right",
-										fontFamily: "Courier New,monospace",
-									})}
-								>
-									USD 8,179
+								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px" })}>Total amortización</td>
+								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+									{fD(subtotalAmort)}
 								</td>
 							</tr>
 						</tbody>
 					</table>
 				</div>
 				<div>
-					<div
-						style={Object.assign({}, os(11, 700, BLACK), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							marginBottom: 8,
-						})}
-					>
+					<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
 						CV por certificado emitido
 					</div>
 					<table style={{ width: "100%", borderCollapse: "collapse" }}>
 						<tbody>
-							{CV_CERT_ITEMS.map(function (r, i) {
+							{costConfig.cvCertItems.map(function (r, i) {
 								return (
-									<tr
-										key={r.item}
-										style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}
-									>
-										<td
-											style={Object.assign({}, os(11, 400, BLACK), {
-												padding: "3px 6px",
-											})}
-										>
-											{r.item}
-										</td>
-										<td
-											style={Object.assign({}, os(11, 400, BLACK), {
-												padding: "3px 6px",
-												textAlign: "right",
-												fontFamily: "Courier New,monospace",
-											})}
-										>
+									<tr key={r.item} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px" })}>{r.item}</td>
+										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 											{r.v.toFixed(4)}
 										</td>
 									</tr>
 								);
 							})}
 							<tr style={{ background: WNBG }}>
-								<td
-									style={Object.assign({}, os(11, 700, WN), {
-										padding: "5px 6px",
-									})}
-								>
-									Total CV cert
-								</td>
-								<td
-									style={Object.assign({}, os(11, 700, WN), {
-										padding: "5px 6px",
-										textAlign: "right",
-										fontFamily: "Courier New,monospace",
-									})}
-								>
+								<td style={Object.assign({}, os(11, 700, WN), { padding: "5px 6px" })}>Total CV cert</td>
+								<td style={Object.assign({}, os(11, 700, WN), { padding: "5px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 									{calcs.cvCertUnit.toFixed(4)}
 								</td>
 							</tr>
 						</tbody>
 					</table>
-					<div
-						style={Object.assign({}, os(11, 700, BLACK), {
-							textTransform: "uppercase",
-							letterSpacing: "0.5px",
-							margin: "14px 0 8px",
-						})}
-					>
+					<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "14px 0 8px" })}>
 						CV por firma ejecutada
 					</div>
 					<table style={{ width: "100%", borderCollapse: "collapse" }}>
 						<tbody>
 							<tr style={{ background: "#fafafa" }}>
-								<td
-									style={Object.assign({}, os(11, 400, BLACK), {
-										padding: "3px 6px",
-									})}
-								>
-									OTP SMS (Twilio)
-								</td>
-								<td
-									style={Object.assign({}, os(11, 400, BLACK), {
-										padding: "3px 6px",
-										textAlign: "right",
-										fontFamily: "Courier New,monospace",
-									})}
-								>
-									{CV_FIRMA_OTP.toFixed(4)}
+								<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px" })}>OTP SMS (Twilio)</td>
+								<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+									{costConfig.cvFirmaOtp.toFixed(4)}
 								</td>
 							</tr>
 							<tr>
 								<td style={{ padding: "3px 6px" }}>
 									<span style={os(11, 400, BLACK)}>Infra activada</span>
-									<span
-										style={Object.assign({}, os(10, 400, GRAY), {
-											display: "block",
-										})}
-									>
-										150,545 ÷ {fK(firmasComp)} firmas comprometidas
+									<span style={Object.assign({}, os(10, 400, GRAY), { display: "block" })}>
+										{fK(costs.activosTotal)} ÷ {fK(firmasComp)} firmas comprometidas
 									</span>
 								</td>
-								<td
-									style={Object.assign({}, os(11, 400, BLUE), {
-										padding: "3px 6px",
-										textAlign: "right",
-										fontFamily: "Courier New,monospace",
-									})}
-								>
+								<td style={Object.assign({}, os(11, 400, BLUE), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 									{calcs.infraPorFirma.toFixed(4)}
 								</td>
 							</tr>
 							{calcs.svcUserMes > 0 && (
 								<tr style={{ background: "#fafafa" }}>
-									<td
-										style={Object.assign({}, os(11, 400, BLACK), {
-											padding: "3px 6px",
-										})}
-									>
-										Servicios opcionales activos
-									</td>
-									<td
-										style={Object.assign({}, os(11, 400, BLUE), {
-											padding: "3px 6px",
-											textAlign: "right",
-											fontFamily: "Courier New,monospace",
-										})}
-									>
+									<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px" })}>Servicios opcionales activos</td>
+									<td style={Object.assign({}, os(11, 400, BLUE), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 										{fD2(calcs.svcUserMes)}/usr/mes
 									</td>
 								</tr>
 							)}
 							<tr style={{ background: OKBG }}>
-								<td
-									style={Object.assign({}, os(11, 700, OK), {
-										padding: "5px 6px",
-									})}
-								>
-									Total CV firma
-								</td>
-								<td
-									style={Object.assign({}, os(11, 700, OK), {
-										padding: "5px 6px",
-										textAlign: "right",
-										fontFamily: "Courier New,monospace",
-									})}
-								>
+								<td style={Object.assign({}, os(11, 700, OK), { padding: "5px 6px" })}>Total CV firma</td>
+								<td style={Object.assign({}, os(11, 700, OK), { padding: "5px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
 									{calcs.cvFirmaUnit.toFixed(4)}
 								</td>
 							</tr>
@@ -1048,7 +863,7 @@ function TabCostos({ calcs, firmasComp }) {
 }
 
 // ─── TAB: Precios ─────────────────────────────────────────────────────────
-function TabPrecios({ calcs, users }) {
+function TabPrecios({ calcs, users, costs }) {
 	const VOLS = [5000, 10000, 20000, 50000, 100000, 200000];
 	return (
 		<div>
@@ -1138,7 +953,7 @@ function TabPrecios({ calcs, users }) {
 					marginBottom: 10,
 				})}
 			>
-				Sensibilidad EBITDA por volumen · CF asignado: {fD(CF_SEGMENTO)}/mes
+				Sensibilidad EBITDA por volumen · CF asignado: {fD(costs.cfSegmento)}/mes
 			</div>
 			<table
 				style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
@@ -1171,7 +986,7 @@ function TabPrecios({ calcs, users }) {
 					{VOLS.map(function (u, i) {
 						const r = calcs.revMes * u,
 							cv = calcs.cvMes * u,
-							e = r - cv - CF_SEGMENTO;
+							e = r - cv - costs.cfSegmento;
 						const m = r > 0 ? (e / r) * 100 : -100;
 						const ec = e > 0 ? OK : e > -20000 ? WN : ER;
 						const act = u === users;
@@ -1390,18 +1205,18 @@ function TabProyeccion({ proj, beMes }) {
 }
 
 // ─── TAB: Break-even charts ────────────────────────────────────────────────
-function TabBreakEven({ arch, inp, svc, firmasComp, currentUsers }) {
+function TabBreakEven({ arch, inp, svc, firmasComp, currentUsers, costs }) {
 	const curveData = useMemo(
 		function () {
-			return beCurveData(arch, inp, svc, firmasComp, currentUsers);
+			return beCurveData(arch, inp, svc, firmasComp, currentUsers, costs);
 		},
-		[arch, inp, svc, firmasComp, currentUsers],
+		[arch, inp, svc, firmasComp, currentUsers, costs],
 	);
 	const sensData = useMemo(
 		function () {
-			return priceSensData(arch, inp, svc, firmasComp);
+			return priceSensData(arch, inp, svc, firmasComp, costs);
 		},
-		[arch, inp, svc, firmasComp],
+		[arch, inp, svc, firmasComp, costs],
 	);
 
 	const bePoint = curveData.find(function (d) {
@@ -1658,6 +1473,352 @@ function TabBreakEven({ arch, inp, svc, firmasComp, currentUsers }) {
 	);
 }
 
+// ─── TAB: Configuración ───────────────────────────────────────────────────
+function InlineNum({ value, onChange, decimals }) {
+	return (
+		<input
+			type="number"
+			value={value}
+			step={decimals > 0 ? Math.pow(10, -decimals) : 1}
+			onChange={function (e) { onChange(Number(e.target.value)); }}
+			style={{
+				width: "100%",
+				border: "1px solid " + BORD,
+				borderRadius: 4,
+				padding: "2px 6px",
+				fontFamily: "Courier New,monospace",
+				fontSize: 12,
+				textAlign: "right",
+				color: BLACK,
+				background: WHITE,
+				outline: "none",
+				boxSizing: "border-box",
+			}}
+		/>
+	);
+}
+
+function SectionHeader({ title }) {
+	return (
+		<div
+			style={Object.assign({}, mont(14), {
+				color: WHITE,
+				background: BLACK,
+				padding: "10px 16px",
+				borderRadius: "8px 8px 0 0",
+				marginTop: 20,
+			})}
+		>
+			{title}
+		</div>
+	);
+}
+
+function TabConfig({ costConfig, setCostConfig }) {
+	function updRow(key, i, field, val) {
+		setCostConfig(function (prev) {
+			return Object.assign({}, prev, {
+				[key]: prev[key].map(function (r, j) {
+					return j === i ? Object.assign({}, r, { [field]: val }) : r;
+				}),
+			});
+		});
+	}
+	function removeRow(key, i) {
+		setCostConfig(function (prev) {
+			return Object.assign({}, prev, {
+				[key]: prev[key].filter(function (_, j) { return j !== i; }),
+			});
+		});
+	}
+	function addRow(key, blank) {
+		setCostConfig(function (prev) {
+			return Object.assign({}, prev, { [key]: prev[key].concat([blank]) });
+		});
+	}
+
+	const salaryRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat === "RRHH"; });
+	const opsRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat !== "RRHH"; });
+	const cfSalary = salaryRows.reduce(function (s, r) { return s + r.v; }, 0);
+	const cfOps = opsRows.reduce(function (s, r) { return s + r.v; }, 0);
+	const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
+	const cfTotal = cfSalary + cfOps + cfAmort;
+	const cvCertTotal = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
+
+	const thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "6px 10px", textAlign: "left", background: GRAY });
+	const thR = Object.assign({}, thStyle, { textAlign: "right" });
+
+	const inputText = {
+		width: "100%",
+		border: "1px solid " + BORD,
+		borderRadius: 4,
+		padding: "2px 6px",
+		fontFamily: "'Open Sans',sans-serif",
+		fontSize: 12,
+		color: BLACK,
+		background: WHITE,
+		outline: "none",
+		boxSizing: "border-box",
+	};
+
+	const addBtn = {
+		marginTop: 8,
+		padding: "5px 14px",
+		background: WHITE,
+		border: "1.5px dashed " + BLUE,
+		borderRadius: 6,
+		color: BLUE,
+		fontFamily: "'Open Sans',sans-serif",
+		fontSize: 12,
+		fontWeight: 700,
+		cursor: "pointer",
+	};
+
+	const delBtn = {
+		background: "none",
+		border: "none",
+		color: GRAY,
+		cursor: "pointer",
+		fontSize: 14,
+		lineHeight: 1,
+		padding: "0 4px",
+	};
+
+	return (
+		<div style={{ maxWidth: 900 }}>
+			{/* ── COSTOS FIJOS ─────────────────────────────────────── */}
+			<SectionHeader title="1 · Costos Fijos" />
+			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 16, background: WHITE, marginBottom: 4 }}>
+
+				{/* Activos adquiridos */}
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
+					Activos adquiridos
+				</div>
+				<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
+					<thead>
+						<tr>
+							<th style={thStyle}>Ítem</th>
+							<th style={Object.assign({}, thR, { width: 130 })}>Amort. / mes (USD)</th>
+							<th style={Object.assign({}, thR, { width: 90 })}>Vida útil (m)</th>
+							<th style={Object.assign({}, thStyle, { width: 28 })} />
+						</tr>
+					</thead>
+					<tbody>
+						{costConfig.assetItems.map(function (r, i) {
+							return (
+								<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+									<td style={{ padding: "4px 6px" }}>
+										<input style={inputText} value={r.item} onChange={function (e) { updRow("assetItems", i, "item", e.target.value); }} />
+									</td>
+									<td style={{ padding: "4px 6px", width: 130 }}>
+										<InlineNum value={r.amort} decimals={2} onChange={function (v) { updRow("assetItems", i, "amort", v); }} />
+									</td>
+									<td style={{ padding: "4px 6px", width: 90 }}>
+										<InlineNum value={r.vida} decimals={0} onChange={function (v) { updRow("assetItems", i, "vida", v); }} />
+									</td>
+									<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
+										<button style={delBtn} onClick={function () { removeRow("assetItems", i); }} title="Eliminar">×</button>
+									</td>
+								</tr>
+							);
+						})}
+						<tr style={{ background: BLUEL }}>
+							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal activos</td>
+							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfAmort)}</td>
+							<td colSpan={2} />
+						</tr>
+					</tbody>
+				</table>
+				<button style={addBtn} onClick={function () { addRow("assetItems", { item: "", amort: 0, vida: 36 }); }}>+ Agregar activo</button>
+
+				{/* Sueldos */}
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "20px 0 8px" })}>
+					Sueldos
+				</div>
+				<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
+					<thead>
+						<tr>
+							<th style={thStyle}>Ítem</th>
+							<th style={Object.assign({}, thR, { width: 150 })}>Monto / mes (USD)</th>
+							<th style={Object.assign({}, thStyle, { width: 28 })} />
+						</tr>
+					</thead>
+					<tbody>
+						{salaryRows.map(function (r) {
+							var i = r._i;
+							return (
+								<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+									<td style={{ padding: "4px 6px" }}>
+										<input style={inputText} value={r.item} onChange={function (e) { updRow("fixedItems", i, "item", e.target.value); }} />
+									</td>
+									<td style={{ padding: "4px 6px", width: 150 }}>
+										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
+									</td>
+									<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
+										<button style={delBtn} onClick={function () { removeRow("fixedItems", i); }} title="Eliminar">×</button>
+									</td>
+								</tr>
+							);
+						})}
+						<tr style={{ background: BLUEL }}>
+							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal sueldos</td>
+							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfSalary)}</td>
+							<td />
+						</tr>
+					</tbody>
+				</table>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0 }); }}>+ Agregar sueldo</button>
+
+				{/* Costos fijos operativos */}
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "20px 0 8px" })}>
+					Costos fijos operativos
+				</div>
+				<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
+					<thead>
+						<tr>
+							<th style={Object.assign({}, thStyle, { width: 70 })}>Cat.</th>
+							<th style={thStyle}>Ítem</th>
+							<th style={Object.assign({}, thR, { width: 150 })}>Monto / mes (USD)</th>
+							<th style={Object.assign({}, thStyle, { width: 28 })} />
+						</tr>
+					</thead>
+					<tbody>
+						{opsRows.map(function (r) {
+							var i = r._i;
+							return (
+								<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+									<td style={{ padding: "4px 6px", width: 70 }}>
+										<input
+											style={Object.assign({}, inputText, { textTransform: "uppercase", fontWeight: 700, fontSize: 10, color: CAT_COLOR[r.cat] || GRAY })}
+											value={r.cat}
+											onChange={function (e) { updRow("fixedItems", i, "cat", e.target.value.toUpperCase()); }}
+										/>
+									</td>
+									<td style={{ padding: "4px 6px" }}>
+										<input style={inputText} value={r.item} onChange={function (e) { updRow("fixedItems", i, "item", e.target.value); }} />
+									</td>
+									<td style={{ padding: "4px 6px", width: 150 }}>
+										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
+									</td>
+									<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
+										<button style={delBtn} onClick={function () { removeRow("fixedItems", i); }} title="Eliminar">×</button>
+									</td>
+								</tr>
+							);
+						})}
+						<tr style={{ background: BLUEL }}>
+							<td />
+							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal operativos</td>
+							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfOps)}</td>
+							<td />
+						</tr>
+					</tbody>
+				</table>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0 }); }}>+ Agregar costo operativo</button>
+
+				{/* CF summary */}
+				<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", marginTop: 20 }}>
+					<div>
+						<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CF Total empresa / mes</div>
+						<div style={Object.assign({}, mont(20), { color: BLUE })}>{fD(cfTotal)}</div>
+					</div>
+					<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 24, minWidth: 200 }}>
+						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>CF asignado al segmento Individuos</div>
+						<InlineNum
+							value={costConfig.cfSegmento}
+							decimals={0}
+							onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { cfSegmento: v }); }); }}
+						/>
+					</div>
+				</div>
+			</div>
+
+			{/* ── COSTOS VARIABLES ─────────────────────────────────── */}
+			<SectionHeader title="2 · Costos Variables" />
+			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 16, background: WHITE }}>
+				<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
+
+					{/* CV × Certificado */}
+					<div>
+						<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
+							CV × Certificado emitido
+						</div>
+						<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
+							<thead>
+								<tr>
+									<th style={thStyle}>Componente</th>
+									<th style={Object.assign({}, thR, { width: 130 })}>Costo (USD)</th>
+									<th style={Object.assign({}, thStyle, { width: 28 })} />
+								</tr>
+							</thead>
+							<tbody>
+								{costConfig.cvCertItems.map(function (r, i) {
+									return (
+										<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
+											<td style={{ padding: "4px 6px" }}>
+												<input style={inputText} value={r.item} onChange={function (e) { updRow("cvCertItems", i, "item", e.target.value); }} />
+											</td>
+											<td style={{ padding: "4px 6px", width: 130 }}>
+												<InlineNum value={r.v} decimals={4} onChange={function (v) { updRow("cvCertItems", i, "v", v); }} />
+											</td>
+											<td style={{ padding: "4px 4px", width: 28, textAlign: "center" }}>
+												<button style={delBtn} onClick={function () { removeRow("cvCertItems", i); }} title="Eliminar">×</button>
+											</td>
+										</tr>
+									);
+								})}
+								<tr style={{ background: WNBG }}>
+									<td style={Object.assign({}, os(11, 700, WN), { padding: "6px 10px" })}>Total CV cert</td>
+									<td style={Object.assign({}, os(12, 700, WN), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{cvCertTotal.toFixed(4)}</td>
+									<td />
+								</tr>
+							</tbody>
+						</table>
+						<button style={addBtn} onClick={function () { addRow("cvCertItems", { item: "", v: 0 }); }}>+ Agregar componente</button>
+					</div>
+
+					{/* CV × Firma */}
+					<div>
+						<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
+							CV × Firma ejecutada
+						</div>
+						<table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 16 }}>
+							<thead>
+								<tr>
+									<th style={thStyle}>Componente</th>
+									<th style={Object.assign({}, thR, { width: 130 })}>Costo (USD)</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr style={{ background: "#fafafa" }}>
+									<td style={Object.assign({}, os(12, 400, BLACK), { padding: "5px 10px" })}>OTP SMS (Twilio)</td>
+									<td style={{ padding: "4px 10px", width: 130 }}>
+										<InlineNum value={costConfig.cvFirmaOtp} decimals={4} onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { cvFirmaOtp: v }); }); }} />
+									</td>
+								</tr>
+								<tr>
+									<td style={{ padding: "5px 10px" }}>
+										<div style={os(12, 400, BLACK)}>Infra activada total (activos)</div>
+										<div style={os(10, 400, GRAY)}>Se divide por firmas comprometidas en cartera</div>
+									</td>
+									<td style={{ padding: "4px 10px", width: 130 }}>
+										<InlineNum value={costConfig.activosTotal} decimals={0} onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { activosTotal: v }); }); }} />
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<div style={{ background: OKBG, border: "1px solid " + OK + "44", borderRadius: 8, padding: "10px 14px" }}>
+							<div style={Object.assign({}, os(10, 700, OK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CV firma base (sin infra variable)</div>
+							<div style={Object.assign({}, mont(18), { color: OK })}>{costConfig.cvFirmaOtp.toFixed(4)} USD</div>
+							<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>La infra por firma se calcula al momento del análisis según las firmas comprometidas.</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 // ─── TAB: Cotizadora ──────────────────────────────────────────────────────
 const FREQ_OPTIONS = [
 	{
@@ -1700,7 +1861,7 @@ const PAY_OPTIONS = [
 	},
 ];
 
-function Cotizadora() {
+function Cotizadora({ costs }) {
 	const [freq, setFreq] = useState(null);
 	const [pay, setPay] = useState(null);
 	const [extra, setExtra] = useState([]);
@@ -1919,6 +2080,7 @@ function Cotizadora() {
 								},
 								users: 20000,
 								firmasComp: 200000,
+								costs,
 							});
 							return (
 								<div
@@ -2063,6 +2225,29 @@ export default function LakautCalc() {
 		competenceStamp: false,
 	});
 	const [inp, setInp] = useState(PACKS.B.defaults);
+	const [costConfig, setCostConfig] = useState({
+		fixedItems: FIXED_ITEMS,
+		assetItems: ASSET_ITEMS,
+		cvCertItems: CV_CERT_ITEMS,
+		cvFirmaOtp: CV_FIRMA_OTP,
+		activosTotal: ACTIVOS_TOTAL,
+		cfSegmento: 26024,
+	});
+
+	const costs = useMemo(function () {
+		const cfOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
+		const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
+		const cfTotal = cfOps + cfAmort;
+		const cfSegmento = costConfig.cfSegmento;
+		const cvCertBase = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
+		return {
+			cfTotal,
+			cfSegmento,
+			cvCertBase,
+			cvFirmaOtp: costConfig.cvFirmaOtp,
+			activosTotal: costConfig.activosTotal,
+		};
+	}, [costConfig]);
 
 	const cfg = PACKS[family];
 
@@ -2083,9 +2268,9 @@ export default function LakautCalc() {
 
 	const calcs = useMemo(
 		function () {
-			return engine({ arch: cfg.arch, inp, svc, users, firmasComp });
+			return engine({ arch: cfg.arch, inp, svc, users, firmasComp, costs });
 		},
-		[cfg.arch, inp, svc, users, firmasComp],
+		[cfg.arch, inp, svc, users, firmasComp, costs],
 	);
 
 	const ec = calcs.ebitda > 0 ? OK : calcs.ebitda > -10000 ? WN : ER;
@@ -2096,6 +2281,7 @@ export default function LakautCalc() {
 	const SECTIONS = [
 		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
+		{ k: "configuración", label: "Configuración" },
 	];
 
 	return (
@@ -2388,13 +2574,13 @@ export default function LakautCalc() {
 									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
 										<span style={os(11, 400, GRAY)}>CF total empresa</span>
 										<span style={Object.assign({}, os(11, 700, BLACK), { fontFamily: "Courier New,monospace" })}>
-											{fD(CF_TOTAL)}
+											{fD(costs.cfTotal)}
 										</span>
 									</div>
 									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
 										<span style={os(11, 400, GRAY)}>CF segmento (20%)</span>
 										<span style={Object.assign({}, os(11, 700, BLUE), { fontFamily: "Courier New,monospace" })}>
-											{fD(CF_SEGMENTO)}
+											{fD(costs.cfSegmento)}
 										</span>
 									</div>
 									<div style={{ borderTop: "1px solid " + BORD, paddingTop: 6, marginTop: 2 }}>
@@ -2496,8 +2682,15 @@ export default function LakautCalc() {
 									padding: 20,
 								}}
 							>
-								{tab === "costos" && <TabCostos calcs={calcs} firmasComp={firmasComp} />}
-								{tab === "precios" && <TabPrecios calcs={calcs} users={users} />}
+								{tab === "costos" && (
+									<TabCostos
+										calcs={calcs}
+										firmasComp={firmasComp}
+										costConfig={costConfig}
+										costs={costs}
+									/>
+								)}
+								{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} />}
 								{tab === "proyección" && <TabProyeccion proj={calcs.proj} beMes={calcs.beMes} />}
 								{tab === "break-even" && (
 									<TabBreakEven
@@ -2506,6 +2699,7 @@ export default function LakautCalc() {
 										svc={svc}
 										firmasComp={firmasComp}
 										currentUsers={users}
+										costs={costs}
 									/>
 								)}
 							</div>
@@ -2516,7 +2710,13 @@ export default function LakautCalc() {
 
 			{section === "cotizadora" && (
 				<div style={{ padding: "24px" }}>
-					<Cotizadora />
+					<Cotizadora costs={costs} />
+				</div>
+			)}
+
+			{section === "configuración" && (
+				<div style={{ padding: "24px" }}>
+					<TabConfig costConfig={costConfig} setCostConfig={setCostConfig} />
 				</div>
 			)}
 		</div>
