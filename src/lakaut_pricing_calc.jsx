@@ -185,9 +185,8 @@ function fK(n) {
 }
 
 // ─── Engine ────────────────────────────────────────────────────────────────
-function engine({ arch, inp, svc, users, firmasComp, costs }) {
+function engine({ arch, inp, svc, users, costs }) {
 	const { activosTotal, cfSegmento, cvCertBase, cvFirmaOtp } = costs;
-	const infraPorFirma = firmasComp > 0 ? activosTotal / firmasComp : 0;
 	let svcFirma = 0,
 		svcCert = 0,
 		svcUserMes = 0;
@@ -198,9 +197,8 @@ function engine({ arch, inp, svc, users, firmasComp, costs }) {
 		if (d.costType === "cert") svcCert += d.cost;
 		if (d.costType === "user_mes") svcUserMes += d.cost;
 	});
-	const cvFirmaUnit = cvFirmaOtp + infraPorFirma + svcFirma;
-	const cvCertUnit = cvCertBase + svcCert;
 
+	// Parse arch/inp first to get firmasMesUsr before computing infraPorFirma
 	let revMes = 0,
 		firmasMesUsr = 0,
 		certsMesUsr = 0;
@@ -256,6 +254,11 @@ function engine({ arch, inp, svc, users, firmasComp, costs }) {
 		displayPriceSuffix = "/ pack (" + p + " meses)";
 	}
 
+	const firmasTotal = users * firmasMesUsr;
+	const infraPorFirma = firmasTotal > 0 ? activosTotal / firmasTotal : 0;
+	const cvFirmaUnit = cvFirmaOtp + infraPorFirma + svcFirma;
+	const cvCertUnit = cvCertBase + svcCert;
+
 	const cvMes =
 		certsMesUsr * cvCertUnit + firmasMesUsr * cvFirmaUnit + svcUserMes;
 	const margenUnit = revMes - cvMes;
@@ -292,6 +295,7 @@ function engine({ arch, inp, svc, users, firmasComp, costs }) {
 
 	return {
 		infraPorFirma,
+		firmasMesUsr,
 		cvFirmaUnit,
 		cvCertUnit,
 		cvMes,
@@ -313,12 +317,12 @@ function engine({ arch, inp, svc, users, firmasComp, costs }) {
 }
 
 // ─── Break-even chart data: sweep users 0..3x, show EBITDA ────────────────
-function beCurveData(arch, inp, svc, firmasComp, currentUsers, costs) {
+function beCurveData(arch, inp, svc, currentUsers, costs) {
 	const maxU = Math.max(currentUsers * 3, 150000);
 	const step = Math.max(Math.round(maxU / 40), 500);
 	const points = [];
 	for (let u = 0; u <= maxU; u += step) {
-		const c = engine({ arch, inp, svc, users: u, firmasComp, costs });
+		const c = engine({ arch, inp, svc, users: u, costs });
 		points.push({
 			users: u,
 			EBITDA: Math.round(c.ebitda),
@@ -330,8 +334,8 @@ function beCurveData(arch, inp, svc, firmasComp, currentUsers, costs) {
 }
 
 // ─── Price sensitivity: sweep price, show BE users ────────────────────────
-function priceSensData(arch, inp, svc, firmasComp, costs) {
-	const c0 = engine({ arch, inp, svc, users: 1, firmasComp, costs });
+function priceSensData(arch, inp, svc, users, costs) {
+	const c0 = engine({ arch, inp, svc, users, costs });
 	const minPrice = c0.cvMes * 0.5;
 	const maxPrice = c0.cvMes * 5 || 10;
 	const step = (maxPrice - minPrice) / 40;
@@ -692,7 +696,7 @@ function ChartTip({ active, payload, label }) {
 
 // ─── TAB: Costos ──────────────────────────────────────────────────────────
 const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: "#8b5cf6", Ops: OK };
-function TabCostos({ calcs, firmasComp, costConfig, costs }) {
+function TabCostos({ calcs, users, costConfig, costs }) {
 	const subtotalOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
 	const subtotalAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	return (
@@ -832,7 +836,7 @@ function TabCostos({ calcs, firmasComp, costConfig, costs }) {
 								<td style={{ padding: "3px 6px" }}>
 									<span style={os(11, 400, BLACK)}>Infra activada</span>
 									<span style={Object.assign({}, os(10, 400, GRAY), { display: "block" })}>
-										{fK(costs.activosTotal)} ÷ {fK(firmasComp)} firmas comprometidas
+										{fK(costs.activosTotal)} ÷ {fK(users)}u × {fK(calcs.firmasMesUsr || 0)}f
 									</span>
 								</td>
 								<td style={Object.assign({}, os(11, 400, BLUE), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
@@ -1204,18 +1208,18 @@ function TabProyeccion({ proj, beMes }) {
 }
 
 // ─── TAB: Break-even charts ────────────────────────────────────────────────
-function TabBreakEven({ arch, inp, svc, firmasComp, currentUsers, costs }) {
+function TabBreakEven({ arch, inp, svc, currentUsers, costs }) {
 	const curveData = useMemo(
 		function () {
-			return beCurveData(arch, inp, svc, firmasComp, currentUsers, costs);
+			return beCurveData(arch, inp, svc, currentUsers, costs);
 		},
-		[arch, inp, svc, firmasComp, currentUsers, costs],
+		[arch, inp, svc, currentUsers, costs],
 	);
 	const sensData = useMemo(
 		function () {
-			return priceSensData(arch, inp, svc, firmasComp, costs);
+			return priceSensData(arch, inp, svc, currentUsers, costs);
 		},
-		[arch, inp, svc, firmasComp, costs],
+		[arch, inp, svc, currentUsers, costs],
 	);
 
 	const bePoint = curveData.find(function (d) {
@@ -2077,7 +2081,6 @@ function Cotizadora({ costs }) {
 									competenceStamp: false,
 								},
 								users: 20000,
-								firmasComp: 200000,
 								costs,
 							});
 							return (
@@ -2214,7 +2217,6 @@ export default function LakautCalc() {
 	const [section, setSection] = useState("modelos");
 	const [family, setFamily] = useState("B");
 	const [users, setUsers] = useState(20000);
-	const [firmasComp, setFirmasComp] = useState(200000);
 	const [tab, setTab] = useState("costos");
 	const [svc, setSvc] = useState({
 		cloudStorage: false,
@@ -2265,9 +2267,9 @@ export default function LakautCalc() {
 
 	const calcs = useMemo(
 		function () {
-			return engine({ arch: cfg.arch, inp, svc, users, firmasComp, costs });
+			return engine({ arch: cfg.arch, inp, svc, users, costs });
 		},
-		[cfg.arch, inp, svc, users, firmasComp, costs],
+		[cfg.arch, inp, svc, users, costs],
 	);
 
 	const ec = calcs.ebitda > 0 ? OK : calcs.ebitda > -10000 ? WN : ER;
@@ -2542,14 +2544,7 @@ export default function LakautCalc() {
 									value={users}
 									onChange={setUsers}
 									suffix="usu"
-									note="Sin límite · cualquier escala"
-								/>
-								<NumInput
-									label="Firmas comprometidas en cartera"
-									value={firmasComp}
-									onChange={setFirmasComp}
-									suffix="f"
-									note="Define el costo de infra activada/firma"
+									note="Escala para análisis de EBITDA y proyección"
 								/>
 								<div
 									style={{
@@ -2575,7 +2570,7 @@ export default function LakautCalc() {
 										</span>
 									</div>
 									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-										<span style={os(11, 400, GRAY)}>CF segmento (20%)</span>
+										<span style={os(11, 400, GRAY)}>CF sueldos (RRHH)</span>
 										<span style={Object.assign({}, os(11, 700, BLUE), { fontFamily: "Courier New,monospace" })}>
 											{fD(costs.cfSegmento)}
 										</span>
@@ -2595,7 +2590,7 @@ export default function LakautCalc() {
 												USD {calcs.infraPorFirma.toFixed(2)}
 											</div>
 											<div style={os(10, 400, BLUE)}>
-												{fK(costs.activosTotal)} ÷ {fK(firmasComp)}
+												{fK(costs.activosTotal)} ÷ ({fK(users)}u×{fK(calcs.firmasMesUsr)}f)
 											</div>
 										</div>
 										<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>
@@ -2682,7 +2677,7 @@ export default function LakautCalc() {
 								{tab === "costos" && (
 									<TabCostos
 										calcs={calcs}
-										firmasComp={firmasComp}
+										users={users}
 										costConfig={costConfig}
 										costs={costs}
 									/>
@@ -2694,7 +2689,6 @@ export default function LakautCalc() {
 										arch={cfg.arch}
 										inp={inp}
 										svc={svc}
-										firmasComp={firmasComp}
 										currentUsers={users}
 										costs={costs}
 									/>
