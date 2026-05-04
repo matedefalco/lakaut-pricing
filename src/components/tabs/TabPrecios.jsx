@@ -230,6 +230,95 @@ export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 					})}
 				</tbody>
 			</table>
+
+			<div
+				style={Object.assign({}, os(11, 700, BLACK), {
+					textTransform: "uppercase",
+					letterSpacing: "0.5px",
+					marginTop: 28,
+					marginBottom: 6,
+				})}
+			>
+				Precio mínimo según escala · precio actual: {fMoney2(calcs.revMes)}/usu·mes
+			</div>
+			<div style={Object.assign({}, os(11, 400, GRAY), { marginBottom: 10 })}>
+				A mayor escala el CF directo se diluye entre más usuarios y baja el precio mínimo necesario.
+			</div>
+			<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+				<thead>
+					<tr style={{ background: BLACK }}>
+						{["Usuarios", "Precio BE", "vs actual", "Estado"].map(function (h) {
+							return (
+								<th
+									key={h}
+									style={Object.assign({}, os(10, 700, WHITE), {
+										padding: "8px 10px",
+										textAlign: h === "Usuarios" ? "left" : "right",
+									})}
+								>
+									{h}
+								</th>
+							);
+						})}
+					</tr>
+				</thead>
+				<tbody>
+					{VOLS.map(function (u, i) {
+						const bePrice = calcs.cvMes + costs.cfDirecto / u;
+						const diff = calcs.revMes - bePrice;
+						const viable = diff >= 0;
+						const needPct = !viable && calcs.revMes > 0 ? ((bePrice - calcs.revMes) / calcs.revMes) * 100 : 0;
+						const act = u === users;
+						const sc = viable ? OK : ER;
+						return (
+							<tr
+								key={u}
+								style={{
+									background: act ? BLUEL : i % 2 === 0 ? "#fafafa" : WHITE,
+									outline: act ? "2px solid " + BLUE : "none",
+								}}
+							>
+								<td
+									style={Object.assign(
+										{},
+										os(13, act ? 700 : 400, act ? BLUE : BLACK),
+										{ padding: "9px 10px" },
+									)}
+								>
+									{act ? "▶ " : ""}
+									{u.toLocaleString()}
+								</td>
+								<td
+									style={Object.assign({}, os(13, 700, sc), {
+										fontFamily: "Courier New,monospace",
+										textAlign: "right",
+										padding: "9px 10px",
+									})}
+								>
+									{fMoney2(bePrice)}
+								</td>
+								<td
+									style={Object.assign({}, os(13, 400, sc), {
+										fontFamily: "Courier New,monospace",
+										textAlign: "right",
+										padding: "9px 10px",
+									})}
+								>
+									{viable ? "+" + fMoney2(diff) : "−" + fMoney2(-diff)}
+								</td>
+								<td
+									style={Object.assign({}, os(11, 700, sc), {
+										textAlign: "right",
+										padding: "9px 10px",
+									})}
+								>
+									{viable ? "✓ Viable" : "↑ +" + fP(needPct)}
+								</td>
+							</tr>
+						);
+					})}
+				</tbody>
+			</table>
 		</div>
 	);
 }

@@ -15,15 +15,15 @@ function priceField(usdVal, currency, tc, updateFn) {
 
 export function PackFields({ arch, inp, update, currency, tc }) {
 	if (arch === "ppu") {
-		const cert = priceField(inp.precioCert || 5, currency, tc, function (v) { update("precioCert", v); });
-		const firma = priceField(inp.precioFirma || 1.5, currency, tc, function (v) { update("precioFirma", v); });
+		const cert = priceField(inp.precioCert ?? 5, currency, tc, function (v) { update("precioCert", v); });
+		const firma = priceField(inp.precioFirma ?? 1.5, currency, tc, function (v) { update("precioFirma", v); });
 		return (
 			<div>
 				<NumInput label="Precio certificado (one-time)" {...cert} />
 				<NumInput label="Precio por firma" {...firma} />
 				<NumInput
 					label="Firmas asumidas / mes (para análisis)"
-					value={inp.firmasAsumidas || 5}
+					value={inp.firmasAsumidas ?? 5}
 					onChange={function (v) { update("firmasAsumidas", v); }}
 					suffix="f"
 					note="No limita al usuario. Define el consumo promedio asumido para proyectar revenue."
@@ -36,34 +36,34 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 		return (
 			<NumInput
 				label="Firmas gratuitas / mes"
-				value={inp.firmas || 1}
+				value={inp.firmas ?? 1}
 				onChange={function (v) { update("firmas", v); }}
 				suffix="f"
 			/>
 		);
 
 	if (arch === "hibrido") {
-		const cert = priceField(inp.precioCert || 5, currency, tc, function (v) { update("precioCert", v); });
-		const bolsa = priceField(inp.precio || 0, currency, tc, function (v) { update("precio", v); });
-		const extra = priceField(inp.extraFirma || 1, currency, tc, function (v) { update("extraFirma", v); });
+		const cert = priceField(inp.precioCert ?? 5, currency, tc, function (v) { update("precioCert", v); });
+		const bolsa = priceField(inp.precio ?? 0, currency, tc, function (v) { update("precio", v); });
+		const extra = priceField(inp.extraFirma ?? 1, currency, tc, function (v) { update("extraFirma", v); });
 		return (
 			<div>
 				<NumInput label="Precio certificado" {...cert} />
 				<NumInput label="Precio bolsa de firmas" {...bolsa} />
 				<NumInput
 					label="Firmas incluidas en bolsa"
-					value={inp.firmas || 0}
+					value={inp.firmas ?? 0}
 					onChange={function (v) { update("firmas", v); }}
 					suffix="f"
 				/>
-				{(inp.firmas || 0) > 0 && <NumInput label="Firma extra" {...extra} />}
+				{(inp.firmas ?? 0) > 0 && <NumInput label="Firma extra" {...extra} />}
 			</div>
 		);
 	}
 
 	const isAnual = arch === "anual", isPack = arch === "bolsa";
-	const precio = priceField(inp.precio || 0, currency, tc, function (v) { update("precio", v); });
-	const extra = priceField(inp.extraFirma || 1, currency, tc, function (v) { update("extraFirma", v); });
+	const precio = priceField(inp.precio ?? 0, currency, tc, function (v) { update("precio", v); });
+	const extra = priceField(inp.extraFirma ?? 1, currency, tc, function (v) { update("extraFirma", v); });
 	return (
 		<div>
 			<NumInput
@@ -73,7 +73,7 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 			/>
 			<NumInput
 				label={isAnual ? "Firmas / año" : isPack ? "Firmas incluidas (toda la vigencia)" : "Firmas incluidas / mes"}
-				value={inp.firmas || 0}
+				value={inp.firmas ?? 0}
 				onChange={function (v) { update("firmas", v); }}
 				suffix="f"
 			/>
