@@ -44,7 +44,7 @@ function os(sz, w, col) {
 }
 
 // ─── Cost defaults (initial state values) ────────────────────────────────
-const CAPACIDAD_FIRMAS_ANUAL = 15785714285.7142857143;
+const CAPACIDAD_FIRMAS_ANUAL = 500 * 60 * 60 * 24 * 365; // 500f/s × year = 15,768,000,000
 
 const FIXED_ITEMS = [
 	{ cat: "RRHH", item: "Sueldos IT", v: 96000, tipo: "indirecto" },
@@ -86,6 +86,7 @@ const CV_FIRMA_ITEMS = [
 const SERVICES_DEF = {
 	cloudStorage: { label: "Almacenamiento en nube", costType: "firma", cost: 0.05 },
 	mailCert: { label: "Mail certificado", costType: "user_mes", cost: 2.0 },
+	paywall: { label: "Paywall (pago con tarjeta)", costType: "pct_rev", cost: 0.002 },
 };
 
 // ─── Pack definitions ──────────────────────────────────────────────────────
@@ -181,7 +182,8 @@ function engine({ arch, inp, svc, users, costs }) {
 	const infraPorFirma = capacidadFirmasAnual > 0 ? activosTotal / (capacidadFirmasAnual / 12) : 0;
 	let svcFirma = 0,
 		svcCert = 0,
-		svcUserMes = 0;
+		svcUserMes = 0,
+		svcPctRev = 0;
 	Object.keys(svc).forEach(function (k) {
 		if (!svc[k]) return;
 		const d = SERVICES_DEF[k];
@@ -189,6 +191,7 @@ function engine({ arch, inp, svc, users, costs }) {
 		if (d.costType === "firma") svcFirma += d.cost;
 		if (d.costType === "cert") svcCert += d.cost;
 		if (d.costType === "user_mes") svcUserMes += d.cost;
+		if (d.costType === "pct_rev") svcPctRev += d.cost;
 	});
 
 	// Parse arch/inp first to get firmasMesUsr before computing infraPorFirma
@@ -250,8 +253,9 @@ function engine({ arch, inp, svc, users, costs }) {
 	const cvFirmaUnit = cvFirmaBase + infraPorFirma + svcFirma;
 	const cvCertUnit = cvCertBase + svcCert;
 
+	const paywallCost = revMes * svcPctRev;
 	const cvMes =
-		certsMesUsr * cvCertUnit + firmasMesUsr * cvFirmaUnit + svcUserMes;
+		certsMesUsr * cvCertUnit + firmasMesUsr * cvFirmaUnit + svcUserMes + paywallCost;
 	const margenUnit = revMes - cvMes;
 	const margenPct = revMes > 0 ? (margenUnit / revMes) * 100 : -100;
 	const beUsuarios =
@@ -468,7 +472,9 @@ function Toggle({ label, cost, costType, checked, onChange }) {
 			? "/firma"
 			: costType === "cert"
 				? "/cert"
-				: "/usuario/mes";
+				: costType === "pct_rev"
+					? "% del revenue"
+					: "/usuario/mes";
 	return (
 		<div
 			style={{
@@ -483,7 +489,7 @@ function Toggle({ label, cost, costType, checked, onChange }) {
 				<div style={os(12, 400, BLACK)}>{label}</div>
 				<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 1 })}>
 					{cost > 0
-						? "+ USD " + cost.toFixed(2) + " " + unit
+						? (costType === "pct_rev" ? "+ " + (cost * 100).toFixed(1) + "% " + unit : "+ USD " + cost.toFixed(2) + " " + unit)
 						: "Sin costo adicional"}
 				</div>
 			</div>
@@ -703,7 +709,20 @@ function ChartTip({ active, payload, label }) {
 
 // ─── TAB: Costos ──────────────────────────────────────────────────────────
 const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: "#8b5cf6", Ops: OK };
-function TabCostos({ calcs, users, costConfig, costs }) {
+function TabCostos({ calcs, users, costConfig, costs, currency, tc }) {
+	const fMoney = function (n, d) {
+		if (!isFinite(n)) return "—";
+		if (currency === "ARS") return "$ " + Math.round(n * tc).toLocaleString("es-AR");
+		const dec = d !== undefined ? d : 0;
+		const a = Math.abs(n);
+		const s = a >= 1000 ? a.toLocaleString("es-AR", { maximumFractionDigits: 0 }) : a.toFixed(dec);
+		return (n < 0 ? "−" : "") + "USD " + s;
+	};
+	const fMoney2 = function (n) {
+		if (!isFinite(n)) return "—";
+		if (currency === "ARS") return "$ " + Math.round(n * tc).toLocaleString("es-AR");
+		return "USD " + n.toFixed(2);
+	};
 	const subtotalOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
 	const subtotalAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	const costoTotalMes = costs.cfDirecto + calcs.cvMes * users;
@@ -726,30 +745,30 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 				<div>
 					<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CF directo / mes
-						<InfoTooltip text={"Suma de todos los costos fijos clasificados como Directo. Se usa para calcular EBITDA y break-even. CF total empresa: " + fD(costs.cfTotal)} />
+						<InfoTooltip text={"Suma de todos los costos fijos clasificados como Directo. Se usa para calcular EBITDA y break-even. CF total empresa: " + fMoney(costs.cfTotal)} />
 					</div>
-					<div style={Object.assign({}, mont(18), { color: BLUE })}>{fD(costs.cfDirecto)}</div>
+					<div style={Object.assign({}, mont(18), { color: BLUE })}>{fMoney(costs.cfDirecto)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
 					<div style={Object.assign({}, os(10, 700, WN), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CV por certificado
 						<InfoTooltip text={"Suma de todos los componentes de CV x Certificado (RENAPER, Veriff, PKI, OTP cert., Sello de competencia)."} />
 					</div>
-					<div style={Object.assign({}, mont(18), { color: WN })}>{fD2(calcs.cvCertUnit)}</div>
+					<div style={Object.assign({}, mont(18), { color: WN })}>{fMoney2(calcs.cvCertUnit)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
 					<div style={Object.assign({}, os(10, 700, OK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						CV por firma
 						<InfoTooltip text={"OTP SMS + Sello de tiempo RFC 3161 + infra por firma (activos ÷ capacidad anual ÷ 12). Fijo por firma, independiente del cliente."} />
 					</div>
-					<div style={Object.assign({}, mont(18), { color: OK })}>{fD2(calcs.cvFirmaUnit)}</div>
+					<div style={Object.assign({}, mont(18), { color: OK })}>{fMoney2(calcs.cvFirmaUnit)}</div>
 				</div>
 				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 20 }}>
 					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>
 						Costo / usuario / mes
 						<InfoTooltip text={"(CF directo + CV mensual × usuarios) ÷ usuarios. Costo de servir a un usuario promedio a la escala actual."} />
 					</div>
-					<div style={Object.assign({}, mont(18), { color: GRAY })}>{fD2(costoPorUsuario)}</div>
+					<div style={Object.assign({}, mont(18), { color: GRAY })}>{fMoney2(costoPorUsuario)}</div>
 				</div>
 			</div>
 
@@ -770,7 +789,7 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 											<span style={os(11, 400, BLACK)}>{r.item}</span>
 										</td>
 										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-											{fD(r.v)}
+											{fMoney(r.v)}
 										</td>
 									</tr>
 								);
@@ -778,7 +797,7 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 							<tr style={{ background: BLUEL }}>
 								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px" })}>Subtotal operativos</td>
 								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-									{fD(subtotalOps)}
+									{fMoney(subtotalOps)}
 								</td>
 							</tr>
 						</tbody>
@@ -796,7 +815,7 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 											<span style={Object.assign({}, os(10, 400, GRAY), { marginLeft: 4 })}>({r.vida}m)</span>
 										</td>
 										<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-											{fD(r.amort)}
+											{fMoney(r.amort)}
 										</td>
 									</tr>
 								);
@@ -804,7 +823,7 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 							<tr style={{ background: BLUEL }}>
 								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px" })}>Total amortización</td>
 								<td style={Object.assign({}, os(11, 700, BLUE), { padding: "5px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-									{fD(subtotalAmort)}
+									{fMoney(subtotalAmort)}
 								</td>
 							</tr>
 						</tbody>
@@ -853,7 +872,7 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 								<td style={{ padding: "3px 6px" }}>
 									<span style={os(11, 400, BLACK)}>Infra activada</span>
 									<span style={Object.assign({}, os(10, 400, GRAY), { display: "block" })}>
-										{fD(costs.activosTotal)} ÷ ({fK(costs.capacidadFirmasAnual || 0)} / 12)
+										{fMoney(costs.activosTotal)} ÷ ({fK(costs.capacidadFirmasAnual || 0)} / 12)
 									</span>
 								</td>
 								<td style={Object.assign({}, os(11, 400, BLUE), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
@@ -864,7 +883,7 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 								<tr style={{ background: "#fafafa" }}>
 									<td style={Object.assign({}, os(11, 400, BLACK), { padding: "3px 6px" })}>Servicios opcionales activos</td>
 									<td style={Object.assign({}, os(11, 400, BLUE), { padding: "3px 6px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-										{fD2(calcs.svcUserMes)}/usr/mes
+										{fMoney2(calcs.svcUserMes)}/usr/mes
 									</td>
 								</tr>
 							)}
@@ -883,16 +902,16 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 			<div style={{ marginTop: 20, background: "#1e293b", borderRadius: 10, padding: "14px 18px", display: "flex", flexWrap: "wrap", gap: 24 }}>
 			<div>
 				<div style={Object.assign({}, os(10, 700, "#94a3b8"), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>Costo total / mes</div>
-				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fD(costoTotalMes)}</div>
-				<div style={Object.assign({}, os(10, 400, "#94a3b8"), { marginTop: 2 })}>CF {fD(costs.cfDirecto)} + CV {fD(calcs.cvMes * users)}</div>
+				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fMoney(costoTotalMes)}</div>
+				<div style={Object.assign({}, os(10, 400, "#94a3b8"), { marginTop: 2 })}>CF {fMoney(costs.cfDirecto)} + CV {fMoney(calcs.cvMes * users)}</div>
 			</div>
 			<div style={{ borderLeft: "1px solid #334155", paddingLeft: 24 }}>
 				<div style={Object.assign({}, os(10, 700, "#94a3b8"), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>Costo / usuario</div>
-				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fD2(costoPorUsuario)}/mes</div>
+				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fMoney2(costoPorUsuario)}/mes</div>
 			</div>
 			<div style={{ borderLeft: "1px solid #334155", paddingLeft: 24 }}>
 				<div style={Object.assign({}, os(10, 700, "#94a3b8"), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 })}>CV / usuario</div>
-				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fD2(calcs.cvMes)}/mes</div>
+				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fMoney2(calcs.cvMes)}/mes</div>
 			</div>
 			</div>
 		</div>
@@ -900,7 +919,20 @@ function TabCostos({ calcs, users, costConfig, costs }) {
 }
 
 // ─── TAB: Precios ─────────────────────────────────────────────────────────
-function TabPrecios({ calcs, users, costs }) {
+function TabPrecios({ calcs, users, costs, currency, tc }) {
+	const fMoney = function (n, d) {
+		if (!isFinite(n)) return "—";
+		if (currency === "ARS") return "$ " + Math.round(n * tc).toLocaleString("es-AR");
+		const dec = d !== undefined ? d : 0;
+		const a = Math.abs(n);
+		const s = a >= 1000 ? a.toLocaleString("es-AR", { maximumFractionDigits: 0 }) : a.toFixed(dec);
+		return (n < 0 ? "−" : "") + "USD " + s;
+	};
+	const fMoney2 = function (n) {
+		if (!isFinite(n)) return "—";
+		if (currency === "ARS") return "$ " + Math.round(n * tc).toLocaleString("es-AR");
+		return "USD " + n.toFixed(2);
+	};
 	const VOLS = [5000, 10000, 20000, 50000, 100000, 200000];
 	return (
 		<div>
@@ -942,8 +974,8 @@ function TabPrecios({ calcs, users, costs }) {
 						{calcs.displayPriceSuffix}
 					</div>
 					<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 8 })}>
-						Equivalente mensual: {fD2(calcs.revMes)} · CV: {fD2(calcs.cvMes)} ·
-						Margen: {fD2(calcs.margenUnit)}
+						Equivalente mensual: {fMoney2(calcs.revMes)} · CV: {fMoney2(calcs.cvMes)} ·
+						Margen: {fMoney2(calcs.margenUnit)}
 					</div>
 				</div>
 				<div
@@ -973,7 +1005,7 @@ function TabPrecios({ calcs, users, costs }) {
 							lineHeight: 1,
 						})}
 					>
-						{fD2(calcs.priceSug)}
+						{fMoney2(calcs.priceSug)}
 					</div>
 					<div style={Object.assign({}, os(12, 400, GRAY), { marginTop: 8 })}>
 						{calcs.priceSug > calcs.revMes
@@ -990,7 +1022,7 @@ function TabPrecios({ calcs, users, costs }) {
 					marginBottom: 10,
 				})}
 			>
-				Sensibilidad EBITDA por volumen · CF directo: {fD(costs.cfDirecto)}/mes
+				Sensibilidad EBITDA por volumen · CF directo: {fMoney(costs.cfDirecto)}/mes
 			</div>
 			<table
 				style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
@@ -1052,7 +1084,7 @@ function TabPrecios({ calcs, users, costs }) {
 										padding: "9px 10px",
 									})}
 								>
-									{fD(r)}
+									{fMoney(r)}
 								</td>
 								<td
 									style={Object.assign({}, os(13, 400, GRAY), {
@@ -1061,7 +1093,7 @@ function TabPrecios({ calcs, users, costs }) {
 										padding: "9px 10px",
 									})}
 								>
-									{fD(cv)}
+									{fMoney(cv)}
 								</td>
 								<td
 									style={Object.assign({}, os(13, 700, ec), {
@@ -1070,7 +1102,7 @@ function TabPrecios({ calcs, users, costs }) {
 										padding: "9px 10px",
 									})}
 								>
-									{fD(e)}
+									{fMoney(e)}
 								</td>
 								<td
 									style={Object.assign({}, os(13, 400, ec), {
@@ -1551,7 +1583,7 @@ function SectionHeader({ title }) {
 	);
 }
 
-function TabConfig({ costConfig, setCostConfig }) {
+function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 	const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + r.v; }, 0);
 	const activosTotal = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	function updRow(key, i, field, val) {
@@ -1892,6 +1924,29 @@ function TabConfig({ costConfig, setCostConfig }) {
 				</div>
 			</div>
 
+			{/* Cotizaciones */}
+			<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 20, marginTop: 24 }}>
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 })}>Cotizaciones</div>
+				<div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+					<div style={{ flex: "0 0 auto" }}>
+						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>Tipo de cambio USD → ARS</div>
+						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+							<span style={os(12, 400, GRAY)}>1 USD =</span>
+							<input
+								type="number"
+								value={tc}
+								onChange={function (e) { setTc(Number(e.target.value) || 1); }}
+								style={{ width: 100, padding: "6px 10px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 13, color: BLACK }}
+							/>
+							<span style={os(12, 400, GRAY)}>ARS</span>
+						</div>
+					</div>
+					<div style={Object.assign({}, os(11, 400, GRAY), { flex: 1, minWidth: 200 })}>
+						El toggle USD/ARS en la barra de navegación usa este valor para convertir todos los precios de la herramienta.
+					</div>
+				</div>
+			</div>
+
 			{/* Save button */}
 			<div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
 				<button
@@ -1947,12 +2002,10 @@ const PAY_OPTIONS = [
 	},
 ];
 
-function Cotizadora({ costs }) {
+function Cotizadora({ costs, currency, tc }) {
 	const [freq, setFreq] = useState(null);
 	const [pay, setPay] = useState(null);
 	const [extra, setExtra] = useState([]);
-	const [tc, setTc] = useState(1150);
-	const [currency, setCurrency] = useState("USD");
 
 	function toggleExtra(k) {
 		setExtra(function (prev) {
@@ -2099,28 +2152,10 @@ function Cotizadora({ costs }) {
 
 	return (
 		<div>
-			<div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
-				<div style={Object.assign({}, os(11, 400, GRAY), { flex: 1 })}>
+			<div style={{ marginBottom: 20 }}>
+				<div style={Object.assign({}, os(11, 400, GRAY), {})}>
 					Respondé las preguntas y el sistema te sugiere el plan más conveniente
 					según tu perfil de uso.
-				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-					{["USD", "ARS"].map(function (c) {
-						return (
-							<button key={c} onClick={function () { setCurrency(c); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1.5px solid " + (currency === c ? BLUE : BORD), background: currency === c ? BLUE : WHITE, color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
-						);
-					})}
-					{currency === "ARS" && (
-						<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-							<span style={os(11, 400, GRAY)}>TC:</span>
-							<input
-								type="number"
-								value={tc}
-								onChange={function (e) { setTc(Number(e.target.value) || 1); }}
-								style={{ width: 80, padding: "4px 8px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 12, color: BLACK }}
-							/>
-						</div>
-					)}
 				</div>
 			</div>
 
@@ -2153,7 +2188,32 @@ function Cotizadora({ costs }) {
 					marginBottom: 8,
 				})}
 			>
-				3 · ¿Qué servicios adicionales te interesan? (opcional)
+				3 · ¿Cómo vas a pagar?
+			</div>
+			<Opt
+				options={[
+					{ k: "transferencia", label: "Transferencia / efectivo", desc: "Sin costo de procesamiento" },
+					{ k: "tarjeta", label: "Tarjeta de crédito / débito", desc: "Se suma 0.2% de Paywall" },
+				]}
+				selected={extra.includes("tarjeta") ? "tarjeta" : "transferencia"}
+				onSelect={function (k) {
+					setExtra(function (prev) {
+						return k === "tarjeta"
+							? prev.filter(function (x) { return x !== "transferencia"; }).concat(["tarjeta"])
+							: prev.filter(function (x) { return x !== "tarjeta"; });
+					});
+				}}
+			/>
+
+			<div
+				style={Object.assign({}, os(11, 700, BLACK), {
+					textTransform: "uppercase",
+					letterSpacing: "0.5px",
+					marginBottom: 8,
+					marginTop: 16,
+				})}
+			>
+				4 · ¿Qué servicios adicionales te interesan? (opcional)
 			</div>
 			<Opt
 				options={COMP_OPTIONS}
@@ -2188,6 +2248,7 @@ function Cotizadora({ costs }) {
 								svc: {
 									cloudStorage: false,
 									mailCert: false,
+									paywall: extra.includes("tarjeta"),
 								},
 								users: 20000,
 								costs,
@@ -2332,9 +2393,12 @@ export default function LakautCalc() {
 	const [family, setFamily] = useState("B");
 	const [users, setUsers] = useState(20000);
 	const [tab, setTab] = useState("costos");
+	const [currency, setCurrency] = useState("USD");
+	const [tc, setTc] = useState(1150);
 	const [svc, setSvc] = useState({
 		cloudStorage: false,
 		mailCert: false,
+		paywall: false,
 	});
 	const [inp, setInp] = useState(PACKS.B.defaults);
 	const [costConfig, setCostConfig] = useState(function () {
@@ -2381,6 +2445,20 @@ export default function LakautCalc() {
 			return Object.assign({}, prev, { [k]: v });
 		});
 	}
+
+	const fMoney = function (n, d) {
+		if (!isFinite(n)) return "—";
+		if (currency === "ARS") return "$ " + Math.round(n * tc).toLocaleString("es-AR");
+		const dec = d !== undefined ? d : 0;
+		const a = Math.abs(n);
+		const s = a >= 1000 ? a.toLocaleString("es-AR", { maximumFractionDigits: 0 }) : a.toFixed(dec);
+		return (n < 0 ? "−" : "") + "USD " + s;
+	};
+	const fMoney2 = function (n) {
+		if (!isFinite(n)) return "—";
+		if (currency === "ARS") return "$ " + Math.round(n * tc).toLocaleString("es-AR");
+		return "USD " + n.toFixed(2);
+	};
 
 	const calcs = useMemo(
 		function () {
@@ -2449,31 +2527,47 @@ export default function LakautCalc() {
 					padding: "0 24px",
 					display: "flex",
 					gap: 0,
+					alignItems: "center",
 				}}
 			>
-				{SECTIONS.map(function (s) {
-					const act = section === s.k;
-					return (
-						<button
-							key={s.k}
-							onClick={function () { setSection(s.k); }}
-							style={{
-								padding: "14px 24px",
-								fontFamily: "'Open Sans',sans-serif",
-								fontSize: 14,
-								fontWeight: act ? 700 : 400,
-								color: act ? BLUE : GRAY,
-								background: "transparent",
-								border: "none",
-								cursor: "pointer",
-								borderBottom: "3px solid " + (act ? BLUE : "transparent"),
-								marginBottom: -2,
-							}}
-						>
-							{s.label}
-						</button>
-					);
-				})}
+				<div style={{ display: "flex", flex: 1 }}>
+					{SECTIONS.map(function (s) {
+						const act = section === s.k;
+						return (
+							<button
+								key={s.k}
+								onClick={function () { setSection(s.k); }}
+								style={{
+									padding: "14px 24px",
+									fontFamily: "'Open Sans',sans-serif",
+									fontSize: 14,
+									fontWeight: act ? 700 : 400,
+									color: act ? BLUE : GRAY,
+									background: "transparent",
+									border: "none",
+									cursor: "pointer",
+									borderBottom: "3px solid " + (act ? BLUE : "transparent"),
+									marginBottom: -2,
+								}}
+							>
+								{s.label}
+							</button>
+						);
+					})}
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+					{["USD", "ARS"].map(function (c) {
+						return (
+							<button key={c} onClick={function () { setCurrency(c); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (currency === c ? BLUE : BORD), background: currency === c ? BLUE : WHITE, color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
+						);
+					})}
+					{currency === "ARS" && (
+						<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+							<span style={os(11, 400, GRAY)}>TC:</span>
+							<input type="number" value={tc} onChange={function (e) { setTc(Number(e.target.value) || 1); }} style={{ width: 72, padding: "3px 7px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 12, color: BLACK }} />
+						</div>
+					)}
+				</div>
 			</div>
 
 			{section === "modelos" && (
@@ -2552,20 +2646,20 @@ export default function LakautCalc() {
 						<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
 							<KpiCard
 								label="Revenue / mes"
-								value={fD(calcs.revTotal)}
+								value={fMoney(calcs.revTotal)}
 								sub={users.toLocaleString() + " usuarios activos"}
 								accent={BLUE}
 							/>
 							<KpiCard
 								label="EBITDA / mes"
-								value={fD(calcs.ebitda)}
+								value={fMoney(calcs.ebitda)}
 								sub={"Margen " + fP(calcs.ebitdaPct)}
 								accent={ec}
 							/>
 							<KpiCard
 								label="Margen unitario"
 								value={fP(calcs.margenPct)}
-								sub={fD2(calcs.margenUnit) + " / usuario / mes"}
+								sub={fMoney2(calcs.margenUnit) + " / usuario / mes"}
 								accent={mc}
 							/>
 							<KpiCard
@@ -2581,7 +2675,7 @@ export default function LakautCalc() {
 							{cfg.arch === "free" && (
 								<KpiCard
 									label="Costo asumido/mes"
-									value={fD(calcs.cvTotal)}
+									value={fMoney(calcs.cvTotal)}
 									sub="Sin revenue · costo directo"
 									accent={ER}
 								/>
@@ -2632,7 +2726,7 @@ export default function LakautCalc() {
 											Costo asumido / usuario / mes
 										</div>
 										<div style={Object.assign({}, mont(20), { color: ER })}>
-											{fD2(calcs.cvMes)}
+											{fMoney2(calcs.cvMes)}
 										</div>
 										<div
 											style={Object.assign({}, os(11, 400, ER), {
@@ -2640,7 +2734,7 @@ export default function LakautCalc() {
 												opacity: 0.85,
 											})}
 										>
-											{users.toLocaleString()} usuarios → {fD(calcs.cvTotal)} / mes sin revenue
+											{users.toLocaleString()} usuarios → {fMoney(calcs.cvTotal)} / mes sin revenue
 										</div>
 									</div>
 								)}
@@ -2666,15 +2760,15 @@ export default function LakautCalc() {
 								<div style={{ background: BLUEL, borderRadius: 10, padding: "10px 14px", marginTop: 4 }}>
 									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
 										<span style={os(11, 400, GRAY)}>CF directo / mes</span>
-										<span style={Object.assign({}, os(11, 700, OK), { fontFamily: "Courier New,monospace" })}>{fD(costs.cfDirecto)}</span>
+										<span style={Object.assign({}, os(11, 700, OK), { fontFamily: "Courier New,monospace" })}>{fMoney(costs.cfDirecto)}</span>
 									</div>
 									<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
 										<span style={os(11, 400, GRAY)}>CV firma / unidad</span>
-										<span style={Object.assign({}, os(11, 700, BLUE), { fontFamily: "Courier New,monospace" })}>USD {calcs.cvFirmaUnit.toFixed(4)}</span>
+										<span style={Object.assign({}, os(11, 700, BLUE), { fontFamily: "Courier New,monospace" })}>{fMoney2(calcs.cvFirmaUnit)}</span>
 									</div>
 									<div style={{ display: "flex", justifyContent: "space-between" }}>
 										<span style={os(11, 400, GRAY)}>Infra / firma</span>
-										<span style={Object.assign({}, os(11, 400, GRAY), { fontFamily: "Courier New,monospace" })}>USD {calcs.infraPorFirma.toFixed(6)}</span>
+										<span style={Object.assign({}, os(11, 400, GRAY), { fontFamily: "Courier New,monospace" })}>{fMoney2(calcs.infraPorFirma)}</span>
 									</div>
 								</div>
 							</div>
@@ -2756,9 +2850,11 @@ export default function LakautCalc() {
 										users={users}
 										costConfig={costConfig}
 										costs={costs}
+										currency={currency}
+										tc={tc}
 									/>
 								)}
-								{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} />}
+								{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} currency={currency} tc={tc} />}
 								{tab === "proyección" && <TabProyeccion proj={calcs.proj} beMes={calcs.beMes} />}
 								{tab === "break-even" && (
 									<TabBreakEven
@@ -2777,13 +2873,13 @@ export default function LakautCalc() {
 
 			{section === "cotizadora" && (
 				<div style={{ padding: "24px" }}>
-					<Cotizadora costs={costs} />
+					<Cotizadora costs={costs} currency={currency} tc={tc} />
 				</div>
 			)}
 
 			{section === "configuración" && (
 				<div style={{ padding: "24px" }}>
-					<TabConfig costConfig={costConfig} setCostConfig={setCostConfig} />
+					<TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} />
 				</div>
 			)}
 		</div>
