@@ -9,8 +9,14 @@ import { fP } from "../utils/formatters";
 import { NumInput } from "./ui/NumInput";
 import { ChartTip } from "./ui/ChartTip";
 
-const ESCALONES = [2000, 3000, 5000, 7500, 10000, 15000, 25000, 50000];
+const ESCALONES = [2000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2500000, 5000000];
 const MARGIN_OPTS = [30, 40, 50, 60];
+
+function fNum(n) {
+	if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + "M";
+	if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + "k";
+	return n.toLocaleString("es-AR");
+}
 
 function computeRow(firmas, certs, periodo, marginTarget, costs) {
 	const cvPack = certs * costs.cvCertBase + firmas * costs.cvFirmaBase;
@@ -26,32 +32,55 @@ function computeRow(firmas, certs, periodo, marginTarget, costs) {
 export function EnterpriseQuote({ costs, currency, tc }) {
 	const { fMoney2 } = makeMoney(currency, tc);
 
+	// Unified inputs — drive everything
+	const [firmas, setFirmas] = useState(5000);
 	const [certs, setCerts] = useState(4);
 	const [periodo, setPeriodo] = useState(24);
 	const [marginTarget, setMarginTarget] = useState(40);
-	const [customFirmas, setCustomFirmas] = useState(5000);
-	const [customCerts, setCustomCerts] = useState(4);
+	const [copied, setCopied] = useState(false);
 
+	// Custom quote from unified inputs
+	const customRow = useMemo(function () {
+		return computeRow(firmas, certs, periodo, marginTarget, costs);
+	}, [firmas, certs, periodo, marginTarget, costs]);
+
+	// Escalation table: same certs/periodo/margin, varying firmas
 	const rows = useMemo(function () {
 		return ESCALONES.map(function (f) {
 			return computeRow(f, certs, periodo, marginTarget, costs);
 		});
 	}, [certs, periodo, marginTarget, costs]);
 
-	const customRow = useMemo(function () {
-		return computeRow(customFirmas, customCerts, periodo, marginTarget, costs);
-	}, [customFirmas, customCerts, periodo, marginTarget, costs]);
+	const baseRow = rows[0]; // 2000 firmas
 
-	const baseRow = rows[0]; // 2000 firmas — referencia
-
-	const chartData = rows.map(function (r) {
+	const chartData = rows.slice(0, 8).map(function (r) {
 		return {
-			label: (r.firmas / 1000).toFixed(0) + "k",
+			label: fNum(r.firmas),
 			"CV pack": Math.round(r.cvPack),
 			"Margen": Math.round(r.margenPack),
 			"$/firma": Number(r.pricePerFirma.toFixed(3)),
 		};
 	});
+
+	function handleCopy() {
+		var header = "Cotización Lakaut Enterprise\n";
+		header += certs + " cert" + (certs !== 1 ? "s" : "") + " por pack · vigencia " + periodo + "m · margen objetivo " + marginTarget + "%\n";
+		header += "─".repeat(64) + "\n";
+		var cols = ["Firmas", "CV pack (USD)", "Precio (USD)", "Margen (USD)", "USD/firma", "BE clientes"].join("\t");
+		var body = rows.map(function (r) {
+			return [
+				r.firmas.toLocaleString("es-AR"),
+				Math.round(r.cvPack).toLocaleString("es-AR"),
+				Math.round(r.priceSug).toLocaleString("es-AR"),
+				Math.round(r.margenPack).toLocaleString("es-AR"),
+				r.pricePerFirma.toFixed(3),
+				isFinite(r.be) ? r.be.toLocaleString("es-AR") : "—",
+			].join("\t");
+		}).join("\n");
+		navigator.clipboard.writeText(header + cols + "\n" + body);
+		setCopied(true);
+		setTimeout(function () { setCopied(false); }, 2000);
+	}
 
 	const thStyle = Object.assign({}, os(10, 700, WHITE), {
 		padding: "7px 10px",
@@ -65,146 +94,124 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 	return (
 		<div>
 			{/* Header */}
-			<div style={{ marginBottom: 16 }}>
+			<div style={{ marginBottom: 20 }}>
 				<div style={Object.assign({}, mont(18), { marginBottom: 4 })}>Cotizador Enterprise · Volumen personalizado</div>
 				<div style={os(12, 400, GRAY)}>
-					Precios óptimos para clientes con volúmenes superiores al pack Enterprise estándar (2.000 firmas).
+					Ingresá los datos del cliente. El resultado se actualiza al instante y la tabla escalonada usa los mismos parámetros.
 				</div>
 			</div>
 
-			{/* Config panel */}
-			<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-				<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", alignSelf: "center", flexShrink: 0 })}>
-					Parámetros globales
+			{/* Unified input panel */}
+			<div style={{ background: BLUEL, border: "2px solid " + BLUE, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
+				<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 14 })}>
+					Parámetros del cliente
 				</div>
-				<div style={{ flex: "0 0 130px" }}>
-					<NumInput
-						label="Certs por pack"
-						value={certs}
-						onChange={function (v) { setCerts(Math.max(1, Math.round(v))); }}
-						suffix="certs"
-					/>
-				</div>
-				<div style={{ flex: "0 0 130px" }}>
-					<NumInput
-						label="Vigencia"
-						value={periodo}
-						onChange={function (v) { setPeriodo(Math.max(6, Math.min(60, Math.round(v)))); }}
-						suffix="meses"
-					/>
-				</div>
-				<div>
-					<div style={os(10, 400, GRAY)}>Margen objetivo</div>
-					<div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-						{MARGIN_OPTS.map(function (m) {
-							var act = m === marginTarget;
-							return (
-								<button
-									key={m}
-									onClick={function () { setMarginTarget(m); }}
-									style={{
-										padding: "5px 10px",
-										borderRadius: 6,
-										border: "1.5px solid " + (act ? BLUE : BORD),
-										background: act ? BLUE : WHITE,
-										color: act ? WHITE : GRAY,
-										fontFamily: "'Open Sans',sans-serif",
-										fontSize: 11,
-										fontWeight: 700,
-										cursor: "pointer",
-									}}
-								>
-									{m}%
-								</button>
-							);
-						})}
+				<div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+					<div style={{ flex: "0 0 160px" }}>
+						<NumInput
+							label="Firmas totales"
+							value={firmas}
+							onChange={function (v) { setFirmas(Math.max(1, Math.round(v))); }}
+							suffix="firmas"
+						/>
 					</div>
-				</div>
-				<div style={Object.assign({}, os(10, 400, GRAY), { alignSelf: "center", marginLeft: "auto" })}>
-					CV cert: {fMoney2(costs.cvCertBase)} · CV firma: {fMoney2(costs.cvFirmaBase)}
-				</div>
-			</div>
-
-			{/* Custom quote hero */}
-			<div style={{ background: WHITE, border: "2px solid " + BLUE, borderRadius: 14, marginBottom: 24, overflow: "hidden" }}>
-				<div style={{ background: BLUE, padding: "12px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-					<span style={Object.assign({}, mont(15), { color: WHITE })}>Cotización puntual</span>
-					<span style={Object.assign({}, os(11, 400, WHITE), { opacity: 0.75 })}>
-						Ingresá el volumen exacto y obtenés el precio al instante
-					</span>
-				</div>
-				<div style={{ padding: "16px 20px" }}>
-					<div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16, alignItems: "flex-end" }}>
-						<div style={{ flex: "0 0 160px" }}>
-							<NumInput
-								label="Firmas totales"
-								value={customFirmas}
-								onChange={function (v) { setCustomFirmas(Math.max(1, Math.round(v))); }}
-								suffix="firmas"
-							/>
-						</div>
-						<div style={{ flex: "0 0 160px" }}>
-							<NumInput
-								label="Certificados"
-								value={customCerts}
-								onChange={function (v) { setCustomCerts(Math.max(1, Math.round(v))); }}
-								suffix="certs"
-							/>
-						</div>
-						<div style={Object.assign({}, os(11, 400, GRAY), { alignSelf: "center", paddingBottom: 10 })}>
-							Vigencia: {periodo}m · Margen objetivo: {marginTarget}%
-						</div>
+					<div style={{ flex: "0 0 140px" }}>
+						<NumInput
+							label="Certificados"
+							value={certs}
+							onChange={function (v) { setCerts(Math.max(1, Math.round(v))); }}
+							suffix="certs"
+						/>
 					</div>
-
-					<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-						<div style={{ background: "#f8fafc", borderRadius: 10, padding: "12px 14px", border: "1px solid " + BORD }}>
-							<div style={os(10, 700, GRAY)}>COSTO VARIABLE</div>
-							<div style={Object.assign({}, mont(20), { color: BLACK, marginTop: 4 })}>{fMoney2(customRow.cvPack)}</div>
-							<div style={os(10, 400, GRAY)}>{fMoney2(customRow.cvPerFirma)}/firma</div>
-						</div>
-
-						<div style={{ background: OKBG, borderRadius: 10, padding: "12px 14px", border: "1.5px solid " + OK }}>
-							<div style={os(10, 700, OK)}>PRECIO AL {marginTarget}% MARGEN</div>
-							<div style={Object.assign({}, mont(20), { color: OK, marginTop: 4 })}>{fMoney2(customRow.priceSug)}</div>
-							<div style={os(10, 400, GRAY)}>{fMoney2(customRow.pricePerFirma)}/firma</div>
-						</div>
-
-						<div style={{ background: "#f8fafc", borderRadius: 10, padding: "12px 14px", border: "1px solid " + BORD }}>
-							<div style={os(10, 700, GRAY)}>MARGEN PACK</div>
-							<div style={Object.assign({}, mont(20), { color: BLACK, marginTop: 4 })}>{fMoney2(customRow.margenPack)}</div>
-							<div style={os(10, 400, GRAY)}>{fP(marginTarget)} de {fMoney2(customRow.priceSug)}</div>
-						</div>
-
-						<div style={{ background: "#f8fafc", borderRadius: 10, padding: "12px 14px", border: "1px solid " + BORD }}>
-							<div style={os(10, 700, GRAY)}>BREAK-EVEN</div>
-							<div style={Object.assign({}, mont(20), { color: isFinite(customRow.be) ? BLACK : ER, marginTop: 4 })}>
-								{isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞"}
-							</div>
-							<div style={os(10, 400, GRAY)}>clientes de este tipo</div>
-						</div>
-
-						<div style={{ background: "#f8fafc", borderRadius: 10, padding: "12px 14px", border: "1px solid " + BORD }}>
-							<div style={Object.assign({}, os(10, 700, GRAY), { marginBottom: 4 })}>RANGO DE PRECIOS</div>
-							{[30, 40, 50, 60].map(function (m) {
-								var p = customRow.cvPack / (1 - m / 100);
+					<div style={{ flex: "0 0 130px" }}>
+						<NumInput
+							label="Vigencia"
+							value={periodo}
+							onChange={function (v) { setPeriodo(Math.max(6, Math.min(60, Math.round(v)))); }}
+							suffix="meses"
+						/>
+					</div>
+					<div>
+						<div style={os(10, 400, GRAY)}>Margen objetivo</div>
+						<div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+							{MARGIN_OPTS.map(function (m) {
 								var act = m === marginTarget;
 								return (
-									<div key={m} style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-										<span style={os(10, act ? 700 : 400, act ? BLUE : GRAY)}>{m}%</span>
-										<span style={Object.assign({}, os(11, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>
-											{fMoney2(p)}
-										</span>
-									</div>
+									<button
+										key={m}
+										onClick={function () { setMarginTarget(m); }}
+										style={{
+											padding: "5px 10px",
+											borderRadius: 6,
+											border: "1.5px solid " + (act ? BLUE : BORD),
+											background: act ? BLUE : WHITE,
+											color: act ? WHITE : GRAY,
+											fontFamily: "'Open Sans',sans-serif",
+											fontSize: 11,
+											fontWeight: 700,
+											cursor: "pointer",
+										}}
+									>
+										{m}%
+									</button>
 								);
 							})}
 						</div>
 					</div>
+					<div style={Object.assign({}, os(10, 400, GRAY), { alignSelf: "center", marginLeft: "auto" })}>
+						CV cert: {fMoney2(costs.cvCertBase)} · CV firma: {fMoney2(costs.cvFirmaBase)}
+					</div>
 				</div>
 			</div>
 
-			{/* Chart */}
+			{/* Result cards */}
+			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 28 }}>
+				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
+					<div style={os(10, 700, GRAY)}>COSTO VARIABLE</div>
+					<div style={Object.assign({}, mont(22), { color: BLACK, marginTop: 6 })}>{fMoney2(customRow.cvPack)}</div>
+					<div style={os(10, 400, GRAY)}>{fMoney2(customRow.cvPerFirma)}/firma</div>
+				</div>
+
+				<div style={{ background: OKBG, borderRadius: 10, padding: "14px 16px", border: "1.5px solid " + OK }}>
+					<div style={os(10, 700, OK)}>PRECIO AL {marginTarget}% MARGEN</div>
+					<div style={Object.assign({}, mont(22), { color: OK, marginTop: 6 })}>{fMoney2(customRow.priceSug)}</div>
+					<div style={os(10, 400, GRAY)}>{fMoney2(customRow.pricePerFirma)}/firma</div>
+				</div>
+
+				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
+					<div style={os(10, 700, GRAY)}>MARGEN PACK</div>
+					<div style={Object.assign({}, mont(22), { color: BLACK, marginTop: 6 })}>{fMoney2(customRow.margenPack)}</div>
+					<div style={os(10, 400, GRAY)}>{fP(marginTarget)} del precio</div>
+				</div>
+
+				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
+					<div style={os(10, 700, GRAY)}>BREAK-EVEN</div>
+					<div style={Object.assign({}, mont(22), { color: isFinite(customRow.be) ? BLACK : ER, marginTop: 6 })}>
+						{isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞"}
+					</div>
+					<div style={os(10, 400, GRAY)}>clientes de este tipo</div>
+				</div>
+
+				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
+					<div style={Object.assign({}, os(10, 700, GRAY), { marginBottom: 6 })}>RANGO DE PRECIOS</div>
+					{[30, 40, 50, 60].map(function (m) {
+						var p = customRow.cvPack / (1 - m / 100);
+						var act = m === marginTarget;
+						return (
+							<div key={m} style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+								<span style={os(10, act ? 700 : 400, act ? BLUE : GRAY)}>{m}%</span>
+								<span style={Object.assign({}, os(11, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>
+									{fMoney2(p)}
+								</span>
+							</div>
+						);
+					})}
+				</div>
+			</div>
+
+			{/* Chart — first 8 tiers to keep it readable */}
 			<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
-				CV (gris) + Margen (verde) = Precio sugerido · $/firma por volumen (eje derecho)
+				CV (gris) + Margen (verde) = Precio · $/firma por volumen (eje der.)
 			</div>
 			<div style={{ height: 220, marginBottom: 28 }}>
 				<ResponsiveContainer width="100%" height="100%">
@@ -215,7 +222,7 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 							yAxisId="left"
 							tick={{ fontSize: 10, fill: GRAY }}
 							tickFormatter={function (v) {
-								return "$" + (v >= 1000 ? Math.round(v / 1000) + "k" : v);
+								return "$" + (v >= 1000000 ? Math.round(v / 1000000) + "M" : v >= 1000 ? Math.round(v / 1000) + "k" : v);
 							}}
 						/>
 						<YAxis
@@ -232,10 +239,30 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 				</ResponsiveContainer>
 			</div>
 
-			{/* Escalation table */}
-			<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
-				Tabla escalonada · {certs} cert{certs !== 1 ? "s" : ""} por pack · margen objetivo {marginTarget}%
+			{/* Escalation table header + copy button */}
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px" })}>
+					Tabla escalonada · {certs} cert{certs !== 1 ? "s" : ""} por pack · {marginTarget}% margen
+				</div>
+				<button
+					onClick={handleCopy}
+					style={{
+						padding: "6px 14px",
+						background: copied ? OK : WHITE,
+						color: copied ? WHITE : BLUE,
+						border: "1.5px solid " + (copied ? OK : BLUE),
+						borderRadius: 6,
+						fontFamily: "'Open Sans',sans-serif",
+						fontSize: 12,
+						fontWeight: 700,
+						cursor: "pointer",
+						transition: "all 0.2s",
+					}}
+				>
+					{copied ? "✓ Copiado" : "Copiar tabla"}
+				</button>
 			</div>
+
 			<div style={{ overflowX: "auto" }}>
 				<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
 					<thead>
@@ -286,7 +313,7 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 													padding: "2px 7px",
 													borderRadius: 10,
 												})}>
-													{vsBase < 0 ? "" : "+"}{vsBase.toFixed(2)}% /firma
+													{vsBase < 0 ? "" : "+"}{vsBase.toFixed(2)}%/firma
 												</span>
 											)}
 									</td>
@@ -297,7 +324,8 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 				</table>
 			</div>
 			<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 8 })}>
-				BE = clientes de ese tipo necesarios para cubrir CF directo mensual (USD {Math.round(costs.cfDirecto).toLocaleString("es-AR")}/mes)
+				BE = clientes de ese tipo necesarios para cubrir CF directo (USD {Math.round(costs.cfDirecto).toLocaleString("es-AR")}/mes) ·
+				CV cert: {fMoney2(costs.cvCertBase)} · CV firma: {fMoney2(costs.cvFirmaBase)}
 			</div>
 		</div>
 	);
