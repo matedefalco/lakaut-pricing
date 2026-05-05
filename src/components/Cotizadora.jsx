@@ -3,7 +3,7 @@ import { BLUE, GRAY, BLACK, WHITE, BORD, BLUEL, OK, WN, WNBG, ER, os, mont } fro
 import { fP, fK } from "../utils/formatters";
 import { makeMoney } from "../utils/useMoney";
 import { engine } from "../engine/engine";
-import { PLANS } from "../data/plans";
+import { useModels } from "../context/ModelsContext";
 
 // ─── Questionnaire options ─────────────────────────────────────────────────────
 const PROFILE_OPTS = [
@@ -23,22 +23,28 @@ const PAY_OPTS = [
 	{ k: "tarjeta", label: "Tarjeta de crédito / débito", desc: "Se agrega 0.2% de Paywall" },
 ];
 
-function getRecommendations(profile, detail) {
+function getRecommendations(profile, detail, models) {
+	const byId = function (id) { return models.find(function (m) { return m.id === id; }); };
 	if (profile === "persona") {
+		const smart = byId("smart"), prof = byId("profesional");
+		const personaModels = models.filter(function (m) { return m.segment === "persona"; });
 		return detail === "ocasional"
-			? [PLANS.smart, PLANS.profesional]
-			: [PLANS.profesional, PLANS.smart];
+			? (smart && prof ? [smart, prof] : personaModels.slice(0, 2))
+			: (prof && smart ? [prof, smart] : personaModels.slice(0, 2).reverse());
 	}
 	if (profile === "empresa") {
+		const pyme = byId("pyme"), ent = byId("enterprise");
+		const empresaModels = models.filter(function (m) { return m.segment === "empresa"; });
 		return detail === "chica"
-			? [PLANS.pyme, PLANS.enterprise]
-			: [PLANS.enterprise, PLANS.pyme];
+			? (pyme && ent ? [pyme, ent] : empresaModels.slice(0, 2))
+			: (ent && pyme ? [ent, pyme] : empresaModels.slice(0, 2).reverse());
 	}
 	return [];
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 export function Cotizadora({ costs, currency, tc }) {
+	const { models } = useModels();
 	const [profile, setProfile] = useState(null);
 	const [detail, setDetail] = useState(null);
 	const [payMethod, setPayMethod] = useState("transferencia");
@@ -47,8 +53,8 @@ export function Cotizadora({ costs, currency, tc }) {
 
 	const recommendations = useMemo(function () {
 		if (!profile || !detail) return [];
-		return getRecommendations(profile, detail);
-	}, [profile, detail]);
+		return getRecommendations(profile, detail, models);
+	}, [profile, detail, models]);
 
 	function handleProfileChange(k) {
 		setProfile(k);
@@ -85,14 +91,16 @@ export function Cotizadora({ costs, currency, tc }) {
 
 	const PlanCard = function ({ plan, isFirst }) {
 		const svc = { cloudStorage: false, mailCert: false, paywall: payMethod === "tarjeta" };
-		const c = engine({ arch: "bolsa", inp: plan.inp, svc, users: 1000, costs });
+		const periodo = plan.vigencia || plan.billingPeriod || 24;
+		const inp = plan.inp || { precio: plan.priceUSD, firmas: plan.firmas || 0, periodo };
+		const c = engine({ arch: plan.arch || "bolsa", inp, svc, users: 1000, costs });
 		const col = plan.color;
 
 		// Compute ilimitadas risk threshold dynamically from current costs
 		const ilimitadasThreshold = plan.ilimitadas
 			? (function () {
-				const revMes = plan.inp.precio / plan.inp.periodo;
-				const certCostMes = costs.cvCertBase / plan.inp.periodo;
+				const revMes = plan.priceUSD / periodo;
+				const certCostMes = costs.cvCertBase / periodo;
 				const avail = revMes - certCostMes;
 				return avail > 0 ? Math.floor(avail / costs.cvFirmaBase) : 0;
 			})()

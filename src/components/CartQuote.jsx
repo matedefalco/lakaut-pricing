@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, WN, WNBG, os, mont } from "../theme/tokens";
 import { makeMoney } from "../utils/useMoney";
-import { PLANS } from "../data/plans";
+import { useModels } from "../context/ModelsContext";
 import { NumInput } from "./ui/NumInput";
 
 const PAYWALL_PCT = 0.002;
@@ -32,15 +32,16 @@ function computeCustomPrice(firmas, certs, vigencia) {
 	return Math.round(base * vigenciaFactor * 100) / 100;
 }
 
-function findBestPlan(segment, firmas, certs, vigencia) {
+function findBestPlan(segment, firmas, certs, vigencia, models) {
 	if (vigencia !== 24) return null;
+	const byId = function (id) { return models.find(function (m) { return m.id === id; }); };
 	if (segment === "persona") {
 		if (certs > 1) return null;
-		return firmas <= 10 ? PLANS.smart : PLANS.profesional;
+		return firmas <= 10 ? (byId("smart") || null) : (byId("profesional") || null);
 	}
 	if (segment === "empresa") {
-		if (certs <= 1 && firmas <= 300) return PLANS.pyme;
-		if (certs <= 4 && firmas <= 2000) return PLANS.enterprise;
+		if (certs <= 1 && firmas <= 300) return byId("pyme") || null;
+		if (certs <= 4 && firmas <= 2000) return byId("enterprise") || null;
 	}
 	return null;
 }
@@ -110,6 +111,7 @@ function SegmentedControl({ options, value, onChange }) {
 }
 
 export function CartQuote({ costs, currency, tc }) {
+	const { models } = useModels();
 	// Configurator state
 	const [segment, setSegment] = useState("persona");
 	const [certs, setCerts] = useState(1);
@@ -130,8 +132,8 @@ export function CartQuote({ costs, currency, tc }) {
 	const effectiveFirmas = firmaMode === "total" ? firmasTotal : certs * firmasPerCert;
 
 	const plan = useMemo(
-		() => findBestPlan(segment, effectiveFirmas, certs, vigencia),
-		[segment, effectiveFirmas, certs, vigencia]
+		() => findBestPlan(segment, effectiveFirmas, certs, vigencia, models),
+		[segment, effectiveFirmas, certs, vigencia, models]
 	);
 
 	const unitPrice = useMemo(
@@ -141,8 +143,9 @@ export function CartQuote({ costs, currency, tc }) {
 
 	const ilimitadasThreshold = plan?.ilimitadas
 		? (() => {
-			const revMes = plan.priceUSD / plan.inp.periodo;
-			const available = revMes - costs.cvCertBase / plan.inp.periodo;
+			const periodo = plan.vigencia || plan.billingPeriod || 24;
+			const revMes = plan.priceUSD / periodo;
+			const available = revMes - costs.cvCertBase / periodo;
 			return available > 0 ? Math.floor(available / costs.cvFirmaBase) : 0;
 		})()
 		: null;
