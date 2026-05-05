@@ -196,6 +196,28 @@ export function TabCostos({ calcs, users, costConfig, costs, currency, tc }) {
 				<div style={Object.assign({}, mont(22), { color: WHITE })}>{fMoney2(calcs.cvMes)}/mes</div>
 			</div>
 			</div>
+
+			{/* Referencia rápida */}
+			<div style={{ marginTop: 16, background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "12px 14px" }}>
+				<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
+					Referencia rápida
+				</div>
+				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
+					{[
+						{ l: "Break-even", v: isFinite(calcs.beUsuarios) ? calcs.beUsuarios.toLocaleString("es-AR") + " usu." : "∞", color: isFinite(calcs.beUsuarios) ? OK : ER },
+						{ l: "CF directo / mes", v: fMoney(costs.cfDirecto), color: GRAY },
+						{ l: "CV firma / unidad", v: calcs.cvFirmaUnit.toFixed(4), color: BLUE },
+						{ l: "Infra / firma", v: fMoney2(calcs.infraPorFirma), color: GRAY },
+					].map(function (row) {
+						return (
+							<div key={row.l} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+								<span style={os(11, 400, GRAY)}>{row.l}</span>
+								<span style={Object.assign({}, os(11, 700, row.color), { fontFamily: "Courier New,monospace", whiteSpace: "nowrap" })}>{row.v}</span>
+							</div>
+						);
+					})}
+				</div>
+			</div>
 		</div>
 	);
 }
