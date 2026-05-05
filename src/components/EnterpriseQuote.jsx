@@ -210,8 +210,31 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 			</div>
 
 			{/* Chart — first 8 tiers to keep it readable */}
-			<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
-				CV (gris) + Margen (verde) = Precio · $/firma por volumen (eje der.)
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px" })}>
+					Precio por volumen de firmas
+				</div>
+				{/* Legend */}
+				<div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 12, height: 12, background: GRAY, opacity: 0.5, borderRadius: 2 }} />
+						<span style={os(10, 400, GRAY)}>Costo variable</span>
+					</div>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 12, height: 12, background: OK, opacity: 0.85, borderRadius: 2 }} />
+						<span style={os(10, 400, GRAY)}>Margen</span>
+					</div>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 20, height: 2.5, background: BLUE, borderRadius: 2 }} />
+						<div style={{ width: 6, height: 6, background: BLUE, borderRadius: "50%", marginLeft: -4 }} />
+						<span style={os(10, 400, GRAY)}>USD / firma (eje der.)</span>
+					</div>
+				</div>
+			</div>
+			{/* Axis labels row */}
+			<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2, paddingRight: 4 }}>
+				<span style={os(9, 700, GRAY)}>← Precio total pack (USD)</span>
+				<span style={os(9, 700, BLUE)}>Precio por firma (USD) →</span>
 			</div>
 			<div style={{ height: 220, marginBottom: 28 }}>
 				<ResponsiveContainer width="100%" height="100%">
