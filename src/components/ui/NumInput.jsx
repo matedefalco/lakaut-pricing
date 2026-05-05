@@ -52,6 +52,8 @@ export function NumInput({ label, value, onChange, prefix, suffix, note }) {
 							padding: "5px 8px",
 							background: "#f4f6fd",
 							borderLeft: "1px solid " + BORD,
+							whiteSpace: "nowrap",
+							flexShrink: 0,
 						})}
 					>
 						{suffix}

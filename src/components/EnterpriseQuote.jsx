@@ -29,15 +29,20 @@ function computeRow(firmas, certs, periodo, marginTarget, costs) {
 	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, pricePerFirma, cvPerFirma };
 }
 
-export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCerts, initialPeriodo, initialMargin }) {
+export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCerts, initialPeriodo, initialMargin, hideInputs }) {
 	const { fMoney2 } = makeMoney(currency, tc);
 
-	// Unified inputs — drive everything (seeded from model if provided)
-	const [firmas, setFirmas] = useState(initialFirmas || 5000);
-	const [certs, setCerts] = useState(initialCerts || 4);
-	const [periodo, setPeriodo] = useState(initialPeriodo || 24);
-	const [marginTarget, setMarginTarget] = useState(initialMargin || 40);
+	const [firmasState, setFirmas] = useState(initialFirmas || 5000);
+	const [certsState, setCerts] = useState(initialCerts || 4);
+	const [periodoState, setPeriodo] = useState(initialPeriodo || 24);
+	const [marginTargetState, setMarginTarget] = useState(initialMargin || 40);
 	const [copied, setCopied] = useState(false);
+
+	// When embedded (hideInputs), values come from props live; otherwise from local state
+	const firmas = hideInputs ? (initialFirmas || 5000) : firmasState;
+	const certs = hideInputs ? (initialCerts || 4) : certsState;
+	const periodo = hideInputs ? (initialPeriodo || 24) : periodoState;
+	const marginTarget = hideInputs ? (initialMargin || 40) : marginTargetState;
 
 	// Custom quote from unified inputs
 	const customRow = useMemo(function () {
@@ -143,12 +148,14 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 			<div style={{ marginBottom: 20 }}>
 				<div style={Object.assign({}, mont(18), { marginBottom: 4 })}>Cotizador Enterprise · Volumen personalizado</div>
 				<div style={os(12, 400, GRAY)}>
-					Ingresá los datos del cliente. El resultado se actualiza al instante y la tabla escalonada usa los mismos parámetros.
+					{hideInputs
+						? "Los parámetros se toman del panel de Parámetros (sandbox). El resultado se actualiza al instante."
+						: "Ingresá los datos del cliente. El resultado se actualiza al instante y la tabla escalonada usa los mismos parámetros."}
 				</div>
 			</div>
 
-			{/* Unified input panel */}
-			<div style={{ background: BLUEL, border: "2px solid " + BLUE, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
+			{/* Unified input panel — hidden when embedded in Simulador */}
+			{!hideInputs && <div style={{ background: BLUEL, border: "2px solid " + BLUE, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
 				<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 14 })}>
 					Parámetros del cliente
 				</div>
@@ -208,7 +215,7 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 						CV cert: {fMoney2(costs.cvCertBase)} · CV firma: {fMoney2(costs.cvFirmaBase)}
 					</div>
 				</div>
-			</div>
+			</div>}
 
 			{/* Result cards */}
 			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 28 }}>

@@ -458,6 +458,7 @@ function LakautCalcInner() {
 												initialCerts={selectedModel ? (selectedModel.certs || 1) : 1}
 												initialPeriodo={inp.periodo || 24}
 												initialMargin={margenDeseado || 40}
+												hideInputs={true}
 											/>
 										)}
 									</div>
