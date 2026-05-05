@@ -18,6 +18,7 @@ import { TabConfig } from "./components/tabs/TabConfig";
 import { Cotizadora } from "./components/Cotizadora";
 import { Comparison } from "./components/Comparison";
 import { EnterpriseQuote } from "./components/EnterpriseQuote";
+import { CartQuote } from "./components/CartQuote";
 
 export default function LakautCalc() {
 	useEffect(function () {
@@ -122,6 +123,7 @@ export default function LakautCalc() {
 		{ k: "configuración", label: "Configuración" },
 		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
+		{ k: "carrito", label: "Armar Cotización" },
 		{ k: "comparación", label: "Comparación" },
 		{ k: "enterprise", label: "Enterprise" },
 	];
@@ -569,6 +571,12 @@ export default function LakautCalc() {
 			{section === "cotizadora" && (
 				<div style={{ padding: "24px" }}>
 					<Cotizadora costs={costs} currency={currency} tc={tc} />
+				</div>
+			)}
+
+			{section === "carrito" && (
+				<div style={{ padding: "24px" }}>
+					<CartQuote costs={costs} currency={currency} tc={tc} />
 				</div>
 			)}
 
