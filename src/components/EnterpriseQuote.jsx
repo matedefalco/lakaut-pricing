@@ -142,15 +142,16 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 	const thL = Object.assign({}, thStyle, { textAlign: "left" });
 	const tdMono = { fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" };
 
+	// Diverging chart data: delta from current price
+	const rangoData = [30, 40, 50, 60].map(function (m) {
+		var p = customRow.cvPack / (1 - m / 100);
+		var delta = p - customRow.priceSug;
+		return { m: m, p: p, delta: delta };
+	});
+	var maxAbsDelta = rangoData.reduce(function (mx, r) { return Math.max(mx, Math.abs(r.delta)); }, 0);
+
 	return (
 		<div>
-			{/* Header — only shown in standalone mode */}
-			{!hideInputs && (
-				<div style={{ marginBottom: 20 }}>
-					<div style={Object.assign({}, mont(18), { marginBottom: 4 })}>Cotizador Enterprise · Volumen personalizado</div>
-					<div style={os(12, 400, GRAY)}>Ingresá los datos del cliente. El resultado se actualiza al instante y la tabla escalonada usa los mismos parámetros.</div>
-				</div>
-			)}
 
 			{/* Unified input panel — hidden when embedded in Simulador */}
 			{!hideInputs && <div style={{ background: BLUEL, border: "2px solid " + BLUE, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
@@ -215,33 +216,75 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 				</div>
 			</div>}
 
-			{/* Result row — all metrics in one line */}
-			<div style={{ display: "flex", border: "1px solid " + BORD, borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
-				{[
-					{ label: "Costo variable", value: fMoney2(customRow.cvPack), sub: fMoney2(customRow.cvPerFirma) + "/firma", bg: "#f8fafc", color: BLACK },
-					{ label: "Precio al " + marginTarget + "% margen", value: fMoney2(customRow.priceSug), sub: fMoney2(customRow.pricePerFirma) + "/firma", bg: OKBG, color: OK, bold: true },
-					{ label: "Margen pack", value: fMoney2(customRow.margenPack), sub: fP(marginTarget) + " del precio", bg: "#f8fafc", color: BLACK },
-					{ label: "Break-even", value: isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞", sub: "clientes de este tipo", bg: "#f8fafc", color: isFinite(customRow.be) ? BLACK : ER },
-				].map(function (c, i) {
+			{/* KPI cards */}
+			<div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+				{/* Costo variable */}
+				<div style={{ flex: "1 1 140px", background: "#fff7ed", border: "1px solid #f59e0b", borderLeft: "4px solid #f59e0b", borderRadius: 10, padding: "8px 12px", minWidth: 0 }}>
+					<div style={os(8, 700, "#b45309")}>COSTO VARIABLE</div>
+					<div style={Object.assign({}, mont(16), { color: "#b45309", marginTop: 2, lineHeight: 1.2 })}>{fMoney2(customRow.cvPack)}</div>
+					<div style={os(9, 400, "#92400e")}>{fMoney2(customRow.cvPerFirma)}/firma</div>
+				</div>
+				{/* Precio */}
+				<div style={{ flex: "1 1 160px", background: OKBG, border: "1px solid " + OK, borderLeft: "4px solid " + OK, borderRadius: 10, padding: "8px 12px", minWidth: 0 }}>
+					<div style={os(8, 700, OK)}>PRECIO AL {marginTarget}% MARGEN</div>
+					<div style={Object.assign({}, mont(20), { color: OK, marginTop: 2, lineHeight: 1.2 })}>{fMoney2(customRow.priceSug)}</div>
+					<div style={os(9, 400, OK)}>{fMoney2(customRow.pricePerFirma)}/firma</div>
+				</div>
+				{/* Margen */}
+				<div style={{ flex: "1 1 140px", background: BLUEL, border: "1px solid " + BLUE, borderLeft: "4px solid " + BLUE, borderRadius: 10, padding: "8px 12px", minWidth: 0 }}>
+					<div style={os(8, 700, BLUE)}>MARGEN PACK</div>
+					<div style={Object.assign({}, mont(16), { color: BLUE, marginTop: 2, lineHeight: 1.2 })}>{fMoney2(customRow.margenPack)}</div>
+					<div style={os(9, 400, BLUE)}>{fP(marginTarget)} del precio</div>
+				</div>
+				{/* Break-even */}
+				{(function () {
+					var beOk = isFinite(customRow.be) && customRow.be < 5000;
+					var beMid = isFinite(customRow.be) && customRow.be >= 5000;
+					var bc = beOk ? OK : beMid ? WN : ER;
+					var bbg = beOk ? OKBG : beMid ? "#fffbeb" : "#fef2f2";
+					var bborder = beOk ? OK : beMid ? WN : ER;
 					return (
-						<div key={c.label} style={{ flex: 1, padding: "8px 12px", background: c.bg, borderLeft: i > 0 ? "1px solid " + BORD : "none", minWidth: 0 }}>
-							<div style={os(8, 700, c.bold ? c.color : GRAY)}>{c.label.toUpperCase()}</div>
-							<div style={Object.assign({}, mont(14), { color: c.color, marginTop: 3, lineHeight: 1.2 })}>{c.value}</div>
-							<div style={os(9, 400, GRAY)}>{c.sub}</div>
+						<div style={{ flex: "1 1 130px", background: bbg, border: "1px solid " + bborder, borderLeft: "4px solid " + bborder, borderRadius: 10, padding: "8px 12px", minWidth: 0 }}>
+							<div style={os(8, 700, bc)}>BREAK-EVEN</div>
+							<div style={Object.assign({}, mont(16), { color: bc, marginTop: 2, lineHeight: 1.2 })}>
+								{isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞"}
+							</div>
+							<div style={os(9, 400, bc)}>clientes de este tipo</div>
 						</div>
 					);
-				})}
-				{/* Price range inline */}
-				<div style={{ borderLeft: "1px solid " + BORD, padding: "8px 12px", background: "#f8fafc", flexShrink: 0 }}>
-					<div style={os(8, 700, GRAY)}>RANGO</div>
-					<div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 3 }}>
-						{[30, 40, 50, 60].map(function (m) {
-							var p = customRow.cvPack / (1 - m / 100);
-							var act = m === marginTarget;
+				})()}
+			</div>
+
+			{/* Price range number line */}
+			<div style={{ background: "#f8fafc", border: "1px solid " + BORD, borderRadius: 10, padding: "14px 20px", marginBottom: 20 }}>
+				<div style={Object.assign({}, os(8, 700, GRAY), { marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.5px" })}>Rango de precio</div>
+				<div style={{ position: "relative", padding: "0 16px" }}>
+					{/* Horizontal line */}
+					<div style={{ position: "absolute", top: "50%", left: 16, right: 16, height: 2, background: "#e2e8f0", transform: "translateY(-50%)", zIndex: 0 }} />
+					{/* Items */}
+					<div style={{ display: "flex", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
+						{rangoData.map(function (r) {
+							var isSel = r.m === marginTarget;
+							var dotColor = isSel ? BLUE : "#94a3b8";
+							var labelColor = isSel ? BLUE : GRAY;
 							return (
-								<div key={m} style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-									<span style={os(9, act ? 700 : 400, act ? BLUE : GRAY)}>{m}%</span>
-									<span style={Object.assign({}, os(9, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>{fMoney2(p)}</span>
+								<div key={r.m} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+									{/* Price above */}
+									<span style={Object.assign({}, os(isSel ? 12 : 10, isSel ? 700 : 400, labelColor), { fontFamily: "Courier New,monospace", whiteSpace: "nowrap" })}>
+										{fMoney2(r.p)}
+									</span>
+									{/* Dot */}
+									<div style={{
+										width: isSel ? 13 : 8,
+										height: isSel ? 13 : 8,
+										borderRadius: "50%",
+										background: dotColor,
+										border: "2px solid " + WHITE,
+										boxShadow: isSel ? "0 0 0 2px " + BLUE : "none",
+										flexShrink: 0,
+									}} />
+									{/* % below */}
+									<span style={os(isSel ? 11 : 9, isSel ? 700 : 400, labelColor)}>{r.m}%</span>
 								</div>
 							);
 						})}

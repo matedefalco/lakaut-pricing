@@ -147,7 +147,7 @@ function LakautCalcInner() {
 	};
 	const scaleLabel = scaleLabels[cfg.arch] || "Usuarios activos";
 
-	const ANALYSIS_TABS = ["costos", "break-even", "precios", "proyección", "calculadora"];
+	const ANALYSIS_TABS = ["costos", "break-even", "precios", "proyección"];
 	const SECTIONS = [
 		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
@@ -165,6 +165,7 @@ function LakautCalcInner() {
 	const COT_TABS = [
 		{ k: "estándar", label: "Por perfil" },
 		{ k: "armar", label: "A medida" },
+		{ k: "enterprise", label: "Enterprise" },
 	];
 
 	const activeModTab = MOD_TABS.find(function (t) { return t.k === modTab; });
@@ -403,19 +404,7 @@ function LakautCalcInner() {
 											/>
 										)}
 										{tab === "break-even" && <TabBreakEven arch={cfg.arch} inp={inp} svc={svc} currentUsers={users} costs={costs} />}
-										{tab === "calculadora" && (
-											<EnterpriseQuote
-												costs={costs}
-												currency={currency}
-												tc={tc}
-												initialFirmas={inp.firmas || 0}
-												initialCerts={selectedModel ? (selectedModel.certs || 1) : 1}
-												initialPeriodo={inp.periodo || 24}
-												initialMargin={margenDeseado || 40}
-												hideInputs={true}
-											/>
-										)}
-									</div>
+										</div>
 								</div>
 
 								{/* Right KPI panel */}
@@ -552,12 +541,6 @@ function LakautCalcInner() {
 							);
 						})}
 					</div>
-					{/* Breadcrumb */}
-					<div style={{ background: "#f8fafc", borderBottom: "1px solid " + BORD, padding: "5px 24px" }}>
-						<span style={os(10, 400, GRAY)}>Cotizadora</span>
-						<span style={Object.assign({}, os(10, 400, GRAY), { margin: "0 5px" })}>·</span>
-						<span style={os(10, 700, GRAY)}>{activeCotTab ? activeCotTab.label : ""}</span>
-					</div>
 					{cotTab === "estándar" && (
 						<div style={{ padding: 24 }}>
 							<Cotizadora costs={costs} currency={currency} tc={tc} />
@@ -566,6 +549,15 @@ function LakautCalcInner() {
 					{cotTab === "armar" && (
 						<div style={{ padding: 24 }}>
 							<CartQuote costs={costs} currency={currency} tc={tc} />
+						</div>
+					)}
+					{cotTab === "enterprise" && (
+						<div style={{ padding: 24 }}>
+							<EnterpriseQuote
+								costs={costs}
+								currency={currency}
+								tc={tc}
+							/>
 						</div>
 					)}
 				</div>
