@@ -144,15 +144,13 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 
 	return (
 		<div>
-			{/* Header */}
-			<div style={{ marginBottom: 20 }}>
-				<div style={Object.assign({}, mont(18), { marginBottom: 4 })}>Cotizador Enterprise · Volumen personalizado</div>
-				<div style={os(12, 400, GRAY)}>
-					{hideInputs
-						? "Los parámetros se toman del panel de Parámetros (sandbox). El resultado se actualiza al instante."
-						: "Ingresá los datos del cliente. El resultado se actualiza al instante y la tabla escalonada usa los mismos parámetros."}
+			{/* Header — only shown in standalone mode */}
+			{!hideInputs && (
+				<div style={{ marginBottom: 20 }}>
+					<div style={Object.assign({}, mont(18), { marginBottom: 4 })}>Cotizador Enterprise · Volumen personalizado</div>
+					<div style={os(12, 400, GRAY)}>Ingresá los datos del cliente. El resultado se actualiza al instante y la tabla escalonada usa los mismos parámetros.</div>
 				</div>
-			</div>
+			)}
 
 			{/* Unified input panel — hidden when embedded in Simulador */}
 			{!hideInputs && <div style={{ background: BLUEL, border: "2px solid " + BLUE, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
@@ -217,38 +215,37 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 				</div>
 			</div>}
 
-			{/* Result strip */}
+			{/* Result row — all metrics in one line */}
 			<div style={{ display: "flex", border: "1px solid " + BORD, borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
 				{[
-					{ label: "Costo variable", value: fMoney2(customRow.cvPack), sub: fMoney2(customRow.cvPerFirma) + "/firma", bg: "#f8fafc", color: BLACK, accent: BORD },
-					{ label: "Precio al " + marginTarget + "% margen", value: fMoney2(customRow.priceSug), sub: fMoney2(customRow.pricePerFirma) + "/firma", bg: OKBG, color: OK, accent: OK, bold: true },
-					{ label: "Margen pack", value: fMoney2(customRow.margenPack), sub: fP(marginTarget) + " del precio", bg: "#f8fafc", color: BLACK, accent: BORD },
-					{ label: "Break-even", value: isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞", sub: "clientes de este tipo", bg: "#f8fafc", color: isFinite(customRow.be) ? BLACK : ER, accent: BORD },
+					{ label: "Costo variable", value: fMoney2(customRow.cvPack), sub: fMoney2(customRow.cvPerFirma) + "/firma", bg: "#f8fafc", color: BLACK },
+					{ label: "Precio al " + marginTarget + "% margen", value: fMoney2(customRow.priceSug), sub: fMoney2(customRow.pricePerFirma) + "/firma", bg: OKBG, color: OK, bold: true },
+					{ label: "Margen pack", value: fMoney2(customRow.margenPack), sub: fP(marginTarget) + " del precio", bg: "#f8fafc", color: BLACK },
+					{ label: "Break-even", value: isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞", sub: "clientes de este tipo", bg: "#f8fafc", color: isFinite(customRow.be) ? BLACK : ER },
 				].map(function (c, i) {
 					return (
-						<div key={c.label} style={{ flex: 1, padding: "10px 14px", background: c.bg, borderLeft: i > 0 ? "1px solid " + c.accent : "none", minWidth: 0 }}>
-							<div style={os(9, 700, c.bold ? c.color : GRAY)}>{c.label.toUpperCase()}</div>
-							<div style={Object.assign({}, mont(16), { color: c.color, marginTop: 4, lineHeight: 1.2 })}>{c.value}</div>
-							<div style={os(10, 400, GRAY)}>{c.sub}</div>
+						<div key={c.label} style={{ flex: 1, padding: "8px 12px", background: c.bg, borderLeft: i > 0 ? "1px solid " + BORD : "none", minWidth: 0 }}>
+							<div style={os(8, 700, c.bold ? c.color : GRAY)}>{c.label.toUpperCase()}</div>
+							<div style={Object.assign({}, mont(14), { color: c.color, marginTop: 3, lineHeight: 1.2 })}>{c.value}</div>
+							<div style={os(9, 400, GRAY)}>{c.sub}</div>
 						</div>
 					);
 				})}
-			</div>
-
-			{/* Price range */}
-			<div style={{ display: "inline-block", background: "#f8fafc", border: "1px solid " + BORD, borderRadius: 10, padding: "10px 16px", marginBottom: 20 }}>
-				<div style={Object.assign({}, os(9, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Rango de precios</div>
-				<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-					{[30, 40, 50, 60].map(function (m) {
-						var p = customRow.cvPack / (1 - m / 100);
-						var act = m === marginTarget;
-						return (
-							<div key={m} style={{ display: "flex", justifyContent: "space-between", gap: 32 }}>
-								<span style={os(10, act ? 700 : 400, act ? BLUE : GRAY)}>{m}%</span>
-								<span style={Object.assign({}, os(11, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>{fMoney2(p)}</span>
-							</div>
-						);
-					})}
+				{/* Price range inline */}
+				<div style={{ borderLeft: "1px solid " + BORD, padding: "8px 12px", background: "#f8fafc", flexShrink: 0 }}>
+					<div style={os(8, 700, GRAY)}>RANGO</div>
+					<div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 3 }}>
+						{[30, 40, 50, 60].map(function (m) {
+							var p = customRow.cvPack / (1 - m / 100);
+							var act = m === marginTarget;
+							return (
+								<div key={m} style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+									<span style={os(9, act ? 700 : 400, act ? BLUE : GRAY)}>{m}%</span>
+									<span style={Object.assign({}, os(9, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>{fMoney2(p)}</span>
+								</div>
+							);
+						})}
+					</div>
 				</div>
 			</div>
 
