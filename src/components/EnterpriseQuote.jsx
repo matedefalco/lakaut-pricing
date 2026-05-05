@@ -217,45 +217,35 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 				</div>
 			</div>}
 
-			{/* Result cards */}
-			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 28 }}>
-				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
-					<div style={os(10, 700, GRAY)}>COSTO VARIABLE</div>
-					<div style={Object.assign({}, mont(22), { color: BLACK, marginTop: 6 })}>{fMoney2(customRow.cvPack)}</div>
-					<div style={os(10, 400, GRAY)}>{fMoney2(customRow.cvPerFirma)}/firma</div>
-				</div>
+			{/* Result strip */}
+			<div style={{ display: "flex", border: "1px solid " + BORD, borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+				{[
+					{ label: "Costo variable", value: fMoney2(customRow.cvPack), sub: fMoney2(customRow.cvPerFirma) + "/firma", bg: "#f8fafc", color: BLACK, accent: BORD },
+					{ label: "Precio al " + marginTarget + "% margen", value: fMoney2(customRow.priceSug), sub: fMoney2(customRow.pricePerFirma) + "/firma", bg: OKBG, color: OK, accent: OK, bold: true },
+					{ label: "Margen pack", value: fMoney2(customRow.margenPack), sub: fP(marginTarget) + " del precio", bg: "#f8fafc", color: BLACK, accent: BORD },
+					{ label: "Break-even", value: isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞", sub: "clientes de este tipo", bg: "#f8fafc", color: isFinite(customRow.be) ? BLACK : ER, accent: BORD },
+				].map(function (c, i) {
+					return (
+						<div key={c.label} style={{ flex: 1, padding: "10px 14px", background: c.bg, borderLeft: i > 0 ? "1px solid " + c.accent : "none", minWidth: 0 }}>
+							<div style={os(9, 700, c.bold ? c.color : GRAY)}>{c.label.toUpperCase()}</div>
+							<div style={Object.assign({}, mont(16), { color: c.color, marginTop: 4, lineHeight: 1.2 })}>{c.value}</div>
+							<div style={os(10, 400, GRAY)}>{c.sub}</div>
+						</div>
+					);
+				})}
+			</div>
 
-				<div style={{ background: OKBG, borderRadius: 10, padding: "14px 16px", border: "1.5px solid " + OK }}>
-					<div style={os(10, 700, OK)}>PRECIO AL {marginTarget}% MARGEN</div>
-					<div style={Object.assign({}, mont(22), { color: OK, marginTop: 6 })}>{fMoney2(customRow.priceSug)}</div>
-					<div style={os(10, 400, GRAY)}>{fMoney2(customRow.pricePerFirma)}/firma</div>
-				</div>
-
-				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
-					<div style={os(10, 700, GRAY)}>MARGEN PACK</div>
-					<div style={Object.assign({}, mont(22), { color: BLACK, marginTop: 6 })}>{fMoney2(customRow.margenPack)}</div>
-					<div style={os(10, 400, GRAY)}>{fP(marginTarget)} del precio</div>
-				</div>
-
-				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
-					<div style={os(10, 700, GRAY)}>BREAK-EVEN</div>
-					<div style={Object.assign({}, mont(22), { color: isFinite(customRow.be) ? BLACK : ER, marginTop: 6 })}>
-						{isFinite(customRow.be) ? customRow.be.toLocaleString("es-AR") : "∞"}
-					</div>
-					<div style={os(10, 400, GRAY)}>clientes de este tipo</div>
-				</div>
-
-				<div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid " + BORD }}>
-					<div style={Object.assign({}, os(10, 700, GRAY), { marginBottom: 6 })}>RANGO DE PRECIOS</div>
+			{/* Price range */}
+			<div style={{ display: "inline-block", background: "#f8fafc", border: "1px solid " + BORD, borderRadius: 10, padding: "10px 16px", marginBottom: 20 }}>
+				<div style={Object.assign({}, os(9, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Rango de precios</div>
+				<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
 					{[30, 40, 50, 60].map(function (m) {
 						var p = customRow.cvPack / (1 - m / 100);
 						var act = m === marginTarget;
 						return (
-							<div key={m} style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+							<div key={m} style={{ display: "flex", justifyContent: "space-between", gap: 32 }}>
 								<span style={os(10, act ? 700 : 400, act ? BLUE : GRAY)}>{m}%</span>
-								<span style={Object.assign({}, os(11, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>
-									{fMoney2(p)}
-								</span>
+								<span style={Object.assign({}, os(11, act ? 700 : 400, act ? BLUE : BLACK), { fontFamily: "Courier New,monospace" })}>{fMoney2(p)}</span>
 							</div>
 						);
 					})}

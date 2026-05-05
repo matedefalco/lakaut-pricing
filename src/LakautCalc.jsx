@@ -352,7 +352,7 @@ function LakautCalcInner() {
 									tooltip: "Precio de pack necesario para alcanzar " + margenDeseado + "% de margen.",
 								});
 								return (
-									<div style={{ borderBottom: "1px solid " + BORD, display: "flex", overflowX: "auto" }}>
+									<div style={{ borderBottom: "1px solid " + BORD, background: "#f1f5f9", display: "flex", overflowX: "auto" }}>
 										{items.map(function (item, i) {
 											return (
 												<div
