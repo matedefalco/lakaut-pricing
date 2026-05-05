@@ -7,7 +7,7 @@ import { PACKS } from "./data/packs";
 import { engine } from "./engine/engine";
 import { modelToInp } from "./utils/modelToInp";
 import { ModelsProvider, useModels } from "./context/ModelsContext";
-import { KpiCard } from "./components/ui/KpiCard";
+import { InfoTooltip } from "./components/ui/InfoTooltip";
 import { Sec } from "./components/ui/Sec";
 import { PackFields } from "./components/ui/PackFields";
 import { NumInput } from "./components/ui/NumInput";
@@ -311,51 +311,72 @@ function LakautCalcInner() {
 								<div style={os(12, 400, BLACK)}>{strategyText}</div>
 							</div>
 
-							{/* KPI strip */}
-							<div style={{ padding: "16px 24px 0" }}>
-								<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-									<KpiCard
-										label="Revenue / mes"
-										value={fMoney(calcs.revTotal)}
-										sub={fMoney2(calcs.revMes) + " / usuario / mes"}
-										accent={BLUE}
-										tooltip={"Revenue total mensual = precio por usuario × " + users.toLocaleString() + " usuarios."}
-									/>
-									<KpiCard
-										label="EBITDA / mes"
-										value={fMoney(calcs.ebitda)}
-										sub={"Margen " + fP(calcs.ebitdaPct)}
-										accent={ec}
-										tooltip={"EBITDA = Revenue total − CV total − CF directo."}
-									/>
-									<KpiCard
-										label="Margen unitario"
-										value={fP(calcs.margenPct)}
-										sub={fMoney2(calcs.margenUnit) + " / usuario / mes"}
-										accent={mc}
-										tooltip={"Margen unitario = precio − CV por usuario."}
-									/>
-									<KpiCard
-										label="Break-even"
-										value={fK(calcs.beUsuarios) + " usu."}
-										sub={calcs.beMes ? "Alcanzado en mes " + calcs.beMes : "No alcanza en 24M"}
-										accent={bc}
-										tooltip={"Usuarios mínimos para cubrir el CF directo."}
-									/>
-									{cfg.arch === "free" && (
-										<KpiCard label="Costo asumido/mes" value={fMoney(calcs.cvTotal)} sub="Sin revenue · costo directo" accent={ER} />
-									)}
-									{precioSugerido !== null && (
-										<KpiCard
-											label={"Precio para " + margenDeseado + "% margen"}
-											value={fMoney2(precioSugerido)}
-											sub={"Actual: " + fMoney2(inp.precio || 0) + " · Δ " + fMoney2(precioSugerido - (inp.precio || 0))}
-											accent={OK}
-											tooltip={"Precio de pack necesario para alcanzar " + margenDeseado + "% de margen, dado el costo variable actual."}
-										/>
-									)}
-								</div>
-							</div>
+							{/* KPI strip compacto */}
+							{(function () {
+								var items = [
+									{
+										label: "Revenue / mes",
+										value: fMoney(calcs.revTotal),
+										sub: fMoney2(calcs.revMes) + " / usu",
+										color: BLUE,
+										tooltip: "Revenue total mensual = precio por usuario × " + users.toLocaleString() + " usuarios.",
+									},
+									{
+										label: "EBITDA / mes",
+										value: fMoney(calcs.ebitda),
+										sub: "Margen " + fP(calcs.ebitdaPct),
+										color: ec,
+										tooltip: "EBITDA = Revenue total − CV total − CF directo.",
+									},
+									{
+										label: "Margen unitario",
+										value: fP(calcs.margenPct),
+										sub: fMoney2(calcs.margenUnit) + " / usu",
+										color: mc,
+										tooltip: "Margen unitario = precio − CV por usuario.",
+									},
+									{
+										label: "Break-even",
+										value: fK(calcs.beUsuarios) + " usu.",
+										sub: calcs.beMes ? "Mes " + calcs.beMes : "No alcanza 24M",
+										color: bc,
+										tooltip: "Usuarios mínimos para cubrir el CF directo.",
+									},
+								];
+								if (cfg.arch === "free") items.push({ label: "Costo asumido/mes", value: fMoney(calcs.cvTotal), sub: "Sin revenue", color: ER });
+								if (precioSugerido !== null) items.push({
+									label: "Precio " + margenDeseado + "% margen",
+									value: fMoney2(precioSugerido),
+									sub: "Δ " + fMoney2(precioSugerido - (inp.precio || 0)),
+									color: OK,
+									tooltip: "Precio de pack necesario para alcanzar " + margenDeseado + "% de margen.",
+								});
+								return (
+									<div style={{ borderBottom: "1px solid " + BORD, display: "flex", overflowX: "auto" }}>
+										{items.map(function (item, i) {
+											return (
+												<div
+													key={item.label}
+													style={{
+														flex: "1 1 0",
+														minWidth: 120,
+														padding: "10px 18px",
+														borderLeft: i > 0 ? "1px solid " + BORD : "none",
+														borderTop: "3px solid " + item.color,
+													}}
+												>
+													<div style={Object.assign({}, os(9, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3, display: "flex", alignItems: "center", gap: 3 })}>
+														{item.label}
+														{item.tooltip && <InfoTooltip text={item.tooltip} />}
+													</div>
+													<div style={Object.assign({}, mont(16), { color: item.color, lineHeight: 1.2 })}>{item.value}</div>
+													<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 2 })}>{item.sub}</div>
+												</div>
+											);
+										})}
+									</div>
+								);
+							})()}
 
 							{/* Body */}
 							<div style={{ display: "flex", gap: 16, padding: "16px 24px", flexWrap: "wrap" }}>
