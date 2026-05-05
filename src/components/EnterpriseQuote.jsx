@@ -29,14 +29,14 @@ function computeRow(firmas, certs, periodo, marginTarget, costs) {
 	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, pricePerFirma, cvPerFirma };
 }
 
-export function EnterpriseQuote({ costs, currency, tc }) {
+export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCerts, initialPeriodo, initialMargin }) {
 	const { fMoney2 } = makeMoney(currency, tc);
 
-	// Unified inputs — drive everything
-	const [firmas, setFirmas] = useState(5000);
-	const [certs, setCerts] = useState(4);
-	const [periodo, setPeriodo] = useState(24);
-	const [marginTarget, setMarginTarget] = useState(40);
+	// Unified inputs — drive everything (seeded from model if provided)
+	const [firmas, setFirmas] = useState(initialFirmas || 5000);
+	const [certs, setCerts] = useState(initialCerts || 4);
+	const [periodo, setPeriodo] = useState(initialPeriodo || 24);
+	const [marginTarget, setMarginTarget] = useState(initialMargin || 40);
 	const [copied, setCopied] = useState(false);
 
 	// Custom quote from unified inputs

@@ -50,8 +50,11 @@ function LakautCalcInner() {
 	// Top-level navigation
 	const [section, setSection] = useState("modelos");
 
-	// Modelos sub-nav: análisis | gestionar | suscripción | comparación
+	// Modelos sub-nav
 	const [modTab, setModTab] = useState("análisis");
+
+	// Cotizadora sub-nav
+	const [cotTab, setCotTab] = useState("estándar");
 
 	// Selected model id in análisis mode
 	const [selectedModelId, setSelectedModelId] = useState(function () {
@@ -67,6 +70,7 @@ function LakautCalcInner() {
 	const [svc, setSvc] = useState({ cloudStorage: false, mailCert: false, paywall: false });
 	const [inp, setInp] = useState(PACKS.B.defaults);
 	const [projParams, setProjParams] = useState({ usersM1: 1000, growthRate: 10, churnRate: 5 });
+	const [margenDeseado, setMargenDeseado] = useState(null); // null = desactivado
 	const [costConfig, setCostConfig] = useState(function () {
 		try {
 			const saved = localStorage.getItem("lakaut_costConfig");
@@ -126,6 +130,13 @@ function LakautCalcInner() {
 	const mc = calcs.margenPct > 30 ? OK : calcs.margenPct > 0 ? WN : ER;
 	const bc = isFinite(calcs.beUsuarios) ? OK : WN;
 
+	// Precio sugerido para lograr margen deseado: p = cvMes * periodo / (1 - m/100)
+	const precioSugerido = useMemo(function () {
+		if (margenDeseado === null || margenDeseado >= 100) return null;
+		const periodo = inp.periodo || 24;
+		return Math.round((calcs.cvMes * periodo / (1 - margenDeseado / 100)) * 100) / 100;
+	}, [margenDeseado, calcs.cvMes, inp.periodo]);
+
 	const scaleLabels = {
 		sub: "Suscripciones activas",
 		bolsa: "Clientes activos",
@@ -136,27 +147,34 @@ function LakautCalcInner() {
 	};
 	const scaleLabel = scaleLabels[cfg.arch] || "Usuarios activos";
 
-	const ANALYSIS_TABS = ["costos", "break-even", "precios", "proyección"];
+	const ANALYSIS_TABS = ["costos", "break-even", "precios", "proyección", "calculadora"];
 	const SECTIONS = [
-		{ k: "configuración", label: "Configuración" },
 		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
-		{ k: "carrito", label: "Armar Cotización" },
-		{ k: "comparación", label: "Comparación" },
-		{ k: "enterprise", label: "Enterprise" },
+		{ k: "configuración", label: "Configuración" },
 	];
 	const MOD_TABS = [
-		{ k: "análisis", label: "Análisis" },
-		{ k: "gestionar", label: "Modelos guardados" },
-		{ k: "suscripción", label: "Suscripción" },
-		{ k: "comparación", label: "Comparación" },
+		// Grupo gestión
+		{ k: "gestionar", label: "Guardados", group: "gestión" },
+		{ k: "análisis", label: "Simulador", group: "gestión" },
+		// Grupo herramientas
+		{ k: "suscripción", label: "Suscripción", group: "herramientas" },
+		{ k: "comparación", label: "Comparación", group: "herramientas" },
+		{ k: "tabla-planes", label: "Tabla Planes", group: "herramientas" },
 	];
+	const COT_TABS = [
+		{ k: "estándar", label: "Por perfil" },
+		{ k: "armar", label: "A medida" },
+	];
+
+	const activeModTab = MOD_TABS.find(function (t) { return t.k === modTab; });
+	const activeCotTab = COT_TABS.find(function (t) { return t.k === cotTab; });
 
 	const selectedModel = models.find(function (m) { return m.id === selectedModelId; });
 
 	// Description text: prefer model tagline, fallback to pack strategy
 	const strategyText = selectedModel && modTab === "análisis"
-		? selectedModel.tagline
+		? (selectedModel.tagline || cfg.strategy)
 		: cfg.strategy;
 
 	return (
@@ -170,16 +188,16 @@ function LakautCalcInner() {
 						Calculadora de Pricing · Modelos y Planes Comerciales
 					</div>
 				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+					<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
+						{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
+					</div>
 					<button
 						onClick={function () { window.print(); }}
 						style={{ padding: "6px 14px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, color: WHITE, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
 					>
 						Exportar PDF
 					</button>
-					<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
-						{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
-					</div>
 				</div>
 			</div>
 
@@ -220,19 +238,44 @@ function LakautCalcInner() {
 			{section === "modelos" && (
 				<div>
 					{/* Modelos sub-nav */}
-					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", gap: 0 }}>
-						{MOD_TABS.map(function (t) {
+					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", alignItems: "stretch", gap: 0 }}>
+						{MOD_TABS.map(function (t, i) {
 							const act = modTab === t.k;
+							const prevGroup = i > 0 ? MOD_TABS[i - 1].group : t.group;
+							const groupBreak = i > 0 && t.group !== prevGroup;
 							return (
-								<button
-									key={t.k}
-									onClick={function () { setModTab(t.k); }}
-									style={{ padding: "10px 20px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent") }}
-								>
-									{t.label}
-								</button>
+								<div key={t.k} style={{ display: "flex", alignItems: "stretch" }}>
+									{groupBreak && (
+										<div style={{ width: 1, background: BORD, margin: "8px 6px" }} />
+									)}
+									<button
+										onClick={function () { setModTab(t.k); }}
+										style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
+									>
+										{t.label}
+										{t.k === "gestionar" && (
+											<span style={{
+												background: act ? BLUE : "#e2e8f0",
+												color: act ? WHITE : GRAY,
+												fontSize: 10,
+												fontWeight: 700,
+												borderRadius: 10,
+												padding: "1px 6px",
+												lineHeight: "14px",
+											}}>
+												{models.length}
+											</span>
+										)}
+									</button>
+								</div>
 							);
 						})}
+					</div>
+					{/* Breadcrumb */}
+					<div style={{ background: "#f8fafc", borderBottom: "1px solid " + BORD, padding: "5px 24px" }}>
+						<span style={os(10, 400, GRAY)}>Modelos</span>
+						<span style={Object.assign({}, os(10, 400, GRAY), { margin: "0 5px" })}>·</span>
+						<span style={os(10, 700, GRAY)}>{activeModTab ? activeModTab.label : ""}</span>
 					</div>
 
 					{/* ── Análisis ──────────────────────────────────────────────────────── */}
@@ -302,6 +345,15 @@ function LakautCalcInner() {
 									{cfg.arch === "free" && (
 										<KpiCard label="Costo asumido/mes" value={fMoney(calcs.cvTotal)} sub="Sin revenue · costo directo" accent={ER} />
 									)}
+									{precioSugerido !== null && (
+										<KpiCard
+											label={"Precio para " + margenDeseado + "% margen"}
+											value={fMoney2(precioSugerido)}
+											sub={"Actual: " + fMoney2(inp.precio || 0) + " · Δ " + fMoney2(precioSugerido - (inp.precio || 0))}
+											accent={OK}
+											tooltip={"Precio de pack necesario para alcanzar " + margenDeseado + "% de margen, dado el costo variable actual."}
+										/>
+									)}
 								</div>
 							</div>
 
@@ -338,25 +390,23 @@ function LakautCalcInner() {
 												</div>
 											</div>
 										)}
-									</div>
 
-									{/* Cost reference */}
-									<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 16 }}>
-										<Sec title="Referencia de costos" />
-										<div style={{ background: BLUEL, borderRadius: 10, padding: "10px 14px" }}>
-											{[
-												{ l: "Break-even", v: isFinite(calcs.beUsuarios) ? calcs.beUsuarios.toLocaleString("es-AR") + " usu." : "∞", color: isFinite(calcs.beUsuarios) ? OK : ER },
-												{ l: "CF directo / mes", v: fMoney(costs.cfDirecto), color: OK },
-												{ l: "CV firma / unidad", v: fMoney2(calcs.cvFirmaUnit), color: BLUE },
-												{ l: "Infra / firma", v: fMoney2(calcs.infraPorFirma), color: GRAY },
-											].map(function (row) {
-												return (
-													<div key={row.l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-														<span style={os(11, 400, GRAY)}>{row.l}</span>
-														<span style={Object.assign({}, os(11, 700, row.color), { fontFamily: "Courier New,monospace" })}>{row.v}</span>
-													</div>
-												);
-											})}
+										{/* Margen objetivo — dentro de parámetros */}
+										<div style={{ borderTop: "1px solid " + BORD, marginTop: 12, paddingTop: 12 }}>
+											<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: margenDeseado !== null ? 10 : 0 }}>
+												<span style={os(11, 400, GRAY)}>Margen objetivo</span>
+												<label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+													<input
+														type="checkbox"
+														checked={margenDeseado !== null}
+														onChange={function (e) { setMargenDeseado(e.target.checked ? 40 : null); }}
+													/>
+													<span style={os(11, 400, GRAY)}>{margenDeseado !== null ? "Activo" : "Activar"}</span>
+												</label>
+											</div>
+											{margenDeseado !== null && (
+												<NumInput value={margenDeseado} onChange={setMargenDeseado} suffix="%" />
+											)}
 										</div>
 									</div>
 
@@ -370,6 +420,7 @@ function LakautCalcInner() {
 											);
 										})}
 									</div>
+
 								</div>
 
 								{/* Right panel: analysis tabs */}
@@ -398,6 +449,17 @@ function LakautCalcInner() {
 											/>
 										)}
 										{tab === "break-even" && <TabBreakEven arch={cfg.arch} inp={inp} svc={svc} currentUsers={users} costs={costs} />}
+										{tab === "calculadora" && (
+											<EnterpriseQuote
+												costs={costs}
+												currency={currency}
+												tc={tc}
+												initialFirmas={inp.firmas || 0}
+												initialCerts={selectedModel ? (selectedModel.certs || 1) : 1}
+												initialPeriodo={inp.periodo || 24}
+												initialMargin={margenDeseado || 40}
+											/>
+										)}
 									</div>
 								</div>
 							</div>
@@ -430,33 +492,53 @@ function LakautCalcInner() {
 							<TabComparacion costs={costs} currency={currency} tc={tc} />
 						</div>
 					)}
-				</div>
+
+					{/* ── Tabla de planes ───────────────────────────────────────────── */}
+					{modTab === "tabla-planes" && (
+						<div style={{ padding: 24 }}>
+							<Comparison costs={costs} currency={currency} tc={tc} />
+						</div>
+					)}
+
+					</div>
 			)}
 
 			{/* ════════════════════════════════════════════════════════════════════════
 			    OTHER SECTIONS
 			    ════════════════════════════════════════════════════════════════════════ */}
 			{section === "cotizadora" && (
-				<div style={{ padding: 24 }}>
-					<Cotizadora costs={costs} currency={currency} tc={tc} />
-				</div>
-			)}
-
-			{section === "carrito" && (
-				<div style={{ padding: 24 }}>
-					<CartQuote costs={costs} currency={currency} tc={tc} />
-				</div>
-			)}
-
-			{section === "comparación" && (
-				<div style={{ padding: 24 }}>
-					<Comparison costs={costs} currency={currency} tc={tc} />
-				</div>
-			)}
-
-			{section === "enterprise" && (
-				<div style={{ padding: 24 }}>
-					<EnterpriseQuote costs={costs} currency={currency} tc={tc} />
+				<div>
+					{/* Cotizadora sub-nav */}
+					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", gap: 0 }}>
+						{COT_TABS.map(function (t) {
+							const act = cotTab === t.k;
+							return (
+								<button
+									key={t.k}
+									onClick={function () { setCotTab(t.k); }}
+									style={{ padding: "10px 20px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
+								>
+									{t.label}
+								</button>
+							);
+						})}
+					</div>
+					{/* Breadcrumb */}
+					<div style={{ background: "#f8fafc", borderBottom: "1px solid " + BORD, padding: "5px 24px" }}>
+						<span style={os(10, 400, GRAY)}>Cotizadora</span>
+						<span style={Object.assign({}, os(10, 400, GRAY), { margin: "0 5px" })}>·</span>
+						<span style={os(10, 700, GRAY)}>{activeCotTab ? activeCotTab.label : ""}</span>
+					</div>
+					{cotTab === "estándar" && (
+						<div style={{ padding: 24 }}>
+							<Cotizadora costs={costs} currency={currency} tc={tc} />
+						</div>
+					)}
+					{cotTab === "armar" && (
+						<div style={{ padding: 24 }}>
+							<CartQuote costs={costs} currency={currency} tc={tc} />
+						</div>
+					)}
 				</div>
 			)}
 
