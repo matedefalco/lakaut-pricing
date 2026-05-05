@@ -110,12 +110,31 @@ export function Comparison({ costs, currency, tc }) {
 
 	return (
 		<div>
-			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
 				<div>
 					<div style={Object.assign({}, mont(18), { marginBottom: 4 })}>Comparación de planes comerciales</div>
 					<div style={os(12, 400, GRAY)}>
 						Métricas calculadas con los costos actuales de la configuración. Enterprise asume 4 certificados (rango 3–5).
 					</div>
+				</div>
+			</div>
+
+			{/* Live cost reference — reactive to Configuración changes */}
+			<div style={{ marginBottom: 20, background: BLUEL, border: "1px solid " + BORD, borderRadius: 8, padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+				<div>
+					<div style={os(10, 700, GRAY)}>CF DIRECTO / MES</div>
+					<div style={Object.assign({}, mont(16), { color: BLUE })}>USD {Math.round(costs.cfDirecto).toLocaleString("es-AR")}</div>
+				</div>
+				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 16 }}>
+					<div style={os(10, 700, GRAY)}>CV CERT</div>
+					<div style={Object.assign({}, mont(16), { color: BLUE })}>USD {costs.cvCertBase.toFixed(4)}</div>
+				</div>
+				<div style={{ borderLeft: "1px solid " + BORD, paddingLeft: 16 }}>
+					<div style={os(10, 700, GRAY)}>CV FIRMA</div>
+					<div style={Object.assign({}, mont(16), { color: BLUE })}>USD {costs.cvFirmaBase.toFixed(4)}</div>
+				</div>
+				<div style={Object.assign({}, os(10, 400, GRAY), { marginLeft: "auto", maxWidth: 260 })}>
+					BE y viabilidad cambian con CF directo. Margen % depende solo de CV (costo variable por pack).
 				</div>
 			</div>
 
@@ -183,9 +202,13 @@ export function Comparison({ costs, currency, tc }) {
 				{plans.map(function (p, pi) {
 					const m = metrics[pi];
 					const isViable = isFinite(m.be) && m.margenUnit > 0;
-					const risk = !isViable ? ER : m.margenPct < 30 ? WN : OK;
-					const riskBg = !isViable ? ERBG : m.margenPct < 30 ? WNBG : OKBG;
-					const riskLabel = !isViable ? "No viable" : m.margenPct < 30 ? "Margen ajustado" : "Viable";
+					const beColor = !isFinite(m.be) ? ER : m.be <= 5000 ? OK : m.be <= 20000 ? WN : ER;
+					const marginOk = m.margenPct >= 40;
+					const beOk = isFinite(m.be) && m.be <= 5000;
+					const beMed = isFinite(m.be) && m.be <= 20000;
+					const risk = !isViable ? ER : !beMed ? ER : (!beOk || !marginOk) ? WN : OK;
+					const riskBg = risk === ER ? ERBG : risk === WN ? WNBG : OKBG;
+					const riskLabel = !isViable ? "No viable" : !beMed ? "BE inviable" : !beOk ? "BE elevado" : !marginOk ? "Margen ajustado" : "Viable";
 					return (
 						<div
 							key={p.id}
@@ -211,7 +234,7 @@ export function Comparison({ costs, currency, tc }) {
 								</div>
 								<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
 									<span style={os(11, 400, GRAY)}>Break-even</span>
-									<span style={os(12, 700, isFinite(m.be) ? OK : ER)}>
+									<span style={os(12, 700, beColor)}>
 										{isFinite(m.be) ? m.be.toLocaleString("es-AR") + " clientes" : "∞"}
 									</span>
 								</div>
@@ -230,15 +253,6 @@ export function Comparison({ costs, currency, tc }) {
 				})}
 			</div>
 
-			{/* CF reference */}
-			<div style={{ marginTop: 20, background: BLUEL, border: "1px solid " + BORD, borderRadius: 8, padding: "10px 16px" }}>
-				<span style={os(11, 400, GRAY)}>CF directo / mes: </span>
-				<span style={os(11, 700, BLUE)}>USD {Math.round(costs.cfDirecto).toLocaleString("es-AR")}</span>
-				<span style={Object.assign({}, os(11, 400, GRAY), { marginLeft: 16 })}>CV cert base: </span>
-				<span style={os(11, 700, BLUE)}>USD {costs.cvCertBase.toFixed(4)}</span>
-				<span style={Object.assign({}, os(11, 400, GRAY), { marginLeft: 16 })}>CV firma base: </span>
-				<span style={os(11, 700, BLUE)}>USD {costs.cvFirmaBase.toFixed(4)}</span>
-			</div>
 		</div>
 	);
 }
