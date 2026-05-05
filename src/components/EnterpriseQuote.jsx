@@ -63,21 +63,67 @@ export function EnterpriseQuote({ costs, currency, tc }) {
 	});
 
 	function handleCopy() {
-		var header = "Cotización Lakaut Enterprise\n";
-		header += certs + " cert" + (certs !== 1 ? "s" : "") + " por pack · vigencia " + periodo + "m · margen objetivo " + marginTarget + "%\n";
-		header += "─".repeat(64) + "\n";
-		var cols = ["Firmas", "CV pack (USD)", "Precio (USD)", "Margen (USD)", "USD/firma", "BE clientes"].join("\t");
-		var body = rows.map(function (r) {
-			return [
-				r.firmas.toLocaleString("es-AR"),
-				Math.round(r.cvPack).toLocaleString("es-AR"),
-				Math.round(r.priceSug).toLocaleString("es-AR"),
-				Math.round(r.margenPack).toLocaleString("es-AR"),
-				r.pricePerFirma.toFixed(3),
-				isFinite(r.be) ? r.be.toLocaleString("es-AR") : "—",
-			].join("\t");
-		}).join("\n");
-		navigator.clipboard.writeText(header + cols + "\n" + body);
+		function pad(str, len, right) {
+			var s = String(str);
+			return right ? s.padStart(len) : s.padEnd(len);
+		}
+
+		var sep = "─".repeat(72);
+		var thin = "·".repeat(72);
+
+		// Header
+		var lines = [];
+		lines.push("COTIZACIÓN ENTERPRISE — LAKAUT");
+		lines.push(sep);
+		lines.push("");
+
+		// Parameters
+		lines.push("PARÁMETROS");
+		lines.push("  Certificaciones por pack  : " + certs);
+		lines.push("  Vigencia del contrato     : " + periodo + " meses");
+		lines.push("  Margen objetivo           : " + marginTarget + "%");
+		lines.push("  Moneda                    : " + (currency === "USD" ? "USD" : "ARS (TC " + tc + ")"));
+		lines.push("");
+
+		// Custom quote
+		var cr = customRow;
+		lines.push("COTIZACIÓN PERSONALIZADA");
+		lines.push(thin);
+		lines.push("  Firmas                    : " + cr.firmas.toLocaleString("es-AR"));
+		lines.push("  Costo variable del pack   : USD " + Math.round(cr.cvPack).toLocaleString("es-AR"));
+		lines.push("  Precio sugerido al cliente: USD " + Math.round(cr.priceSug).toLocaleString("es-AR"));
+		lines.push("  Margen bruto              : USD " + Math.round(cr.margenPack).toLocaleString("es-AR") + "  (" + marginTarget + "%)");
+		lines.push("  Precio por firma          : USD " + cr.pricePerFirma.toFixed(3));
+		lines.push("  Break-even en clientes    : " + (isFinite(cr.be) ? cr.be.toLocaleString("es-AR") + " clientes" : "N/A"));
+		lines.push("");
+
+		// Escalation table
+		lines.push("TABLA DE ESCALONAMIENTO — VOLÚMENES DE REFERENCIA");
+		lines.push(sep);
+		lines.push(
+			pad("Firmas", 12) +
+			pad("CV Pack (USD)", 16, true) +
+			pad("Precio (USD)", 15, true) +
+			pad("Margen (USD)", 15, true) +
+			pad("USD/firma", 12, true) +
+			pad("Break-even", 12, true)
+		);
+		lines.push(sep);
+		rows.forEach(function (r) {
+			lines.push(
+				pad(r.firmas.toLocaleString("es-AR"), 12) +
+				pad(Math.round(r.cvPack).toLocaleString("es-AR"), 16, true) +
+				pad(Math.round(r.priceSug).toLocaleString("es-AR"), 15, true) +
+				pad(Math.round(r.margenPack).toLocaleString("es-AR"), 15, true) +
+				pad(r.pricePerFirma.toFixed(3), 12, true) +
+				pad(isFinite(r.be) ? r.be.toLocaleString("es-AR") : "—", 12, true)
+			);
+		});
+		lines.push(sep);
+		lines.push("");
+		lines.push("Generado con Cotizador Lakaut · " + new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }));
+
+		navigator.clipboard.writeText(lines.join("\n"));
 		setCopied(true);
 		setTimeout(function () { setCopied(false); }, 2000);
 	}
