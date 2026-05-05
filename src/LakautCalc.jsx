@@ -311,78 +311,10 @@ function LakautCalcInner() {
 								<div style={os(12, 400, BLACK)}>{strategyText}</div>
 							</div>
 
-							{/* KPI strip compacto */}
-							{(function () {
-								var items = [
-									{
-										label: "Revenue / mes",
-										value: fMoney(calcs.revTotal),
-										sub: fMoney2(calcs.revMes) + " / usu",
-										color: BLUE,
-										tooltip: "Revenue total mensual = precio por usuario × " + users.toLocaleString() + " usuarios.",
-									},
-									{
-										label: "EBITDA / mes",
-										value: fMoney(calcs.ebitda),
-										sub: "Margen " + fP(calcs.ebitdaPct),
-										color: ec,
-										tooltip: "EBITDA = Revenue total − CV total − CF directo.",
-									},
-									{
-										label: "Margen unitario",
-										value: fP(calcs.margenPct),
-										sub: fMoney2(calcs.margenUnit) + " / usu",
-										color: mc,
-										tooltip: "Margen unitario = precio − CV por usuario.",
-									},
-									{
-										label: "Break-even",
-										value: fK(calcs.beUsuarios) + " usu.",
-										sub: calcs.beMes ? "Mes " + calcs.beMes : "No alcanza 24M",
-										color: bc,
-										tooltip: "Usuarios mínimos para cubrir el CF directo.",
-									},
-								];
-								if (cfg.arch === "free") items.push({ label: "Costo asumido/mes", value: fMoney(calcs.cvTotal), sub: "Sin revenue", color: ER });
-								if (precioSugerido !== null) items.push({
-									label: "Precio " + margenDeseado + "% margen",
-									value: fMoney2(precioSugerido),
-									sub: "Δ " + fMoney2(precioSugerido - (inp.precio || 0)),
-									color: OK,
-									tooltip: "Precio de pack necesario para alcanzar " + margenDeseado + "% de margen.",
-								});
-								return (
-									<div style={{ borderBottom: "1px solid " + BORD, background: BLUEL, display: "flex", flexWrap: "wrap" }}>
-										{items.map(function (item, i) {
-											return (
-												<div
-													key={item.label}
-													style={{
-														flex: "1 1 0",
-														minWidth: 120,
-														padding: "10px 18px",
-														borderLeft: i > 0 ? "1px solid " + BORD : "none",
-														borderTop: "3px solid " + item.color,
-														position: "relative",
-													}}
-												>
-													<div style={Object.assign({}, os(9, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3, display: "flex", alignItems: "center", gap: 3 })}>
-														{item.label}
-														{item.tooltip && <InfoTooltip text={item.tooltip} />}
-													</div>
-													<div style={Object.assign({}, mont(16), { color: item.color, lineHeight: 1.2 })}>{item.value}</div>
-													<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 2 })}>{item.sub}</div>
-												</div>
-											);
-										})}
-									</div>
-								);
-							})()}
-
 							{/* Body */}
-							<div style={{ display: "flex", gap: 16, padding: "16px 24px", flexWrap: "wrap" }}>
+							<div style={{ display: "flex", gap: 16, padding: "16px 24px", alignItems: "flex-start" }}>
 								{/* Left panel */}
-								<div className="no-print" style={{ width: "clamp(220px, 22vw, 268px)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+								<div className="no-print" style={{ width: "clamp(200px, 20vw, 248px)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
 									{/* Model info */}
 									{selectedModel && (
 										<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 16, borderLeft: "3px solid " + (selectedModel.color || BLUE) }}>
@@ -484,6 +416,80 @@ function LakautCalcInner() {
 											/>
 										)}
 									</div>
+								</div>
+
+								{/* Right KPI panel */}
+								<div className="no-print" style={{ width: 188, flexShrink: 0, background: WHITE, border: "1px solid " + BORD, borderRadius: 12, overflow: "hidden", position: "sticky", top: 16 }}>
+									{(function () {
+										var costoTotal = costs.cfDirecto + calcs.cvMes * users;
+										var sections = [
+											{
+												title: "Ingresos",
+												color: BLUE,
+												rows: [
+													{ label: "Revenue / mes", value: fMoney(calcs.revTotal), color: BLUE, big: true },
+													{ label: "por usuario", value: fMoney2(calcs.revMes) + " / usu", color: GRAY },
+												],
+											},
+											{
+												title: "Rentabilidad",
+												color: ec,
+												rows: [
+													{ label: "EBITDA / mes", value: fMoney(calcs.ebitda), color: ec, big: true },
+													{ label: "Margen EBITDA", value: fP(calcs.ebitdaPct), color: ec },
+													{ label: "Margen unitario", value: fP(calcs.margenPct), color: mc },
+													{ label: "por usuario", value: fMoney2(calcs.margenUnit) + " / usu", color: GRAY },
+												],
+											},
+											{
+												title: "Costos",
+												color: GRAY,
+												rows: [
+													{ label: "CF directo / mes", value: fMoney(costs.cfDirecto), color: BLUE },
+													{ label: "CV por usuario", value: fMoney2(calcs.cvMes) + " / usu", color: WN },
+													{ label: "Costo total / mes", value: fMoney(costoTotal), color: BLACK, big: true },
+													{ label: "por usuario", value: fMoney2(users > 0 ? costoTotal / users : 0) + " / usu", color: GRAY },
+												],
+											},
+											{
+												title: "Break-even",
+												color: bc,
+												rows: [
+													{ label: "Usuarios necesarios", value: isFinite(calcs.beUsuarios) ? fK(calcs.beUsuarios) + " usu." : "∞", color: bc, big: true },
+													{ label: "Alcance", value: calcs.beMes ? "Mes " + calcs.beMes : "No en 24M", color: bc },
+												],
+											},
+										];
+										if (precioSugerido !== null) {
+											sections.push({
+												title: "Precio " + margenDeseado + "% margen",
+												color: OK,
+												rows: [
+													{ label: "Precio sugerido", value: fMoney2(precioSugerido), color: OK, big: true },
+													{ label: "vs. actual", value: "Δ " + fMoney2(precioSugerido - (inp.precio || 0)), color: GRAY },
+												],
+											});
+										}
+										return sections.map(function (sec, si) {
+											return (
+												<div key={sec.title} style={{ borderTop: si > 0 ? "1px solid " + BORD : "none" }}>
+													<div style={Object.assign({}, os(8, 700, WHITE), { background: sec.color, padding: "4px 12px", textTransform: "uppercase", letterSpacing: "0.6px", opacity: 0.92 })}>
+														{sec.title}
+													</div>
+													<div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+														{sec.rows.map(function (row) {
+															return (
+																<div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
+																	<span style={os(9, 400, GRAY)}>{row.label}</span>
+																	<span style={Object.assign({}, os(row.big ? 12 : 10, 700, row.color), { fontFamily: "Courier New,monospace", whiteSpace: "nowrap" })}>{row.value}</span>
+																</div>
+															);
+														})}
+													</div>
+												</div>
+											);
+										});
+									})()}
 								</div>
 							</div>
 						</div>
