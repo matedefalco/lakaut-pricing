@@ -13,15 +13,25 @@ import { fP, fK, fD2 } from "../../utils/formatters";
 import { NumInput } from "../ui/NumInput";
 
 // ─── Metric definitions ────────────────────────────────────────────────────────
+// group: used to render section headers in the matrix table
 const METRICS = [
-	{ id: "margenPct", label: "Margen %", fmt: fP, higherIsBetter: true, get: function (c) { return c.margenPct; } },
-	{ id: "revMes", label: "Revenue / mes (ref)", fmt: function (v, fm) { return fm(v); }, higherIsBetter: true, get: function (c) { return c.revTotal; } },
-	{ id: "ebitda", label: "EBITDA / mes (ref)", fmt: function (v, fm) { return fm(v); }, higherIsBetter: true, get: function (c) { return c.ebitda; } },
-	{ id: "margenUnit", label: "Margen unitario", fmt: function (v, fm) { return fm(v) + " / usu."; }, higherIsBetter: true, get: function (c) { return c.margenUnit; } },
-	{ id: "beUsuarios", label: "Break-even (usu.)", fmt: function (v) { return isFinite(v) ? fK(v) + " usu." : "∞"; }, higherIsBetter: false, get: function (c) { return c.beUsuarios; } },
-	{ id: "cvMes", label: "CV / usuario / mes", fmt: function (v, fm) { return fm(v); }, higherIsBetter: false, get: function (c) { return c.cvMes; } },
-	{ id: "precioFirma", label: "Precio / firma", fmt: function (v, fm2) { return fm2(v); }, higherIsBetter: false, get: null }, // computed separately
-	{ id: "ltv", label: "LTV (precio × vigencia)", fmt: function (v, fm) { return fm(v); }, higherIsBetter: true, get: null }, // computed separately
+	// Parámetros comerciales (from model fields)
+	{ id: "priceUSD",    label: "Precio del pack",          group: "Parámetros comerciales", higherIsBetter: null, getM: function (m) { return m.priceUSD || null; } },
+	{ id: "firmasInc",   label: "Firmas incluidas",          group: null,                     higherIsBetter: true,  getM: function (m) { return m.ilimitadas ? null : (m.firmas || 0); }, renderRaw: function (r) { return r.model.ilimitadas ? "Ilimitadas ⚠" : (r.model.firmas || 0).toLocaleString("es-AR"); } },
+	{ id: "certs",       label: "Certificados",              group: null,                     higherIsBetter: null,  getM: function (m) { return m.certs || null; }, renderRaw: function (r) { return String(r.model.certs || "—"); } },
+	{ id: "vigencia",    label: "Vigencia",                  group: null,                     higherIsBetter: null,  getM: function (m) { return m.vigencia || 24; }, renderRaw: function (r) { return (r.model.vigencia || 24) + " meses"; } },
+	// Economía por cliente
+	{ id: "revMesCli",  label: "Revenue / mes / cliente",   group: "Economía por cliente",   higherIsBetter: true,  get: function (c) { return c.revMes; } },
+	{ id: "cvMes",      label: "CV / mes / cliente",         group: null,                     higherIsBetter: false, get: function (c) { return c.cvMes; } },
+	{ id: "margenUnit", label: "Margen unitario",            group: null,                     higherIsBetter: true,  get: function (c) { return c.margenUnit; } },
+	{ id: "margenPct",  label: "Margen %",                   group: null,                     higherIsBetter: true,  get: function (c) { return c.margenPct; } },
+	{ id: "precioFirma",label: "Precio / firma",             group: null,                     higherIsBetter: false, get: null },
+	{ id: "revPerFirma",label: "Revenue por firma incl.",    group: null,                     higherIsBetter: null,  getM: function (m) { return (!m.ilimitadas && m.firmas > 0) ? m.priceUSD / m.firmas : null; } },
+	{ id: "ltv",        label: "LTV (precio × vigencia)",    group: null,                     higherIsBetter: true,  get: null },
+	// A escala (con usuarios de referencia)
+	{ id: "revTotal",   label: "Revenue / mes (ref)",        group: "A escala (ref. usuarios)", higherIsBetter: true,  get: function (c) { return c.revTotal; } },
+	{ id: "ebitda",     label: "EBITDA / mes (ref)",         group: null,                     higherIsBetter: true,  get: function (c) { return c.ebitda; } },
+	{ id: "beUsuarios", label: "Break-even (clientes)",      group: null,                     higherIsBetter: false, get: function (c) { return c.beUsuarios; } },
 ];
 
 function bestInRow(values, higherIsBetter) {
@@ -30,15 +40,34 @@ function bestInRow(values, higherIsBetter) {
 	return higherIsBetter ? Math.max(...valid) : Math.min(...valid);
 }
 
-function MetricMatrix({ rows }) {
-	// rows: [{ label, values: [{ value, formatted, isBest }], higherIsBetter }]
+function MetricMatrix({ rows, colCount }) {
+	// rows: [{ isHeader, label } | { label, values, higherIsBetter }]
+	var dataRowIndex = 0;
 	return (
 		<div style={{ overflowX: "auto" }}>
 			<table style={{ width: "100%", borderCollapse: "collapse" }}>
 				<tbody>
 					{rows.map(function (row, ri) {
+						if (row.isHeader) {
+							return (
+								<tr key={"h" + ri}>
+									<td
+										colSpan={(colCount || 1) + 1}
+										style={{
+											padding: "6px 14px",
+											background: "#1e293b",
+											borderBottom: "1px solid " + BORD,
+										}}
+									>
+										<span style={os(9, 700, WHITE)}>{row.label.toUpperCase()}</span>
+									</td>
+								</tr>
+							);
+						}
+						var bg = dataRowIndex % 2 === 0 ? WHITE : "#fafafa";
+						dataRowIndex++;
 						return (
-							<tr key={ri} style={{ background: ri % 2 === 0 ? WHITE : "#fafafa" }}>
+							<tr key={ri} style={{ background: bg }}>
 								<td style={{ padding: "8px 14px", borderBottom: "1px solid " + BORD, minWidth: 160 }}>
 									<span style={os(11, 400, GRAY)}>{row.label}</span>
 								</td>
@@ -194,28 +223,43 @@ export function TabComparacion({ costs, currency, tc }) {
 		});
 	}, [selectedModels, costs]);
 
-	// Build metric matrix rows
+	// Build metric matrix rows (includes group header sentinel rows)
 	const matrixRows = useMemo(function () {
-		return METRICS.map(function (metric) {
-			const rawValues = results.map(function (r) {
+		var rows = [];
+		METRICS.forEach(function (metric) {
+			// Group header sentinel
+			if (metric.group) {
+				rows.push({ isHeader: true, label: metric.group });
+			}
+			// Rows with renderRaw bypass numeric logic entirely
+			if (metric.renderRaw) {
+				var values = results.map(function (r) {
+					return { value: null, formatted: metric.renderRaw(r), isBest: false };
+				});
+				rows.push({ label: metric.label, values: values, higherIsBetter: null });
+				return;
+			}
+			var rawValues = results.map(function (r) {
+				if (metric.getM) return metric.getM(r.model);
 				if (metric.id === "precioFirma") return r.precioFirma;
 				if (metric.id === "ltv") return r.ltv;
 				return metric.get ? metric.get(r.calcs) : null;
 			});
-			const best = bestInRow(rawValues, metric.higherIsBetter);
-			const values = rawValues.map(function (v) {
-				const formatted = v === null || !isFinite(v)
+			var best = bestInRow(rawValues, metric.higherIsBetter);
+			var values = rawValues.map(function (v) {
+				var formatted = v === null || !isFinite(v)
 					? "—"
-					: (metric.id === "margenPct" ? fP(v)
-						: metric.id === "beUsuarios" ? (isFinite(v) ? fK(v) + " usu." : "∞")
-						: metric.id === "precioFirma" ? fMoney2(v)
-						: metric.id === "ltv" ? fMoney2(v)
-						: metric.id === "cvMes" || metric.id === "margenUnit" ? fMoney2(v)
-						: fMoney(v));
-				return { value: v, formatted, isBest: v !== null && isFinite(v) && v === best };
+					: metric.id === "margenPct" ? fP(v)
+					: metric.id === "beUsuarios" ? (isFinite(v) ? fK(v) + " clientes" : "∞")
+					: metric.id === "precioFirma" || metric.id === "revPerFirma" || metric.id === "priceUSD" ? fMoney2(v)
+					: metric.id === "ltv" ? fMoney2(v)
+					: metric.id === "cvMes" || metric.id === "revMesCli" || metric.id === "margenUnit" ? fMoney2(v)
+					: fMoney(v);
+				return { value: v, formatted: formatted, isBest: v !== null && isFinite(v) && v === best };
 			});
-			return { label: metric.label, values, higherIsBetter: metric.higherIsBetter };
+			rows.push({ label: metric.label, values: values, higherIsBetter: metric.higherIsBetter });
 		});
+		return rows;
 	}, [results, fMoney, fMoney2]);
 
 	// Bar chart data per model
@@ -341,7 +385,7 @@ export function TabComparacion({ costs, currency, tc }) {
 									</tr>
 								</thead>
 							</table>
-							<MetricMatrix rows={matrixRows} />
+							<MetricMatrix rows={matrixRows} colCount={selectedModels.length} />
 						</div>
 					</div>
 

@@ -21,7 +21,6 @@ import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
 import { Cotizadora } from "./components/Cotizadora";
-import { Comparison } from "./components/Comparison";
 import { EnterpriseQuote } from "./components/EnterpriseQuote";
 import { CartQuote } from "./components/CartQuote";
 
@@ -160,7 +159,6 @@ function LakautCalcInner() {
 		// Grupo herramientas
 		{ k: "suscripción", label: "Suscripción", group: "herramientas" },
 		{ k: "comparación", label: "Comparación", group: "herramientas" },
-		{ k: "tabla-planes", label: "Tabla Planes", group: "herramientas" },
 	];
 	const COT_TABS = [
 		{ k: "estándar", label: "Por perfil" },
@@ -511,12 +509,6 @@ function LakautCalcInner() {
 						</div>
 					)}
 
-					{/* ── Tabla de planes ───────────────────────────────────────────── */}
-					{modTab === "tabla-planes" && (
-						<div style={{ padding: 24 }}>
-							<Comparison costs={costs} currency={currency} tc={tc} />
-						</div>
-					)}
 
 					</div>
 			)}
