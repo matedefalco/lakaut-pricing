@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, os, mont } from "../../theme/tokens";
+import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, CAT_COLOR, os, mont } from "../../theme/tokens";
 import { fD } from "../../utils/formatters";
-import { CAT_COLOR } from "./TabCostos";
-import { CAPACIDAD_FIRMAS_ANUAL } from "../../data/costs";
+import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "../../data/costs";
 
 function InlineNum({ value, onChange, decimals }) {
 	return (
@@ -44,9 +43,20 @@ function SectionHeader({ title }) {
 	);
 }
 
+const DEFAULT_COST_CONFIG = {
+	fixedItems: FIXED_ITEMS.map(function (r) { return Object.assign({}, r); }),
+	assetItems: ASSET_ITEMS.map(function (r) { return Object.assign({}, r); }),
+	cvCertItems: CV_CERT_ITEMS.map(function (r) { return Object.assign({}, r); }),
+	cvFirmaItems: CV_FIRMA_ITEMS.map(function (r) { return Object.assign({}, r); }),
+	capacidadFirmasAnual: CAPACIDAD_FIRMAS_ANUAL,
+};
+
 export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 	const activosTotal = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
+	const [isDirty, setIsDirty] = useState(false);
+
 	function updRow(key, i, field, val) {
+		setIsDirty(true);
 		setCostConfig(function (prev) {
 			return Object.assign({}, prev, {
 				[key]: prev[key].map(function (r, j) {
@@ -56,6 +66,7 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 		});
 	}
 	function removeRow(key, i) {
+		setIsDirty(true);
 		setCostConfig(function (prev) {
 			return Object.assign({}, prev, {
 				[key]: prev[key].filter(function (_, j) { return j !== i; }),
@@ -63,6 +74,7 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 		});
 	}
 	function addRow(key, blank) {
+		setIsDirty(true);
 		setCostConfig(function (prev) {
 			return Object.assign({}, prev, { [key]: prev[key].concat([blank]) });
 		});
@@ -72,7 +84,18 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 	function handleSave() {
 		try { localStorage.setItem("lakaut_costConfig", JSON.stringify(costConfig)); } catch (e) {}
 		setSaveOk(true);
+		setIsDirty(false);
 		setTimeout(function () { setSaveOk(false); }, 2000);
+	}
+	function handleReset() {
+		setCostConfig({
+			fixedItems: FIXED_ITEMS.map(function (r) { return Object.assign({}, r); }),
+			assetItems: ASSET_ITEMS.map(function (r) { return Object.assign({}, r); }),
+			cvCertItems: CV_CERT_ITEMS.map(function (r) { return Object.assign({}, r); }),
+			cvFirmaItems: CV_FIRMA_ITEMS.map(function (r) { return Object.assign({}, r); }),
+			capacidadFirmasAnual: CAPACIDAD_FIRMAS_ANUAL,
+		});
+		setIsDirty(true);
 	}
 	const salaryRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat === "RRHH"; });
 	const opsRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat !== "RRHH"; });
@@ -407,14 +430,29 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 				</div>
 			</div>
 
-			{/* Save button */}
-			<div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
-				<button
-					onClick={handleSave}
-					style={{ padding: "10px 28px", background: saveOk ? OK : BLUE, color: WHITE, border: "none", borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "background 0.3s" }}
-				>
-					{saveOk ? "Guardado" : "Guardar configuración"}
-				</button>
+			{/* Save / reset buttons */}
+			<div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+					{isDirty && !saveOk && (
+						<span style={Object.assign({}, os(11, 700, ER), { background: "#fee2e2", padding: "4px 10px", borderRadius: 6 })}>
+							Cambios sin guardar
+						</span>
+					)}
+				</div>
+				<div style={{ display: "flex", gap: 10 }}>
+					<button
+						onClick={handleReset}
+						style={{ padding: "10px 20px", background: WHITE, color: GRAY, border: "1.5px solid " + BORD, borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 400, cursor: "pointer" }}
+					>
+						Restaurar valores originales
+					</button>
+					<button
+						onClick={handleSave}
+						style={{ padding: "10px 28px", background: saveOk ? OK : isDirty ? WN : BLUE, color: WHITE, border: "none", borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "background 0.3s" }}
+					>
+						{saveOk ? "✓ Guardado" : "Guardar configuración"}
+					</button>
+				</div>
 			</div>
 		</div>
 	);

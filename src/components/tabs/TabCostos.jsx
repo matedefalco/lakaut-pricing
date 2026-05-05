@@ -1,9 +1,7 @@
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, os, mont } from "../../theme/tokens";
+import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, CAT_COLOR, os, mont } from "../../theme/tokens";
 import { makeMoney } from "../../utils/useMoney";
 import { fK } from "../../utils/formatters";
 import { InfoTooltip } from "../ui/InfoTooltip";
-
-export const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: "#8b5cf6", Ops: OK };
 
 export function TabCostos({ calcs, users, costConfig, costs, currency, tc }) {
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);

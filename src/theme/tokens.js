@@ -13,6 +13,10 @@ export const WNBG  = "#fef3c7";
 export const ER    = "#dc2626";
 export const ERBG  = "#fee2e2";
 
+export const PURPLE = "#8b5cf6";
+
+export const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: PURPLE, Ops: OK };
+
 export function mont(sz) {
 	return {
 		fontFamily: "Montserrat,sans-serif",

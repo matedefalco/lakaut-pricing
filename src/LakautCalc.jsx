@@ -16,6 +16,7 @@ import { TabProyeccion } from "./components/tabs/TabProyeccion";
 import { TabBreakEven } from "./components/tabs/TabBreakEven";
 import { TabConfig } from "./components/tabs/TabConfig";
 import { Cotizadora } from "./components/Cotizadora";
+import { Comparison } from "./components/Comparison";
 
 export default function LakautCalc() {
 	useEffect(function () {
@@ -46,6 +47,7 @@ export default function LakautCalc() {
 		paywall: false,
 	});
 	const [inp, setInp] = useState(PACKS.B.defaults);
+	const [projParams, setProjParams] = useState({ usersM1: 1000, growthRate: 10, churnRate: 5 });
 	const [costConfig, setCostConfig] = useState(function () {
 		try {
 			const saved = localStorage.getItem("lakaut_costConfig");
@@ -95,9 +97,9 @@ export default function LakautCalc() {
 
 	const calcs = useMemo(
 		function () {
-			return engine({ arch: cfg.arch, inp, svc, users, costs });
+			return engine({ arch: cfg.arch, inp, svc, users, costs, projConfig: projParams });
 		},
-		[cfg.arch, inp, svc, users, costs],
+		[cfg.arch, inp, svc, users, costs, projParams],
 	);
 
 	const ec = calcs.ebitda > 0 ? OK : calcs.ebitda > -10000 ? WN : ER;
@@ -106,20 +108,25 @@ export default function LakautCalc() {
 
 	const scaleLabels = {
 		sub: "Suscripciones activas",
-		bolsa: "Packs vendidos",
+		bolsa: "Clientes activos",
 		ppu: "Certificados activos",
 		anual: "Contratos anuales activos",
 		free: "Usuarios activos",
-		hibrido: "Packs vendidos",
+		hibrido: "Clientes activos",
 	};
 	const scaleLabel = scaleLabels[cfg.arch] || "Usuarios activos";
 
-	const TABS = ["costos", "precios", "proyección", "break-even"];
+	const TABS = ["costos", "break-even", "precios", "proyección"];
 	const SECTIONS = [
 		{ k: "configuración", label: "Configuración" },
 		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
+		{ k: "comparación", label: "Comparación" },
 	];
+
+	function handlePrint() {
+		window.print();
+	}
 
 	return (
 		<div
@@ -132,6 +139,7 @@ export default function LakautCalc() {
 		>
 			{/* Header */}
 			<div
+				className="no-print"
 				style={{
 					background: BLUE,
 					padding: "14px 24px",
@@ -142,7 +150,7 @@ export default function LakautCalc() {
 			>
 				<div>
 					<div style={Object.assign({}, mont(22), { color: WHITE })}>
-						LAKAUT · NEWCO
+						LAKAUT
 					</div>
 					<div
 						style={Object.assign({}, os(13, 400, WHITE), {
@@ -150,20 +158,38 @@ export default function LakautCalc() {
 							marginTop: 2,
 						})}
 					>
-						Calculadora de Pricing · Segmento Individuos
+						Calculadora de Pricing · Modelos y Planes Comerciales
 					</div>
 				</div>
-				<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
-					Documento confidencial ·{" "}
-					{new Date().toLocaleDateString("es-AR", {
-						month: "long",
-						year: "numeric",
-					})}
+				<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+					<button
+						onClick={handlePrint}
+						style={{
+							padding: "6px 14px",
+							background: "rgba(255,255,255,0.15)",
+							border: "1px solid rgba(255,255,255,0.3)",
+							borderRadius: 6,
+							color: WHITE,
+							fontFamily: "'Open Sans',sans-serif",
+							fontSize: 12,
+							fontWeight: 700,
+							cursor: "pointer",
+						}}
+					>
+						Exportar PDF
+					</button>
+					<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
+						{new Date().toLocaleDateString("es-AR", {
+							month: "long",
+							year: "numeric",
+						})}
+					</div>
 				</div>
 			</div>
 
 			{/* Top-level nav */}
 			<div
+				className="no-print"
 				style={{
 					background: WHITE,
 					borderBottom: "2px solid " + BORD,
@@ -217,6 +243,7 @@ export default function LakautCalc() {
 				<div>
 					{/* Pack selector */}
 					<div
+						className="no-print"
 						style={{
 							background: WHITE,
 							borderBottom: "1px solid " + BORD,
@@ -255,7 +282,7 @@ export default function LakautCalc() {
 										cursor: "pointer",
 									}}
 								>
-									{k} · {p.label}
+									{p.label}
 								</button>
 							);
 						})}
@@ -334,6 +361,7 @@ export default function LakautCalc() {
 					<div style={{ display: "flex", gap: 16, padding: "16px 24px", flexWrap: "wrap" }}>
 						{/* Left panel */}
 						<div
+							className="no-print"
 							style={{
 								width: "clamp(220px, 22vw, 268px)",
 								flexShrink: 0,
@@ -455,6 +483,7 @@ export default function LakautCalc() {
 						{/* Right panel */}
 						<div style={{ flex: "1 1 320px", minWidth: 0 }}>
 							<div
+								className="no-print"
 								style={{
 									background: WHITE,
 									border: "1px solid " + BORD,
@@ -507,7 +536,19 @@ export default function LakautCalc() {
 									/>
 								)}
 								{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} currency={currency} tc={tc} arch={cfg.arch} inp={inp} />}
-								{tab === "proyección" && <TabProyeccion proj={calcs.proj} beMes={calcs.beMes} calcs={calcs} costs={costs} currency={currency} tc={tc} />}
+								{tab === "proyección" && (
+									<TabProyeccion
+										proj={calcs.proj}
+										beMes={calcs.beMes}
+										calcs={calcs}
+										costs={costs}
+										currency={currency}
+										tc={tc}
+										projParams={projParams}
+										setProjParams={setProjParams}
+										arch={cfg.arch}
+									/>
+								)}
 								{tab === "break-even" && (
 									<TabBreakEven
 										arch={cfg.arch}
@@ -526,6 +567,12 @@ export default function LakautCalc() {
 			{section === "cotizadora" && (
 				<div style={{ padding: "24px" }}>
 					<Cotizadora costs={costs} currency={currency} tc={tc} />
+				</div>
+			)}
+
+			{section === "comparación" && (
+				<div style={{ padding: "24px" }}>
+					<Comparison costs={costs} currency={currency} tc={tc} />
 				</div>
 			)}
 

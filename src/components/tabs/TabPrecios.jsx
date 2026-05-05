@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, os, mont } from "../../theme/tokens";
 import { makeMoney } from "../../utils/useMoney";
 import { fP, fK } from "../../utils/formatters";
@@ -38,7 +39,29 @@ export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 	const priceSugLabel = arch === "ppu"
 		? "Precio mínimo sugerido · equiv. mensual (" + (inp ? (inp.firmasAsumidas ?? 5) : 5) + " f/mes asumidas)"
 		: "Precio mínimo sugerido · usuario / mes";
-	const VOLS = [5000, 10000, 20000, 50000, 100000, 200000];
+	const VOLS = useMemo(function () {
+		var beU = calcs.beUsuarios;
+		if (!isFinite(beU) || beU <= 0) {
+			var c = Math.max(users, 1000);
+			return [
+				Math.max(1, Math.round(c * 0.1)),
+				Math.max(1, Math.round(c * 0.25)),
+				Math.max(1, Math.round(c * 0.5)),
+				c,
+				Math.round(c * 2),
+				Math.round(c * 5),
+			];
+		}
+		var be = Math.ceil(beU);
+		return [
+			Math.max(1, Math.round(be * 0.2)),
+			Math.max(1, Math.round(be * 0.5)),
+			Math.max(1, Math.round(be * 0.8)),
+			be,
+			Math.round(be * 1.5),
+			Math.round(be * 3),
+		];
+	}, [calcs.beUsuarios, users]);
 	return (
 		<div>
 			<div

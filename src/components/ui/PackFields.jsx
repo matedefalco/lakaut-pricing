@@ -57,6 +57,12 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 					suffix="f"
 				/>
 				{(inp.firmas ?? 0) > 0 && <NumInput label="Firma extra" {...extra} />}
+				<NumInput
+					label="Vigencia del pack"
+					value={inp.periodo ?? 24}
+					onChange={function (v) { update("periodo", Math.max(6, Math.min(48, Math.round(v)))); }}
+					suffix="meses"
+				/>
 			</div>
 		);
 	}
@@ -77,6 +83,14 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 				onChange={function (v) { update("firmas", v); }}
 				suffix="f"
 			/>
+			{isPack && (
+				<NumInput
+					label="Vigencia del pack"
+					value={inp.periodo ?? 24}
+					onChange={function (v) { update("periodo", Math.max(6, Math.min(48, Math.round(v)))); }}
+					suffix="meses"
+				/>
+			)}
 			{arch === "sub" && <NumInput label="Firma extra (USD/firma)" {...extra} />}
 		</div>
 	);

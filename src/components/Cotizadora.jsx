@@ -1,107 +1,9 @@
 import { useState, useMemo } from "react";
-import { BLUE, GRAY, BLACK, WHITE, BORD, BLUEL, OK, WN, ER, os, mont } from "../theme/tokens";
+import { BLUE, GRAY, BLACK, WHITE, BORD, BLUEL, OK, WN, WNBG, ER, os, mont } from "../theme/tokens";
 import { fP, fK } from "../utils/formatters";
 import { makeMoney } from "../utils/useMoney";
 import { engine } from "../engine/engine";
-
-// ─── Plan definitions ──────────────────────────────────────────────────────────
-const PLANS = {
-	smart: {
-		id: "smart",
-		label: "SMART",
-		segment: "persona",
-		color: BLUE,
-		recommended: false,
-		tagline: "Ideal para personas que firman contratos o trámites de manera ocasional",
-		priceUSD: 34,
-		priceNote: "Pago único · vigencia 2 años",
-		firmas: 10,
-		ilimitadas: false,
-		benefits: [
-			"10 firmas digitales",
-			"Vigencia 2 años",
-			"Certificado digital personal bonificado",
-			"Firmador de documentos",
-			"Soporte vía mail (hasta 24 hs)",
-			"Firmas adicionales disponibles",
-		],
-		cta: "Contratar SMART",
-		inp: { precio: 34, firmas: 10, periodo: 24 },
-	},
-	profesional: {
-		id: "profesional",
-		label: "PROFESIONAL",
-		segment: "persona",
-		color: "#0891b2",
-		recommended: false,
-		tagline: "Pensado para profesionales que firman documentos con mayor frecuencia",
-		priceUSD: 200,
-		priceNote: "Pago único · vigencia 2 años",
-		firmas: null,
-		ilimitadas: true,
-		benefits: [
-			"Firmas digitales ilimitadas",
-			"Vigencia 2 años",
-			"Certificado digital personal bonificado",
-			"Firmador e historial de documentos",
-			"Soporte prioritario vía mail",
-			"Firmas adicionales disponibles",
-		],
-		cta: "Contratar PROFESIONAL",
-		inp: { precio: 200, firmas: 240, periodo: 24 },
-	},
-	pyme: {
-		id: "pyme",
-		label: "PyME",
-		segment: "empresa",
-		color: "#7c3aed",
-		recommended: false,
-		tagline: "Para empresas que comienzan a digitalizar sus procesos de firma",
-		priceUSD: 300,
-		priceNote: "Pago único · vigencia 2 años",
-		firmas: 300,
-		ilimitadas: false,
-		admins: 1,
-		certs: 1,
-		benefits: [
-			"1 Administrador empresa",
-			"1 certificado digital bonificado",
-			"300 firmas digitales",
-			"Vigencia 2 años",
-			"Panel de control y trazabilidad de documentos",
-			"Soporte mail/chat (hasta 24 hs)",
-			"Firmas adicionales disponibles",
-		],
-		cta: "Contratar PyME",
-		inp: { precio: 300, firmas: 300, periodo: 24 },
-	},
-	enterprise: {
-		id: "enterprise",
-		label: "ENTERPRISE",
-		segment: "empresa",
-		color: "#b45309",
-		recommended: true,
-		tagline: "Para organizaciones con mayor volumen de documentos y múltiples áreas firmantes",
-		priceUSD: 600,
-		priceNote: "Pago único · vigencia 2 años",
-		firmas: 2000,
-		ilimitadas: false,
-		admins: 1,
-		certs: "3 a 5",
-		benefits: [
-			"1 Administrador empresa",
-			"De 3 a 5 certificados digitales bonificados",
-			"2.000 firmas digitales",
-			"Vigencia 2 años",
-			"Gestión avanzada de usuarios y roles",
-			"Panel de control y trazabilidad de documentos",
-			"Soporte prioritario mail/chat",
-			"Firmas adicionales disponibles",
-		],
-		cta: "Contratar ENTERPRISE",
-		inp: { precio: 600, firmas: 2000, periodo: 24 },
-	},
-};
+import { PLANS } from "../data/plans";
 
 // ─── Questionnaire options ─────────────────────────────────────────────────────
 const PROFILE_OPTS = [
@@ -185,6 +87,17 @@ export function Cotizadora({ costs, currency, tc }) {
 		const svc = { cloudStorage: false, mailCert: false, paywall: payMethod === "tarjeta" };
 		const c = engine({ arch: "bolsa", inp: plan.inp, svc, users: 1000, costs });
 		const col = plan.color;
+
+		// Compute ilimitadas risk threshold dynamically from current costs
+		const ilimitadasThreshold = plan.ilimitadas
+			? (function () {
+				const revMes = plan.inp.precio / plan.inp.periodo;
+				const certCostMes = costs.cvCertBase / plan.inp.periodo;
+				const avail = revMes - certCostMes;
+				return avail > 0 ? Math.floor(avail / costs.cvFirmaBase) : 0;
+			})()
+			: null;
+
 		return (
 			<div
 				style={{
@@ -238,7 +151,7 @@ export function Cotizadora({ costs, currency, tc }) {
 					</div>
 					{currency === "USD" && (
 						<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>
-							{"$ " + plan.priceUSD * tc + " ARS"}
+							{"$ " + (plan.priceUSD * tc).toLocaleString("es-AR") + " ARS"}
 						</div>
 					)}
 					{currency === "ARS" && (
@@ -251,6 +164,18 @@ export function Cotizadora({ costs, currency, tc }) {
 						{payMethod === "tarjeta" ? " · +0.2% Paywall" : ""}
 					</div>
 				</div>
+
+				{/* Risk warning for ilimitadas plans */}
+				{ilimitadasThreshold !== null && (
+					<div style={{ padding: "10px 18px", background: WNBG, borderBottom: "1px solid " + BORD }}>
+						<div style={Object.assign({}, os(11, 700, WN), { marginBottom: 2 })}>
+							⚠ Rentable hasta {ilimitadasThreshold} firmas / mes
+						</div>
+						<div style={os(10, 400, WN)}>
+							Por encima de ese umbral el costo variable supera el ingreso del pack.
+						</div>
+					</div>
+				)}
 
 				{/* Benefits */}
 				<div style={{ padding: "14px 18px", flex: 1 }}>
@@ -291,7 +216,7 @@ export function Cotizadora({ costs, currency, tc }) {
 					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
 						{[
 							{ l: "Margen", v: fP(c.margenPct), col: c.margenPct > 30 ? OK : c.margenPct > 0 ? WN : ER },
-							{ l: "BE usuarios", v: isFinite(c.beUsuarios) ? fK(c.beUsuarios) + " usu." : "∞", col: isFinite(c.beUsuarios) ? OK : WN },
+							{ l: "BE clientes", v: isFinite(c.beUsuarios) ? fK(c.beUsuarios) + " usu." : "∞", col: isFinite(c.beUsuarios) ? OK : WN },
 							{ l: "CV/pack", v: fMoney2(c.cvMes * 24), col: GRAY },
 						].map(function (m) {
 							return (

@@ -9,11 +9,12 @@ import {
 	ReferenceLine,
 	ResponsiveContainer,
 } from "recharts";
-import { BLUE, GRAY, BLACK, WHITE, OK, WN, WNBG, ER, ERBG, os, mont } from "../../theme/tokens";
+import { BLUE, BLUEL, BORD, GRAY, BLACK, WHITE, OK, OKBG, WN, WNBG, ER, ERBG, os, mont } from "../../theme/tokens";
 import { makeMoney } from "../../utils/useMoney";
 import { ChartTip } from "../ui/ChartTip";
+import { NumInput } from "../ui/NumInput";
 
-export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc }) {
+export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc, projParams, setProjParams, arch }) {
 	const { fMoney2 } = makeMoney(currency, tc);
 	const PRICE_FACTORS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 	const beRows = calcs ? PRICE_FACTORS.map(function (f) {
@@ -22,8 +23,54 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc }) {
 		const be = margen > 0 ? Math.ceil(costs.cfDirecto / margen) : Infinity;
 		return { f, precio, margen, be };
 	}) : [];
+
+	const params = projParams || { usersM1: 1000, growthRate: 10, churnRate: 5 };
+	function setParam(key, val) {
+		if (!setProjParams) return;
+		setProjParams(function (p) { return Object.assign({}, p, { [key]: val }); });
+	}
+
 	return (
 		<div>
+			{/* Projection parameters */}
+			<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "10px 16px", marginBottom: 16, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+				<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", alignSelf: "center", flexShrink: 0 })}>
+					Parámetros de proyección
+				</div>
+				<div style={{ flex: "0 0 140px" }}>
+					<NumInput
+						label="Usuarios mes 1"
+						value={params.usersM1}
+						onChange={function (v) { setParam("usersM1", Math.max(1, Math.round(v))); }}
+						suffix="usu"
+					/>
+				</div>
+				<div style={{ flex: "0 0 140px" }}>
+					<NumInput
+						label="Crecimiento mensual"
+						value={params.growthRate}
+						onChange={function (v) { setParam("growthRate", v); }}
+						suffix="%"
+					/>
+				</div>
+				{arch === "sub" && (
+					<div style={{ flex: "0 0 140px" }}>
+						<NumInput
+							label="Churn mensual"
+							value={params.churnRate}
+							onChange={function (v) { setParam("churnRate", Math.max(0, v)); }}
+							suffix="%"
+						/>
+					</div>
+				)}
+				{arch === "sub" && (
+					<div style={Object.assign({}, os(10, 400, GRAY), { alignSelf: "flex-end", paddingBottom: 10, maxWidth: 180 })}>
+						Neto: {(params.growthRate - params.churnRate).toFixed(1)}% / mes
+					</div>
+				)}
+			</div>
+
+			{/* Chart 1: Revenue / Costo / EBITDA */}
 			<div
 				style={{
 					display: "flex",
@@ -42,8 +89,8 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc }) {
 				</div>
 				{beMes ? (
 					<span
-						style={Object.assign({}, os(11, 700, WN), {
-							background: WNBG,
+						style={Object.assign({}, os(11, 700, OK), {
+							background: OKBG,
 							padding: "3px 10px",
 							borderRadius: 20,
 						})}
@@ -111,6 +158,8 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc }) {
 					</ComposedChart>
 				</ResponsiveContainer>
 			</div>
+
+			{/* Chart 2: Balance acumulado */}
 			<div
 				style={Object.assign({}, os(11, 700, BLACK), {
 					textTransform: "uppercase",
@@ -158,6 +207,7 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc }) {
 				</ResponsiveContainer>
 			</div>
 
+			{/* BE by price table */}
 			{calcs && beRows.length > 0 && (
 				<div style={{ marginTop: 24 }}>
 					<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>

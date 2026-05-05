@@ -2,7 +2,7 @@ import { SERVICES_DEF } from "../data/costs";
 import { fD2 } from "../utils/formatters";
 
 // ─── Engine ────────────────────────────────────────────────────────────────────
-export function engine({ arch, inp, svc, users, costs }) {
+export function engine({ arch, inp, svc, users, costs, projConfig }) {
 	const { activosTotal, cfTotal, cfDirecto, cvCertBase, cvFirmaBase, capacidadFirmasAnual } = costs;
 	const infraPorFirma = capacidadFirmasAnual > 0 ? activosTotal / (capacidadFirmasAnual / 12) : 0;
 	let svcFirma = 0,
@@ -95,13 +95,16 @@ export function engine({ arch, inp, svc, users, costs }) {
 		? cfDirecto * firmasMesUsr / capFirmasMes
 		: 0);
 
+	const { usersM1 = null, growthRate = 15, churnRate = 0 } = projConfig || {};
+	const pU1 = usersM1 !== null ? usersM1 : Math.max(Math.round(users * 0.05), 10);
+	const netRate = (growthRate - (arch === "sub" ? churnRate : 0)) / 100;
+
 	let acum = 0;
 	const proj = Array.from({ length: 24 }, function (_, i) {
-		const ramp = Math.min(1, 0.25 + i * 0.1);
-		const uM = Math.round(users * ramp);
-		const rM = revMes * uM,
-			cM = cvMes * uM + cfDirecto,
-			eM = rM - cM;
+		const uM = Math.max(0, Math.round(pU1 * Math.pow(1 + netRate, i)));
+		const rM = revMes * uM;
+		const cM = cvMes * uM + cfDirecto;
+		const eM = rM - cM;
 		acum += eM;
 		return {
 			mes: "M" + (i + 1),

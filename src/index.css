@@ -109,3 +109,13 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+  #root {
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+}
