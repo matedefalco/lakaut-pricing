@@ -352,7 +352,7 @@ function LakautCalcInner() {
 									tooltip: "Precio de pack necesario para alcanzar " + margenDeseado + "% de margen.",
 								});
 								return (
-									<div style={{ borderBottom: "1px solid " + BORD, background: "#f1f5f9", display: "flex", overflowX: "auto" }}>
+									<div style={{ borderBottom: "1px solid " + BORD, background: BLUEL, display: "flex", flexWrap: "wrap" }}>
 										{items.map(function (item, i) {
 											return (
 												<div
@@ -363,6 +363,7 @@ function LakautCalcInner() {
 														padding: "10px 18px",
 														borderLeft: i > 0 ? "1px solid " + BORD : "none",
 														borderTop: "3px solid " + item.color,
+														position: "relative",
 													}}
 												>
 													<div style={Object.assign({}, os(9, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3, display: "flex", alignItems: "center", gap: 3 })}>
