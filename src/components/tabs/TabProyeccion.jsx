@@ -16,6 +16,7 @@ import { NumInput } from "../ui/NumInput";
 
 export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc, projParams, setProjParams, arch }) {
 	const { fMoney2 } = makeMoney(currency, tc);
+	const hasExtras = proj && proj.length > 0 && (proj[0]["Rev Extras"] || 0) > 0;
 	const PRICE_FACTORS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 	const beRows = calcs ? PRICE_FACTORS.map(function (f) {
 		const precio = calcs.revMes * f;
@@ -109,6 +110,27 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc, projPar
 					</span>
 				)}
 			</div>
+			{/* Legend when extras are present */}
+			{hasExtras && (
+				<div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 12, height: 12, background: BLUE, opacity: 0.85, borderRadius: 2 }} />
+						<span style={os(10, 400, GRAY)}>Packs</span>
+					</div>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 12, height: 12, background: "#22c55e", opacity: 0.85, borderRadius: 2 }} />
+						<span style={os(10, 400, GRAY)}>Firmas extra</span>
+					</div>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 12, height: 12, background: GRAY, opacity: 0.6, borderRadius: 2 }} />
+						<span style={os(10, 400, GRAY)}>Costo</span>
+					</div>
+					<div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+						<div style={{ width: 20, height: 2.5, background: OK, borderRadius: 2 }} />
+						<span style={os(10, 400, GRAY)}>EBITDA</span>
+					</div>
+				</div>
+			)}
 			<div style={{ height: 200, marginBottom: 20 }}>
 				<ResponsiveContainer width="100%" height="100%">
 					<ComposedChart
@@ -128,12 +150,19 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc, projPar
 							}}
 						/>
 						<Tooltip content={ChartTip} />
-						<Bar
-							dataKey="Revenue"
-							fill={BLUE}
-							opacity={0.85}
-							radius={[2, 2, 0, 0]}
-						/>
+						{hasExtras ? (
+							<>
+								<Bar dataKey="Rev Pack" name="Packs" stackId="rev" fill={BLUE} opacity={0.85} />
+								<Bar dataKey="Rev Extras" name="Firmas extra" stackId="rev" fill="#22c55e" opacity={0.85} radius={[2, 2, 0, 0]} />
+							</>
+						) : (
+							<Bar
+								dataKey="Revenue"
+								fill={BLUE}
+								opacity={0.85}
+								radius={[2, 2, 0, 0]}
+							/>
+						)}
 						<Bar
 							dataKey="Costo"
 							fill={GRAY}

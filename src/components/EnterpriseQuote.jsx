@@ -232,7 +232,7 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 						</div>
 						<div style={{ flex: "0 0 160px" }}>
 							<NumInput
-								label="Firmas extra usadas"
+								label="Firmas extra vendidas (total)"
 								value={cantFirmasExtra}
 								onChange={function (v) { setCantFirmasExtra(Math.max(0, Math.round(v))); }}
 								suffix="firmas"

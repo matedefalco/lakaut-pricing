@@ -27,6 +27,11 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 	let displayPrice = "",
 		displayPriceSuffix = "";
 
+	// Extra firma revenue: total fixed amount per month (bolsa only)
+	// cantFirmasExtra = total firmas extra sold (not per-user)
+	let extraRevMes = 0,
+		extraFirmasMes = 0;
+
 	if (arch === "ppu") {
 		const fa = inp.firmasAsumidas || 5;
 		revMes = (inp.precioCert || 0) / 24 + fa * (inp.precioFirma || 0);
@@ -66,11 +71,12 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 			"Cert " + fD2(inp.precioCert || 0) + " + Bolsa " + fD2(inp.precio || 0);
 		displayPriceSuffix = "/ pack (" + p + "m)";
 	} else {
-		// bolsa
+		// bolsa — extras son TOTAL vendido, no per-user
 		const p = inp.periodo || 24;
-		const extraRev = (inp.extraFirmaPrice || 0) * (inp.cantFirmasExtra || 0);
-		revMes = ((inp.precio || 0) + extraRev) / p;
-		firmasMesUsr = ((inp.firmas || 0) + (inp.cantFirmasExtra || 0)) / p;
+		extraFirmasMes = (inp.cantFirmasExtra || 0) / p;
+		extraRevMes = (inp.extraFirmaPrice || 0) * extraFirmasMes;
+		revMes = (inp.precio || 0) / p;           // solo packs, per-user
+		firmasMesUsr = (inp.firmas || 0) / p;     // solo firmas del pack, per-user
 		certsMesUsr = 1 / p;
 		displayPrice = fD2(inp.precio || 0);
 		displayPriceSuffix = "/ pack (" + p + " meses)";
@@ -79,15 +85,23 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 	const cvFirmaUnit = cvFirmaBase + infraPorFirma + svcFirma;
 	const cvCertUnit = cvCertBase + svcCert;
 
+	// CV de extras: costo total mensual fijo (igual que extraRevMes, no per-user)
+	const cvExtras = extraFirmasMes * cvFirmaUnit;
+
 	const paywallCost = revMes * svcPctRev;
 	const cvMes =
 		certsMesUsr * cvCertUnit + firmasMesUsr * cvFirmaUnit + svcUserMes + paywallCost;
 	const margenUnit = revMes - cvMes;
 	const margenPct = revMes > 0 ? (margenUnit / revMes) * 100 : -100;
+
+	// BE: extras compensan parte del CF fijo → reducen usuarios necesarios
+	const cfNeto = cfDirecto + cvExtras - extraRevMes;
 	const beUsuarios =
-		margenUnit > 0 ? Math.ceil(cfDirecto / margenUnit) : Infinity;
-	const revTotal = revMes * users,
-		cvTotal = cvMes * users;
+		margenUnit > 0 ? Math.max(0, Math.ceil(cfNeto / margenUnit)) : Infinity;
+
+	const revPackTotal = revMes * users;
+	const revTotal = revPackTotal + extraRevMes;
+	const cvTotal = cvMes * users + cvExtras;
 	const ebitda = revTotal - cvTotal - cfDirecto;
 	const ebitdaPct =
 		revTotal > 0 ? (ebitda / revTotal) * 100 : ebitda > 0 ? 100 : -100;
@@ -103,14 +117,18 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 	let acum = 0;
 	const proj = Array.from({ length: 24 }, function (_, i) {
 		const uM = Math.max(0, Math.round(pU1 * Math.pow(1 + netRate, i)));
-		const rM = revMes * uM;
-		const cM = cvMes * uM + cfDirecto;
+		const rPack = Math.round(revMes * uM);
+		const rExtras = Math.round(extraRevMes);
+		const rM = rPack + rExtras;
+		const cM = Math.round(cvMes * uM + cfDirecto + cvExtras);
 		const eM = rM - cM;
 		acum += eM;
 		return {
 			mes: "M" + (i + 1),
-			Revenue: Math.round(rM),
-			Costo: Math.round(cM),
+			Revenue: rM,
+			"Rev Pack": rPack,
+			"Rev Extras": rExtras,
+			Costo: cM,
 			EBITDA: Math.round(eM),
 			Acumulado: Math.round(acum),
 		};
@@ -126,7 +144,10 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 		cvFirmaUnit,
 		cvCertUnit,
 		cvMes,
+		cvExtras,
 		revMes,
+		extraRevMes,
+		revPackTotal,
 		margenUnit,
 		margenPct,
 		beUsuarios,

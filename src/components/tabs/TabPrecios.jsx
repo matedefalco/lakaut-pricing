@@ -255,8 +255,8 @@ export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 				</thead>
 				<tbody>
 					{VOLS.map(function (u, i) {
-						const r = calcs.revMes * u,
-							cv = calcs.cvMes * u,
+						const r = calcs.revMes * u + (calcs.extraRevMes || 0),
+							cv = calcs.cvMes * u + (calcs.cvExtras || 0),
 							e = r - cv - costs.cfDirecto;
 						const m = r > 0 ? (e / r) * 100 : -100;
 						const ec = e > 0 ? OK : e > -20000 ? WN : ER;
@@ -366,7 +366,8 @@ export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 				</thead>
 				<tbody>
 					{VOLS.map(function (u, i) {
-						const bePrice = calcs.cvMes + costs.cfDirecto / u;
+						const cfNeto = costs.cfDirecto + (calcs.cvExtras || 0) - (calcs.extraRevMes || 0);
+						const bePrice = calcs.cvMes + Math.max(0, cfNeto) / u;
 						const diff = calcs.revMes - bePrice;
 						const viable = diff >= 0;
 						const needPct = !viable && calcs.revMes > 0 ? ((bePrice - calcs.revMes) / calcs.revMes) * 100 : 0;

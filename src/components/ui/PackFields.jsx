@@ -97,7 +97,7 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 			)}
 			{isPack && (inp.extraFirmaPrice ?? 0) > 0 && (
 				<NumInput
-					label="Firmas extra usadas (vigencia)"
+					label="Firmas extra vendidas (total)"
 					value={inp.cantFirmasExtra ?? 0}
 					onChange={function (v) { update("cantFirmasExtra", Math.max(0, Math.round(v))); }}
 					suffix="f"
