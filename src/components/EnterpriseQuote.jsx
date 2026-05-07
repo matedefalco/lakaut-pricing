@@ -36,6 +36,8 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 	const [certsState, setCerts] = useState(initialCerts || 4);
 	const [periodoState, setPeriodo] = useState(initialPeriodo || 24);
 	const [marginTargetState, setMarginTarget] = useState(initialMargin || 40);
+	const [extraFirmaPriceState, setExtraFirmaPrice] = useState(1.0);
+	const [cantFirmasExtraState, setCantFirmasExtra] = useState(0);
 	const [copied, setCopied] = useState(false);
 
 	// When embedded (hideInputs), values come from props live; otherwise from local state
@@ -43,11 +45,21 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 	const certs = hideInputs ? (initialCerts || 4) : certsState;
 	const periodo = hideInputs ? (initialPeriodo || 24) : periodoState;
 	const marginTarget = hideInputs ? (initialMargin || 40) : marginTargetState;
+	const extraFirmaPrice = extraFirmaPriceState;
+	const cantFirmasExtra = cantFirmasExtraState;
 
 	// Custom quote from unified inputs
 	const customRow = useMemo(function () {
-		return computeRow(firmas, certs, periodo, marginTarget, costs);
-	}, [firmas, certs, periodo, marginTarget, costs]);
+		const row = computeRow(firmas, certs, periodo, marginTarget, costs);
+		const extraRevTotal = extraFirmaPrice * cantFirmasExtra;
+		const extraCvTotal = cantFirmasExtra * costs.cvFirmaBase;
+		return Object.assign({}, row, {
+			extraRevTotal,
+			extraCvTotal,
+			totalRevenue: row.priceSug + extraRevTotal,
+			margenConExtras: row.margenPack + extraRevTotal - extraCvTotal,
+		});
+	}, [firmas, certs, periodo, marginTarget, costs, extraFirmaPrice, cantFirmasExtra]);
 
 	// Escalation table: same certs/periodo/margin, varying firmas
 	const rows = useMemo(function () {
@@ -210,11 +222,27 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 							})}
 						</div>
 					</div>
-					<div style={Object.assign({}, os(10, 400, GRAY), { alignSelf: "center", marginLeft: "auto" })}>
+					<div style={{ flex: "0 0 140px" }}>
+							<NumInput
+								label="Precio firma extra"
+								value={extraFirmaPrice}
+								onChange={function (v) { setExtraFirmaPrice(Math.max(0, v)); }}
+								prefix="USD"
+							/>
+						</div>
+						<div style={{ flex: "0 0 160px" }}>
+							<NumInput
+								label="Firmas extra usadas"
+								value={cantFirmasExtra}
+								onChange={function (v) { setCantFirmasExtra(Math.max(0, Math.round(v))); }}
+								suffix="firmas"
+							/>
+						</div>
+					</div>
+					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 8 })}>
 						CV cert: {fMoney2(costs.cvCertBase)} · CV firma: {fMoney2(costs.cvFirmaBase)}
 					</div>
-				</div>
-			</div>}
+				</div>}
 
 			{/* KPI cards */}
 			<div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -232,10 +260,18 @@ export function EnterpriseQuote({ costs, currency, tc, initialFirmas, initialCer
 				</div>
 				{/* Margen */}
 				<div style={{ flex: "1 1 140px", background: BLUEL, border: "1px solid " + BLUE, borderLeft: "4px solid " + BLUE, borderRadius: 10, padding: "8px 12px", minWidth: 0 }}>
-					<div style={os(8, 700, BLUE)}>MARGEN PACK</div>
-					<div style={Object.assign({}, mont(16), { color: BLUE, marginTop: 2, lineHeight: 1.2 })}>{fMoney2(customRow.margenPack)}</div>
-					<div style={os(9, 400, BLUE)}>{fP(marginTarget)} del precio</div>
+					<div style={os(8, 700, BLUE)}>{cantFirmasExtra > 0 ? "MARGEN TOTAL" : "MARGEN PACK"}</div>
+					<div style={Object.assign({}, mont(16), { color: BLUE, marginTop: 2, lineHeight: 1.2 })}>{fMoney2(cantFirmasExtra > 0 ? customRow.margenConExtras : customRow.margenPack)}</div>
+					<div style={os(9, 400, BLUE)}>{cantFirmasExtra > 0 ? "pack + extras" : fP(marginTarget) + " del precio"}</div>
 				</div>
+				{/* Firmas extra */}
+				{cantFirmasExtra > 0 && (
+					<div style={{ flex: "1 1 150px", background: "#f0fdf4", border: "1px solid #86efac", borderLeft: "4px solid #22c55e", borderRadius: 10, padding: "8px 12px", minWidth: 0 }}>
+						<div style={os(8, 700, "#15803d")}>FIRMAS EXTRA</div>
+						<div style={Object.assign({}, mont(16), { color: "#15803d", marginTop: 2, lineHeight: 1.2 })}>{fMoney2(customRow.extraRevTotal)}</div>
+						<div style={os(9, 400, "#15803d")}>{cantFirmasExtra.toLocaleString("es-AR")} f. × {fMoney2(extraFirmaPrice)}</div>
+					</div>
+				)}
 				{/* Break-even */}
 				{(function () {
 					var beOk = isFinite(customRow.be) && customRow.be < 5000;

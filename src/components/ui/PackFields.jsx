@@ -70,6 +70,7 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 	const isAnual = arch === "anual", isPack = arch === "bolsa";
 	const precio = priceField(inp.precio ?? 0, currency, tc, function (v) { update("precio", v); });
 	const extra = priceField(inp.extraFirma ?? 1, currency, tc, function (v) { update("extraFirma", v); });
+	const extraPack = priceField(inp.extraFirmaPrice ?? 0, currency, tc, function (v) { update("extraFirmaPrice", v); });
 	return (
 		<div>
 			<NumInput
@@ -89,6 +90,17 @@ export function PackFields({ arch, inp, update, currency, tc }) {
 					value={inp.periodo ?? 24}
 					onChange={function (v) { update("periodo", Math.max(6, Math.min(48, Math.round(v)))); }}
 					suffix="meses"
+				/>
+			)}
+			{isPack && (
+				<NumInput label="Precio firma extra" {...extraPack} />
+			)}
+			{isPack && (inp.extraFirmaPrice ?? 0) > 0 && (
+				<NumInput
+					label="Firmas extra usadas (vigencia)"
+					value={inp.cantFirmasExtra ?? 0}
+					onChange={function (v) { update("cantFirmasExtra", Math.max(0, Math.round(v))); }}
+					suffix="f"
 				/>
 			)}
 			{arch === "sub" && <NumInput label="Firma extra (USD/firma)" {...extra} />}

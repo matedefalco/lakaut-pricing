@@ -68,8 +68,9 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 	} else {
 		// bolsa
 		const p = inp.periodo || 24;
-		revMes = (inp.precio || 0) / p;
-		firmasMesUsr = (inp.firmas || 0) / p;
+		const extraRev = (inp.extraFirmaPrice || 0) * (inp.cantFirmasExtra || 0);
+		revMes = ((inp.precio || 0) + extraRev) / p;
+		firmasMesUsr = ((inp.firmas || 0) + (inp.cantFirmasExtra || 0)) / p;
 		certsMesUsr = 1 / p;
 		displayPrice = fD2(inp.precio || 0);
 		displayPriceSuffix = "/ pack (" + p + " meses)";

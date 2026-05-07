@@ -44,6 +44,8 @@ export function modelToInp(model) {
 				precio: priceUSD,
 				firmas: firmas || 0,
 				periodo: vigencia || 24,
+				extraFirmaPrice: extraFirmaPrice || 0,
+				cantFirmasExtra: 0,
 			};
 	}
 }

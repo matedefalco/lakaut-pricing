@@ -409,14 +409,21 @@ function LakautCalcInner() {
 								<div className="no-print" style={{ width: 188, flexShrink: 0, background: WHITE, border: "1px solid " + BORD, borderRadius: 12, overflow: "hidden", position: "sticky", top: 16 }}>
 									{(function () {
 										var costoTotal = costs.cfDirecto + calcs.cvMes * users;
+										var extraRevMes = cfg.arch === "bolsa"
+											? (inp.extraFirmaPrice || 0) * (inp.cantFirmasExtra || 0) / (inp.periodo || 24)
+											: 0;
+										var ingresoRows = [
+											{ label: "Revenue / mes", value: fMoney(calcs.revTotal), color: BLUE, big: true },
+											{ label: "por usuario", value: fMoney2(calcs.revMes) + " / usu", color: GRAY },
+										];
+										if (extraRevMes > 0) {
+											ingresoRows.push({ label: "Firmas extra / mes", value: fMoney(extraRevMes * users), color: BLUE });
+										}
 										var sections = [
 											{
 												title: "Ingresos",
 												color: BLUE,
-												rows: [
-													{ label: "Revenue / mes", value: fMoney(calcs.revTotal), color: BLUE, big: true },
-													{ label: "por usuario", value: fMoney2(calcs.revMes) + " / usu", color: GRAY },
-												],
+												rows: ingresoRows,
 											},
 											{
 												title: "Rentabilidad",
