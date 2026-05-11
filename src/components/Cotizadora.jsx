@@ -44,9 +44,9 @@ const ESCALON_BASE = [10, 25, 50, 100, 200, 300, 500, 1000, 2000, 5000, 10000, 2
 function getEscalones(targetFirmas) {
 	const all = [...new Set([...ESCALON_BASE, targetFirmas])].sort(function (a, b) { return a - b; });
 	var idx = all.indexOf(targetFirmas);
-	var start = Math.max(0, idx - 4);
-	var end = Math.min(all.length - 1, idx + 4);
-	return all.slice(start, end + 1);
+	var below = all.slice(Math.max(0, idx - 3), idx);
+	var above = all.slice(idx + 1, idx + 4);
+	return [...below, targetFirmas, ...above];
 }
 
 function fNumShort(n) {
@@ -381,6 +381,23 @@ function PlanCard({ plan, isFirst, costs, payMethod, fMoney2, currency, tc, onEx
 // ─── Volume section ───────────────────────────────────────────────────────────
 function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash }) {
 	var [useCustomMargin, setUseCustomMargin] = useState(false);
+	var [copied, setCopied] = useState(false);
+
+	function copyTable() {
+		var header = ["Firmas", "Precio", "$/firma", "$/cert"].join("\t");
+		var bodyLines = rows.map(function (r) {
+			return [
+				r.firmas.toLocaleString("es-AR") + (r.firmas === firmas ? " ◀" : ""),
+				fMoney2(r.priceSug),
+				fMoney2(r.pricePerFirma),
+				fMoney2(r.pricePerCert),
+			].join("\t");
+		});
+		navigator.clipboard.writeText([header, ...bodyLines].join("\n")).then(function () {
+			setCopied(true);
+			setTimeout(function () { setCopied(false); }, 2000);
+		});
+	}
 	var thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "7px 10px", background: "#1e293b", textAlign: "right", whiteSpace: "nowrap" });
 	var thL = Object.assign({}, thStyle, { textAlign: "left" });
 
@@ -444,21 +461,25 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 			</div>
 
 			{/* Escalation table */}
-			<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
-				Escalonado de precios · {marginTarget}% margen objetivo
+			<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", flex: 1 })}>
+					Escalonado de precios · {marginTarget}% margen objetivo
+				</div>
+				<button onClick={copyTable} style={{ padding: "4px 12px", borderRadius: 6, border: "1.5px solid " + BORD, background: copied ? "#059669" : WHITE, color: copied ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+					{copied ? "✓ Copiado" : "Copiar"}
+				</button>
 			</div>
 			<div style={Object.assign({}, os(11, 400, GRAY), { marginBottom: 10 })}>
 				Los precios varían según el volumen. Tu cotización está marcada con ▶.
 			</div>
 			<div style={{ overflowX: "auto" }}>
-				<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 560 }}>
+				<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 480 }}>
 					<thead>
 						<tr>
 							<th style={thL}>Firmas</th>
-							<th style={thStyle}>CV pack</th>
 							<th style={thStyle}>Precio ({marginTarget}%)</th>
-							<th style={thStyle}>$/firma</th>
-							<th style={thStyle}>Margen bruto</th>
+							<th style={thStyle}>Precio x firma</th>
+							<th style={thStyle}>Precio x certificado</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -470,10 +491,9 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 										{isTarget && "▶ "}{r.firmas.toLocaleString("es-AR")}
 										{isTarget && <span style={Object.assign({}, os(10, 400, BLUE), { marginLeft: 6 })}>← tu volumen</span>}
 									</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.cvPack)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: isTarget ? OK : "inherit" }}>{fMoney2(r.priceSug)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.pricePerFirma)}</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.margenPack)}</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.pricePerCert)}</td>
 								</tr>
 							);
 						})}
