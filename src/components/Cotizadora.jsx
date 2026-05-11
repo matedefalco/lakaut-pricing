@@ -540,7 +540,7 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 }
 
 // ─── Cart panel ───────────────────────────────────────────────────────────────
-function CartPanel({ cart, onRemove, onClear, pay, setPay, subtotal, paywall, total, fMoney2, currency, tc, onExport }) {
+function CartPanel({ cart, onRemove, onClear, pay, setPay, subtotal, paywall, total, fMoney2, currency, tc, onExport, costs }) {
 	const PAY_OPTS_CART = [
 		{ k: "transferencia", label: "Transferencia" },
 		{ k: "tarjeta", label: "Tarjeta · +0.2%" },
@@ -944,6 +944,7 @@ export function Cotizadora({ costs, currency, tc }) {
 					fMoney2={fMoney2}
 					currency={currency}
 					tc={tc}
+					costs={costs}
 					onExport={function () {
 						openProposalWindow({
 							profile: profile,
