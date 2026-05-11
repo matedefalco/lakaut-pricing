@@ -119,7 +119,7 @@ function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, pay
 		}).join("");
 		tableHtml = [
 			"<table class='prop-table'>",
-			"<thead><tr><th>Cant. Firmas</th><th>$ / Firma</th><th>$ / Cert.</th><th>Total (" + marginTarget + "% margen)</th></tr></thead>",
+			"<thead><tr><th>Cant. Firmas</th><th>$ / Firma</th><th>$ / Cert.</th><th>Precio</th></tr></thead>",
 			"<tbody>" + escRowsHtml + "</tbody></table>",
 			"<div style='margin-top:6px;font-size:11px;color:#64748b'>Vigencia: " + volumeData.periodo + " meses · " + volumeData.certs + " cert" + (volumeData.certs !== 1 ? "s" : "") + " · ▶ volumen seleccionado.</div>",
 		].join("");
@@ -441,7 +441,7 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 				<div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-end" }}>
 					{[
 						{ l: "Costo variable del pack", v: fMoney2(targetRow.cvPack), col: "#b45309", big: false },
-						{ l: "Precio al " + marginTarget + "% margen", v: fMoney2(targetRow.priceSug), col: OK, big: true },
+						{ l: "Precio", v: fMoney2(targetRow.priceSug), col: OK, big: true },
 						{ l: "Margen bruto", v: fMoney2(targetRow.margenPack), col: BLUE, big: false },
 						{ l: "Precio por firma", v: fMoney2(targetRow.pricePerFirma), col: GRAY, big: false },
 						{ l: "Precio por certificado", v: fMoney2(targetRow.pricePerCert), col: GRAY, big: false },
@@ -481,7 +481,7 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 					<thead>
 						<tr>
 							<th style={thL}>Firmas</th>
-							<th style={thStyle}>Precio ({marginTarget}%)</th>
+							<th style={thStyle}>Precio</th>
 							<th style={thStyle}>Precio x firma</th>
 							<th style={thStyle}>Precio x certificado</th>
 						</tr>
