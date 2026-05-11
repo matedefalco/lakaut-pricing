@@ -21,8 +21,6 @@ import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
 import { Cotizadora } from "./components/Cotizadora";
-import { EnterpriseQuote } from "./components/EnterpriseQuote";
-import { CartQuote } from "./components/CartQuote";
 
 // ─── Archive mapping arch → pack key for strategy text ─────────────────────────
 const ARCH_TO_PACK = { bolsa: "A", sub: "B", ppu: "C", anual: "D", free: "E", hibrido: "F" };
@@ -52,8 +50,6 @@ function LakautCalcInner() {
 	// Modelos sub-nav
 	const [modTab, setModTab] = useState("análisis");
 
-	// Cotizadora sub-nav
-	const [cotTab, setCotTab] = useState("estándar");
 
 	// Selected model id in análisis mode
 	const [selectedModelId, setSelectedModelId] = useState(function () {
@@ -160,14 +156,7 @@ function LakautCalcInner() {
 		{ k: "suscripción", label: "Suscripción", group: "herramientas" },
 		{ k: "comparación", label: "Comparación", group: "herramientas" },
 	];
-	const COT_TABS = [
-		{ k: "estándar", label: "Por perfil" },
-		{ k: "armar", label: "A medida" },
-		{ k: "enterprise", label: "Enterprise" },
-	];
-
 	const activeModTab = MOD_TABS.find(function (t) { return t.k === modTab; });
-	const activeCotTab = COT_TABS.find(function (t) { return t.k === cotTab; });
 
 	const selectedModel = models.find(function (m) { return m.id === selectedModelId; });
 
@@ -524,41 +513,8 @@ function LakautCalcInner() {
 			    OTHER SECTIONS
 			    ════════════════════════════════════════════════════════════════════════ */}
 			{section === "cotizadora" && (
-				<div>
-					{/* Cotizadora sub-nav */}
-					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", gap: 0 }}>
-						{COT_TABS.map(function (t) {
-							const act = cotTab === t.k;
-							return (
-								<button
-									key={t.k}
-									onClick={function () { setCotTab(t.k); }}
-									style={{ padding: "10px 20px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
-								>
-									{t.label}
-								</button>
-							);
-						})}
-					</div>
-					{cotTab === "estándar" && (
-						<div style={{ padding: 24 }}>
-							<Cotizadora costs={costs} currency={currency} tc={tc} />
-						</div>
-					)}
-					{cotTab === "armar" && (
-						<div style={{ padding: 24 }}>
-							<CartQuote costs={costs} currency={currency} tc={tc} />
-						</div>
-					)}
-					{cotTab === "enterprise" && (
-						<div style={{ padding: 24 }}>
-							<EnterpriseQuote
-								costs={costs}
-								currency={currency}
-								tc={tc}
-							/>
-						</div>
-					)}
+				<div style={{ padding: 24 }}>
+					<Cotizadora costs={costs} currency={currency} tc={tc} />
 				</div>
 			)}
 
