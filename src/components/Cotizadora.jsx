@@ -386,7 +386,7 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 		var lines = rows.map(function (r) {
 			var marker = r.firmas === firmas ? " *" : "";
 			return r.firmas.toLocaleString("es-AR") + " firmas: " + fMoney2(r.priceSug) +
-				" (" + fMoney2(r.pricePerFirma) + "/f | " + fMoney2(r.pricePerCert) + "/cert)" + marker;
+				" (" + fMoney2(r.pricePerFirma) + "/firma | " + fMoney2(r.pricePerCert) + "/cert)" + marker;
 		});
 		navigator.clipboard.writeText(lines.join("\n")).then(function () {
 			setCopied(true);
