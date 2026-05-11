@@ -219,7 +219,7 @@ function buildProposalHtml({ date, validUntil, profileLabel, firmaTypeLabel, pay
 		"<table class='profile-table'>",
 		"<tr><td>Tipo de cliente:</td><td><strong>" + profileLabel + "</strong></td></tr>",
 		"<tr><td>Modalidad de firma:</td><td><strong>" + firmaTypeLabel + "</strong></td></tr>",
-		"<tr><td>Certificados requeridos:</td><td><strong>" + certsCount + "</strong></td></tr>",
+		"<tr><td>Certificados requeridos:</td><td><strong>" + (typeof certsCount === "number" ? certsCount.toLocaleString("es-AR") : certsCount) + "</strong></td></tr>",
 		firmasEstimadas > 0 ? "<tr><td>Firmas estimadas (vigencia):</td><td><strong>" + firmasEstimadas.toLocaleString("es-AR") + "</strong></td></tr>" : "",
 		"<tr><td>Forma de pago:</td><td><strong>" + payLabel + "</strong></td></tr>",
 		"</table></div>",
@@ -236,7 +236,7 @@ function buildProposalHtml({ date, validUntil, profileLabel, firmaTypeLabel, pay
 		"<li>Los planes incluyen certificado digital, plataforma de gestión documental y soporte técnico.</li>",
 		"<li>Las firmas indicadas son el volumen incluido en la vigencia del pack. Firmas adicionales disponibles bajo pedido.</li>",
 		"<li>Sujeto a revisión comercial final por parte del equipo de Lakaut.</li>",
-		"</ul><div style='margin-top:8px;font-size:12px'>Para consultas o contratar: <strong>ventas@lakaut.com.ar</strong></div></div>",
+		"</ul><div style='margin-top:8px;font-size:12px'>Para consultas o contratar: <strong>nataliasalinas@lakaut.com.ar</strong></div></div>",
 		"<div class='footer'>Generado con Cotizador Lakaut · " + date + "</div>",
 		"<div style='margin-top:20px'><button onclick='window.print()' style='padding:10px 22px;background:#3949ab;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;font-family:Arial,sans-serif'>Imprimir / Guardar PDF</button></div>",
 		"</body></html>",
@@ -696,7 +696,7 @@ export function Cotizadora({ costs, currency, tc }) {
 		setCart(function (prev) {
 			return [...prev, {
 				id: Date.now(),
-				planLabel: firmasEstimadas.toLocaleString("es-AR") + " firmas · " + certsCount + " cert" + (certsCount !== 1 ? "s" : ""),
+				planLabel: firmasEstimadas.toLocaleString("es-AR") + " firmas · " + certsCount.toLocaleString("es-AR") + " cert" + (certsCount !== 1 ? "s" : ""),
 				col: BLUE,
 				isCustom: true,
 				ilimitadas: false,
