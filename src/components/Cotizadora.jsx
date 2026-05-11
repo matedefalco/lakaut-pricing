@@ -33,8 +33,9 @@ function computeRow(firmas, certs, periodo, marginTarget, costs) {
 	const margenPack = priceSug - cvPack;
 	const margenMes = margenPack / periodo;
 	const be = margenMes > 0 ? Math.ceil(costs.cfDirecto / margenMes) : Infinity;
-	const pricePerFirma = firmas > 0 ? priceSug / firmas : 0;
-	const pricePerCert = certs > 0 ? priceSug / certs : 0;
+	const mult = 1 / (1 - marginTarget / 100);
+	const pricePerFirma = costs.cvFirmaBase * mult;
+	const pricePerCert = costs.cvCertBase * mult;
 	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, pricePerFirma, pricePerCert };
 }
 
@@ -55,7 +56,7 @@ function fNumShort(n) {
 }
 
 // ─── Quick per-plan export ─────────────────────────────────────────────────────
-function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, payMethod, planData, volumeData, marginTarget, currency, tc }) {
+function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, payMethod, planData, volumeData, marginTarget, currency, tc, costs }) {
 	var date = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 	var validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 	var fmt = function (n) {
@@ -76,8 +77,9 @@ function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, pay
 	if (planData) {
 		totalPrice = planData.priceUSD;
 		var firmasLabel = planData.ilimitadas ? "Ilimitadas" : (planData.firmas || 0).toLocaleString("es-AR");
-		var perFirma = (planData.firmas && planData.firmas > 0) ? fmt(planData.priceUSD / planData.firmas) : "—";
-		var perCert = planData.certs > 0 ? fmt(planData.priceUSD / planData.certs) : "—";
+		var unitMult = costs ? 1 / (1 - marginTarget / 100) : 1;
+		var perFirma = (costs && !planData.ilimitadas) ? fmt(costs.cvFirmaBase * unitMult) : "—";
+		var perCert = costs ? fmt(costs.cvCertBase * unitMult) : "—";
 		tableHtml = [
 			"<table class='prop-table'>",
 			"<thead><tr><th>Plan</th><th style='text-align:center'>Certs.</th><th>Cant. Firmas</th><th>$ / Firma</th><th>$ / Cert.</th><th>Vigencia</th><th>Total</th></tr></thead>",
@@ -124,7 +126,7 @@ function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, pay
 }
 
 // ─── Cart proposal export ──────────────────────────────────────────────────────
-function openProposalWindow({ profile, firmaType, pay, items, subtotal, paywall, total, currency, tc }) {
+function openProposalWindow({ profile, firmaType, pay, items, subtotal, paywall, total, currency, tc, costs }) {
 	var date = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 	var validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 	var fmt = function (n) {
@@ -143,8 +145,9 @@ function openProposalWindow({ profile, firmaType, pay, items, subtotal, paywall,
 	var firmasTotal = items.reduce(function (s, it) { return s + (it.ilimitadas ? 0 : it.effectiveFirmas * it.qty); }, 0);
 
 	var rowsHtml = items.map(function (item) {
-		var perFirma = (!item.ilimitadas && item.effectiveFirmas > 0) ? fmt(item.unitPrice / item.effectiveFirmas) : "—";
-		var perCert = item.certs > 0 ? fmt(item.unitPrice / item.certs) : "—";
+		var itemMult = costs ? 1 / (1 - item.marginTarget / 100) : 1;
+		var perFirma = (costs && !item.ilimitadas) ? fmt(costs.cvFirmaBase * itemMult) : "—";
+		var perCert = costs ? fmt(costs.cvCertBase * itemMult) : "—";
 		var firmasCell = item.ilimitadas ? "Ilimitadas" : item.effectiveFirmas.toLocaleString("es-AR");
 		return [
 			"<tr>",
@@ -517,8 +520,9 @@ function CartPanel({ cart, onRemove, onClear, pay, setPay, subtotal, paywall, to
 					</thead>
 					<tbody>
 						{cart.map(function (item, idx) {
-							var pf = (!item.ilimitadas && item.effectiveFirmas > 0) ? fMoney2(item.unitPrice / item.effectiveFirmas) : "—";
-							var pc = item.certs > 0 ? fMoney2(item.unitPrice / item.certs) : "—";
+							var cartMult = 1 / (1 - item.marginTarget / 100);
+							var pf = (!item.ilimitadas) ? fMoney2(costs.cvFirmaBase * cartMult) : "—";
+							var pc = fMoney2(costs.cvCertBase * cartMult);
 							var firmasCell = item.ilimitadas ? "Ilimitadas" : item.effectiveFirmas.toLocaleString("es-AR");
 							return (
 								<tr key={item.id} style={{ background: idx % 2 === 1 ? "#fafafa" : WHITE, borderBottom: "1px solid " + BORD }}>
@@ -734,6 +738,7 @@ export function Cotizadora({ costs, currency, tc }) {
 			marginTarget: marginTarget,
 			currency: currency,
 			tc: tc,
+			costs: costs,
 		});
 	}
 
@@ -898,6 +903,7 @@ export function Cotizadora({ costs, currency, tc }) {
 							total: cartTotal,
 							currency: currency,
 							tc: tc,
+							costs: costs,
 						});
 					}}
 				/>
