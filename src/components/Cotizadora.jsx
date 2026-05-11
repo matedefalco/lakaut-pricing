@@ -40,6 +40,15 @@ function computeRow(firmas, certs, periodo, marginTarget, costs) {
 
 const ESCALON_BASE = [10, 25, 50, 100, 200, 300, 500, 1000, 2000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000];
 
+// Volume discount applied to the margined price as pack size grows
+function volumeDiscountRate(firmas) {
+	if (firmas >= 100000) return 0.20;
+	if (firmas >= 20000)  return 0.15;
+	if (firmas >= 5000)   return 0.10;
+	if (firmas >= 1000)   return 0.05;
+	return 0;
+}
+
 function getEscalones(targetFirmas) {
 	const all = [...new Set([...ESCALON_BASE, targetFirmas])].sort(function (a, b) { return a - b; });
 	var idx = all.indexOf(targetFirmas);
@@ -674,12 +683,32 @@ export function Cotizadora({ costs, currency, tc }) {
 
 	var volumeRows = useMemo(function () {
 		if (!isVolume) return [];
-		return escalones.map(function (f) { return computeRow(f, certsCount, PERIODO, marginTarget, costs); });
-	}, [isVolume, escalones, certsCount, marginTarget, costs]);
+		return escalones.map(function (f) {
+			var scaledCerts = Math.max(1, Math.round(certsCount * f / firmasEstimadas));
+			var row = computeRow(f, scaledCerts, PERIODO, marginTarget, costs);
+			var disc = volumeDiscountRate(f);
+			var p = row.priceSug * (1 - disc);
+			return Object.assign({}, row, {
+				certs: scaledCerts,
+				priceSug: p,
+				pricePerFirma: p / f,
+				pricePerCert: p / scaledCerts,
+				discount: disc,
+			});
+		});
+	}, [isVolume, escalones, certsCount, firmasEstimadas, marginTarget, costs]);
 
 	var targetRow = useMemo(function () {
 		if (!isVolume) return null;
-		return computeRow(firmasEstimadas, certsCount, PERIODO, marginTarget, costs);
+		var row = computeRow(firmasEstimadas, certsCount, PERIODO, marginTarget, costs);
+		var disc = volumeDiscountRate(firmasEstimadas);
+		var p = row.priceSug * (1 - disc);
+		return Object.assign({}, row, {
+			priceSug: p,
+			pricePerFirma: p / firmasEstimadas,
+			pricePerCert: p / certsCount,
+			discount: disc,
+		});
 	}, [isVolume, firmasEstimadas, certsCount, marginTarget, costs]);
 
 	var certShortcuts = profile === "empresa" && firmaType === "humana"
