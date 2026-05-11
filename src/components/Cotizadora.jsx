@@ -33,9 +33,8 @@ function computeRow(firmas, certs, periodo, marginTarget, costs) {
 	const margenPack = priceSug - cvPack;
 	const margenMes = margenPack / periodo;
 	const be = margenMes > 0 ? Math.ceil(costs.cfDirecto / margenMes) : Infinity;
-	const mult = 1 / (1 - marginTarget / 100);
-	const pricePerFirma = costs.cvFirmaBase * mult;
-	const pricePerCert = costs.cvCertBase * mult;
+	const pricePerFirma = firmas > 0 ? priceSug / firmas : 0;
+	const pricePerCert = certs > 0 ? priceSug / certs : 0;
 	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, pricePerFirma, pricePerCert };
 }
 
@@ -384,51 +383,15 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 	var [copied, setCopied] = useState(false);
 
 	function copyTable() {
-		var cols = ["Firmas", "Precio (" + marginTarget + "% margen)", "Precio x firma", "Precio x certificado"];
-		var dataRows = rows.map(function (r) {
-			return [
-				r.firmas.toLocaleString("es-AR") + (r.firmas === firmas ? " ◀" : ""),
-				fMoney2(r.priceSug),
-				fMoney2(r.pricePerFirma),
-				fMoney2(r.pricePerCert),
-			];
+		var lines = rows.map(function (r) {
+			return r.firmas.toLocaleString("es-AR") + " Firmas → " +
+				fMoney2(r.priceSug) +
+				" (" + fMoney2(r.pricePerFirma) + " x firma · " + fMoney2(r.pricePerCert) + " x cert)";
 		});
-
-		var thCss = "background:#1e293b;color:#fff;font-weight:700;padding:8px 14px;text-align:right;font-family:sans-serif;font-size:13px;border:1px solid #334155;";
-		var thLCss = thCss + "text-align:left;";
-		var tdCss = "padding:7px 14px;text-align:right;font-family:monospace;font-size:13px;border:1px solid #e2e8f0;";
-		var tdLCss = tdCss + "text-align:left;font-family:sans-serif;";
-
-		var htmlTable = [
-			"<table style='border-collapse:collapse;font-size:13px;'>",
-			"<thead><tr>",
-			"<th style='" + thLCss + "'>" + cols[0] + "</th>",
-			cols.slice(1).map(function (c) { return "<th style='" + thCss + "'>" + c + "</th>"; }).join(""),
-			"</tr></thead><tbody>",
-			dataRows.map(function (r, i) {
-				var isT = rows[i].firmas === firmas;
-				var rowBg = isT ? "background:#eaecfb;" : (i % 2 === 1 ? "background:#f8fafc;" : "");
-				var boldCell = isT ? "font-weight:700;" : "";
-				return "<tr>" +
-					"<td style='" + tdLCss + rowBg + boldCell + "'>" + r[0] + "</td>" +
-					r.slice(1).map(function (v) { return "<td style='" + tdCss + rowBg + boldCell + "'>" + v + "</td>"; }).join("") +
-					"</tr>";
-			}).join(""),
-			"</tbody></table>",
-		].join("");
-
-		var tsv = [cols.join("\t"), ...dataRows.map(function (r) { return r.join("\t"); })].join("\n");
-
-		try {
-			navigator.clipboard.write([new ClipboardItem({
-				"text/html": new Blob([htmlTable], { type: "text/html" }),
-				"text/plain": new Blob([tsv], { type: "text/plain" }),
-			})]);
-		} catch (_) {
-			navigator.clipboard.writeText(tsv);
-		}
-		setCopied(true);
-		setTimeout(function () { setCopied(false); }, 2000);
+		navigator.clipboard.writeText(lines.join("\n")).then(function () {
+			setCopied(true);
+			setTimeout(function () { setCopied(false); }, 2000);
+		});
 	}
 	var thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "7px 10px", background: "#1e293b", textAlign: "right", whiteSpace: "nowrap" });
 	var thL = Object.assign({}, thStyle, { textAlign: "left" });
