@@ -384,19 +384,51 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 	var [copied, setCopied] = useState(false);
 
 	function copyTable() {
-		var header = ["Firmas", "Precio", "$/firma", "$/cert"].join("\t");
-		var bodyLines = rows.map(function (r) {
+		var cols = ["Firmas", "Precio (" + marginTarget + "% margen)", "Precio x firma", "Precio x certificado"];
+		var dataRows = rows.map(function (r) {
 			return [
 				r.firmas.toLocaleString("es-AR") + (r.firmas === firmas ? " ◀" : ""),
 				fMoney2(r.priceSug),
 				fMoney2(r.pricePerFirma),
 				fMoney2(r.pricePerCert),
-			].join("\t");
+			];
 		});
-		navigator.clipboard.writeText([header, ...bodyLines].join("\n")).then(function () {
-			setCopied(true);
-			setTimeout(function () { setCopied(false); }, 2000);
-		});
+
+		var thCss = "background:#1e293b;color:#fff;font-weight:700;padding:8px 14px;text-align:right;font-family:sans-serif;font-size:13px;border:1px solid #334155;";
+		var thLCss = thCss + "text-align:left;";
+		var tdCss = "padding:7px 14px;text-align:right;font-family:monospace;font-size:13px;border:1px solid #e2e8f0;";
+		var tdLCss = tdCss + "text-align:left;font-family:sans-serif;";
+
+		var htmlTable = [
+			"<table style='border-collapse:collapse;font-size:13px;'>",
+			"<thead><tr>",
+			"<th style='" + thLCss + "'>" + cols[0] + "</th>",
+			cols.slice(1).map(function (c) { return "<th style='" + thCss + "'>" + c + "</th>"; }).join(""),
+			"</tr></thead><tbody>",
+			dataRows.map(function (r, i) {
+				var isT = rows[i].firmas === firmas;
+				var rowBg = isT ? "background:#eaecfb;" : (i % 2 === 1 ? "background:#f8fafc;" : "");
+				var boldCell = isT ? "font-weight:700;" : "";
+				return "<tr>" +
+					"<td style='" + tdLCss + rowBg + boldCell + "'>" + r[0] + "</td>" +
+					r.slice(1).map(function (v) { return "<td style='" + tdCss + rowBg + boldCell + "'>" + v + "</td>"; }).join("") +
+					"</tr>";
+			}).join(""),
+			"</tbody></table>",
+		].join("");
+
+		var tsv = [cols.join("\t"), ...dataRows.map(function (r) { return r.join("\t"); })].join("\n");
+
+		try {
+			navigator.clipboard.write([new ClipboardItem({
+				"text/html": new Blob([htmlTable], { type: "text/html" }),
+				"text/plain": new Blob([tsv], { type: "text/plain" }),
+			})]);
+		} catch (_) {
+			navigator.clipboard.writeText(tsv);
+		}
+		setCopied(true);
+		setTimeout(function () { setCopied(false); }, 2000);
 	}
 	var thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "7px 10px", background: "#1e293b", textAlign: "right", whiteSpace: "nowrap" });
 	var thL = Object.assign({}, thStyle, { textAlign: "left" });
