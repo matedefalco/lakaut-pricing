@@ -258,24 +258,63 @@ function buildProposalHtml({ date, validUntil, profileLabel, firmaTypeLabel, pay
 }
 
 // ─── UI helpers ────────────────────────────────────────────────────────────────
-function QLabel({ n, text }) {
+function QCard({ children }) {
 	return (
-		<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
-			{n} · {text}
+		<div style={{
+			background: WHITE,
+			border: "1.5px solid " + BORD,
+			borderRadius: 16,
+			padding: "18px 20px",
+			marginBottom: 10,
+		}}>
+			{children}
+		</div>
+	);
+}
+
+function QLabel({ n, text, sub }) {
+	return (
+		<div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+			<div style={{
+				width: 26, height: 26, borderRadius: "50%",
+				background: BLUE, color: WHITE, flexShrink: 0,
+				display: "flex", alignItems: "center", justifyContent: "center",
+				fontFamily: "'Open Sans',sans-serif", fontWeight: 700, fontSize: 11,
+			}}>{n}</div>
+			<div>
+				<div style={os(13, 700, BLACK)}>{text}</div>
+				{sub && <div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2 })}>{sub}</div>}
+			</div>
 		</div>
 	);
 }
 
 function Opt({ options, selected, onSelect }) {
 	return (
-		<div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+		<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
 			{options.map(function (o) {
 				var act = selected === o.k;
 				return (
 					<button key={o.k} onClick={function () { onSelect(o.k); }}
-						style={{ padding: "10px 16px", borderRadius: 10, textAlign: "left", background: act ? BLUE : WHITE, border: "1.5px solid " + (act ? BLUE : BORD), cursor: "pointer", minWidth: 180 }}>
-						<div style={os(13, 700, act ? WHITE : BLACK)}>{o.label}</div>
-						<div style={os(11, 400, act ? "#c5cbf7" : GRAY)}>{o.desc}</div>
+						style={{
+							padding: "11px 16px", borderRadius: 12, textAlign: "left",
+							background: act ? BLUEL : WHITE,
+							border: "1.5px solid " + (act ? BLUE : BORD),
+							cursor: "pointer", minWidth: 180,
+							display: "flex", alignItems: "flex-start", gap: 10,
+						}}>
+						<div style={{
+							width: 16, height: 16, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+							border: "2px solid " + (act ? BLUE : BORD),
+							background: act ? BLUE : "transparent",
+							display: "flex", alignItems: "center", justifyContent: "center",
+						}}>
+							{act && <div style={{ width: 6, height: 6, borderRadius: "50%", background: WHITE }} />}
+						</div>
+						<div>
+							<div style={os(13, 700, act ? BLUE : BLACK)}>{o.label}</div>
+							<div style={os(11, 400, act ? BLUE : GRAY)}>{o.desc}</div>
+						</div>
 					</button>
 				);
 			})}
@@ -290,7 +329,14 @@ function ShortcutBar({ values, selected, onSelect }) {
 				var act = selected === n;
 				return (
 					<button key={n} onClick={function () { onSelect(n); }}
-						style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (act ? BLUE : BORD), background: act ? BLUE : WHITE, color: act ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: act ? 700 : 400, cursor: "pointer" }}>
+						style={{
+							padding: "5px 14px", borderRadius: 20,
+							border: "1.5px solid " + (act ? BLUE : BORD),
+							background: act ? BLUE : WHITE,
+							color: act ? WHITE : GRAY,
+							fontFamily: "'Open Sans',sans-serif", fontSize: 12,
+							fontWeight: act ? 700 : 400, cursor: "pointer",
+						}}>
 						{fNumShort(n)}
 					</button>
 				);
@@ -447,35 +493,47 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 				<MarginInput label="Margen cert:" value={marginCert}  onChange={setMarginCert}  />
 			</div>
 
-			{/* KPI cards */}
-			<div style={{ background: BLUEL, border: "2px solid " + BLUE, borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
-				<div style={Object.assign({}, os(10, 700, BLUE), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 })}>
+			{/* KPI preview card */}
+			<div style={{
+				background: "linear-gradient(135deg, #1a2494 0%, " + BLUE + " 100%)",
+				borderRadius: 16, padding: "20px 22px", marginBottom: 16,
+			}}>
+				<div style={Object.assign({}, os(10, 700, "rgba(255,255,255,0.6)"), { textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 14 })}>
 					Tu volumen · {firmas.toLocaleString("es-AR")} firmas · {certs} cert{certs !== 1 ? "s" : ""}
 				</div>
-				<div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-end" }}>
-					{[
-						{ l: "Costo variable del pack", v: fMoney2(targetRow.cvPack), col: "#b45309", big: false },
-						{ l: "Precio", v: fMoney2(targetRow.priceSug), col: OK, big: true },
-						{ l: "Margen bruto", v: fMoney2(targetRow.margenPack), col: BLUE, big: false },
-						{ l: "$/firma (unit.)", v: fMoney2(targetRow.unitFirma), col: GRAY, big: false },
-						{ l: "$/cert (unit.)", v: fMoney2(targetRow.unitCert), col: GRAY, big: false },
-					].map(function (k) {
-						return (
-							<div key={k.l}>
-								<div style={os(9, 400, GRAY)}>{k.l}</div>
-								<div style={Object.assign({}, mont(k.big ? 24 : 16), { color: k.col, fontWeight: k.big ? 700 : 400, lineHeight: 1.2 })}>{k.v}</div>
-							</div>
-						);
-					})}
+				<div style={{ display: "flex", gap: 0, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+					<div style={{ marginRight: 28 }}>
+						<div style={os(11, 400, "rgba(255,255,255,0.65)")}>Precio cotizado</div>
+						<div style={Object.assign({}, mont(32), { color: WHITE, lineHeight: 1.1 })}>{fMoney2(targetRow.priceSug)}</div>
+					</div>
+					<div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+						{[
+							{ l: "CV pack", v: fMoney2(targetRow.cvPack) },
+							{ l: "Margen bruto", v: fMoney2(targetRow.margenPack) },
+							{ l: "$/firma", v: fMoney2(targetRow.unitFirma) },
+							{ l: "$/cert", v: fMoney2(targetRow.unitCert) },
+						].map(function (k) {
+							return (
+								<div key={k.l}>
+									<div style={os(9, 400, "rgba(255,255,255,0.55)")}>{k.l}</div>
+									<div style={Object.assign({}, os(14, 600, "rgba(255,255,255,0.9)"), { fontFamily: "Montserrat,sans-serif" })}>{k.v}</div>
+								</div>
+							);
+						})}
+					</div>
 				</div>
-				<div style={{ marginTop: 14 }}>
-					<button
-						onClick={onAddToCart}
-						style={{ padding: "9px 20px", background: addedFlash ? "#059669" : BLUE, color: WHITE, border: "none", borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
-					>
-						{addedFlash ? "✓ Agregado a la cotización" : "+ Agregar a cotización"}
-					</button>
-				</div>
+				<button
+					onClick={onAddToCart}
+					style={{
+						padding: "9px 22px",
+						background: addedFlash ? "#059669" : "rgba(255,255,255,0.18)",
+						color: WHITE,
+						border: "1.5px solid rgba(255,255,255,0.4)",
+						borderRadius: 10, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",
+					}}
+				>
+					{addedFlash ? "✓ Agregado a la cotización" : "+ Agregar a cotización"}
+				</button>
 			</div>
 
 			{/* Escalation table */}
@@ -813,74 +871,77 @@ export function Cotizadora({ costs, currency, tc }) {
 
 	return (
 		<div>
-			<div style={Object.assign({}, os(12, 400, GRAY), { marginBottom: 20 })}>
-				Respondé las preguntas y te mostramos los planes más adecuados o una cotización personalizada según tu volumen.
-			</div>
-
 			{/* Q1 */}
-			<QLabel n="1" text="¿Quién necesita la firma digital?" />
-			<Opt options={PROFILE_OPTS} selected={profile} onSelect={handleProfileChange} />
+			<QCard>
+				<QLabel n="1" text="¿Quién necesita la firma digital?" sub="Respondé las preguntas para ver planes o una cotización a medida." />
+				<Opt options={PROFILE_OPTS} selected={profile} onSelect={handleProfileChange} />
+			</QCard>
 
 			{/* Q2 — empresa only */}
 			{profile === "empresa" && (
-				<>
+				<QCard>
 					<QLabel n="2" text="¿Cómo van a firmar?" />
 					<Opt options={FIRMA_TYPE_OPTS} selected={firmaType} onSelect={handleFirmaTypeChange} />
-				</>
+				</QCard>
 			)}
 
 			{/* Q3 — certs */}
 			{profileSet && firmaTypeSet && (
-				<>
+				<QCard>
 					<QLabel n={String(2 + qOffset)} text="¿Cuántos certificados digitales necesitás?" />
 					<ShortcutBar values={certShortcuts} selected={certsCount} onSelect={setCertsCount} />
 					<div style={{ maxWidth: 220 }}>
 						<NumInput label="" value={certsCount} onChange={function (v) { setCertsCount(Math.max(1, Math.round(v))); }} suffix="certificados" />
 					</div>
 					{profile === "empresa" && firmaType === "humana" && certsCount >= 50 && (
-						<div style={{ background: WNBG, border: "1px solid " + WN, borderRadius: 8, padding: "8px 12px", marginTop: 4, marginBottom: 8 }}>
+						<div style={{ background: WNBG, border: "1px solid " + WN, borderRadius: 8, padding: "8px 12px", marginTop: 10 }}>
 							<span style={os(11, 700, WN)}>Alto volumen de certificados — </span>
 							<span style={os(11, 400, WN)}>se generará una cotización escalonada a medida.</span>
 						</div>
 					)}
-				</>
+				</QCard>
 			)}
 
 			{/* Q4 — firmas */}
 			{profileSet && firmaTypeSet && (
-				<>
+				<QCard>
 					<QLabel n={String(3 + qOffset)} text={"¿Cuántas firmas estimás usar en " + PERIODO + " meses?"} />
 					<ShortcutBar values={firmaShortcuts} selected={firmasEstimadas} onSelect={setFirmasEstimadas} />
 					<div style={{ maxWidth: 220 }}>
 						<NumInput label="" value={firmasEstimadas || ""} onChange={function (v) { setFirmasEstimadas(Math.max(0, Math.round(v))); }} suffix="firmas" />
 					</div>
 					{firmasEstimadas > 2000 && (
-						<div style={{ background: BLUEL, border: "1px solid " + BLUE, borderRadius: 8, padding: "8px 12px", marginTop: 4, marginBottom: 8 }}>
+						<div style={{ background: BLUEL, border: "1px solid " + BLUE, borderRadius: 8, padding: "8px 12px", marginTop: 10 }}>
 							<span style={os(11, 700, BLUE)}>Volumen alto — </span>
 							<span style={os(11, 400, BLUE)}>se mostrará la tabla escalonada de precios.</span>
 						</div>
 					)}
-				</>
+				</QCard>
 			)}
 
 			{/* Q5 — pago */}
 			{profileSet && firmaTypeSet && (
-				<>
+				<QCard>
 					<QLabel n={String(4 + qOffset)} text="¿Cómo vas a pagar?" />
 					<Opt options={PAY_OPTS} selected={payMethod} onSelect={setPayMethod} />
-				</>
+				</QCard>
 			)}
 
 			{/* ── Resultados ─────────────────────────────────────────────────── */}
 			{readyToRecommend && (
-				<div style={{ marginTop: 8 }}>
-					<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 12px", flexWrap: "wrap", gap: 10 }}>
-						<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px" })}>
+				<div style={{ marginTop: 4 }}>
+					<div style={{
+						display: "flex", justifyContent: "space-between", alignItems: "center",
+						margin: "16px 0 12px", flexWrap: "wrap", gap: 10,
+						padding: "12px 16px",
+						background: BLUE, borderRadius: 12,
+					}}>
+						<div style={Object.assign({}, os(13, 700, WHITE))}>
 							{isVolume ? "Cotización de volumen" : "Planes para tu perfil"}
 						</div>
 						<button
 							onClick={function () { handleExport(null); }}
-							style={{ padding: "7px 16px", background: WHITE, color: BLUE, border: "2px solid " + BLUE, borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+							style={{ padding: "6px 14px", background: "rgba(255,255,255,0.15)", color: WHITE, border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
 						>
 							↓ Exportar cotización
 						</button>
