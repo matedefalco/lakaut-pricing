@@ -27,18 +27,16 @@ const PAY_OPTS = [
 ];
 
 // ─── Volume helpers ────────────────────────────────────────────────────────────
-function computeRow(firmas, certs, periodo, marginTarget, costs) {
-	const cvPack = certs * costs.cvCertBase + firmas * costs.cvFirmaBase;
-	const priceSug = cvPack / (1 - marginTarget / 100);
+function computeRow(firmas, certs, periodo, marginFirma, marginCert, costs) {
+	const unitFirma = costs.cvFirmaBase / (1 - marginFirma / 100);
+	const unitCert  = costs.cvCertBase  / (1 - marginCert  / 100);
+	const cvPack    = certs * costs.cvCertBase + firmas * costs.cvFirmaBase;
+	const priceSug  = unitFirma * firmas + unitCert * certs;
 	const margenPack = priceSug - cvPack;
-	const margenMes = margenPack / periodo;
+	const margenMes  = margenPack / periodo;
 	const be = margenMes > 0 ? Math.ceil(costs.cfDirecto / margenMes) : Infinity;
-	const pricePerFirma = firmas > 0 ? priceSug / firmas : 0;
-	const pricePerCert = certs > 0 ? priceSug / certs : 0;
-	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, pricePerFirma, pricePerCert };
+	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, unitFirma, unitCert };
 }
-
-const ESCALON_BASE = [10, 25, 50, 100, 200, 300, 500, 1000, 2000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000];
 
 // Volume discount applied to the margined price as pack size grows
 function volumeDiscountRate(firmas) {
@@ -49,11 +47,16 @@ function volumeDiscountRate(firmas) {
 	return 0;
 }
 
+// Escalones dinámicos relativos al target — below: 10%, 20%, 50% / above: 150%, 300%, 500%
 function getEscalones(targetFirmas) {
-	const all = [...new Set([...ESCALON_BASE, targetFirmas])].sort(function (a, b) { return a - b; });
-	var idx = all.indexOf(targetFirmas);
-	var below = all.slice(Math.max(0, idx - 3), idx);
-	var above = all.slice(idx + 1, idx + 4);
+	const BELOW = [0.1, 0.2, 0.5];
+	const ABOVE = [1.5, 3, 5];
+	const below = BELOW
+		.map(function (m) { return Math.max(1, Math.round(m * targetFirmas)); })
+		.filter(function (v, i, arr) { return v < targetFirmas && arr.indexOf(v) === i; });
+	const above = ABOVE
+		.map(function (m) { return Math.round(m * targetFirmas); })
+		.filter(function (v, i, arr) { return v > targetFirmas && arr.indexOf(v) === i; });
 	return [...below, targetFirmas, ...above];
 }
 
@@ -387,15 +390,46 @@ function PlanCard({ plan, isFirst, costs, payMethod, fMoney2, currency, tc, onEx
 }
 
 // ─── Volume section ───────────────────────────────────────────────────────────
-function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash }) {
-	var [useCustomMargin, setUseCustomMargin] = useState(false);
+function MarginInput({ label, value, onChange }) {
+	var [custom, setCustom] = useState(false);
+	return (
+		<div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+			<span style={Object.assign({}, os(11, 700, BLACK), { minWidth: 76 })}>{label}</span>
+			{MARGIN_OPTS.map(function (m) {
+				var act = m === value && !custom;
+				return (
+					<button key={m} onClick={function () { onChange(m); setCustom(false); }}
+						style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (act ? BLUE : BORD), background: act ? BLUE : WHITE, color: act ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+						{m}%
+					</button>
+				);
+			})}
+			{!custom
+				? <button onClick={function () { setCustom(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + BORD, background: WHITE, color: GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Otro…</button>
+				: (
+					<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+						<input type="number" value={value} min={1} max={99}
+							onChange={function (e) { onChange(Math.max(1, Math.min(99, Number(e.target.value) || 40))); }}
+							style={{ width: 52, padding: "4px 8px", border: "1.5px solid " + BLUE, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 11, color: BLACK, outline: "none" }} />
+						<span style={os(11, 400, GRAY)}>%</span>
+						<button onClick={function () { setCustom(false); }} style={{ padding: "2px 7px", border: "1px solid " + BORD, borderRadius: 4, background: WHITE, color: GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 10, cursor: "pointer" }}>✕</button>
+					</div>
+				)
+			}
+		</div>
+	);
+}
+
+function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMarginFirma, setMarginCert, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash }) {
 	var [copied, setCopied] = useState(false);
 
 	function copyTable() {
 		var lines = rows.map(function (r) {
+			var firmaTotal = r.unitFirma * r.firmas;
+			var certTotal  = r.unitCert  * r.certs;
 			var marker = r.firmas === firmas ? " *" : "";
 			return r.firmas.toLocaleString("es-AR") + " firmas: " + fMoney2(r.priceSug) +
-				" (" + fMoney2(r.pricePerFirma) + "/firma | " + fMoney2(r.pricePerCert) + "/cert)" + marker;
+				" = " + fMoney2(firmaTotal) + " firmas + " + fMoney2(certTotal) + " cert" + marker;
 		});
 		navigator.clipboard.writeText(lines.join("\n")).then(function () {
 			setCopied(true);
@@ -407,30 +441,10 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 
 	return (
 		<div>
-			{/* Margin selector */}
-			<div style={{ display: "flex", gap: 6, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
-				<span style={os(11, 400, GRAY)}>Margen objetivo:</span>
-				{MARGIN_OPTS.map(function (m) {
-					var act = m === marginTarget && !useCustomMargin;
-					return (
-						<button key={m} onClick={function () { setMarginTarget(m); setUseCustomMargin(false); }}
-							style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (act ? BLUE : BORD), background: act ? BLUE : WHITE, color: act ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-							{m}%
-						</button>
-					);
-				})}
-				{!useCustomMargin
-					? <button onClick={function () { setUseCustomMargin(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + BORD, background: WHITE, color: GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Otro…</button>
-					: (
-						<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-							<input type="number" value={marginTarget} min={1} max={99}
-								onChange={function (e) { setMarginTarget(Math.max(1, Math.min(99, Number(e.target.value) || 40))); }}
-								style={{ width: 52, padding: "4px 8px", border: "1.5px solid " + BLUE, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 11, color: BLACK, outline: "none" }} />
-							<span style={os(11, 400, GRAY)}>%</span>
-							<button onClick={function () { setUseCustomMargin(false); }} style={{ padding: "2px 7px", border: "1px solid " + BORD, borderRadius: 4, background: WHITE, color: GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 10, cursor: "pointer" }}>✕</button>
-						</div>
-					)
-				}
+			{/* Margin selectors */}
+			<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+				<MarginInput label="Margen firma:" value={marginFirma} onChange={setMarginFirma} />
+				<MarginInput label="Margen cert:" value={marginCert}  onChange={setMarginCert}  />
 			</div>
 
 			{/* KPI cards */}
@@ -443,8 +457,8 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 						{ l: "Costo variable del pack", v: fMoney2(targetRow.cvPack), col: "#b45309", big: false },
 						{ l: "Precio", v: fMoney2(targetRow.priceSug), col: OK, big: true },
 						{ l: "Margen bruto", v: fMoney2(targetRow.margenPack), col: BLUE, big: false },
-						{ l: "Precio por firma", v: fMoney2(targetRow.pricePerFirma), col: GRAY, big: false },
-						{ l: "Precio por certificado", v: fMoney2(targetRow.pricePerCert), col: GRAY, big: false },
+						{ l: "$/firma (unit.)", v: fMoney2(targetRow.unitFirma), col: GRAY, big: false },
+						{ l: "$/cert (unit.)", v: fMoney2(targetRow.unitCert), col: GRAY, big: false },
 					].map(function (k) {
 						return (
 							<div key={k.l}>
@@ -467,7 +481,7 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 			{/* Escalation table */}
 			<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", flex: 1 })}>
-					Escalonado de precios · {marginTarget}% margen objetivo
+					Escalonado de precios · {marginFirma}% firma / {marginCert}% cert
 				</div>
 				<button onClick={copyTable} style={{ padding: "4px 12px", borderRadius: 6, border: "1.5px solid " + BORD, background: copied ? "#059669" : WHITE, color: copied ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
 					{copied ? "✓ Copiado" : "Copiar"}
@@ -481,9 +495,11 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 					<thead>
 						<tr>
 							<th style={thL}>Firmas</th>
-							<th style={thStyle}>Precio</th>
-							<th style={thStyle}>Precio x firma</th>
-							<th style={thStyle}>Precio x certificado</th>
+							<th style={thStyle}>$/firma</th>
+							<th style={thStyle}>$/cert</th>
+							<th style={thStyle}>Total firmas</th>
+							<th style={thStyle}>Total cert</th>
+							<th style={thStyle}>Precio total</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -495,9 +511,11 @@ function VolumeSection({ certs, firmas, periodo, marginTarget, setMarginTarget, 
 										{isTarget && "▶ "}{r.firmas.toLocaleString("es-AR")}
 										{isTarget && <span style={Object.assign({}, os(10, 400, BLUE), { marginLeft: 6 })}>← tu volumen</span>}
 									</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma)}</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert)}</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma * r.firmas)}</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert * r.certs)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: isTarget ? OK : "inherit" }}>{fMoney2(r.priceSug)}</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.pricePerFirma)}</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.pricePerCert)}</td>
 								</tr>
 							);
 						})}
@@ -630,7 +648,8 @@ export function Cotizadora({ costs, currency, tc }) {
 	const [certsCount, setCertsCount] = useState(1);
 	const [firmasEstimadas, setFirmasEstimadas] = useState(0);
 	const [payMethod, setPayMethod] = useState("transferencia");
-	const [marginTarget, setMarginTarget] = useState(40);
+	const [marginFirma, setMarginFirma] = useState(40);
+	const [marginCert,  setMarginCert]  = useState(40);
 	var PERIODO = 24;
 
 	// Cart
@@ -685,31 +704,33 @@ export function Cotizadora({ costs, currency, tc }) {
 		if (!isVolume) return [];
 		return escalones.map(function (f) {
 			var scaledCerts = Math.max(1, Math.round(certsCount * f / firmasEstimadas));
-			var row = computeRow(f, scaledCerts, PERIODO, marginTarget, costs);
+			var row = computeRow(f, scaledCerts, PERIODO, marginFirma, marginCert, costs);
 			var disc = volumeDiscountRate(f);
-			var p = row.priceSug * (1 - disc);
+			var factor = 1 - disc;
+			var p = row.priceSug * factor;
 			return Object.assign({}, row, {
 				certs: scaledCerts,
 				priceSug: p,
-				pricePerFirma: p / f,
-				pricePerCert: p / scaledCerts,
+				unitFirma: row.unitFirma * factor,
+				unitCert:  row.unitCert  * factor,
 				discount: disc,
 			});
 		});
-	}, [isVolume, escalones, certsCount, firmasEstimadas, marginTarget, costs]);
+	}, [isVolume, escalones, certsCount, firmasEstimadas, marginFirma, marginCert, costs]);
 
 	var targetRow = useMemo(function () {
 		if (!isVolume) return null;
-		var row = computeRow(firmasEstimadas, certsCount, PERIODO, marginTarget, costs);
+		var row = computeRow(firmasEstimadas, certsCount, PERIODO, marginFirma, marginCert, costs);
 		var disc = volumeDiscountRate(firmasEstimadas);
-		var p = row.priceSug * (1 - disc);
+		var factor = 1 - disc;
+		var p = row.priceSug * factor;
 		return Object.assign({}, row, {
 			priceSug: p,
-			pricePerFirma: p / firmasEstimadas,
-			pricePerCert: p / certsCount,
+			unitFirma: row.unitFirma * factor,
+			unitCert:  row.unitCert  * factor,
 			discount: disc,
 		});
-	}, [isVolume, firmasEstimadas, certsCount, marginTarget, costs]);
+	}, [isVolume, firmasEstimadas, certsCount, marginFirma, marginCert, costs]);
 
 	var certShortcuts = profile === "empresa" && firmaType === "humana"
 		? [1, 5, 10, 50, 200, 1000, 10000]
@@ -753,7 +774,8 @@ export function Cotizadora({ costs, currency, tc }) {
 				vigencia: PERIODO,
 				qty: 1,
 				unitPrice: targetRow.priceSug,
-				marginTarget: marginTarget,
+				marginFirma: marginFirma,
+				marginCert: marginCert,
 			}];
 		});
 		setFlashId("volume");
@@ -779,7 +801,7 @@ export function Cotizadora({ costs, currency, tc }) {
 			volumeData: isVolume && targetRow
 				? { firmas: firmasEstimadas, certs: certsCount, periodo: PERIODO, targetRow: targetRow, rows: volumeRows }
 				: null,
-			marginTarget: marginTarget,
+			marginTarget: marginFirma,
 			currency: currency,
 			tc: tc,
 			costs: costs,
@@ -897,8 +919,10 @@ export function Cotizadora({ costs, currency, tc }) {
 							certs={certsCount}
 							firmas={firmasEstimadas}
 							periodo={PERIODO}
-							marginTarget={marginTarget}
-							setMarginTarget={setMarginTarget}
+							marginFirma={marginFirma}
+							marginCert={marginCert}
+							setMarginFirma={setMarginFirma}
+							setMarginCert={setMarginCert}
 							costs={costs}
 							fMoney2={fMoney2}
 							rows={volumeRows}
