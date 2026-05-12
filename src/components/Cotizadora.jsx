@@ -27,9 +27,14 @@ const PAY_OPTS = [
 ];
 
 // ─── Volume helpers ────────────────────────────────────────────────────────────
+// Round UP to nearest cent, eliminating float noise first (e.g. 0.3099999… → 0.31 not 0.32)
+function ceilCents(x) {
+	return Math.ceil(Math.round(x * 10000) / 100) / 100;
+}
+
 function computeRow(firmas, certs, periodo, marginFirma, marginCert, costs) {
-	const unitFirma = costs.cvFirmaBase / (1 - marginFirma / 100);
-	const unitCert  = costs.cvCertBase  / (1 - marginCert  / 100);
+	const unitFirma = ceilCents(costs.cvFirmaBase / (1 - marginFirma / 100));
+	const unitCert  = ceilCents(costs.cvCertBase  / (1 - marginCert  / 100));
 	const cvPack    = certs * costs.cvCertBase + firmas * costs.cvFirmaBase;
 	const priceSug  = unitFirma * firmas + unitCert * certs;
 	const margenPack = priceSug - cvPack;
@@ -765,12 +770,13 @@ export function Cotizadora({ costs, currency, tc }) {
 			var row = computeRow(f, scaledCerts, PERIODO, marginFirma, marginCert, costs);
 			var disc = volumeDiscountRate(f);
 			var factor = 1 - disc;
-			var p = row.priceSug * factor;
+			var uF = ceilCents(row.unitFirma * factor);
+			var uC = ceilCents(row.unitCert  * factor);
 			return Object.assign({}, row, {
 				certs: scaledCerts,
-				priceSug: p,
-				unitFirma: row.unitFirma * factor,
-				unitCert:  row.unitCert  * factor,
+				priceSug: uF * f + uC * scaledCerts,
+				unitFirma: uF,
+				unitCert:  uC,
 				discount: disc,
 			});
 		});
@@ -781,11 +787,12 @@ export function Cotizadora({ costs, currency, tc }) {
 		var row = computeRow(firmasEstimadas, certsCount, PERIODO, marginFirma, marginCert, costs);
 		var disc = volumeDiscountRate(firmasEstimadas);
 		var factor = 1 - disc;
-		var p = row.priceSug * factor;
+		var uF = ceilCents(row.unitFirma * factor);
+		var uC = ceilCents(row.unitCert  * factor);
 		return Object.assign({}, row, {
-			priceSug: p,
-			unitFirma: row.unitFirma * factor,
-			unitCert:  row.unitCert  * factor,
+			priceSug: uF * firmasEstimadas + uC * certsCount,
+			unitFirma: uF,
+			unitCert:  uC,
 			discount: disc,
 		});
 	}, [isVolume, firmasEstimadas, certsCount, marginFirma, marginCert, costs]);
