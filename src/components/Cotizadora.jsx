@@ -161,9 +161,8 @@ function openProposalWindow({ profile, firmaType, pay, items, subtotal, paywall,
 	var firmasTotal = items.reduce(function (s, it) { return s + (it.ilimitadas ? 0 : it.effectiveFirmas * it.qty); }, 0);
 
 	var rowsHtml = items.map(function (item) {
-		var itemMult = costs ? 1 / (1 - item.marginTarget / 100) : 1;
-		var perFirma = (costs && !item.ilimitadas) ? fmt(costs.cvFirmaBase * itemMult) : "—";
-		var perCert = costs ? fmt(costs.cvCertBase * itemMult) : "—";
+		var perFirma = (!item.ilimitadas && isFinite(item.unitFirma)) ? fmt(item.unitFirma) : "—";
+		var perCert = isFinite(item.unitCert) ? fmt(item.unitCert) : "—";
 		var firmasCell = item.ilimitadas ? "Ilimitadas" : item.effectiveFirmas.toLocaleString("es-AR");
 		return [
 			"<tr>",
@@ -625,9 +624,8 @@ function CartPanel({ cart, onRemove, onClear, pay, setPay, subtotal, paywall, to
 					</thead>
 					<tbody>
 						{cart.map(function (item, idx) {
-							var cartMult = 1 / (1 - item.marginTarget / 100);
-							var pf = (!item.ilimitadas) ? fMoney2(costs.cvFirmaBase * cartMult) : "—";
-							var pc = fMoney2(costs.cvCertBase * cartMult);
+							var pf = (!item.ilimitadas) ? fMoney2(item.unitFirma) : "—";
+							var pc = fMoney2(item.unitCert);
 							var firmasCell = item.ilimitadas ? "Ilimitadas" : item.effectiveFirmas.toLocaleString("es-AR");
 							return (
 								<tr key={item.id} style={{ background: idx % 2 === 1 ? "#fafafa" : WHITE, borderBottom: "1px solid " + BORD }}>
@@ -808,6 +806,10 @@ export function Cotizadora({ costs, currency, tc }) {
 
 	// Cart operations
 	function addPlanToCart(plan) {
+		var planCerts = plan.certs || 1;
+		var planFirmas = plan.firmas || 0;
+		var cvPack = planCerts * costs.cvCertBase + planFirmas * costs.cvFirmaBase;
+		var mult = cvPack > 0 ? plan.priceUSD / cvPack : 1;
 		setCart(function (prev) {
 			return [...prev, {
 				id: Date.now(),
@@ -815,11 +817,13 @@ export function Cotizadora({ costs, currency, tc }) {
 				col: plan.color,
 				isCustom: false,
 				ilimitadas: plan.ilimitadas || false,
-				certs: plan.certs || 1,
-				effectiveFirmas: plan.firmas || 0,
+				certs: planCerts,
+				effectiveFirmas: planFirmas,
 				vigencia: 24,
 				qty: 1,
 				unitPrice: plan.priceUSD,
+				unitFirma: costs.cvFirmaBase * mult,
+				unitCert: costs.cvCertBase * mult,
 			}];
 		});
 		setFlashId(plan.id);
@@ -839,6 +843,8 @@ export function Cotizadora({ costs, currency, tc }) {
 				vigencia: PERIODO,
 				qty: 1,
 				unitPrice: targetRow.priceSug,
+				unitFirma: targetRow.unitFirma,
+				unitCert: targetRow.unitCert,
 				marginFirma: marginFirma,
 				marginCert: marginCert,
 			}];
