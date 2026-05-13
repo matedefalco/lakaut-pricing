@@ -61,7 +61,7 @@ function LakautCalcInner() {
 	const [users, setUsers] = useState(20000);
 	const [tab, setTab] = useState("costos");
 	const [currency, setCurrency] = useState("USD");
-	const [tc, setTc] = useState(1150);
+	const [tc, setTc] = useState(1410);
 	const [svc, setSvc] = useState({ cloudStorage: false, mailCert: false, paywall: false });
 	const [inp, setInp] = useState(PACKS.B.defaults);
 	const [projParams, setProjParams] = useState({ usersM1: 1000, growthRate: 10, churnRate: 5 });

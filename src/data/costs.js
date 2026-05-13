@@ -39,7 +39,7 @@ export const CV_CERT_ITEMS = [
 
 export const CV_FIRMA_ITEMS = [
 	{ item: "OTP SMS (Twilio)", v: 0.1034, tipo: "directo" },
-	{ item: "Sello de tiempo RFC 3161", v: 0.1, tipo: "directo" },
+	{ item: "Infra", v: 0.08, tipo: "directo" },
 ];
 
 export const SERVICES_DEF = {
