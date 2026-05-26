@@ -605,18 +605,8 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 									<td style={{ textAlign: "right", padding: "9px 10px" }}>
 										<span style={os(12, hasDisc ? 700 : 400, hasDisc ? OK : GRAY)}>{Math.round((r.discount || 0) * 100)}%</span>
 									</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "7px 10px", lineHeight: 1.3 }}>
-										{hasDisc && (
-											<div style={{ fontSize: 10, color: GRAY, textDecoration: "line-through", marginBottom: 1 }}>{fMoney2(r.baseUnitFirma)}</div>
-										)}
-										<div style={{ color: hasDisc ? OK : "inherit", fontWeight: hasDisc ? 700 : 400 }}>{fMoney2(r.unitFirma)}</div>
-									</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "7px 10px", lineHeight: 1.3 }}>
-										{hasDisc && (
-											<div style={{ fontSize: 10, color: GRAY, textDecoration: "line-through", marginBottom: 1 }}>{fMoney2(r.baseUnitCert)}</div>
-										)}
-										<div style={{ color: hasDisc ? OK : "inherit", fontWeight: hasDisc ? 700 : 400 }}>{fMoney2(r.unitCert)}</div>
-									</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", color: hasDisc ? OK : "inherit", fontWeight: hasDisc ? 700 : 400 }}>{fMoney2(r.unitFirma)}</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", color: hasDisc ? OK : "inherit", fontWeight: hasDisc ? 700 : 400 }}>{fMoney2(r.unitCert)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma * r.firmas)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert * r.certs)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: isTarget ? OK : "inherit" }}>{fMoney2(r.priceSug)}</td>
