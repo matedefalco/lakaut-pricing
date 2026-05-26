@@ -468,14 +468,20 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 	var targetDiscount = targetRow ? Math.round((targetRow.discount || 0) * 100) : 0;
 
 	function copyTable() {
+		var header = ["Firmas", "Desc.", "$/firma", "$/cert", "Subtotal firmas", "Subtotal cert", "Total"].join("\t");
 		var lines = rows.map(function (r) {
-			var firmaTotal = r.unitFirma * r.firmas;
-			var certTotal  = r.unitCert  * r.certs;
 			var marker = r.firmas === firmas ? " *" : "";
-			return r.firmas.toLocaleString("es-AR") + " firmas: " + fMoney2(r.priceSug) +
-				" = " + fMoney2(firmaTotal) + " firmas + " + fMoney2(certTotal) + " cert" + marker;
+			return [
+				r.firmas.toLocaleString("es-AR") + marker,
+				Math.round((r.discount || 0) * 100) + "%",
+				fMoney2(r.unitFirma),
+				fMoney2(r.unitCert),
+				fMoney2(r.unitFirma * r.firmas),
+				fMoney2(r.unitCert * r.certs),
+				fMoney2(r.priceSug),
+			].join("\t");
 		});
-		navigator.clipboard.writeText(lines.join("\n")).then(function () {
+		navigator.clipboard.writeText([header].concat(lines).join("\n")).then(function () {
 			setCopied(true);
 			setTimeout(function () { setCopied(false); }, 2000);
 		});
