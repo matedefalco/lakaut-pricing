@@ -4,7 +4,9 @@ import { fP, fK } from "../utils/formatters";
 import { makeMoney } from "../utils/useMoney";
 import { engine } from "../engine/engine";
 import { useModels } from "../context/ModelsContext";
+import { useDiscounts, discountRateFor } from "../context/DiscountContext";
 import { NumInput } from "./ui/NumInput";
+import { TierEditor } from "./ui/TierEditor";
 
 const PAYWALL_PCT = 0.002;
 const MARGIN_OPTS = [30, 40, 50, 60];
@@ -41,15 +43,6 @@ function computeRow(firmas, certs, periodo, marginFirma, marginCert, costs) {
 	const margenMes  = margenPack / periodo;
 	const be = margenMes > 0 ? Math.ceil(costs.cfDirecto / margenMes) : Infinity;
 	return { firmas, certs, cvPack, priceSug, margenPack, margenMes, be, unitFirma, unitCert };
-}
-
-// Volume discount applied to the margined price as pack size grows
-function volumeDiscountRate(firmas) {
-	if (firmas >= 100000) return 0.20;
-	if (firmas >= 20000)  return 0.15;
-	if (firmas >= 5000)   return 0.10;
-	if (firmas >= 1000)   return 0.05;
-	return 0;
 }
 
 // Escalones dinámicos relativos al target — below: 10%, 20%, 50% / above: 150%, 300%, 500%
@@ -470,8 +463,9 @@ function MarginInput({ label, value, onChange }) {
 	);
 }
 
-function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMarginFirma, setMarginCert, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash }) {
+function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMarginFirma, setMarginCert, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash, discountMode, setDiscountMode, customTiers, setCustomTiers, defaultTiers }) {
 	var [copied, setCopied] = useState(false);
+	var targetDiscount = targetRow ? Math.round((targetRow.discount || 0) * 100) : 0;
 
 	function copyTable() {
 		var lines = rows.map(function (r) {
@@ -495,6 +489,39 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 			<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
 				<MarginInput label="Margen firma:" value={marginFirma} onChange={setMarginFirma} />
 				<MarginInput label="Margen cert:" value={marginCert}  onChange={setMarginCert}  />
+			</div>
+
+			{/* Discount tiers config */}
+			<div style={{ border: "1px solid " + BORD, borderRadius: 12, padding: 14, marginBottom: 16, background: "#fafafa" }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: customTiers && discountMode === "custom" ? 12 : 0 }}>
+					<span style={Object.assign({}, os(11, 700, BLACK), { minWidth: 76 })}>Descuentos por volumen:</span>
+					<div style={{ display: "inline-flex", border: "1.5px solid " + BORD, borderRadius: 8, overflow: "hidden" }}>
+						{[
+							{ k: "default", label: "Predeterminados" },
+							{ k: "custom", label: "Personalizados" },
+						].map(function (opt, i) {
+							var act = discountMode === opt.k;
+							return (
+								<button key={opt.k} onClick={function () { setDiscountMode(opt.k); }}
+									style={{ padding: "5px 14px", background: act ? BLUE : WHITE, color: act ? WHITE : GRAY, border: "none", borderLeft: i > 0 ? "1px solid " + BORD : "none", cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+									{opt.label}
+								</button>
+							);
+						})}
+					</div>
+					<span style={Object.assign({}, os(11, 400, GRAY), { marginLeft: "auto" })}>
+						Aplicado a tu volumen: <strong style={{ color: targetDiscount > 0 ? OK : GRAY }}>{targetDiscount}%</strong>
+					</span>
+				</div>
+
+				{discountMode === "custom" && (
+					<TierEditor tiers={customTiers || []} onChange={setCustomTiers} accent={BLUE} compact />
+				)}
+				{discountMode === "default" && (
+					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 8 })}>
+						Usando los tramos pre-pactados ({(defaultTiers || []).map(function (t) { return fNumShort(t.minVol) + "→" + t.discount + "%"; }).join(" · ") || "sin tramos"}). Editalos en Configuración › Precios.
+					</div>
+				)}
 			</div>
 
 			{/* KPI preview card */}
@@ -553,10 +580,11 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 				Los precios varían según el volumen. Tu cotización está marcada con ▶.
 			</div>
 			<div style={{ overflowX: "auto" }}>
-				<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 480 }}>
+				<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 560 }}>
 					<thead>
 						<tr>
 							<th style={thL}>Firmas</th>
+							<th style={thStyle}>Desc.</th>
 							<th style={thStyle}>$/firma</th>
 							<th style={thStyle}>$/cert</th>
 							<th style={thStyle}>Total firmas</th>
@@ -572,6 +600,9 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 									<td style={Object.assign({}, os(13, isTarget ? 700 : 400, isTarget ? BLUE : BLACK), { padding: "9px 10px" })}>
 										{isTarget && "▶ "}{r.firmas.toLocaleString("es-AR")}
 										{isTarget && <span style={Object.assign({}, os(10, 400, BLUE), { marginLeft: 6 })}>← tu volumen</span>}
+									</td>
+									<td style={{ textAlign: "right", padding: "9px 10px" }}>
+										<span style={os(12, (r.discount || 0) > 0 ? 700 : 400, (r.discount || 0) > 0 ? OK : GRAY)}>{Math.round((r.discount || 0) * 100)}%</span>
 									</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert)}</td>
@@ -701,6 +732,7 @@ function CartPanel({ cart, onRemove, onClear, pay, setPay, subtotal, paywall, to
 // ─── Main component ────────────────────────────────────────────────────────────
 export function Cotizadora({ costs, currency, tc }) {
 	const { models } = useModels();
+	const { activeTiers, defaultTiers, customTiers, mode, setCustomTiers, setMode } = useDiscounts();
 	const { fMoney2 } = makeMoney(currency, tc);
 
 	// Questionnaire
@@ -766,7 +798,7 @@ export function Cotizadora({ costs, currency, tc }) {
 		return escalones.map(function (f) {
 			var scaledCerts = Math.max(1, Math.round(certsCount * f / firmasEstimadas));
 			var row = computeRow(f, scaledCerts, PERIODO, marginFirma, marginCert, costs);
-			var disc = volumeDiscountRate(f);
+			var disc = discountRateFor(f, activeTiers);
 			var factor = 1 - disc;
 			var uF = ceilCents(row.unitFirma * factor);
 			var uC = ceilCents(row.unitCert  * factor);
@@ -778,12 +810,12 @@ export function Cotizadora({ costs, currency, tc }) {
 				discount: disc,
 			});
 		});
-	}, [isVolume, escalones, certsCount, firmasEstimadas, marginFirma, marginCert, costs]);
+	}, [isVolume, escalones, certsCount, firmasEstimadas, marginFirma, marginCert, costs, activeTiers]);
 
 	var targetRow = useMemo(function () {
 		if (!isVolume) return null;
 		var row = computeRow(firmasEstimadas, certsCount, PERIODO, marginFirma, marginCert, costs);
-		var disc = volumeDiscountRate(firmasEstimadas);
+		var disc = discountRateFor(firmasEstimadas, activeTiers);
 		var factor = 1 - disc;
 		var uF = ceilCents(row.unitFirma * factor);
 		var uC = ceilCents(row.unitCert  * factor);
@@ -793,7 +825,7 @@ export function Cotizadora({ costs, currency, tc }) {
 			unitCert:  uC,
 			discount: disc,
 		});
-	}, [isVolume, firmasEstimadas, certsCount, marginFirma, marginCert, costs]);
+	}, [isVolume, firmasEstimadas, certsCount, marginFirma, marginCert, costs, activeTiers]);
 
 	var certShortcuts = profile === "empresa" && firmaType === "humana"
 		? [1, 5, 10, 50, 200, 1000, 10000]
@@ -1003,6 +1035,11 @@ export function Cotizadora({ costs, currency, tc }) {
 							targetRow={targetRow}
 							addedFlash={flashId === "volume"}
 							onAddToCart={addVolumeToCart}
+							discountMode={mode}
+							setDiscountMode={setMode}
+							customTiers={customTiers}
+							setCustomTiers={setCustomTiers}
+							defaultTiers={defaultTiers}
 						/>
 					)}
 				</div>

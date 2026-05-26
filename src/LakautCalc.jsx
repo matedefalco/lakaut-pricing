@@ -7,6 +7,7 @@ import { PACKS } from "./data/packs";
 import { engine } from "./engine/engine";
 import { modelToInp } from "./utils/modelToInp";
 import { ModelsProvider, useModels } from "./context/ModelsContext";
+import { DiscountProvider } from "./context/DiscountContext";
 import { InfoTooltip } from "./components/ui/InfoTooltip";
 import { Sec } from "./components/ui/Sec";
 import { PackFields } from "./components/ui/PackFields";
@@ -17,6 +18,7 @@ import { TabPrecios } from "./components/tabs/TabPrecios";
 import { TabProyeccion } from "./components/tabs/TabProyeccion";
 import { TabBreakEven } from "./components/tabs/TabBreakEven";
 import { TabConfig } from "./components/tabs/TabConfig";
+import { TabDescuentos } from "./components/tabs/TabDescuentos";
 import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
@@ -49,6 +51,9 @@ function LakautCalcInner() {
 
 	// Modelos sub-nav
 	const [modTab, setModTab] = useState("análisis");
+
+	// Configuración sub-nav
+	const [cfgTab, setCfgTab] = useState("costos");
 
 
 	// Selected model id in análisis mode
@@ -150,13 +155,17 @@ function LakautCalcInner() {
 	];
 	const MOD_TABS = [
 		// Grupo gestión
-		{ k: "gestionar", label: "Guardados", group: "gestión" },
 		{ k: "análisis", label: "Simulador", group: "gestión" },
 		// Grupo herramientas
 		{ k: "suscripción", label: "Suscripción", group: "herramientas" },
 		{ k: "comparación", label: "Comparación", group: "herramientas" },
 	];
 	const activeModTab = MOD_TABS.find(function (t) { return t.k === modTab; });
+	const CFG_TABS = [
+		{ k: "costos", label: "Costos" },
+		{ k: "precios", label: "Precios" },
+		{ k: "modelos", label: "Modelos pre-cargados" },
+	];
 
 	const selectedModel = models.find(function (m) { return m.id === selectedModelId; });
 
@@ -241,19 +250,6 @@ function LakautCalcInner() {
 										style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
 									>
 										{t.label}
-										{t.k === "gestionar" && (
-											<span style={{
-												background: act ? BLUE : "#e2e8f0",
-												color: act ? WHITE : GRAY,
-												fontSize: 10,
-												fontWeight: 700,
-												borderRadius: 10,
-												padding: "1px 6px",
-												lineHeight: "14px",
-											}}>
-												{models.length}
-											</span>
-										)}
 									</button>
 								</div>
 							);
@@ -287,7 +283,7 @@ function LakautCalcInner() {
 									);
 								})}
 								{models.length === 0 && (
-									<span style={os(12, 400, GRAY)}>Sin modelos guardados · creá uno en "Modelos guardados"</span>
+									<span style={os(12, 400, GRAY)}>Sin modelos guardados · creá uno en "Configuración › Modelos pre-cargados"</span>
 								)}
 							</div>
 
@@ -478,19 +474,6 @@ function LakautCalcInner() {
 						</div>
 					)}
 
-					{/* ── Gestionar modelos (CRUD) ──────────────────────────────────── */}
-					{modTab === "gestionar" && (
-						<div style={{ padding: 24 }}>
-							<TabGuardados
-								selectedId={selectedModelId}
-								onSelect={function (id) {
-									setSelectedModelId(id);
-									if (id) setModTab("análisis");
-								}}
-							/>
-						</div>
-					)}
-
 					{/* ── Suscripción ───────────────────────────────────────────────── */}
 					{modTab === "suscripción" && (
 						<div style={{ padding: 24 }}>
@@ -519,8 +502,47 @@ function LakautCalcInner() {
 			)}
 
 			{section === "configuración" && (
-				<div style={{ padding: 24 }}>
-					<TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} />
+				<div>
+					{/* Configuración sub-nav */}
+					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", alignItems: "stretch", gap: 0 }}>
+						{CFG_TABS.map(function (t) {
+							const act = cfgTab === t.k;
+							return (
+								<button
+									key={t.k}
+									onClick={function () { setCfgTab(t.k); }}
+									style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
+								>
+									{t.label}
+									{t.k === "modelos" && (
+										<span style={{ background: act ? BLUE : "#e2e8f0", color: act ? WHITE : GRAY, fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px", lineHeight: "14px" }}>
+											{models.length}
+										</span>
+									)}
+								</button>
+							);
+						})}
+					</div>
+					{/* Breadcrumb */}
+					<div style={{ background: "#f8fafc", borderBottom: "1px solid " + BORD, padding: "5px 24px" }}>
+						<span style={os(10, 400, GRAY)}>Configuración</span>
+						<span style={Object.assign({}, os(10, 400, GRAY), { margin: "0 5px" })}>·</span>
+						<span style={os(10, 700, GRAY)}>{(CFG_TABS.find(function (t) { return t.k === cfgTab; }) || {}).label}</span>
+					</div>
+
+					<div style={{ padding: 24 }}>
+						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} />}
+						{cfgTab === "precios" && <TabDescuentos />}
+						{cfgTab === "modelos" && (
+							<TabGuardados
+								selectedId={selectedModelId}
+								onSelect={function (id) {
+									setSelectedModelId(id);
+									if (id) { setModTab("análisis"); setSection("modelos"); }
+								}}
+							/>
+						)}
+					</div>
 				</div>
 			)}
 		</div>
@@ -530,7 +552,9 @@ function LakautCalcInner() {
 export default function LakautCalc() {
 	return (
 		<ModelsProvider>
-			<LakautCalcInner />
+			<DiscountProvider>
+				<LakautCalcInner />
+			</DiscountProvider>
 		</ModelsProvider>
 	);
 }
