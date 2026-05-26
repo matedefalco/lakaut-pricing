@@ -587,14 +587,15 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 							<th style={thStyle}>Desc.</th>
 							<th style={thStyle}>$/firma</th>
 							<th style={thStyle}>$/cert</th>
-							<th style={thStyle}>Total firmas</th>
-							<th style={thStyle}>Total cert</th>
-							<th style={thStyle}>Precio total</th>
+							<th style={thStyle}>Subtotal firmas</th>
+							<th style={thStyle}>Subtotal cert</th>
+							<th style={thStyle}>Total</th>
 						</tr>
 					</thead>
 					<tbody>
 						{rows.map(function (r) {
 							var isTarget = r.firmas === firmas;
+							var hasDisc = (r.discount || 0) > 0;
 							return (
 								<tr key={r.firmas} style={{ background: isTarget ? "#eaecfb" : r.firmas % 2 === 0 ? "#fafafa" : WHITE }}>
 									<td style={Object.assign({}, os(13, isTarget ? 700 : 400, isTarget ? BLUE : BLACK), { padding: "9px 10px" })}>
@@ -602,10 +603,20 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 										{isTarget && <span style={Object.assign({}, os(10, 400, BLUE), { marginLeft: 6 })}>← tu volumen</span>}
 									</td>
 									<td style={{ textAlign: "right", padding: "9px 10px" }}>
-										<span style={os(12, (r.discount || 0) > 0 ? 700 : 400, (r.discount || 0) > 0 ? OK : GRAY)}>{Math.round((r.discount || 0) * 100)}%</span>
+										<span style={os(12, hasDisc ? 700 : 400, hasDisc ? OK : GRAY)}>{Math.round((r.discount || 0) * 100)}%</span>
 									</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma)}</td>
-									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert)}</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "7px 10px", lineHeight: 1.3 }}>
+										{hasDisc && (
+											<div style={{ fontSize: 10, color: GRAY, textDecoration: "line-through", marginBottom: 1 }}>{fMoney2(r.baseUnitFirma)}</div>
+										)}
+										<div style={{ color: hasDisc ? OK : "inherit", fontWeight: hasDisc ? 700 : 400 }}>{fMoney2(r.unitFirma)}</div>
+									</td>
+									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "7px 10px", lineHeight: 1.3 }}>
+										{hasDisc && (
+											<div style={{ fontSize: 10, color: GRAY, textDecoration: "line-through", marginBottom: 1 }}>{fMoney2(r.baseUnitCert)}</div>
+										)}
+										<div style={{ color: hasDisc ? OK : "inherit", fontWeight: hasDisc ? 700 : 400 }}>{fMoney2(r.unitCert)}</div>
+									</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma * r.firmas)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert * r.certs)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: isTarget ? OK : "inherit" }}>{fMoney2(r.priceSug)}</td>
@@ -805,6 +816,8 @@ export function Cotizadora({ costs, currency, tc }) {
 			return Object.assign({}, row, {
 				certs: scaledCerts,
 				priceSug: uF * f + uC * scaledCerts,
+				baseUnitFirma: row.unitFirma,
+				baseUnitCert:  row.unitCert,
 				unitFirma: uF,
 				unitCert:  uC,
 				discount: disc,
@@ -821,6 +834,8 @@ export function Cotizadora({ costs, currency, tc }) {
 		var uC = ceilCents(row.unitCert  * factor);
 		return Object.assign({}, row, {
 			priceSug: uF * firmasEstimadas + uC * certsCount,
+			baseUnitFirma: row.unitFirma,
+			baseUnitCert:  row.unitCert,
 			unitFirma: uF,
 			unitCert:  uC,
 			discount: disc,
