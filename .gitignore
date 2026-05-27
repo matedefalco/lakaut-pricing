@@ -36,6 +36,9 @@ lerna-debug.log*
 *.sln
 *.sw?
 
+# Worktrees de Claude Code (internos, no versionar)
+.claude/worktrees/
+
 # Caché
 .cache
 .parcel-cache

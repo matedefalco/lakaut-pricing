@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, os, mont } from "../theme/tokens";
+import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, ER, os, mont } from "../theme/tokens";
 import { fP, fK } from "../utils/formatters";
 import { makeMoney } from "../utils/useMoney";
 import { engine } from "../engine/engine";
@@ -109,20 +109,22 @@ function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, pay
 		totalPrice = tr.priceSug;
 		var escRowsHtml = volumeData.rows.map(function (r) {
 			var isT = r.firmas === volumeData.firmas;
+			var discPct = Math.round((r.discount || 0) * 100);
 			return [
 				"<tr style='background:" + (isT ? "#eef2ff" : "inherit") + "'>",
 				"<td style='font-weight:" + (isT ? "700" : "400") + ";color:" + (isT ? "#3949ab" : "#111") + "'>" + (isT ? "▶ " : "") + r.firmas.toLocaleString("es-AR") + (isT ? " ← tu volumen" : "") + "</td>",
-				"<td style='text-align:right'>" + fmt(r.pricePerFirma) + "</td>",
-				"<td style='text-align:right'>" + fmt(r.pricePerCert) + "</td>",
+				"<td style='text-align:right;font-weight:" + (discPct > 0 ? "700" : "400") + ";color:" + (discPct > 0 ? "#16a34a" : "#94a3b8") + "'>" + (discPct > 0 ? "−" + discPct + "%" : "—") + "</td>",
+				"<td style='text-align:right'>" + fmt(r.unitFirma) + "</td>",
+				"<td style='text-align:right'>" + fmt(r.unitCert) + "</td>",
 				"<td style='text-align:right;font-weight:" + (isT ? "700" : "400") + ";color:" + (isT ? "#16a34a" : "inherit") + "'>" + fmt(r.priceSug) + "</td>",
 				"</tr>",
 			].join("");
 		}).join("");
 		tableHtml = [
 			"<table class='prop-table'>",
-			"<thead><tr><th>Cant. Firmas</th><th>$ / Firma</th><th>$ / Cert.</th><th>Precio</th></tr></thead>",
+			"<thead><tr><th>Cant. Firmas</th><th>Descuento</th><th>$ / Firma</th><th>$ / Cert.</th><th>Precio</th></tr></thead>",
 			"<tbody>" + escRowsHtml + "</tbody></table>",
-			"<div style='margin-top:6px;font-size:11px;color:#64748b'>Vigencia: " + volumeData.periodo + " meses · " + volumeData.certs + " cert" + (volumeData.certs !== 1 ? "s" : "") + " · ▶ volumen seleccionado.</div>",
+			"<div style='margin-top:6px;font-size:11px;color:#64748b'>Vigencia: " + volumeData.periodo + " meses · " + volumeData.certs + " cert" + (volumeData.certs !== 1 ? "s" : "") + " · El precio por firma y por certificado disminuye al aumentar el volumen contratado. ▶ volumen seleccionado.</div>",
 		].join("");
 	}
 
@@ -350,15 +352,6 @@ function PlanCard({ plan, isFirst, costs, payMethod, fMoney2, currency, tc, onEx
 	var c = engine({ arch: plan.arch || "bolsa", inp: inp, svc: svc, users: 1000, costs: costs });
 	var col = plan.color;
 
-	var ilimitadasThreshold = plan.ilimitadas
-		? (function () {
-			var revMes = plan.priceUSD / periodo;
-			var certCostMes = costs.cvCertBase / periodo;
-			var avail = revMes - certCostMes;
-			return avail > 0 ? Math.floor(avail / costs.cvFirmaBase) : 0;
-		})()
-		: null;
-
 	return (
 		<div style={{ background: WHITE, border: "2px solid " + col, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column", opacity: isFirst ? 1 : 0.75 }}>
 			<div style={{ background: col, padding: "14px 18px" }}>
@@ -376,13 +369,6 @@ function PlanCard({ plan, isFirst, costs, payMethod, fMoney2, currency, tc, onEx
 					{plan.priceNote}{payMethod === "tarjeta" ? " · +0.2% Paywall" : ""}
 				</div>
 			</div>
-
-			{ilimitadasThreshold !== null && (
-				<div style={{ padding: "10px 18px", background: WNBG, borderBottom: "1px solid " + BORD }}>
-					<div style={Object.assign({}, os(11, 700, WN), { marginBottom: 2 })}>⚠ Rentable hasta {ilimitadasThreshold} firmas / mes</div>
-					<div style={os(10, 400, WN)}>Por encima de ese umbral el costo variable supera el ingreso del pack.</div>
-				</div>
-			)}
 
 			<div style={{ padding: "14px 18px", flex: 1 }}>
 				{plan.benefits.map(function (b, i) {
@@ -517,7 +503,12 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 				</div>
 
 				{discountMode === "custom" && (
-					<TierEditor tiers={customTiers || []} onChange={setCustomTiers} accent={BLUE} compact />
+					<div>
+						<TierEditor tiers={customTiers || []} onChange={setCustomTiers} accent={BLUE} compact />
+						<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 8 })}>
+							Estos tramos aplican solo a esta propuesta y superponen los descuentos guardados. No modifican los predeterminados.
+						</div>
+					</div>
 				)}
 				{discountMode === "default" && (
 					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 8 })}>
@@ -735,8 +726,17 @@ function CartPanel({ cart, onRemove, onClear, pay, setPay, subtotal, paywall, to
 // ─── Main component ────────────────────────────────────────────────────────────
 export function Cotizadora({ costs, currency, tc }) {
 	const { models } = useModels();
-	const { activeTiers, defaultTiers, customTiers, mode, setCustomTiers, setMode } = useDiscounts();
+	const { defaultTiers } = useDiscounts();
 	const { fMoney2 } = makeMoney(currency, tc);
+
+	// Descuentos por volumen locales a esta propuesta. Arrancan de los tramos
+	// pre-guardados (defaultTiers) pero al editarlos en modo "custom" no se
+	// persisten ni modifican los guardados globales — superponen solo aquí.
+	const [discountMode, setDiscountMode] = useState("default");
+	const [proposalTiers, setProposalTiers] = useState(function () {
+		return (defaultTiers || []).map(function (t) { return { minVol: t.minVol, discount: t.discount }; });
+	});
+	const activeTiers = discountMode === "custom" ? proposalTiers : defaultTiers;
 
 	// Questionnaire
 	const [profile, setProfile] = useState(null);
@@ -945,12 +945,6 @@ export function Cotizadora({ costs, currency, tc }) {
 					<div style={{ maxWidth: 220 }}>
 						<NumInput label="" value={certsCount} onChange={function (v) { setCertsCount(Math.max(1, Math.round(v))); }} suffix="certificados" />
 					</div>
-					{profile === "empresa" && firmaType === "humana" && certsCount >= 50 && (
-						<div style={{ background: WNBG, border: "1px solid " + WN, borderRadius: 8, padding: "8px 12px", marginTop: 10 }}>
-							<span style={os(11, 700, WN)}>Alto volumen de certificados — </span>
-							<span style={os(11, 400, WN)}>se generará una cotización escalonada a medida.</span>
-						</div>
-					)}
 				</QCard>
 			)}
 
@@ -962,12 +956,6 @@ export function Cotizadora({ costs, currency, tc }) {
 					<div style={{ maxWidth: 220 }}>
 						<NumInput label="" value={firmasEstimadas || ""} onChange={function (v) { setFirmasEstimadas(Math.max(0, Math.round(v))); }} suffix="firmas" />
 					</div>
-					{firmasEstimadas > 2000 && (
-						<div style={{ background: BLUEL, border: "1px solid " + BLUE, borderRadius: 8, padding: "8px 12px", marginTop: 10 }}>
-							<span style={os(11, 700, BLUE)}>Volumen alto — </span>
-							<span style={os(11, 400, BLUE)}>se mostrará la tabla escalonada de precios.</span>
-						</div>
-					)}
 				</QCard>
 			)}
 
@@ -1042,10 +1030,10 @@ export function Cotizadora({ costs, currency, tc }) {
 							targetRow={targetRow}
 							addedFlash={flashId === "volume"}
 							onAddToCart={addVolumeToCart}
-							discountMode={mode}
-							setDiscountMode={setMode}
-							customTiers={customTiers}
-							setCustomTiers={setCustomTiers}
+							discountMode={discountMode}
+							setDiscountMode={setDiscountMode}
+							customTiers={proposalTiers}
+							setCustomTiers={setProposalTiers}
 							defaultTiers={defaultTiers}
 						/>
 					)}
