@@ -64,6 +64,29 @@ function fNumShort(n) {
 	return n.toLocaleString("es-AR");
 }
 
+// ─── Volume ranges table (shared by both exports) ──────────────────────────────
+function buildVolumeRangesHtml(rows, selectedFirmas, fmt, markerLabel) {
+	var marker = markerLabel || "← tu volumen";
+	var rowsHtml = rows.map(function (r) {
+		var isT = r.firmas === selectedFirmas;
+		var discPct = Math.round((r.discount || 0) * 100);
+		return [
+			"<tr style='background:" + (isT ? "#eef2ff" : "inherit") + "'>",
+			"<td style='font-weight:" + (isT ? "700" : "400") + ";color:" + (isT ? "#3949ab" : "#111") + "'>" + (isT ? "▶ " : "") + r.firmas.toLocaleString("es-AR") + (isT ? " " + marker : "") + "</td>",
+			"<td style='text-align:right;font-weight:" + (discPct > 0 ? "700" : "400") + ";color:" + (discPct > 0 ? "#16a34a" : "#94a3b8") + "'>" + (discPct > 0 ? "−" + discPct + "%" : "—") + "</td>",
+			"<td style='text-align:right'>" + fmt(r.unitFirma) + "</td>",
+			"<td style='text-align:right'>" + fmt(r.unitCert) + "</td>",
+			"<td style='text-align:right;font-weight:" + (isT ? "700" : "400") + ";color:" + (isT ? "#16a34a" : "inherit") + "'>" + fmt(r.priceSug) + "</td>",
+			"</tr>",
+		].join("");
+	}).join("");
+	return [
+		"<table class='prop-table'>",
+		"<thead><tr><th>Cant. Firmas</th><th>Descuento</th><th>$ / Firma</th><th>$ / Cert.</th><th>Precio</th></tr></thead>",
+		"<tbody>" + rowsHtml + "</tbody></table>",
+	].join("");
+}
+
 // ─── Quick per-plan export ─────────────────────────────────────────────────────
 function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, payMethod, planData, volumeData, marginTarget, currency, tc, costs }) {
 	var date = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
@@ -107,23 +130,8 @@ function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, pay
 	if (volumeData) {
 		var tr = volumeData.targetRow;
 		totalPrice = tr.priceSug;
-		var escRowsHtml = volumeData.rows.map(function (r) {
-			var isT = r.firmas === volumeData.firmas;
-			var discPct = Math.round((r.discount || 0) * 100);
-			return [
-				"<tr style='background:" + (isT ? "#eef2ff" : "inherit") + "'>",
-				"<td style='font-weight:" + (isT ? "700" : "400") + ";color:" + (isT ? "#3949ab" : "#111") + "'>" + (isT ? "▶ " : "") + r.firmas.toLocaleString("es-AR") + (isT ? " ← tu volumen" : "") + "</td>",
-				"<td style='text-align:right;font-weight:" + (discPct > 0 ? "700" : "400") + ";color:" + (discPct > 0 ? "#16a34a" : "#94a3b8") + "'>" + (discPct > 0 ? "−" + discPct + "%" : "—") + "</td>",
-				"<td style='text-align:right'>" + fmt(r.unitFirma) + "</td>",
-				"<td style='text-align:right'>" + fmt(r.unitCert) + "</td>",
-				"<td style='text-align:right;font-weight:" + (isT ? "700" : "400") + ";color:" + (isT ? "#16a34a" : "inherit") + "'>" + fmt(r.priceSug) + "</td>",
-				"</tr>",
-			].join("");
-		}).join("");
 		tableHtml = [
-			"<table class='prop-table'>",
-			"<thead><tr><th>Cant. Firmas</th><th>Descuento</th><th>$ / Firma</th><th>$ / Cert.</th><th>Precio</th></tr></thead>",
-			"<tbody>" + escRowsHtml + "</tbody></table>",
+			buildVolumeRangesHtml(volumeData.rows, volumeData.firmas, fmt),
 			"<div style='margin-top:6px;font-size:11px;color:#64748b'>Vigencia: " + volumeData.periodo + " meses · " + volumeData.certs + " cert" + (volumeData.certs !== 1 ? "s" : "") + " · El precio por firma y por certificado disminuye al aumentar el volumen contratado. ▶ volumen seleccionado.</div>",
 		].join("");
 	}
@@ -183,15 +191,28 @@ function openProposalWindow({ profile, firmaType, pay, items, subtotal, paywall,
 		"</table>",
 	].join("");
 
+	// Escala de precios por volumen — para cada ítem a medida que tenga rangos guardados
+	var volumeItems = items.filter(function (it) { return Array.isArray(it.volumeRows) && it.volumeRows.length > 0; });
+	var rangesHtml = volumeItems.map(function (it) {
+		return [
+			"<div class='section'>",
+			"<h2>Escala de precios por volumen" + (volumeItems.length > 1 ? " · " + it.planLabel : "") + "</h2>",
+			"<div style='font-size:12px;color:#475569;margin-bottom:6px'>El precio por firma y por certificado disminuye al aumentar el volumen contratado. ▶ volumen cotizado.</div>",
+			buildVolumeRangesHtml(it.volumeRows, it.effectiveFirmas, fmt, "← volumen cotizado"),
+			"<div style='margin-top:6px;font-size:11px;color:#64748b'>Vigencia: " + it.vigencia + " meses · " + it.certs + " cert" + (it.certs !== 1 ? "s" : "") + ".</div>",
+			"</div>",
+		].join("");
+	}).join("");
+
 	var paywallNote = pay === "tarjeta" ? "<div class='total-row'><span>Subtotal</span><span>" + fmt(subtotal) + "</span></div><div class='total-row'><span>Paywall (0.2%)</span><span>+ " + fmt(paywall) + "</span></div>" : "";
-	var html = buildProposalHtml({ date: date, validUntil: validUntil, profileLabel: profileLabel, firmaTypeLabel: firmaTypeLabel, payLabel: payLabel, certsCount: certsTotal, firmasEstimadas: firmasTotal, tableHtml: tableHtml, paywallNote: paywallNote, grandTotal: total, currency: currency, tc: tc, fmt: fmt });
+	var html = buildProposalHtml({ date: date, validUntil: validUntil, profileLabel: profileLabel, firmaTypeLabel: firmaTypeLabel, payLabel: payLabel, certsCount: certsTotal, firmasEstimadas: firmasTotal, tableHtml: tableHtml, paywallNote: paywallNote, grandTotal: total, currency: currency, tc: tc, fmt: fmt, extraSectionsHtml: rangesHtml });
 
 	var w = window.open("", "_blank", "width=920,height=750");
 	if (w) { w.document.write(html); w.document.close(); }
 }
 
 // ─── Shared HTML template ──────────────────────────────────────────────────────
-function buildProposalHtml({ date, validUntil, profileLabel, firmaTypeLabel, payLabel, certsCount, firmasEstimadas, tableHtml, paywallNote, grandTotal, currency, tc, fmt }) {
+function buildProposalHtml({ date, validUntil, profileLabel, firmaTypeLabel, payLabel, certsCount, firmasEstimadas, tableHtml, paywallNote, grandTotal, currency, tc, fmt, extraSectionsHtml }) {
 	return [
 		"<!DOCTYPE html><html lang='es'><head>",
 		"<meta charset='UTF-8'><title>Propuesta Comercial — Lakaut</title>",
@@ -243,6 +264,7 @@ function buildProposalHtml({ date, validUntil, profileLabel, firmaTypeLabel, pay
 		"<div class='grand-total'>TOTAL: " + fmt(grandTotal) + "</div>",
 		currency === "USD" ? "<div style='font-size:11px;color:#94a3b8;margin-top:2px'>≈ $ " + Math.round(grandTotal * tc).toLocaleString("es-AR") + " ARS (referencial)</div>" : "",
 		"</div></div>",
+		extraSectionsHtml || "",
 		"<div class='conditions'><strong style='font-size:13px'>Condiciones comerciales</strong><ul>",
 		"<li>Los precios están expresados en " + (currency === "ARS" ? "pesos argentinos" : "dólares estadounidenses (USD)") + " y no incluyen impuestos (IVA / retenciones).</li>",
 		"<li>Esta propuesta tiene vigencia de 30 días a partir de la fecha de emisión.</li>",
@@ -886,6 +908,7 @@ export function Cotizadora({ costs, currency, tc }) {
 				unitCert: targetRow.unitCert,
 				marginFirma: marginFirma,
 				marginCert: marginCert,
+				volumeRows: volumeRows,
 			}];
 		});
 		setFlashId("volume");
