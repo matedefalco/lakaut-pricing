@@ -471,7 +471,7 @@ function MarginInput({ label, value, onChange }) {
 	);
 }
 
-function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMarginFirma, setMarginCert, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash, discountMode, setDiscountMode, customTiers, setCustomTiers, defaultTiers }) {
+function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMarginFirma, setMarginCert, costs, fMoney2, rows, targetRow, onAddToCart, addedFlash, discountMode, setDiscountMode, customTiers, setCustomTiers, defaultTiers, qOffset }) {
 	var [copied, setCopied] = useState(false);
 	var targetDiscount = targetRow ? Math.round((targetRow.discount || 0) * 100) : 0;
 
@@ -495,16 +495,19 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 
 	return (
 		<div>
-			{/* Margin selectors */}
-			<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-				<MarginInput label="Margen firma:" value={marginFirma} onChange={setMarginFirma} />
-				<MarginInput label="Margen cert:" value={marginCert}  onChange={setMarginCert}  />
-			</div>
+			{/* Q: Margen de ganancia */}
+			<QCard>
+				<QLabel n={String(5 + (qOffset || 0))} text="¿Qué margen de ganancia querés aplicar?" />
+				<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+					<MarginInput label="Margen firma:" value={marginFirma} onChange={setMarginFirma} />
+					<MarginInput label="Margen cert:" value={marginCert}  onChange={setMarginCert}  />
+				</div>
+			</QCard>
 
-			{/* Discount tiers config */}
-			<div style={{ border: "1px solid " + BORD, borderRadius: 12, padding: 14, marginBottom: 16, background: "#fafafa" }}>
+			{/* Q: Descuentos por volumen */}
+			<QCard>
+				<QLabel n={String(6 + (qOffset || 0))} text="Descuentos por volumen" />
 				<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: customTiers && discountMode === "custom" ? 12 : 0 }}>
-					<span style={Object.assign({}, os(11, 700, BLACK), { minWidth: 76 })}>Descuentos por volumen:</span>
 					<div style={{ display: "inline-flex", border: "1.5px solid " + BORD, borderRadius: 8, overflow: "hidden" }}>
 						{[
 							{ k: "default", label: "Predeterminados" },
@@ -537,7 +540,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 						Usando los tramos pre-pactados ({(defaultTiers || []).map(function (t) { return fNumShort(t.minVol) + "→" + t.discount + "%"; }).join(" · ") || "sin tramos"}). Editalos en Configuración › Precios.
 					</div>
 				)}
-			</div>
+			</QCard>
 
 			{/* KPI preview card */}
 			<div style={{
@@ -1058,8 +1061,9 @@ export function Cotizadora({ costs, currency, tc }) {
 							customTiers={proposalTiers}
 							setCustomTiers={setProposalTiers}
 							defaultTiers={defaultTiers}
+							qOffset={qOffset}
 						/>
-					)}
+						)}
 				</div>
 			)}
 
