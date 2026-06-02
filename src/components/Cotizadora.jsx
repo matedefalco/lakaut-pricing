@@ -88,7 +88,7 @@ function buildVolumeRangesHtml(rows, selectedFirmas, fmt, markerLabel) {
 }
 
 // ─── Quick per-plan export ─────────────────────────────────────────────────────
-function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, payMethod, planData, volumeData, marginTarget, currency, tc, costs }) {
+function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, payMethod, planData, volumeData, marginTarget, currency, tc, costs, periodo }) {
 	var date = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 	var validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 	var fmt = function (n) {
@@ -121,7 +121,7 @@ function openExportWindow({ profile, firmaType, certsCount, firmasEstimadas, pay
 			"<td style='text-align:right'>" + firmasLabel + "</td>",
 			"<td style='text-align:right'>" + perFirma + "</td>",
 			"<td style='text-align:right'>" + perCert + "</td>",
-			"<td style='text-align:right'>24 meses</td>",
+			"<td style='text-align:right'>" + (periodo || 24) + (periodo === 1 ? " mes" : " meses") + "</td>",
 			"<td style='text-align:right;font-weight:700'>" + fmt(totalPrice) + "</td>",
 			"</tr></tbody></table>",
 		].join("");
@@ -343,7 +343,7 @@ function Opt({ options, selected, onSelect }) {
 	);
 }
 
-function ShortcutBar({ values, selected, onSelect }) {
+function ShortcutBar({ values, selected, onSelect, labelFn }) {
 	return (
 		<div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
 			{values.map(function (n) {
@@ -358,7 +358,7 @@ function ShortcutBar({ values, selected, onSelect }) {
 							fontFamily: "'Open Sans',sans-serif", fontSize: 12,
 							fontWeight: act ? 700 : 400, cursor: "pointer",
 						}}>
-						{fNumShort(n)}
+						{labelFn ? labelFn(n) : fNumShort(n)}
 					</button>
 				);
 			})}
@@ -497,7 +497,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 		<div>
 			{/* Q: Margen de ganancia */}
 			<QCard>
-				<QLabel n={String(5 + (qOffset || 0))} text="¿Qué margen de ganancia querés aplicar?" />
+				<QLabel n={String(6 + (qOffset || 0))} text="¿Qué margen de ganancia querés aplicar?" />
 				<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 					<MarginInput label="Margen firma:" value={marginFirma} onChange={setMarginFirma} />
 					<MarginInput label="Margen cert:" value={marginCert}  onChange={setMarginCert}  />
@@ -506,7 +506,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 
 			{/* Q: Descuentos por volumen */}
 			<QCard>
-				<QLabel n={String(6 + (qOffset || 0))} text="Descuentos por volumen" />
+				<QLabel n={String(7 + (qOffset || 0))} text="Descuentos por volumen" />
 				<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: customTiers && discountMode === "custom" ? 12 : 0 }}>
 					<div style={{ display: "inline-flex", border: "1.5px solid " + BORD, borderRadius: 8, overflow: "hidden" }}>
 						{[
@@ -771,7 +771,8 @@ export function Cotizadora({ costs, currency, tc }) {
 	const [payMethod, setPayMethod] = useState("transferencia");
 	const [marginFirma, setMarginFirma] = useState(40);
 	const [marginCert,  setMarginCert]  = useState(40);
-	var PERIODO = 24;
+	const [periodo, setPeriodo] = useState(24);
+	var PERIODO = periodo;
 
 	// Cart
 	const [cart, setCart] = useState([]);
@@ -941,6 +942,7 @@ export function Cotizadora({ costs, currency, tc }) {
 			currency: currency,
 			tc: tc,
 			costs: costs,
+			periodo: PERIODO,
 		});
 	}
 
@@ -974,10 +976,21 @@ export function Cotizadora({ costs, currency, tc }) {
 				</QCard>
 			)}
 
-			{/* Q4 — firmas */}
+			{/* Q4 — temporalidad */}
 			{profileSet && firmaTypeSet && (
 				<QCard>
-					<QLabel n={String(3 + qOffset)} text={"¿Cuántas firmas estimás usar en " + PERIODO + " meses?"} />
+					<QLabel n={String(3 + qOffset)} text="¿En qué período querés cotizar?" />
+					<ShortcutBar values={[1, 3, 6, 12, 24]} selected={periodo} onSelect={setPeriodo} labelFn={function(v){ return v === 1 ? "1 mes" : v + " meses"; }} />
+					<div style={{ maxWidth: 220 }}>
+						<NumInput label="" value={periodo} onChange={function (v) { setPeriodo(Math.max(1, Math.round(v))); }} suffix="meses" />
+					</div>
+				</QCard>
+			)}
+
+			{/* Q5 — firmas */}
+			{profileSet && firmaTypeSet && (
+				<QCard>
+					<QLabel n={String(4 + qOffset)} text={"¿Cuántas firmas estimás usar en " + PERIODO + (PERIODO === 1 ? " mes?" : " meses?")} />
 					<ShortcutBar values={firmaShortcuts} selected={firmasEstimadas} onSelect={setFirmasEstimadas} />
 					<div style={{ maxWidth: 220 }}>
 						<NumInput label="" value={firmasEstimadas || ""} onChange={function (v) { setFirmasEstimadas(Math.max(0, Math.round(v))); }} suffix="firmas" />
@@ -985,10 +998,10 @@ export function Cotizadora({ costs, currency, tc }) {
 				</QCard>
 			)}
 
-			{/* Q5 — pago */}
+			{/* Q6 — pago */}
 			{profileSet && firmaTypeSet && (
 				<QCard>
-					<QLabel n={String(4 + qOffset)} text="¿Cómo vas a pagar?" />
+					<QLabel n={String(5 + qOffset)} text="¿Cómo vas a pagar?" />
 					<Opt options={PAY_OPTS} selected={payMethod} onSelect={setPayMethod} />
 				</QCard>
 			)}
