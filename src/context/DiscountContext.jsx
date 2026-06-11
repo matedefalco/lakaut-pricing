@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { loadConfig, saveConfig, subscribeConfig } from "../lib/supabase";
 
 const DiscountContext = createContext(null);
 const STORAGE_KEY = "lakaut_volume_discounts_v1";
@@ -35,10 +36,24 @@ function load() {
 export function DiscountProvider({ children }) {
 	const [state, setState] = useState(load);
 
+	// Load from Supabase on mount; subscribe to remote changes
+	useEffect(function () {
+		loadConfig("discounts").then(function (remote) {
+			if (!remote) return;
+			setState(remote);
+			try { localStorage.setItem(STORAGE_KEY, JSON.stringify(remote)); } catch (e) {}
+		});
+		return subscribeConfig("discounts", function (remote) {
+			setState(remote);
+			try { localStorage.setItem(STORAGE_KEY, JSON.stringify(remote)); } catch (e) {}
+		});
+	}, []);
+
 	function persist(updater) {
 		setState(function (prev) {
 			const next = typeof updater === "function" ? updater(prev) : updater;
 			try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) {}
+			saveConfig("discounts", next);
 			return next;
 		});
 	}

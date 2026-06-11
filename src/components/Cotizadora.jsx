@@ -817,15 +817,18 @@ export function Cotizadora({ costs, currency, tc }) {
 		return [];
 	}, [readyToRecommend, isVolume, profile, firmaType, certsCount, firmasEstimadas, models]);
 
+	var totalCerts = certsCount * PERIODO;
+	var totalFirmas = firmasEstimadas * PERIODO;
+
 	var escalones = useMemo(function () {
 		if (!isVolume) return [];
-		return getEscalones(firmasEstimadas);
-	}, [isVolume, firmasEstimadas]);
+		return getEscalones(totalFirmas);
+	}, [isVolume, totalFirmas]);
 
 	var volumeRows = useMemo(function () {
 		if (!isVolume) return [];
 		return escalones.map(function (f) {
-			var scaledCerts = Math.max(1, Math.round(certsCount * f / firmasEstimadas));
+			var scaledCerts = Math.max(1, Math.round(totalCerts * f / totalFirmas));
 			var row = computeRow(f, scaledCerts, PERIODO, marginFirma, marginCert, costs);
 			var disc = discountRateFor(f, activeTiers);
 			var factor = 1 - disc;
@@ -841,24 +844,24 @@ export function Cotizadora({ costs, currency, tc }) {
 				discount: disc,
 			});
 		});
-	}, [isVolume, escalones, certsCount, firmasEstimadas, marginFirma, marginCert, costs, activeTiers]);
+	}, [isVolume, escalones, totalCerts, totalFirmas, marginFirma, marginCert, costs, activeTiers]);
 
 	var targetRow = useMemo(function () {
 		if (!isVolume) return null;
-		var row = computeRow(firmasEstimadas, certsCount, PERIODO, marginFirma, marginCert, costs);
-		var disc = discountRateFor(firmasEstimadas, activeTiers);
+		var row = computeRow(totalFirmas, totalCerts, PERIODO, marginFirma, marginCert, costs);
+		var disc = discountRateFor(totalFirmas, activeTiers);
 		var factor = 1 - disc;
 		var uF = ceilCents(row.unitFirma * factor);
 		var uC = ceilCents(row.unitCert  * factor);
 		return Object.assign({}, row, {
-			priceSug: uF * firmasEstimadas + uC * certsCount,
+			priceSug: uF * totalFirmas + uC * totalCerts,
 			baseUnitFirma: row.unitFirma,
 			baseUnitCert:  row.unitCert,
 			unitFirma: uF,
 			unitCert:  uC,
 			discount: disc,
 		});
-	}, [isVolume, firmasEstimadas, certsCount, marginFirma, marginCert, costs, activeTiers]);
+	}, [isVolume, totalFirmas, totalCerts, marginFirma, marginCert, costs, activeTiers]);
 
 	var certShortcuts = profile === "empresa" && firmaType === "humana"
 		? [1, 5, 10, 50, 200, 1000, 10000]
@@ -899,12 +902,12 @@ export function Cotizadora({ costs, currency, tc }) {
 		setCart(function (prev) {
 			return [...prev, {
 				id: Date.now(),
-				planLabel: firmasEstimadas.toLocaleString("es-AR") + " firmas · " + certsCount.toLocaleString("es-AR") + " cert" + (certsCount !== 1 ? "s" : ""),
+				planLabel: totalFirmas.toLocaleString("es-AR") + " firmas · " + totalCerts.toLocaleString("es-AR") + " cert" + (totalCerts !== 1 ? "s" : ""),
 				col: BLUE,
 				isCustom: true,
 				ilimitadas: false,
-				certs: certsCount,
-				effectiveFirmas: firmasEstimadas,
+				certs: totalCerts,
+				effectiveFirmas: totalFirmas,
 				vigencia: PERIODO,
 				qty: 1,
 				unitPrice: targetRow.priceSug,
@@ -931,12 +934,12 @@ export function Cotizadora({ costs, currency, tc }) {
 		openExportWindow({
 			profile: profile,
 			firmaType: firmaType,
-			certsCount: certsCount,
-			firmasEstimadas: firmasEstimadas,
+			certsCount: totalCerts,
+			firmasEstimadas: totalFirmas,
 			payMethod: payMethod,
 			planData: overridePlan || (!isVolume && recommendations.length > 0 ? recommendations[0] : null),
 			volumeData: isVolume && targetRow
-				? { firmas: firmasEstimadas, certs: certsCount, periodo: PERIODO, targetRow: targetRow, rows: volumeRows }
+				? { firmas: totalFirmas, certs: totalCerts, periodo: PERIODO, targetRow: targetRow, rows: volumeRows }
 				: null,
 			marginTarget: marginFirma,
 			currency: currency,
@@ -965,21 +968,10 @@ export function Cotizadora({ costs, currency, tc }) {
 				</QCard>
 			)}
 
-			{/* Q3 — certs */}
+			{/* Q3 — temporalidad */}
 			{profileSet && firmaTypeSet && (
 				<QCard>
-					<QLabel n={String(2 + qOffset)} text="¿Cuántos certificados digitales necesitás?" />
-					<ShortcutBar values={certShortcuts} selected={certsCount} onSelect={setCertsCount} />
-					<div style={{ maxWidth: 220 }}>
-						<NumInput label="" value={certsCount} onChange={function (v) { setCertsCount(Math.max(1, Math.round(v))); }} suffix="certificados" />
-					</div>
-				</QCard>
-			)}
-
-			{/* Q4 — temporalidad */}
-			{profileSet && firmaTypeSet && (
-				<QCard>
-					<QLabel n={String(3 + qOffset)} text="¿En qué período querés cotizar?" />
+					<QLabel n={String(2 + qOffset)} text="¿En qué período querés cotizar?" />
 					<ShortcutBar values={[1, 3, 6, 12, 24]} selected={periodo} onSelect={setPeriodo} labelFn={function(v){ return v === 1 ? "1 mes" : v + " meses"; }} />
 					<div style={{ maxWidth: 220 }}>
 						<NumInput label="" value={periodo} onChange={function (v) { setPeriodo(Math.max(1, Math.round(v))); }} suffix="meses" />
@@ -987,13 +979,24 @@ export function Cotizadora({ costs, currency, tc }) {
 				</QCard>
 			)}
 
+			{/* Q4 — certs */}
+			{profileSet && firmaTypeSet && (
+				<QCard>
+					<QLabel n={String(3 + qOffset)} text="¿Cuántos certificados digitales necesitás por mes?" />
+					<ShortcutBar values={certShortcuts} selected={certsCount} onSelect={setCertsCount} />
+					<div style={{ maxWidth: 220 }}>
+						<NumInput label="" value={certsCount} onChange={function (v) { setCertsCount(Math.max(1, Math.round(v))); }} suffix="certificados / mes" />
+					</div>
+				</QCard>
+			)}
+
 			{/* Q5 — firmas */}
 			{profileSet && firmaTypeSet && (
 				<QCard>
-					<QLabel n={String(4 + qOffset)} text={"¿Cuántas firmas estimás usar en " + PERIODO + (PERIODO === 1 ? " mes?" : " meses?")} />
+					<QLabel n={String(4 + qOffset)} text="¿Cuántas firmas estimás usar por mes?" />
 					<ShortcutBar values={firmaShortcuts} selected={firmasEstimadas} onSelect={setFirmasEstimadas} />
 					<div style={{ maxWidth: 220 }}>
-						<NumInput label="" value={firmasEstimadas || ""} onChange={function (v) { setFirmasEstimadas(Math.max(0, Math.round(v))); }} suffix="firmas" />
+						<NumInput label="" value={firmasEstimadas || ""} onChange={function (v) { setFirmasEstimadas(Math.max(0, Math.round(v))); }} suffix="firmas / mes" />
 					</div>
 				</QCard>
 			)}
@@ -1056,8 +1059,8 @@ export function Cotizadora({ costs, currency, tc }) {
 
 					{isVolume && targetRow && (
 						<VolumeSection
-							certs={certsCount}
-							firmas={firmasEstimadas}
+							certs={totalCerts}
+							firmas={totalFirmas}
 							periodo={PERIODO}
 							marginFirma={marginFirma}
 							marginCert={marginCert}

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, BG, OK, WN, ER, os, mont } from "./theme/tokens";
 import { fD2, fP, fK } from "./utils/formatters";
 import { makeMoney } from "./utils/useMoney";
@@ -47,7 +48,7 @@ function LakautCalcInner() {
 	}, []);
 
 	// Top-level navigation
-	const [section, setSection] = useState("modelos");
+	const [section, setSection] = useState("cotizadora");
 
 	// Modelos sub-nav
 	const [modTab, setModTab] = useState("análisis");
@@ -84,6 +85,19 @@ function LakautCalcInner() {
 			capacidadFirmasAnual: CAPACIDAD_FIRMAS_ANUAL,
 		};
 	});
+
+	// Load costConfig from Supabase on mount; subscribe to remote changes
+	useEffect(function () {
+		loadConfig("costConfig").then(function (remote) {
+			if (!remote) return;
+			setCostConfig(remote);
+			try { localStorage.setItem("lakaut_costConfig", JSON.stringify(remote)); } catch (e) {}
+		});
+		return subscribeConfig("costConfig", function (remote) {
+			setCostConfig(remote);
+			try { localStorage.setItem("lakaut_costConfig", JSON.stringify(remote)); } catch (e) {}
+		});
+	}, []);
 
 	// Sync analysis sandbox from selected model
 	useEffect(function () {
@@ -149,7 +163,6 @@ function LakautCalcInner() {
 
 	const ANALYSIS_TABS = ["costos", "break-even", "precios", "proyección"];
 	const SECTIONS = [
-		{ k: "modelos", label: "Modelos" },
 		{ k: "cotizadora", label: "Cotizadora" },
 		{ k: "configuración", label: "Configuración" },
 	];

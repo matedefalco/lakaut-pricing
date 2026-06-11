@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { saveConfig } from "../../lib/supabase";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, CAT_COLOR, os, mont } from "../../theme/tokens";
 import { fD } from "../../utils/formatters";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "../../data/costs";
@@ -83,6 +84,7 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 	const [saveOk, setSaveOk] = useState(false);
 	function handleSave() {
 		try { localStorage.setItem("lakaut_costConfig", JSON.stringify(costConfig)); } catch (e) {}
+		saveConfig("costConfig", costConfig);
 		setSaveOk(true);
 		setIsDirty(false);
 		setTimeout(function () { setSaveOk(false); }, 2000);
@@ -393,16 +395,6 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 						</table>
 						<button style={addBtn} onClick={function () { addRow("cvFirmaItems", { item: "", v: 0, tipo: "directo" }); }}>+ Agregar componente</button>
 
-						{/* Capacidad de firmas */}
-						<div style={{ marginTop: 20, padding: "12px 14px", border: "1px solid " + BORD, borderRadius: 8, background: "#fafafa" }}>
-							<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Capacidad total de firmas / año (activos)</div>
-							<InlineNum
-								value={costConfig.capacidadFirmasAnual || CAPACIDAD_FIRMAS_ANUAL}
-								decimals={0}
-								onChange={function (v) { setCostConfig(function (prev) { return Object.assign({}, prev, { capacidadFirmasAnual: v }); }); }}
-							/>
-							<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 4 })}>Infra por firma = amort. mensual ÷ (capacidad ÷ 12)</div>
-						</div>
 					</div>
 				</div>
 			</div>
