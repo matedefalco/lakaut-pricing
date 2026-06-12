@@ -248,7 +248,7 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 						min={0}
 					/>
 					<NumField
-						label={"Firmas promedio / cert / " + pLabel}
+						label={"Firmas / cert / " + pLabel}
 						value={viewPeriodo === "mensual" ? Math.round(firmasPorCert / 12) : firmasPorCert}
 						onChange={function (v) { setFirmasPorCert(viewPeriodo === "mensual" ? v * 12 : v); }}
 						min={0}
