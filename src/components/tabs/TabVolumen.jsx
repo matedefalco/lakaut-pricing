@@ -171,6 +171,7 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 	const [quotesLoading, setQuotesLoading] = useState(true);
 	const [saveFlash, setSaveFlash] = useState(false);
 	const [quoteMonth, setQuoteMonth] = useState("all");
+	const [editingQuoteId, setEditingQuoteId] = useState(null);
 
 	// Meses disponibles en el historial (formato YYYY-MM, más reciente primero)
 	const quoteMonths = useMemo(function () {
@@ -228,9 +229,11 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 
 	function saveQuote() {
 		if (!deal) return;
-		const q = {
-			id: Date.now().toString(36),
-			fecha: new Date().toISOString(),
+		const now = new Date().toISOString();
+		const updated = {
+			id: editingQuoteId || Date.now().toString(36),
+			fecha: editingQuoteId ? quotes.find(function (q) { return q.id === editingQuoteId; })?.fecha || now : now,
+			updatedAt: editingQuoteId ? now : undefined,
 			clientName: clientName || "(sin nombre)",
 			tierId: tier ? tier.id : null,
 			tierLabel: tier ? tier.label : "—",
@@ -241,14 +244,17 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 			revTotal: deal.revTotal,
 			margenPct: deal.margenPct,
 		};
-		const next = [q].concat(quotes).slice(0, 100);
+		const next = editingQuoteId
+			? quotes.map(function (q) { return q.id === editingQuoteId ? updated : q; })
+			: [updated].concat(quotes).slice(0, 100);
 		setQuotes(next);
 		saveConfig(QUOTES_KEY, next);
+		setEditingQuoteId(null);
 		setSaveFlash(true);
 		setTimeout(function () { setSaveFlash(false); }, 1500);
 	}
 
-	function loadQuote(q) {
+	function startEditQuote(q) {
 		setClientName(q.clientName === "(sin nombre)" ? "" : q.clientName);
 		setCertsAnuales(q.certsAnuales);
 		setCertsJuridicas(q.certsJuridicas);
@@ -257,7 +263,12 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 		setOverridePrecioFisica(q.overridePrecioFisica || "");
 		setOverridePrecioFirmaExtra(q.overridePrecioFirmaExtra || "");
 		setOverrideSetupFee(q.overrideSetupFee || "");
+		setEditingQuoteId(q.id);
 		window.scrollTo({ top: 0, behavior: "smooth" });
+	}
+
+	function cancelEdit() {
+		setEditingQuoteId(null);
 	}
 
 	function deleteQuote(id) {
@@ -305,8 +316,15 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 		<div style={{ maxWidth: 820, margin: "0 auto" }}>
 
 			{/* Header */}
-			<div style={Object.assign({}, mont(14), { color: WHITE, background: BLACK, padding: "10px 16px", borderRadius: "8px 8px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" })}>
-				<span>Cotizadora B2B · Volumen</span>
+			<div style={Object.assign({}, mont(14), { color: WHITE, background: editingQuoteId ? "#1a3a1a" : BLACK, padding: "10px 16px", borderRadius: "8px 8px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" })}>
+				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+					<span>Cotizadora B2B · Volumen</span>
+					{editingQuoteId && (
+						<span style={{ fontSize: 11, background: "rgba(255,255,255,.15)", padding: "2px 8px", borderRadius: 10, fontWeight: 400, letterSpacing: 0 }}>
+							Editando cotización existente
+						</span>
+					)}
+				</div>
 				<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 					<div style={{ display: "flex", border: "1px solid rgba(255,255,255,.3)", borderRadius: 6, overflow: "hidden" }}>
 						{["mensual", "anual"].map(function (p) {
@@ -327,13 +345,21 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 							Exportar
 						</button>
 					)}
+					{editingQuoteId && (
+						<button
+							onClick={cancelEdit}
+							style={{ padding: "4px 12px", background: "transparent", color: "rgba(255,255,255,.75)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11 }}
+						>
+							Cancelar
+						</button>
+					)}
 					{deal && (
 						<button
 							onClick={saveQuote}
 							disabled={quotesLoading}
-							style={{ padding: "4px 14px", background: saveFlash ? OK : "transparent", color: WHITE, border: "1px solid " + (saveFlash ? OK : "rgba(255,255,255,.4)"), borderRadius: 6, cursor: quotesLoading ? "wait" : "pointer", opacity: quotesLoading ? 0.5 : 1, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700 }}
+							style={{ padding: "4px 14px", background: saveFlash ? OK : (editingQuoteId ? "#2d6a2d" : "transparent"), color: WHITE, border: "1px solid " + (saveFlash ? OK : editingQuoteId ? "#4ade80" : "rgba(255,255,255,.4)"), borderRadius: 6, cursor: quotesLoading ? "wait" : "pointer", opacity: quotesLoading ? 0.5 : 1, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700 }}
 						>
-							{saveFlash ? "✓ Guardada" : "Guardar"}
+							{saveFlash ? "✓ Guardada" : editingQuoteId ? "Actualizar" : "Guardar"}
 						</button>
 					)}
 				</div>
@@ -688,11 +714,11 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 													</td>
 													<td style={{ padding: "8px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
 														<button
-															onClick={function () { loadQuote(q); }}
-															title="Repone esta cotización en el formulario de arriba para ajustarla o re-exportarla"
-															style={{ padding: "3px 10px", background: WHITE, color: BLUE, border: "1px solid " + BLUE, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, marginRight: 6 }}
+															onClick={function () { startEditQuote(q); }}
+															title="Editar: carga los datos en el formulario y actualiza este registro al guardar"
+															style={{ padding: "3px 9px", background: editingQuoteId === q.id ? BLUE : WHITE, color: editingQuoteId === q.id ? WHITE : BLUE, border: "1px solid " + BLUE, borderRadius: 6, cursor: "pointer", fontSize: 14, lineHeight: 1, marginRight: 6 }}
 														>
-															Reabrir
+															✎
 														</button>
 														<button
 															onClick={function () { deleteQuote(q.id); }}
@@ -711,7 +737,7 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 						)}
 					</div>
 					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 6 })}>
-						Sincronizado vía Supabase: las cotizaciones guardadas son visibles para todo el equipo. <strong>Reabrir</strong> repone la cotización en el formulario.
+						Sincronizado vía Supabase: visible para todo el equipo. El lápiz (✎) carga la cotización para editar; al guardar, actualiza ese registro.
 					</div>
 				</div>
 
