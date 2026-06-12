@@ -127,16 +127,14 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
         ${certsJuridicas > 0 ? "<tr><td>Certificados jurídicos</td><td>" + certsJuridicas.toLocaleString() + "</td><td>$70/empresa/año</td><td class='r'>" + fmt(deal.revCertsJuridicas) + "</td></tr>" : ""}
         ${firmasRow}
         ${setupRow}
-        <tr class="total-row"><td colspan="3">Revenue total / año</td><td class="r">${fmt(deal.revTotal)}</td></tr>
-        <tr><td colspan="3" style="font-size:11px;color:#6b7280">Revenue mensual equivalente</td><td class="r" style="font-size:11px;color:#6b7280">${fmt(deal.revTotal / 12)}/mes</td></tr>
-        <tr class="cv-row"><td colspan="3">Costo variable total / año</td><td class="r">${fmt(deal.cvTotal)}</td></tr>
-        <tr class="margin-row"><td colspan="3">Margen bruto (sobre CV)</td><td class="r">${Math.round(deal.margenPct * 1000) / 10}%</td></tr>
+        <tr class="total-row"><td colspan="3">Total / año</td><td class="r">${fmt(deal.revTotal)}</td></tr>
+        <tr><td colspan="3" style="font-size:11px;color:#6b7280">Equivalente mensual</td><td class="r" style="font-size:11px;color:#6b7280">${fmt(deal.revTotal / 12)}/mes</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="footer">
-    Condiciones: precios en ${cur}, vigencia 12 meses desde la firma. Volúmenes comprometidos anuales. Setup fee mensual recurrente durante la vigencia del contrato. Los precios no incluyen IVA. Esta propuesta es válida por 30 días calendario.
+    Condiciones: precios en ${cur}. Vigencia del contrato: 12 meses desde la firma. Vigencia de certificados y firmas: 2 años. Volúmenes comprometidos anuales. Setup fee mensual recurrente durante la vigencia del contrato. Los precios no incluyen IVA. Esta propuesta es válida por 72 horas.
   </div>
   <button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button>
 </div>
