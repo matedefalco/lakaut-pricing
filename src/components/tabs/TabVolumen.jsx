@@ -247,7 +247,13 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 						onChange={function (v) { setCertsJuridicas(viewPeriodo === "mensual" ? v * 12 : v); }}
 						min={0}
 					/>
-					<NumField label="Firmas promedio / cert / año" value={firmasPorCert} onChange={setFirmasPorCert} min={0} step={1} />
+					<NumField
+						label={"Firmas promedio / cert / " + pLabel}
+						value={viewPeriodo === "mensual" ? Math.round(firmasPorCert / 12) : firmasPorCert}
+						onChange={function (v) { setFirmasPorCert(viewPeriodo === "mensual" ? v * 12 : v); }}
+						min={0}
+						step={1}
+					/>
 				</div>
 
 				{/* Modalidad toggle */}
