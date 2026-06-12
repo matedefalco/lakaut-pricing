@@ -23,7 +23,10 @@ import { TabDescuentos } from "./components/tabs/TabDescuentos";
 import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
+import { TabVolumen } from "./components/tabs/TabVolumen";
+import { TabVolumenConfig } from "./components/tabs/TabVolumenConfig";
 import { Cotizadora } from "./components/Cotizadora";
+import { DEFAULT_VOLUME_TIERS } from "./data/volumeTiers";
 
 // ─── Archive mapping arch → pack key for strategy text ─────────────────────────
 const ARCH_TO_PACK = { bolsa: "A", sub: "B", ppu: "C", anual: "D", free: "E", hibrido: "F" };
@@ -86,6 +89,21 @@ function LakautCalcInner() {
 		};
 	});
 
+	const [cotizadoraMode, setCotizadoraMode] = useState("b2c");
+
+	const [volumeTiers, setVolumeTiers] = useState(function () {
+		try {
+			const saved = localStorage.getItem("lakaut_volumeTiers");
+			if (saved) return JSON.parse(saved);
+		} catch (e) {}
+		return DEFAULT_VOLUME_TIERS;
+	});
+
+	function updateVolumeTiers(tiers) {
+		setVolumeTiers(tiers);
+		try { localStorage.setItem("lakaut_volumeTiers", JSON.stringify(tiers)); } catch (e) {}
+	}
+
 	// Load costConfig from Supabase on mount; subscribe to remote changes
 	useEffect(function () {
 		loadConfig("costConfig").then(function (remote) {
@@ -112,11 +130,12 @@ function LakautCalcInner() {
 	}, [selectedModelId, models]);
 
 	const costs = useMemo(function () {
-		const cfOps = costConfig.fixedItems.reduce(function (s, r) { return s + r.v; }, 0);
+		const rowTot = function (r) { return (r.qty || 1) * r.v; };
+		const cfOps = costConfig.fixedItems.reduce(function (s, r) { return s + rowTot(r); }, 0);
 		const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 		const cfTotal = cfOps + cfAmort;
-		const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + r.v; }, 0);
-		const cfDirecto = costConfig.fixedItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.v; }, 0)
+		const cfSegmento = costConfig.fixedItems.filter(function (r) { return r.cat === "RRHH"; }).reduce(function (s, r) { return s + rowTot(r); }, 0);
+		const cfDirecto = costConfig.fixedItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + rowTot(r); }, 0)
 			+ costConfig.assetItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.amort; }, 0);
 		const cvCertBase = costConfig.cvCertItems.filter(function (r) { return r.tipo !== "indirecto"; }).reduce(function (s, r) { return s + r.v; }, 0);
 		const cvFirmaBase = (costConfig.cvFirmaItems || []).filter(function (r) { return r.tipo !== "indirecto"; }).reduce(function (s, r) { return s + r.v; }, 0);
@@ -509,8 +528,22 @@ function LakautCalcInner() {
 			    OTHER SECTIONS
 			    ════════════════════════════════════════════════════════════════════════ */}
 			{section === "cotizadora" && (
-				<div style={{ padding: 24 }}>
-					<Cotizadora costs={costs} currency={currency} tc={tc} />
+				<div>
+					{/* Mode switcher */}
+					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", alignItems: "stretch", gap: 0 }}>
+						{[{ k: "b2c", label: "Planes B2C" }, { k: "b2b", label: "Volumen B2B" }].map(function (m) {
+							const act = cotizadoraMode === m.k;
+							return (
+								<button key={m.k} onClick={function () { setCotizadoraMode(m.k); }} style={{ background: "none", border: "none", borderBottom: act ? "2px solid " + BLUE : "2px solid transparent", color: act ? BLUE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, padding: "12px 18px", cursor: "pointer", marginBottom: -1 }}>
+									{m.label}
+								</button>
+							);
+						})}
+					</div>
+					<div style={{ padding: 24 }}>
+						{cotizadoraMode === "b2c" && <Cotizadora costs={costs} currency={currency} tc={tc} />}
+						{cotizadoraMode === "b2b" && <TabVolumen volumeTiers={volumeTiers} costs={costs} currency={currency} />}
+					</div>
 				</div>
 			)}
 
@@ -545,7 +578,7 @@ function LakautCalcInner() {
 
 					<div style={{ padding: 24 }}>
 						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} />}
-						{cfgTab === "precios" && <TabDescuentos />}
+						{cfgTab === "precios" && <TabDescuentos volumeTiers={volumeTiers} onUpdateVolumeTiers={updateVolumeTiers} />}
 						{cfgTab === "modelos" && (
 							<TabGuardados
 								selectedId={selectedModelId}

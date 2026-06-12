@@ -101,11 +101,12 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 	}
 	const salaryRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat === "RRHH"; });
 	const opsRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat !== "RRHH"; });
-	const cfSalary = salaryRows.reduce(function (s, r) { return s + r.v; }, 0);
-	const cfOps = opsRows.reduce(function (s, r) { return s + r.v; }, 0);
+	const rowTotal = function (r) { return (r.qty || 1) * r.v; };
+	const cfSalary = salaryRows.reduce(function (s, r) { return s + rowTotal(r); }, 0);
+	const cfOps = opsRows.reduce(function (s, r) { return s + rowTotal(r); }, 0);
 	const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	const cfTotal = cfSalary + cfOps + cfAmort;
-	const cfDirecto = costConfig.fixedItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.v; }, 0)
+	const cfDirecto = costConfig.fixedItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + rowTotal(r); }, 0)
 		+ costConfig.assetItems.filter(function (r) { return r.tipo === "directo"; }).reduce(function (s, r) { return s + r.amort; }, 0);
 	const cvCertTotal = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
 	const cvFirmaTotal = (costConfig.cvFirmaItems || []).reduce(function (s, r) { return s + r.v; }, 0);
@@ -211,7 +212,9 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 					<thead>
 						<tr>
 							<th style={thStyle}>Ítem</th>
-							<th style={Object.assign({}, thR, { width: 150 })}>Monto / mes (USD)</th>
+							<th style={Object.assign({}, thR, { width: 60 })}>Cant.</th>
+							<th style={Object.assign({}, thR, { width: 130 })}>Costo unit. (USD)</th>
+							<th style={Object.assign({}, thR, { width: 110 })}>Total / mes</th>
 							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
@@ -219,13 +222,20 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 					<tbody>
 						{salaryRows.map(function (r) {
 							var i = r._i;
+							var qty = r.qty || 1;
 							return (
 								<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
 									<td style={{ padding: "4px 6px" }}>
 										<input style={inputText} value={r.item} onChange={function (e) { updRow("fixedItems", i, "item", e.target.value); }} />
 									</td>
-									<td style={{ padding: "4px 6px", width: 150 }}>
+									<td style={{ padding: "4px 6px", width: 60 }}>
+										<InlineNum value={qty} decimals={0} onChange={function (v) { updRow("fixedItems", i, "qty", Math.max(1, v)); }} />
+									</td>
+									<td style={{ padding: "4px 6px", width: 130 }}>
 										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
+									</td>
+									<td style={Object.assign({}, os(12, 700, BLACK), { padding: "4px 10px", width: 110, textAlign: "right", fontFamily: "Courier New,monospace" })}>
+										{fD(qty * r.v)}
 									</td>
 									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
 										<button style={tipoStyle(r.tipo || "indirecto")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "indirecto"}</button>
@@ -238,12 +248,13 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 						})}
 						<tr style={{ background: BLUEL }}>
 							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal sueldos</td>
+							<td colSpan={2} />
 							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfSalary)}</td>
 							<td colSpan={2} />
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0, tipo: "indirecto" }); }}>+ Agregar sueldo</button>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0, qty: 1, tipo: "indirecto" }); }}>+ Agregar sueldo</button>
 
 				{/* Costos fijos operativos */}
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "20px 0 8px" })}>
@@ -254,7 +265,9 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 						<tr>
 							<th style={Object.assign({}, thStyle, { width: 70 })}>Cat.</th>
 							<th style={thStyle}>Ítem</th>
-							<th style={Object.assign({}, thR, { width: 150 })}>Monto / mes (USD)</th>
+							<th style={Object.assign({}, thR, { width: 60 })}>Cant.</th>
+							<th style={Object.assign({}, thR, { width: 130 })}>Costo unit. (USD)</th>
+							<th style={Object.assign({}, thR, { width: 110 })}>Total / mes</th>
 							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
@@ -262,6 +275,7 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 					<tbody>
 						{opsRows.map(function (r) {
 							var i = r._i;
+							var qty = r.qty || 1;
 							return (
 								<tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE }}>
 									<td style={{ padding: "4px 6px", width: 70 }}>
@@ -274,8 +288,14 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 									<td style={{ padding: "4px 6px" }}>
 										<input style={inputText} value={r.item} onChange={function (e) { updRow("fixedItems", i, "item", e.target.value); }} />
 									</td>
-									<td style={{ padding: "4px 6px", width: 150 }}>
-										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
+									<td style={{ padding: "4px 6px", width: 60 }}>
+										<InlineNum value={qty} decimals={0} onChange={function (v) { updRow("fixedItems", i, "qty", Math.max(1, v)); }} />
+									</td>
+									<td style={{ padding: "4px 6px", width: 130 }}>
+										<InlineNum value={r.v} decimals={2} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
+									</td>
+									<td style={Object.assign({}, os(12, 700, BLACK), { padding: "4px 10px", width: 110, textAlign: "right", fontFamily: "Courier New,monospace" })}>
+										{fD(qty * r.v)}
 									</td>
 									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
 										<button style={tipoStyle(r.tipo || "directo")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "directo"}</button>
@@ -288,12 +308,13 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc }) {
 						})}
 						<tr style={{ background: BLUEL }}>
 							<td /><td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal operativos</td>
+							<td colSpan={2} />
 							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfOps)}</td>
 							<td colSpan={2} />
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0, tipo: "directo" }); }}>+ Agregar costo operativo</button>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0, qty: 1, tipo: "directo" }); }}>+ Agregar costo operativo</button>
 
 				{/* CF summary */}
 				<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", marginTop: 20 }}>
