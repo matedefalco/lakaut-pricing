@@ -156,15 +156,15 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
 export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 	const [certsAnuales, setCertsAnuales] = useState(4000);
 	const [certsJuridicas, setCertsJuridicas] = useState(40);
-	const [firmasPorCert, setFirmasPorCert] = useState(14);
 	const [modalidad, setModalidad] = useState("bundle");
 	const [clientName, setClientName] = useState("");
 	const [viewPeriodo, setViewPeriodo] = useState("mensual");
 
-	// Override prices (null = use tier default)
+	// Override prices — empty string = usar default del tier
 	const [overridePrecioFisica, setOverridePrecioFisica] = useState("");
 	const [overridePrecioFirmaExtra, setOverridePrecioFirmaExtra] = useState("");
 	const [overrideSetupFee, setOverrideSetupFee] = useState("");
+	const [overrideFirmasPorCert, setOverrideFirmasPorCert] = useState("");
 
 	// Historial de cotizaciones (Supabase, key compartida en app_config)
 	const [quotes, setQuotes] = useState([]);
@@ -238,7 +238,7 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 			tierId: tier ? tier.id : null,
 			tierLabel: tier ? tier.label : "—",
 			certsAnuales, certsJuridicas, firmasPorCert, modalidad,
-			overridePrecioFisica, overridePrecioFirmaExtra, overrideSetupFee,
+			overridePrecioFisica, overridePrecioFirmaExtra, overrideSetupFee, overrideFirmasPorCert,
 			precioCertFisica, precioFirmaExtra, setupFee,
 			currency, tcRate,
 			revTotal: deal.revTotal,
@@ -258,11 +258,11 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 		setClientName(q.clientName === "(sin nombre)" ? "" : q.clientName);
 		setCertsAnuales(q.certsAnuales);
 		setCertsJuridicas(q.certsJuridicas);
-		setFirmasPorCert(q.firmasPorCert);
 		setModalidad(q.modalidad);
 		setOverridePrecioFisica(q.overridePrecioFisica || "");
 		setOverridePrecioFirmaExtra(q.overridePrecioFirmaExtra || "");
 		setOverrideSetupFee(q.overrideSetupFee || "");
+		setOverrideFirmasPorCert(q.overrideFirmasPorCert || "");
 		setEditingQuoteId(q.id);
 		window.scrollTo({ top: 0, behavior: "smooth" });
 	}
@@ -287,6 +287,8 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 	const precioFirmaExtra = overridePrecioFirmaExtra !== "" ? Number(overridePrecioFirmaExtra) : (tier ? tier.precioFirmaExtra : 0);
 	const setupFee = overrideSetupFee !== "" ? Number(overrideSetupFee) : (tier ? tier.setupFee : 0);
 	const firmasIncluidas = tier ? (tier.firmasIncluidas || 0) : 0;
+	// firmasPorCert: override del usuario, o default al valor del tier (firmasIncluidas)
+	const firmasPorCert = overrideFirmasPorCert !== "" ? Number(overrideFirmasPorCert) : firmasIncluidas;
 
 	const deal = useMemo(function () {
 		if (!tier || isEnterprise || !precioCertFisica) return null;
@@ -389,13 +391,23 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 						onChange={function (v) { setCertsJuridicas(viewPeriodo === "mensual" ? v * 12 : v); }}
 						min={0}
 					/>
-					<NumField
-						label={"Firmas / cert / " + pLabel}
-						value={viewPeriodo === "mensual" ? Math.round(firmasPorCert / 12) : firmasPorCert}
-						onChange={function (v) { setFirmasPorCert(viewPeriodo === "mensual" ? v * 12 : v); }}
-						min={0}
-						step={1}
-					/>
+					<div>
+						<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>
+							Firmas / cert / año
+						</div>
+						<input
+							type="number"
+							min={0}
+							step={1}
+							placeholder={tier ? String(firmasIncluidas) : "—"}
+							value={overrideFirmasPorCert}
+							onChange={function (e) { setOverrideFirmasPorCert(e.target.value); }}
+							style={{ width: "100%", border: "1px solid " + BORD, borderRadius: 6, padding: "8px 10px", fontFamily: "Courier New,monospace", fontSize: 14, color: BLACK, background: WHITE, outline: "none", boxSizing: "border-box" }}
+						/>
+						<div style={Object.assign({}, os(10, 400, overrideFirmasPorCert !== "" ? BLUE : GRAY), { marginTop: 3 })}>
+							{overrideFirmasPorCert !== "" ? "Override activo · " + firmasPorCert + " firmas/cert/año" : "Default del tier: " + firmasIncluidas + " firmas incl."}
+						</div>
+					</div>
 				</div>
 
 				{/* Modalidad toggle */}
