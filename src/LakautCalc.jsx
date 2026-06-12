@@ -542,7 +542,7 @@ function LakautCalcInner() {
 					</div>
 					<div style={{ padding: 24 }}>
 						{cotizadoraMode === "b2c" && <Cotizadora costs={costs} currency={currency} tc={tc} />}
-						{cotizadoraMode === "b2b" && <TabVolumen volumeTiers={volumeTiers} costs={costs} currency={currency} />}
+						{cotizadoraMode === "b2b" && <TabVolumen volumeTiers={volumeTiers} costs={costs} currency={currency} tc={tc} />}
 					</div>
 				</div>
 			)}

@@ -1,7 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, ERBG, os, mont } from "../../theme/tokens";
 import { fD2 } from "../../utils/formatters";
+import { makeMoney } from "../../utils/useMoney";
+import { loadConfig, saveConfig } from "../../lib/supabase";
 import { getTierForCerts, calcVolumenDeal, PRECIO_CERT_JURIDICA } from "../../data/volumeTiers";
+
+const QUOTES_KEY = "b2b_quotes";
 
 const TIER_COLORS = {
 	starter:    { bg: "#f1effd", border: "#7c3aed", text: "#4c1d95" },
@@ -53,9 +57,11 @@ function NumField({ label, value, onChange, min, step, decimals }) {
 	);
 }
 
-function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal }) {
-	const cur = "USD";
-	const fmt = function (n) { return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); };
+function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal, currency, tcRate }) {
+	const cur = currency === "ARS" ? "ARS" : "USD";
+	const fmt = currency === "ARS"
+		? function (n) { return "$ " + Math.round(n * tcRate).toLocaleString("es-AR"); }
+		: function (n) { return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); };
 	const tierLabel = tier ? tier.label : "—";
 	const today = new Date().toLocaleDateString("es-AR");
 
@@ -147,7 +153,7 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
 	}
 }
 
-export function TabVolumen({ volumeTiers, costs, currency }) {
+export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 	const [certsAnuales, setCertsAnuales] = useState(4000);
 	const [certsJuridicas, setCertsJuridicas] = useState(40);
 	const [firmasPorCert, setFirmasPorCert] = useState(14);
@@ -159,6 +165,64 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 	const [overridePrecioFisica, setOverridePrecioFisica] = useState("");
 	const [overridePrecioFirmaExtra, setOverridePrecioFirmaExtra] = useState("");
 	const [overrideSetupFee, setOverrideSetupFee] = useState("");
+
+	// Historial de cotizaciones (Supabase, key compartida en app_config)
+	const [quotes, setQuotes] = useState([]);
+	const [quotesLoading, setQuotesLoading] = useState(true);
+	const [saveFlash, setSaveFlash] = useState(false);
+
+	useEffect(function () {
+		let alive = true;
+		loadConfig(QUOTES_KEY).then(function (data) {
+			if (!alive) return;
+			// No pisar el estado si el usuario ya guardó algo mientras cargaba
+			setQuotes(function (prev) {
+				return prev.length > 0 ? prev : (Array.isArray(data) ? data : []);
+			});
+			setQuotesLoading(false);
+		});
+		return function () { alive = false; };
+	}, []);
+
+	function saveQuote() {
+		if (!deal) return;
+		const q = {
+			id: Date.now().toString(36),
+			fecha: new Date().toISOString(),
+			clientName: clientName || "(sin nombre)",
+			tierId: tier ? tier.id : null,
+			tierLabel: tier ? tier.label : "—",
+			certsAnuales, certsJuridicas, firmasPorCert, modalidad,
+			overridePrecioFisica, overridePrecioFirmaExtra, overrideSetupFee,
+			precioCertFisica, precioFirmaExtra, setupFee,
+			currency, tcRate,
+			revTotal: deal.revTotal,
+			margenPct: deal.margenPct,
+		};
+		const next = [q].concat(quotes).slice(0, 100);
+		setQuotes(next);
+		saveConfig(QUOTES_KEY, next);
+		setSaveFlash(true);
+		setTimeout(function () { setSaveFlash(false); }, 1500);
+	}
+
+	function loadQuote(q) {
+		setClientName(q.clientName === "(sin nombre)" ? "" : q.clientName);
+		setCertsAnuales(q.certsAnuales);
+		setCertsJuridicas(q.certsJuridicas);
+		setFirmasPorCert(q.firmasPorCert);
+		setModalidad(q.modalidad);
+		setOverridePrecioFisica(q.overridePrecioFisica || "");
+		setOverridePrecioFirmaExtra(q.overridePrecioFirmaExtra || "");
+		setOverrideSetupFee(q.overrideSetupFee || "");
+		window.scrollTo({ top: 0, behavior: "smooth" });
+	}
+
+	function deleteQuote(id) {
+		const next = quotes.filter(function (q) { return q.id !== id; });
+		setQuotes(next);
+		saveConfig(QUOTES_KEY, next);
+	}
 
 	const tier = useMemo(function () {
 		return getTierForCerts(certsAnuales, volumeTiers);
@@ -193,6 +257,7 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 	const mColor = mPct === null ? GRAY : mPct > 60 ? OK : mPct > 40 ? WN : ER;
 	const pFactor = viewPeriodo === "mensual" ? 1 / 12 : 1;
 	const pLabel = viewPeriodo === "mensual" ? "mes" : "año";
+	const { fMoney2: fM } = makeMoney(currency, tcRate);
 
 	return (
 		<div style={{ maxWidth: 820, margin: "0 auto" }}>
@@ -214,10 +279,19 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 					</div>
 					{deal && (
 						<button
-							onClick={function () { openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal }); }}
+							onClick={function () { openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal, currency, tcRate }); }}
 							style={{ padding: "4px 14px", background: BLUE, color: WHITE, border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700 }}
 						>
 							Exportar
+						</button>
+					)}
+					{deal && (
+						<button
+							onClick={saveQuote}
+							disabled={quotesLoading}
+							style={{ padding: "4px 14px", background: saveFlash ? OK : "transparent", color: WHITE, border: "1px solid " + (saveFlash ? OK : "rgba(255,255,255,.4)"), borderRadius: 6, cursor: quotesLoading ? "wait" : "pointer", opacity: quotesLoading ? 0.5 : 1, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700 }}
+						>
+							{saveFlash ? "✓ Guardada" : "Guardar"}
 						</button>
 					)}
 				</div>
@@ -310,10 +384,10 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 							<div style={{ textAlign: "right" }}>
 								<div style={os(11, 400, tc.text)}>Precio sugerido</div>
 								<div style={Object.assign({}, mont(28), { color: tc.text })}>
-									${precioCertFisica}/cert/año
+									{fM(precioCertFisica)}/cert/año
 								</div>
 								<div style={os(11, 400, tc.text)}>
-									{modalidad === "bundle" ? firmasIncluidas + " firmas incluidas" : "+ $" + precioFirmaExtra + "/firma"}
+									{modalidad === "bundle" ? firmasIncluidas + " firmas incluidas" : "+ " + fM(precioFirmaExtra) + "/firma"}
 								</div>
 							</div>
 						)}
@@ -402,35 +476,35 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 					<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 16, background: WHITE }}>
 						{deal ? (
 							<>
-								<Row label={"Certs físicas × precio / " + pLabel} value={"$" + fD2(deal.revCertsFisicas * pFactor)} mono />
-								{certsJuridicas > 0 && <Row label={"Certs jurídicas × $70 / " + pLabel} value={"$" + fD2(deal.revCertsJuridicas * pFactor)} mono />}
+								<Row label={"Certs físicas × precio / " + pLabel} value={fM(deal.revCertsFisicas * pFactor)} mono />
+								{certsJuridicas > 0 && <Row label={"Certs jurídicas × $70 / " + pLabel} value={fM(deal.revCertsJuridicas * pFactor)} mono />}
 								{modalidad === "bundle" && deal.firmasExtra > 0 && (
-									<Row label={"Firmas extra / " + pLabel} value={"$" + fD2(deal.revFirmasExtra * pFactor)} sub={deal.firmasExtra.toLocaleString() + " × $" + precioFirmaExtra} mono />
+									<Row label={"Firmas extra / " + pLabel} value={fM(deal.revFirmasExtra * pFactor)} sub={deal.firmasExtra.toLocaleString() + " × " + fM(precioFirmaExtra)} mono />
 								)}
 								{modalidad === "bundle" && deal.firmasExtra === 0 && (
-									<Row label={"Firmas extra"} value={"$0"} sub={"dentro de las " + firmasIncluidas + " incluidas"} mono />
+									<Row label={"Firmas extra"} value={fM(0)} sub={"dentro de las " + firmasIncluidas + " incluidas"} mono />
 								)}
 								{modalidad === "demanda" && (
-									<Row label={"Firmas / " + pLabel} value={"$" + fD2(deal.revFirmasExtra * pFactor)} sub={deal.firmasTotales.toLocaleString() + " × $" + precioFirmaExtra} mono />
+									<Row label={"Firmas / " + pLabel} value={fM(deal.revFirmasExtra * pFactor)} sub={deal.firmasTotales.toLocaleString() + " × " + fM(precioFirmaExtra)} mono />
 								)}
 								{(setupFee || 0) > 0 && (
-									<Row label={"Setup fee / " + pLabel} value={"$" + fD2(deal.revSetup * pFactor)} sub={"$" + setupFee + "/mes"} mono />
+									<Row label={"Setup fee / " + pLabel} value={fM(deal.revSetup * pFactor)} sub={fM(setupFee) + "/mes"} mono />
 								)}
 								<div style={{ margin: "8px 0", borderTop: "2px solid " + BLACK }} />
-								<Row label={"Revenue total / " + pLabel} value={"$" + fD2(deal.revTotal * pFactor)} bold mono color={BLUE} />
-								<Row label={"CV total / " + pLabel} value={"$" + fD2(deal.cvTotal * pFactor)} mono color={GRAY} />
+								<Row label={"Revenue total / " + pLabel} value={fM(deal.revTotal * pFactor)} bold mono color={BLUE} />
+								<Row label={"CV total / " + pLabel} value={fM(deal.cvTotal * pFactor)} mono color={GRAY} />
 								<div style={{ margin: "8px 0", borderTop: "1px solid " + BORD }} />
 								<Row
 									label="Margen bruto (sobre CV)"
 									value={mPct + "%"}
 									bold
 									color={mColor}
-									sub={"$" + fD2(deal.margenBruto * pFactor) + " contribución / " + pLabel}
+									sub={fM(deal.margenBruto * pFactor) + " contribución / " + pLabel}
 								/>
 								<div style={{ margin: "8px 0", borderTop: "1px solid " + BORD }} />
 								<Row label="Firmas totales / año" value={deal.firmasTotales.toLocaleString()} />
 								{viewPeriodo === "mensual" && (
-									<Row label="Revenue anual equiv." value={"$" + fD2(deal.revTotal)} mono />
+									<Row label="Revenue anual equiv." value={fM(deal.revTotal)} mono />
 								)}
 							</>
 						) : (
@@ -496,6 +570,77 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 					</table>
 				</div>
 			</div>
+
+				{/* Historial de cotizaciones */}
+				<div style={{ marginTop: 24 }}>
+					<div style={Object.assign({}, mont(14), { color: WHITE, background: BLACK, padding: "10px 16px", borderRadius: "8px 8px 0 0" })}>
+						Historial de cotizaciones
+					</div>
+					<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", background: WHITE, overflow: "hidden" }}>
+						{quotesLoading && (
+							<div style={Object.assign({}, os(12, 400, GRAY), { padding: 16 })}>Cargando…</div>
+						)}
+						{!quotesLoading && quotes.length === 0 && (
+							<div style={Object.assign({}, os(12, 400, GRAY), { padding: 16 })}>
+								Todavía no hay cotizaciones guardadas. Armá un deal y tocá <strong>Guardar</strong> en el header.
+							</div>
+						)}
+						{!quotesLoading && quotes.length > 0 && (
+							<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+								<thead>
+									<tr style={{ background: "#f8f8f8" }}>
+										{["Fecha", "Cliente", "Tier", "Certs/año", "Revenue/año", "Margen", ""].map(function (h, i) {
+											return <th key={i} style={Object.assign({}, os(10, 700, GRAY), { padding: "8px 12px", textAlign: i <= 1 ? "left" : "right", borderBottom: "1px solid " + BORD })}>{h}</th>;
+										})}
+									</tr>
+								</thead>
+								<tbody>
+									{quotes.map(function (q, i) {
+										const qtc = TIER_COLORS[q.tierId] || TIER_COLORS.starter;
+										const qm = Math.round(q.margenPct * 1000) / 10;
+										return (
+											<tr key={q.id} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE, borderBottom: "1px solid " + BORD }}>
+												<td style={Object.assign({}, os(11, 400, GRAY), { padding: "8px 12px", whiteSpace: "nowrap" })}>
+													{new Date(q.fecha).toLocaleDateString("es-AR")}
+												</td>
+												<td style={Object.assign({}, os(12, 700, BLACK), { padding: "8px 12px" })}>{q.clientName}</td>
+												<td style={{ padding: "8px 12px", textAlign: "right" }}>
+													<span style={Object.assign({}, os(10, 700, qtc.text), { background: qtc.bg, border: "1px solid " + qtc.border, padding: "1px 7px", borderRadius: 10 })}>{q.tierLabel}</span>
+												</td>
+												<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+													{q.certsAnuales.toLocaleString()}
+												</td>
+												<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+													{fM(q.revTotal)}
+												</td>
+												<td style={Object.assign({}, os(12, 700, qm > 60 ? OK : qm > 40 ? WN : ER), { padding: "8px 12px", textAlign: "right" })}>
+													{qm}%
+												</td>
+												<td style={{ padding: "8px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
+													<button
+														onClick={function () { loadQuote(q); }}
+														style={{ padding: "3px 10px", background: WHITE, color: BLUE, border: "1px solid " + BLUE, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, marginRight: 6 }}
+													>
+														Cargar
+													</button>
+													<button
+														onClick={function () { deleteQuote(q.id); }}
+														style={{ padding: "3px 8px", background: WHITE, color: GRAY, border: "1px solid " + BORD, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11 }}
+													>
+														✕
+													</button>
+												</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						)}
+					</div>
+					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 6 })}>
+						Sincronizado vía Supabase: las cotizaciones guardadas son visibles para todo el equipo.
+					</div>
+				</div>
 
 		</div>
 	);
