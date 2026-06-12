@@ -170,6 +170,48 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 	const [quotes, setQuotes] = useState([]);
 	const [quotesLoading, setQuotesLoading] = useState(true);
 	const [saveFlash, setSaveFlash] = useState(false);
+	const [quoteMonth, setQuoteMonth] = useState("all");
+
+	// Meses disponibles en el historial (formato YYYY-MM, más reciente primero)
+	const quoteMonths = useMemo(function () {
+		const set = new Set(quotes.map(function (q) { return q.fecha.slice(0, 7); }));
+		return Array.from(set).sort().reverse();
+	}, [quotes]);
+
+	const filteredQuotes = useMemo(function () {
+		if (quoteMonth === "all") return quotes;
+		return quotes.filter(function (q) { return q.fecha.slice(0, 7) === quoteMonth; });
+	}, [quotes, quoteMonth]);
+
+	function exportQuotesCsv() {
+		const header = ["fecha", "cliente", "tier", "modalidad", "certs_fisicas_anio", "certs_juridicas_anio", "firmas_por_cert", "firmas_totales_anio", "precio_cert_usd", "precio_firma_extra_usd", "setup_fee_usd_mes", "revenue_anual_usd", "margen_pct", "moneda_cotizada", "tc"];
+		const rows = filteredQuotes.map(function (q) {
+			return [
+				q.fecha.slice(0, 10),
+				'"' + q.clientName.replace(/"/g, '""') + '"',
+				q.tierLabel,
+				q.modalidad,
+				q.certsAnuales,
+				q.certsJuridicas,
+				q.firmasPorCert,
+				q.certsAnuales * q.firmasPorCert,
+				q.precioCertFisica,
+				q.precioFirmaExtra,
+				q.setupFee || 0,
+				Math.round(q.revTotal * 100) / 100,
+				Math.round(q.margenPct * 1000) / 10,
+				q.currency,
+				q.currency === "ARS" ? q.tcRate : "",
+			].join(",");
+		});
+		const csv = header.join(",") + "\n" + rows.join("\n");
+		const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = "cotizaciones-b2b" + (quoteMonth === "all" ? "" : "-" + quoteMonth) + ".csv";
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
 
 	useEffect(function () {
 		let alive = true;
@@ -586,59 +628,90 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 							</div>
 						)}
 						{!quotesLoading && quotes.length > 0 && (
-							<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-								<thead>
-									<tr style={{ background: "#f8f8f8" }}>
-										{["Fecha", "Cliente", "Tier", "Certs/año", "Revenue/año", "Margen", ""].map(function (h, i) {
-											return <th key={i} style={Object.assign({}, os(10, 700, GRAY), { padding: "8px 12px", textAlign: i <= 1 ? "left" : "right", borderBottom: "1px solid " + BORD })}>{h}</th>;
+							<>
+								<div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: "1px solid " + BORD, flexWrap: "wrap" }}>
+									<span style={os(11, 700, BLACK)}>Mes:</span>
+									<select
+										value={quoteMonth}
+										onChange={function (e) { setQuoteMonth(e.target.value); }}
+										style={{ padding: "4px 8px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 12, color: BLACK, background: WHITE }}
+									>
+										<option value="all">Todos</option>
+										{quoteMonths.map(function (m) {
+											return <option key={m} value={m}>{m}</option>;
 										})}
-									</tr>
-								</thead>
-								<tbody>
-									{quotes.map(function (q, i) {
-										const qtc = TIER_COLORS[q.tierId] || TIER_COLORS.starter;
-										const qm = Math.round(q.margenPct * 1000) / 10;
-										return (
-											<tr key={q.id} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE, borderBottom: "1px solid " + BORD }}>
-												<td style={Object.assign({}, os(11, 400, GRAY), { padding: "8px 12px", whiteSpace: "nowrap" })}>
-													{new Date(q.fecha).toLocaleDateString("es-AR")}
-												</td>
-												<td style={Object.assign({}, os(12, 700, BLACK), { padding: "8px 12px" })}>{q.clientName}</td>
-												<td style={{ padding: "8px 12px", textAlign: "right" }}>
-													<span style={Object.assign({}, os(10, 700, qtc.text), { background: qtc.bg, border: "1px solid " + qtc.border, padding: "1px 7px", borderRadius: 10 })}>{q.tierLabel}</span>
-												</td>
-												<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-													{q.certsAnuales.toLocaleString()}
-												</td>
-												<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
-													{fM(q.revTotal)}
-												</td>
-												<td style={Object.assign({}, os(12, 700, qm > 60 ? OK : qm > 40 ? WN : ER), { padding: "8px 12px", textAlign: "right" })}>
-													{qm}%
-												</td>
-												<td style={{ padding: "8px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
-													<button
-														onClick={function () { loadQuote(q); }}
-														style={{ padding: "3px 10px", background: WHITE, color: BLUE, border: "1px solid " + BLUE, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, marginRight: 6 }}
-													>
-														Cargar
-													</button>
-													<button
-														onClick={function () { deleteQuote(q.id); }}
-														style={{ padding: "3px 8px", background: WHITE, color: GRAY, border: "1px solid " + BORD, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11 }}
-													>
-														✕
-													</button>
-												</td>
-											</tr>
-										);
-									})}
-								</tbody>
-							</table>
+									</select>
+									<button
+										onClick={exportQuotesCsv}
+										style={{ padding: "4px 14px", background: WHITE, color: BLUE, border: "1px solid " + BLUE, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700 }}
+									>
+										Exportar CSV
+									</button>
+									<span style={os(10, 400, GRAY)}>{filteredQuotes.length} {filteredQuotes.length === 1 ? "cotización" : "cotizaciones"}</span>
+								</div>
+								<div style={{ overflowX: "auto" }}>
+								<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 760 }}>
+									<thead>
+										<tr style={{ background: "#f8f8f8" }}>
+											{["Fecha", "Cliente", "Tier", "Certs/año", "Firmas/año", "Setup fee", "Revenue/año", "Margen", ""].map(function (h, i) {
+												return <th key={i} style={Object.assign({}, os(10, 700, GRAY), { padding: "8px 12px", textAlign: i <= 1 ? "left" : "right", borderBottom: "1px solid " + BORD })}>{h}</th>;
+											})}
+										</tr>
+									</thead>
+									<tbody>
+										{filteredQuotes.map(function (q, i) {
+											const qtc = TIER_COLORS[q.tierId] || TIER_COLORS.starter;
+											const qm = Math.round(q.margenPct * 1000) / 10;
+											return (
+												<tr key={q.id} style={{ background: i % 2 === 0 ? "#fafafa" : WHITE, borderBottom: "1px solid " + BORD }}>
+													<td style={Object.assign({}, os(11, 400, GRAY), { padding: "8px 12px", whiteSpace: "nowrap" })}>
+														{new Date(q.fecha).toLocaleDateString("es-AR")}
+													</td>
+													<td style={Object.assign({}, os(12, 700, BLACK), { padding: "8px 12px" })}>{q.clientName}</td>
+													<td style={{ padding: "8px 12px", textAlign: "right" }}>
+														<span style={Object.assign({}, os(10, 700, qtc.text), { background: qtc.bg, border: "1px solid " + qtc.border, padding: "1px 7px", borderRadius: 10 })}>{q.tierLabel}</span>
+													</td>
+													<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+														{q.certsAnuales.toLocaleString()}
+													</td>
+													<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+														{(q.certsAnuales * q.firmasPorCert).toLocaleString()}
+													</td>
+													<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+														{q.setupFee ? fM(q.setupFee) + "/mes" : "—"}
+													</td>
+													<td style={Object.assign({}, os(12, 400, BLACK), { padding: "8px 12px", textAlign: "right", fontFamily: "Courier New,monospace" })}>
+														{fM(q.revTotal)}
+													</td>
+													<td style={Object.assign({}, os(12, 700, qm > 60 ? OK : qm > 40 ? WN : ER), { padding: "8px 12px", textAlign: "right" })}>
+														{qm}%
+													</td>
+													<td style={{ padding: "8px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
+														<button
+															onClick={function () { loadQuote(q); }}
+															title="Repone esta cotización en el formulario de arriba para ajustarla o re-exportarla"
+															style={{ padding: "3px 10px", background: WHITE, color: BLUE, border: "1px solid " + BLUE, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, marginRight: 6 }}
+														>
+															Reabrir
+														</button>
+														<button
+															onClick={function () { deleteQuote(q.id); }}
+															style={{ padding: "3px 8px", background: WHITE, color: GRAY, border: "1px solid " + BORD, borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11 }}
+														>
+															✕
+														</button>
+													</td>
+												</tr>
+											);
+										})}
+									</tbody>
+								</table>
+								</div>
+							</>
 						)}
 					</div>
 					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 6 })}>
-						Sincronizado vía Supabase: las cotizaciones guardadas son visibles para todo el equipo.
+						Sincronizado vía Supabase: las cotizaciones guardadas son visibles para todo el equipo. <strong>Reabrir</strong> repone la cotización en el formulario.
 					</div>
 				</div>
 
