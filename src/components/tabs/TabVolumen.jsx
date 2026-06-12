@@ -235,8 +235,18 @@ export function TabVolumen({ volumeTiers, costs, currency }) {
 				</div>
 
 				<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-					<NumField label="Certs físicas / año" value={certsAnuales} onChange={setCertsAnuales} min={1} />
-					<NumField label="Certs jurídicas / año" value={certsJuridicas} onChange={setCertsJuridicas} min={0} />
+					<NumField
+						label={"Certs físicas / " + pLabel}
+						value={viewPeriodo === "mensual" ? Math.round(certsAnuales / 12) : certsAnuales}
+						onChange={function (v) { setCertsAnuales(viewPeriodo === "mensual" ? v * 12 : v); }}
+						min={1}
+					/>
+					<NumField
+						label={"Certs jurídicas / " + pLabel}
+						value={viewPeriodo === "mensual" ? Math.round(certsJuridicas / 12) : certsJuridicas}
+						onChange={function (v) { setCertsJuridicas(viewPeriodo === "mensual" ? v * 12 : v); }}
+						min={0}
+					/>
 					<NumField label="Firmas promedio / cert / año" value={firmasPorCert} onChange={setFirmasPorCert} min={0} step={1} />
 				</div>
 
