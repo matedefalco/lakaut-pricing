@@ -28,19 +28,24 @@ export const ASSET_ITEMS = [
 	{ item: "Servidores contingencia", amort: 1388.89, vida: 36, tipo: "directo" },
 ];
 
+// CV por certificado emitido (≈ USD 0,375). Estructura validada por el equipo Lakaut.
 export const CV_CERT_ITEMS = [
-	{ item: "Verificación DNI (RENAPER)", v: 0.0435, tipo: "directo" },
-	{ item: "Prueba de vida (RENAPER)", v: 0.0507, tipo: "directo" },
-	{ item: "Biometría Activa (Veriff)", v: 0.6, tipo: "directo" },
-	{ item: "Infra PKI / emisión", v: 0.8, tipo: "directo" },
-	{ item: "OTP SMS cert.", v: 0.006, tipo: "directo" },
-	{ item: "Sello de competencia", v: 0.5, tipo: "directo" },
+	{ item: "Verificación DNI (RENAPER)", v: 0.04, tipo: "directo" },
+	{ item: "Validación de identidad (RENAPER)", v: 0.0507, tipo: "directo" },
+	{ item: "Biometría Activa (Veriff)", v: 0.15, tipo: "directo" },
+	{ item: "Infra PKI / emisión", v: 0.03, tipo: "directo" },
+	{ item: "OTP SMS cert.", v: 0.1034, tipo: "directo" },
+	{ item: "OTP Mail cert.", v: 0.0009, tipo: "directo" },
 ];
 
 export const CV_FIRMA_ITEMS = [
 	{ item: "OTP SMS (Twilio)", v: 0.1034, tipo: "directo" },
 	{ item: "Infra", v: 0.08, tipo: "directo" },
 ];
+
+// Sello de competencia: no integra el CV base del certificado. Se aplica como
+// feature opcional (ej. firmas del producto Profesional Plus).
+export const SELLO_COMPETENCIA = 0.5;
 
 export const SERVICES_DEF = {
 	cloudStorage: { label: "Almacenamiento en nube", costType: "firma", cost: 0.05 },

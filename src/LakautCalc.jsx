@@ -8,6 +8,7 @@ import { PACKS } from "./data/packs";
 import { engine } from "./engine/engine";
 import { modelToInp } from "./utils/modelToInp";
 import { ModelsProvider, useModels } from "./context/ModelsContext";
+import { useQuotes } from "./lib/useQuotes";
 import { DiscountProvider } from "./context/DiscountContext";
 import { InfoTooltip } from "./components/ui/InfoTooltip";
 import { Sec } from "./components/ui/Sec";
@@ -26,6 +27,11 @@ import { TabComparacion } from "./components/tabs/TabComparacion";
 import { TabVolumen } from "./components/tabs/TabVolumen";
 import { TabVolumenConfig } from "./components/tabs/TabVolumenConfig";
 import { Cotizadora } from "./components/Cotizadora";
+import { TabCanalWeb } from "./components/tabs/TabCanalWeb";
+import { TabCanalDistribuidores } from "./components/tabs/TabCanalDistribuidores";
+import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
+import { TabHistorial } from "./components/tabs/TabHistorial";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import { DEFAULT_VOLUME_TIERS } from "./data/volumeTiers";
 
 // ─── Archive mapping arch → pack key for strategy text ─────────────────────────
@@ -33,6 +39,7 @@ const ARCH_TO_PACK = { bolsa: "A", sub: "B", ppu: "C", anual: "D", free: "E", hi
 
 function LakautCalcInner() {
 	const { models } = useModels();
+	const quotesApi = useQuotes();
 
 	useEffect(function () {
 		var urls = [
@@ -89,7 +96,8 @@ function LakautCalcInner() {
 		};
 	});
 
-	const [cotizadoraMode, setCotizadoraMode] = useState("b2c");
+	const [cotizadoraMode, setCotizadoraMode] = useState("web");
+	const [pendingEdit, setPendingEdit] = useState(null);
 
 	const [volumeTiers, setVolumeTiers] = useState(function () {
 		try {
@@ -529,21 +537,22 @@ function LakautCalcInner() {
 			    ════════════════════════════════════════════════════════════════════════ */}
 			{section === "cotizadora" && (
 				<div>
-					{/* Mode switcher */}
-					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", alignItems: "stretch", gap: 0 }}>
-						{[{ k: "b2c", label: "Planes B2C" }, { k: "b2b", label: "Volumen B2B" }].map(function (m) {
-							const act = cotizadoraMode === m.k;
-							return (
-								<button key={m.k} onClick={function () { setCotizadoraMode(m.k); }} style={{ background: "none", border: "none", borderBottom: act ? "2px solid " + BLUE : "2px solid transparent", color: act ? BLUE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, padding: "12px 18px", cursor: "pointer", marginBottom: -1 }}>
-									{m.label}
-								</button>
-							);
-						})}
-					</div>
-					<div style={{ padding: 24 }}>
-						{cotizadoraMode === "b2c" && <Cotizadora costs={costs} currency={currency} tc={tc} />}
-						{cotizadoraMode === "b2b" && <TabVolumen volumeTiers={volumeTiers} costs={costs} currency={currency} tc={tc} />}
-					</div>
+					<Tabs value={cotizadoraMode} onValueChange={setCotizadoraMode}>
+						<div className="no-print border-b bg-card px-6 pt-3 pb-3">
+							<TabsList>
+								<TabsTrigger value="web">Canal Web</TabsTrigger>
+								<TabsTrigger value="distribuidores">Distribuidores</TabsTrigger>
+								<TabsTrigger value="b2b2c">B2B2C (IDC)</TabsTrigger>
+								<TabsTrigger value="historial">Historial</TabsTrigger>
+							</TabsList>
+						</div>
+						<div className="p-6">
+							<TabsContent value="web"><TabCanalWeb costs={costs} currency={currency} tc={tc} /></TabsContent>
+							<TabsContent value="distribuidores"><TabCanalDistribuidores costs={costs} currency={currency} tc={tc} quotesApi={quotesApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
+							<TabsContent value="b2b2c"><TabCanalB2B2C costs={costs} currency={currency} tc={tc} quotesApi={quotesApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
+							<TabsContent value="historial"><TabHistorial quotesApi={quotesApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); setCotizadoraMode(q.channel); }} /></TabsContent>
+						</div>
+					</Tabs>
 				</div>
 			)}
 

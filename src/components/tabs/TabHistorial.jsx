@@ -1,0 +1,364 @@
+import { useMemo, useState } from "react";
+import { Pencil, Trash2, Download, ChevronDown, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { makeMoney } from "@/utils/useMoney";
+import { cn } from "@/lib/utils";
+
+const CHANNELS = {
+	distribuidores: { label: "Distribuidores", variant: "secondary" },
+	b2b2c: { label: "B2B2C", variant: "default" },
+};
+
+const FILTER_DEFS = [
+	{ key: "canal", label: "Canal" },
+	{ key: "mes", label: "Mes" },
+	{ key: "cliente", label: "Cliente" },
+	{ key: "certs", label: "Certs activos" },
+	{ key: "idc", label: "IDC / mes" },
+];
+
+function summaryCols(channel, fMoney) {
+	if (channel === "distribuidores") {
+		return [
+			{ label: "Nivel", get: function (q) { return q.resumen.tier; } },
+			{ label: "Certs activos", get: function (q) { return (q.resumen.certsActivos || 0).toLocaleString("es-AR"); } },
+			{ label: "Compromiso", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
+			{ label: "Firmas/año", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
+			{ label: "Neto", get: function (q) { return fMoney(q.resumen.netoLakaut || 0); } },
+			{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
+		];
+	}
+	return [
+		{ label: "Segmento", get: function (q) { return q.resumen.segmento; } },
+		{ label: "IDC/mes", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
+		{ label: "Firmas/mes", get: function (q) { return (q.resumen.firmasMes || 0).toLocaleString("es-AR"); } },
+		{ label: "Rev/mes", get: function (q) { return fMoney(q.resumen.revMesTotal || 0); } },
+		{ label: "Rev año 1", get: function (q) { return fMoney(q.resumen.revAnual || 0); } },
+		{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
+	];
+}
+
+export function TabHistorial({ quotesApi, currency, tc, onEditQuote }) {
+	const { fMoney } = makeMoney(currency, tc);
+
+	const [openFilter, setOpenFilter] = useState(null);
+	const [selectedChannels, setSelectedChannels] = useState(new Set());
+	const [month, setMonth] = useState("all");
+	const [search, setSearch] = useState("");
+	const [certsMin, setCertsMin] = useState("");
+	const [certsMax, setCertsMax] = useState("");
+	const [idcMin, setIdcMin] = useState("");
+	const [idcMax, setIdcMax] = useState("");
+
+	const quotes = quotesApi.quotes;
+
+	const months = useMemo(function () {
+		const set = new Set(quotes.map(function (q) { return q.fecha.slice(0, 7); }));
+		return Array.from(set).sort().reverse();
+	}, [quotes]);
+
+	function toggleChannel(key) {
+		setSelectedChannels(function (prev) {
+			const next = new Set(prev);
+			if (next.has(key)) next.delete(key); else next.add(key);
+			return next;
+		});
+	}
+
+	function isActive(key) {
+		if (key === "canal") return selectedChannels.size > 0;
+		if (key === "mes") return month !== "all";
+		if (key === "cliente") return search !== "";
+		if (key === "certs") return certsMin !== "" || certsMax !== "";
+		if (key === "idc") return idcMin !== "" || idcMax !== "";
+		return false;
+	}
+
+	function getSummary(key) {
+		if (key === "canal" && selectedChannels.size > 0)
+			return Array.from(selectedChannels).map(function (k) { return CHANNELS[k] ? CHANNELS[k].label : k; }).join(", ");
+		if (key === "mes" && month !== "all") return month;
+		if (key === "cliente" && search) return '"' + search + '"';
+		if (key === "certs") {
+			if (certsMin && certsMax) return certsMin + "–" + certsMax;
+			if (certsMin) return "≥ " + certsMin;
+			if (certsMax) return "≤ " + certsMax;
+		}
+		if (key === "idc") {
+			if (idcMin && idcMax) return idcMin + "–" + idcMax;
+			if (idcMin) return "≥ " + idcMin;
+			if (idcMax) return "≤ " + idcMax;
+		}
+		return null;
+	}
+
+	function clearFilter(key) {
+		if (key === "canal") setSelectedChannels(new Set());
+		if (key === "mes") setMonth("all");
+		if (key === "cliente") setSearch("");
+		if (key === "certs") { setCertsMin(""); setCertsMax(""); }
+		if (key === "idc") { setIdcMin(""); setIdcMax(""); }
+		if (openFilter === key) setOpenFilter(null);
+	}
+
+	function clearAll() {
+		setSelectedChannels(new Set());
+		setMonth("all");
+		setSearch("");
+		setCertsMin(""); setCertsMax("");
+		setIdcMin(""); setIdcMax("");
+		setOpenFilter(null);
+	}
+
+	const hasActiveFilters = FILTER_DEFS.some(function (f) { return isActive(f.key); });
+
+	const filtered = useMemo(function () {
+		return quotes.filter(function (q) {
+			if (selectedChannels.size > 0 && !selectedChannels.has(q.channel)) return false;
+			if (month !== "all" && q.fecha.slice(0, 7) !== month) return false;
+			if (search && !(q.clientName || "").toLowerCase().includes(search.toLowerCase())) return false;
+			if (q.channel === "distribuidores") {
+				const certs = q.resumen.certsActivos || 0;
+				if (certsMin !== "" && certs < Number(certsMin)) return false;
+				if (certsMax !== "" && certs > Number(certsMax)) return false;
+			}
+			if (q.channel === "b2b2c") {
+				const idc = q.resumen.idcMensuales || 0;
+				if (idcMin !== "" && idc < Number(idcMin)) return false;
+				if (idcMax !== "" && idc > Number(idcMax)) return false;
+			}
+			return true;
+		});
+	}, [quotes, selectedChannels, month, search, certsMin, certsMax, idcMin, idcMax]);
+
+	const groups = useMemo(function () {
+		const byCh = {};
+		filtered.forEach(function (q) { (byCh[q.channel] = byCh[q.channel] || []).push(q); });
+		return byCh;
+	}, [filtered]);
+
+	function exportCsv() {
+		const lines = [];
+		Object.keys(groups).forEach(function (ch) {
+			const cols = summaryCols(ch, fMoney);
+			lines.push((CHANNELS[ch] ? CHANNELS[ch].label : ch).toUpperCase());
+			lines.push(["fecha", "cliente"].concat(cols.map(function (c) { return c.label; })).join(","));
+			groups[ch].forEach(function (q) {
+				lines.push([q.fecha.slice(0, 10), '"' + (q.clientName || "").replace(/"/g, '""') + '"'].concat(cols.map(function (c) { return '"' + String(c.get(q)).replace(/"/g, '""') + '"'; })).join(","));
+			});
+			lines.push("");
+		});
+		const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = "cotizaciones" + (month === "all" ? "" : "-" + month) + ".csv";
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
+
+	function del(q) {
+		if (window.confirm("¿Borrar la cotización de " + (q.clientName || "(sin nombre)") + "?")) quotesApi.remove(q.id);
+	}
+
+	const orderedChannels = Object.keys(groups).sort();
+
+	return (
+		<div className="space-y-6">
+			<div className="flex flex-wrap items-end justify-between gap-3">
+				<div>
+					<h2 className="font-heading text-lg font-semibold text-foreground">Historial de cotizaciones</h2>
+					<p className="text-sm text-muted-foreground">Todas las cotizaciones guardadas, sincronizadas vía Supabase para el equipo.</p>
+				</div>
+				<Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+					<Download /> Exportar CSV
+				</Button>
+			</div>
+
+			{/* Panel de filtros estilo Notion */}
+			<Card className="bg-card border-border">
+				<CardContent className="space-y-3 pt-4">
+					{/* Fila de pills */}
+					<div className="flex flex-wrap items-center gap-2">
+						{FILTER_DEFS.map(function (f) {
+							const active = isActive(f.key);
+							const open = openFilter === f.key;
+							const summary = getSummary(f.key);
+							return (
+								<div key={f.key} className="relative inline-flex">
+									<button
+										type="button"
+										onClick={function () { setOpenFilter(open ? null : f.key); }}
+										className={cn(
+											"inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer select-none",
+											active
+												? "bg-primary/10 border-primary/40 text-primary"
+												: open
+												? "bg-muted border-border text-foreground"
+												: "bg-background border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+										)}
+									>
+										<span>{f.label}</span>
+										{summary && <span className="font-normal opacity-70">: {summary}</span>}
+										<ChevronDown className={cn("size-3 transition-transform opacity-50", open && "rotate-180")} />
+									</button>
+									{active && (
+										<button
+											type="button"
+											onClick={function (e) { e.stopPropagation(); clearFilter(f.key); }}
+											title="Quitar filtro"
+											className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer hover:bg-primary/80"
+										>
+											<X className="size-2.5" />
+										</button>
+									)}
+								</div>
+							);
+						})}
+						{hasActiveFilters && (
+							<button
+								type="button"
+								onClick={clearAll}
+								className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 cursor-pointer ml-1"
+							>
+								Limpiar todo
+							</button>
+						)}
+					</div>
+
+					{/* Panel inline del filtro abierto */}
+					{openFilter && (
+						<>
+							<Separator />
+							<div className="pt-1 pb-0.5">
+								{openFilter === "canal" && (
+									<div className="space-y-1.5">
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar canales</span>
+										<div className="flex gap-2">
+											{Object.entries(CHANNELS).map(function (entry) {
+												const key = entry[0], meta = entry[1];
+												const checked = selectedChannels.has(key);
+												return (
+													<button
+														key={key}
+														type="button"
+														onClick={function () { toggleChannel(key); }}
+														className={cn(
+															"inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+															checked
+																? "bg-primary text-primary-foreground border-primary"
+																: "bg-background border-border text-muted-foreground hover:text-foreground"
+														)}
+													>
+														{checked && <svg className="size-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+														{meta.label}
+													</button>
+												);
+											})}
+										</div>
+									</div>
+								)}
+								{openFilter === "mes" && (
+									<div className="space-y-1.5">
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar mes</span>
+										<Select value={month} onValueChange={function (v) { setMonth(v); }}>
+											<SelectTrigger className="w-48 bg-background h-8"><SelectValue /></SelectTrigger>
+											<SelectContent>
+												<SelectItem value="all">Todos los meses</SelectItem>
+												{months.map(function (m) { return <SelectItem key={m} value={m}>{m}</SelectItem>; })}
+											</SelectContent>
+										</Select>
+									</div>
+								)}
+								{openFilter === "cliente" && (
+									<div className="space-y-1.5">
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Buscar por nombre</span>
+										<Input className="max-w-xs h-8 bg-background text-sm" placeholder="Nombre del cliente…" value={search} onChange={function (e) { setSearch(e.target.value); }} autoFocus />
+									</div>
+								)}
+								{openFilter === "certs" && (
+									<div className="space-y-1.5">
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Certs activos administrados (Distribuidores)</span>
+										<div className="flex items-center gap-2">
+											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={certsMin} onChange={function (e) { setCertsMin(e.target.value); }} />
+											<span className="text-muted-foreground text-sm">—</span>
+											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Máx" value={certsMax} onChange={function (e) { setCertsMax(e.target.value); }} />
+										</div>
+									</div>
+								)}
+								{openFilter === "idc" && (
+									<div className="space-y-1.5">
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">IDC nuevas por mes (B2B2C)</span>
+										<div className="flex items-center gap-2">
+											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={idcMin} onChange={function (e) { setIdcMin(e.target.value); }} />
+											<span className="text-muted-foreground text-sm">—</span>
+											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Máx" value={idcMax} onChange={function (e) { setIdcMax(e.target.value); }} />
+										</div>
+									</div>
+								)}
+							</div>
+						</>
+					)}
+
+					<Separator />
+					<div className="flex items-center justify-between">
+						<Badge variant="outline" className="h-6 px-2 text-xs">{filtered.length} {filtered.length === 1 ? "cotización" : "cotizaciones"}</Badge>
+					</div>
+				</CardContent>
+			</Card>
+
+			{quotesApi.loading ? (
+				<p className="text-sm text-muted-foreground">Cargando historial…</p>
+			) : filtered.length === 0 ? (
+				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Distribuidores o B2B2C y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
+			) : (
+				orderedChannels.map(function (ch) {
+					const cols = summaryCols(ch, fMoney);
+					const meta = CHANNELS[ch] || { label: ch, variant: "outline" };
+					return (
+						<Card key={ch}>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2 text-base">
+									<Badge variant={meta.variant}>{meta.label}</Badge>
+									<span className="text-sm font-normal text-muted-foreground">{groups[ch].length} {groups[ch].length === 1 ? "cotización" : "cotizaciones"}</span>
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Fecha</TableHead>
+											<TableHead>Cliente</TableHead>
+											{cols.map(function (c) { return <TableHead key={c.label} className="text-right">{c.label}</TableHead>; })}
+											<TableHead className="text-right">Acciones</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{groups[ch].map(function (q) {
+											return (
+												<TableRow key={q.id}>
+													<TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>
+													<TableCell className="font-medium">{q.clientName || "(sin nombre)"}</TableCell>
+													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
+													<TableCell className="text-right">
+														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
+														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>
+													</TableCell>
+												</TableRow>
+											);
+										})}
+									</TableBody>
+								</Table>
+							</CardContent>
+						</Card>
+					);
+				})
+			)}
+		</div>
+	);
+}
