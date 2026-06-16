@@ -59,10 +59,11 @@ export function getTierForCerts(certs, tiers) {
 // Annual revenue projection for a B2B deal
 export function calcVolumenDeal({ certsAnuales, certsJuridicas, modalidad, firmasPorCert, precioCertFisica, precioCertJuridica, firmasIncluidas, precioFirmaExtra, setupFee, cvCert, cvFirma }) {
 	const cvCertAnual = cvCert / 2; // cert vigencia 2 años → amortizado
+	const certsTotal = certsAnuales + certsJuridicas;
 	const firmasExtra = modalidad === "bundle"
-		? Math.max(0, firmasPorCert - firmasIncluidas) * certsAnuales
+		? Math.max(0, firmasPorCert - firmasIncluidas) * certsTotal
 		: 0;
-	const firmasTotales = firmasPorCert * certsAnuales;
+	const firmasTotales = firmasPorCert * certsTotal;
 
 	const revCertsFisicas = certsAnuales * precioCertFisica;
 	const revCertsJuridicas = certsJuridicas * precioCertJuridica;

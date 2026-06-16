@@ -57,21 +57,28 @@ function NumField({ label, value, onChange, min, step, decimals }) {
 	);
 }
 
-function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal, currency, tcRate }) {
+function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal, currency, tcRate, viewPeriodo }) {
 	const cur = currency === "ARS" ? "ARS" : "USD";
 	const fmt = currency === "ARS"
 		? function (n) { return "$ " + Math.round(n * tcRate).toLocaleString("es-AR"); }
 		: function (n) { return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); };
 	const tierLabel = tier ? tier.label : "—";
 	const today = new Date().toLocaleDateString("es-AR");
+	const isMensual = viewPeriodo === "mensual";
+	const pFactor = isMensual ? 1 / 12 : 1;
+	const pLabel = isMensual ? "mes" : "año";
+	const certsFisicas = isMensual ? Math.round(certsAnuales / 12) : certsAnuales;
+	const certsJur = isMensual ? Math.round(certsJuridicas / 12) : certsJuridicas;
+	const firmasTotal = isMensual ? Math.round(deal.firmasTotales / 12) : deal.firmasTotales;
+	const firmasExtra = isMensual ? Math.round(deal.firmasExtra / 12) : deal.firmasExtra;
 
 	const firmasRow = modalidad === "bundle"
-		? "<tr><td>Firmas incluidas / cert</td><td>" + firmasIncluidas + "</td><td>Bundle</td><td>—</td></tr>"
-			+ (deal.firmasExtra > 0 ? "<tr><td>Firmas extra (" + deal.firmasExtra.toLocaleString() + ")</td><td>1</td><td>" + fmt(precioFirmaExtra) + " c/u</td><td>" + fmt(deal.revFirmasExtra) + "</td></tr>" : "")
-		: "<tr><td>Firmas à la demanda (" + deal.firmasTotales.toLocaleString() + ")</td><td>1</td><td>" + fmt(precioFirmaExtra) + " c/u</td><td>" + fmt(deal.revFirmasExtra) + "</td></tr>";
+		? "<tr><td>Firmas totales (bundle)</td><td>" + firmasTotal.toLocaleString() + "</td><td>" + firmasIncluidas + " incl./cert</td><td>—</td></tr>"
+			+ (deal.firmasExtra > 0 ? "<tr><td>Firmas extra (" + firmasExtra.toLocaleString() + ")</td><td>1</td><td>" + fmt(precioFirmaExtra) + " c/u</td><td class='r'>" + fmt(deal.revFirmasExtra * pFactor) + "</td></tr>" : "")
+		: "<tr><td>Firmas à la demanda (" + firmasTotal.toLocaleString() + ")</td><td>1</td><td>" + fmt(precioFirmaExtra) + " c/u</td><td class='r'>" + fmt(deal.revFirmasExtra * pFactor) + "</td></tr>";
 
 	const setupRow = (setupFee || 0) > 0
-		? "<tr><td>Setup fee mensual</td><td>12 meses</td><td>" + fmt(setupFee) + "/mes</td><td>" + fmt(deal.revSetup) + "</td></tr>"
+		? "<tr><td>Setup fee mensual</td><td>" + (isMensual ? "1 mes" : "12 meses") + "</td><td>" + fmt(setupFee) + "/mes</td><td class='r'>" + fmt(setupFee) + "</td></tr>"
 		: "";
 
 	const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
@@ -97,8 +104,6 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
   td{font-size:13px;padding:9px 12px;border-bottom:1px solid #f3f4f6;color:#111}
   tr:last-child td{border-bottom:none}
   .total-row td{font-weight:700;font-size:14px;background:#f0f5ff;color:#0050f5}
-  .cv-row td{font-size:12px;color:#6b7280}
-  .margin-row td{font-weight:700;color:#16a34a;background:#f0fdf4}
   .footer{padding:20px 32px;font-size:11px;color:#9ca3af;line-height:1.6;background:#f9fafb}
   .print-btn{display:block;margin:24px auto 0;padding:10px 28px;background:#111;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
   @media print{.print-btn{display:none}body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}}
@@ -116,9 +121,9 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
     <h2>Datos del deal</h2>
     <div class="meta-grid">
       ${clientName ? '<div class="meta-item"><div class="label">Cliente</div><div class="value" style="font-size:14px">' + clientName + '</div></div>' : ""}
-      <div class="meta-item"><div class="label">Certs físicas / año</div><div class="value">${certsAnuales.toLocaleString()}</div><div class="sub">Tier ${tierLabel}</div></div>
-      ${certsJuridicas > 0 ? '<div class="meta-item"><div class="label">Certs jurídicas / año</div><div class="value">' + certsJuridicas.toLocaleString() + '</div><div class="sub">$70/empresa/año</div></div>' : ""}
-      <div class="meta-item"><div class="label">Firmas prom. / cert</div><div class="value">${firmasPorCert}</div><div class="sub">Modalidad: ${modalidad}</div></div>
+      <div class="meta-item"><div class="label">Certs físicas / ${pLabel}</div><div class="value">${certsFisicas.toLocaleString()}</div><div class="sub">Tier ${tierLabel}${isMensual ? " · " + certsAnuales.toLocaleString() + "/año" : ""}</div></div>
+      ${certsJuridicas > 0 ? '<div class="meta-item"><div class="label">Certs jurídicas / ' + pLabel + '</div><div class="value">' + certsJur.toLocaleString() + '</div><div class="sub">$70/empresa/año' + (isMensual ? " · " + certsJuridicas + "/año" : "") + '</div></div>' : ""}
+      <div class="meta-item"><div class="label">Firmas / cert</div><div class="value">${firmasPorCert}</div><div class="sub">Modalidad: ${modalidad}</div></div>
       <div class="meta-item"><div class="label">Precio cert / año</div><div class="value">${fmt(precioCertFisica)}</div></div>
       ${(setupFee || 0) > 0 ? '<div class="meta-item"><div class="label">Setup fee</div><div class="value">' + fmt(setupFee) + '/mes</div></div>' : ""}
     </div>
@@ -127,20 +132,20 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
   <div class="section">
     <h2>Desglose de pricing</h2>
     <table>
-      <thead><tr><th>Concepto</th><th>Volumen</th><th>Precio unit.</th><th class="r">Subtotal / año</th></tr></thead>
+      <thead><tr><th>Concepto</th><th>Volumen</th><th>Precio unit.</th><th class="r">Subtotal / ${pLabel}</th></tr></thead>
       <tbody>
-        <tr><td>Certificados físicos</td><td>${certsAnuales.toLocaleString()}</td><td>${fmt(precioCertFisica)}/cert/año</td><td class="r">${fmt(deal.revCertsFisicas)}</td></tr>
-        ${certsJuridicas > 0 ? "<tr><td>Certificados jurídicos</td><td>" + certsJuridicas.toLocaleString() + "</td><td>$70/empresa/año</td><td class='r'>" + fmt(deal.revCertsJuridicas) + "</td></tr>" : ""}
+        <tr><td>Certificados físicos</td><td>${certsFisicas.toLocaleString()}</td><td>${fmt(precioCertFisica)}/cert/año</td><td class="r">${fmt(deal.revCertsFisicas * pFactor)}</td></tr>
+        ${certsJuridicas > 0 ? "<tr><td>Certificados jurídicos</td><td>" + certsJur.toLocaleString() + "</td><td>$70/empresa/año</td><td class='r'>" + fmt(deal.revCertsJuridicas * pFactor) + "</td></tr>" : ""}
         ${firmasRow}
         ${setupRow}
-        <tr class="total-row"><td colspan="3">Total / año</td><td class="r">${fmt(deal.revTotal)}</td></tr>
-        <tr><td colspan="3" style="font-size:11px;color:#6b7280">Equivalente mensual</td><td class="r" style="font-size:11px;color:#6b7280">${fmt(deal.revTotal / 12)}/mes</td></tr>
+        <tr class="total-row"><td colspan="3">Total / ${pLabel}</td><td class="r">${fmt(deal.revTotal * pFactor)}</td></tr>
+        ${isMensual ? "<tr><td colspan='3' style='font-size:11px;color:#6b7280'>Equivalente anual</td><td class='r' style='font-size:11px;color:#6b7280'>" + fmt(deal.revTotal) + "/año</td></tr>" : ""}
       </tbody>
     </table>
   </div>
 
   <div class="footer">
-    Condiciones: precios en ${cur}. Vigencia del contrato: 12 meses desde la firma. Vigencia de certificados y firmas: 2 años. Volúmenes comprometidos anuales. Setup fee mensual recurrente durante la vigencia del contrato. Los precios no incluyen IVA. Esta propuesta es válida por 72 horas.
+    Condiciones: precios en ${cur}. Vigencia del contrato: 12 meses desde la firma. Vigencia de certificados y firmas: 2 años. Volúmenes comprometidos ${isMensual ? "mensuales" : "anuales"}. Setup fee mensual recurrente durante la vigencia del contrato. Los precios no incluyen IVA. Esta propuesta es válida por 72 horas.
   </div>
   <button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button>
 </div>
@@ -155,7 +160,7 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
 
 export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 	const [certsAnuales, setCertsAnuales] = useState(4000);
-	const [certsJuridicas, setCertsJuridicas] = useState(40);
+	const [certsJuridicas, setCertsJuridicas] = useState(0);
 	const [modalidad, setModalidad] = useState("bundle");
 	const [clientName, setClientName] = useState("");
 	const [viewPeriodo, setViewPeriodo] = useState("mensual");
@@ -341,7 +346,7 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 					</div>
 					{deal && (
 						<button
-							onClick={function () { openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal, currency, tcRate }); }}
+							onClick={function () { openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, firmasPorCert, modalidad, firmasIncluidas, precioCertFisica, precioFirmaExtra, setupFee, deal, currency, tcRate, viewPeriodo }); }}
 							style={{ padding: "4px 14px", background: BLUE, color: WHITE, border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700 }}
 						>
 							Exportar
@@ -380,20 +385,20 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 
 				<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
 					<NumField
-						label={"Certs físicas / " + pLabel}
-						value={viewPeriodo === "mensual" ? Math.round(certsAnuales / 12) : certsAnuales}
-						onChange={function (v) { setCertsAnuales(viewPeriodo === "mensual" ? v * 12 : v); }}
+						label="Certs físicas / mes"
+						value={Math.round(certsAnuales / 12)}
+						onChange={function (v) { setCertsAnuales(v * 12); }}
 						min={1}
 					/>
 					<NumField
-						label={"Certs jurídicas / " + pLabel}
-						value={viewPeriodo === "mensual" ? Math.round(certsJuridicas / 12) : certsJuridicas}
-						onChange={function (v) { setCertsJuridicas(viewPeriodo === "mensual" ? v * 12 : v); }}
+						label="Certs jurídicas / mes"
+						value={Math.round(certsJuridicas / 12)}
+						onChange={function (v) { setCertsJuridicas(v * 12); }}
 						min={0}
 					/>
 					<div>
 						<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>
-							Firmas / cert / año
+							Firmas / cert / mes
 						</div>
 						<input
 							type="number"
@@ -404,8 +409,8 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 							onChange={function (e) { setOverrideFirmasPorCert(e.target.value); }}
 							style={{ width: "100%", border: "1px solid " + BORD, borderRadius: 6, padding: "8px 10px", fontFamily: "Courier New,monospace", fontSize: 14, color: BLACK, background: WHITE, outline: "none", boxSizing: "border-box" }}
 						/>
-						<div style={Object.assign({}, os(10, 400, overrideFirmasPorCert !== "" ? BLUE : GRAY), { marginTop: 3 })}>
-							{overrideFirmasPorCert !== "" ? "Override activo · " + firmasPorCert + " firmas/cert/año" : "Default del tier: " + firmasIncluidas + " firmas incl."}
+						<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 3 })}>
+							{"Default del tier: " + firmasIncluidas + " firmas incl."}
 						</div>
 					</div>
 				</div>
@@ -582,7 +587,7 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 									sub={fM(deal.margenBruto * pFactor) + " contribución / " + pLabel}
 								/>
 								<div style={{ margin: "8px 0", borderTop: "1px solid " + BORD }} />
-								<Row label="Firmas totales / año" value={deal.firmasTotales.toLocaleString()} />
+								<Row label={"Firmas totales / " + pLabel} value={Math.round(deal.firmasTotales * pFactor).toLocaleString()} />
 								{viewPeriodo === "mensual" && (
 									<Row label="Revenue anual equiv." value={fM(deal.revTotal)} mono />
 								)}
