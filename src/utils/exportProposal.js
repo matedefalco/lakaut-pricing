@@ -164,15 +164,25 @@ function s3Dist(deal, clientName, currency, tc) {
 
 	const packRows = WEB_PRODUCTS
 		.filter(p => p.precioARS != null && (Number(qtys[p.id]) || 0) > 0)
-		.map(p => ({ label: p.label, qty: Number(qtys[p.id]), unit: p.precioARS / tc, sub: Number(qtys[p.id]) * p.precioARS / tc }));
+		.map(p => ({
+			label: p.label, qty: Number(qtys[p.id]),
+			unit: p.precioARS / tc, sub: Number(qtys[p.id]) * p.precioARS / tc,
+			certs: p.certs || 0, firmas: p.firmas || 0, ilimitadas: p.ilimitadas,
+		}));
 
 	const tierRecord = DISTRIBUTOR_TIERS.find(t => t.label === res.tier);
 	const descPct = tierRecord ? (tierRecord.descuento * 100).toFixed(0) : "—";
 	const lista = res.facturacionLista || 0;
 	const neto = res.netoLakaut || 0;
 	const desc = lista - neto;
-	const totalFirmas = packRows.reduce((s,r) => s + r.qty, 0) + firmasAdic;
 	const mainPack = packRows.reduce((b,r) => (!b || r.sub > b.sub) ? r : b, null);
+
+	// desglose totales
+	const totalPacks = packRows.reduce((s,r) => s + r.qty, 0);
+	const totalCerts = packRows.reduce((s,r) => s + r.qty * r.certs, 0);
+	const hayIlimitadas = packRows.some(r => r.ilimitadas);
+	const totalFirmasIncl = hayIlimitadas ? null : packRows.reduce((s,r) => s + r.qty * r.firmas, 0);
+	const totalFirmasConAdic = totalFirmasIncl != null ? totalFirmasIncl + firmasAdic : null;
 
 	return `<div class="slide" style="background:${OW};">
   <!-- slide header -->
@@ -215,10 +225,21 @@ function s3Dist(deal, clientName, currency, tc) {
           </tr>
         </tbody>
       </table>
-      ${mainPack ? `<div style="margin-top:auto;background:${B};border-radius:8px;padding:0.3cm 0.5cm;">
-        <div style="font-size:10.5pt;font-weight:700;color:${W};">${mainPack.label}</div>
-        <div style="font-size:8pt;color:rgba(255,255,255,0.7);">${totalFirmas.toLocaleString("es-AR")} firmas / año</div>
-      </div>` : ""}
+      <!-- desglose de volumen -->
+      <div style="margin-top:auto;display:flex;gap:0.35cm;">
+        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
+          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Packs / año</div>
+          <div style="font-size:12pt;font-weight:700;color:${DK};">${totalPacks.toLocaleString("es-AR")}</div>
+        </div>
+        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
+          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Certificados</div>
+          <div style="font-size:12pt;font-weight:700;color:${DK};">${totalCerts.toLocaleString("es-AR")}</div>
+        </div>
+        <div style="flex:1;background:${B};border-radius:8px;padding:0.3cm 0.4cm;">
+          <div style="font-size:7pt;color:${BLT};margin-bottom:2px;">Firmas incluidas</div>
+          <div style="font-size:12pt;font-weight:700;color:${W};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
+        </div>
+      </div>
     </div>
 
     <!-- RIGHT: blue box (Resumen) -->
