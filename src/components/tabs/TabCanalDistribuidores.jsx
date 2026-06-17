@@ -107,16 +107,18 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			{/* Card principal de cotización */}
 			<Card className="bg-card border-border">
 				<CardHeader className="pb-3">
-					<CardTitle className="font-heading text-base font-semibold">Canal Distribuidores e Integradores</CardTitle>
-					<p className="text-sm text-muted-foreground">Cargá el volumen anual comprometido. El compromiso de facturación se <strong>calcula</strong> a precios de lista y, junto con los certificados activos, define el nivel (gana el mayor). El descuento aplica sobre toda la lista.</p>
+					<div className="flex items-start justify-between gap-4">
+						<div>
+							<CardTitle className="font-heading text-base font-semibold">Canal Distribuidores e Integradores</CardTitle>
+							<p className="text-sm text-muted-foreground mt-1">El compromiso de facturación se <strong>calcula</strong> a precios de lista y, junto con los certificados activos, define el nivel (gana el mayor). El descuento aplica sobre toda la lista.</p>
+						</div>
+						{editingId && <span className="shrink-0 text-xs font-semibold text-[var(--success)] bg-[var(--success)]/10 px-2 py-1 rounded-md">Editando</span>}
+					</div>
 				</CardHeader>
 				<CardContent className="space-y-5">
 					{/* Cliente */}
 					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">
-							Cliente
-							{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
-						</Label>
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Cliente</Label>
 						<ClientSelector
 							channel="distribuidores"
 							clients={clientsApi?.clients || []}
@@ -128,7 +130,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 					<Separator />
 
-					{/* Parámetros */}
+					{/* Parámetros adicionales */}
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 						<NumberField label="Certificados activos administrados" value={certsActivos} onChange={setCertsActivos} note="Define el nivel por cartera actual" />
 						<NumberField label="Firmas adicionales / año" value={firmasAdic} onChange={setFirmasAdic} />
@@ -137,55 +139,81 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 					<Separator />
 
-					{/* Guardar — al final */}
-					<div className="flex justify-end gap-2">
-						{editingId && <Button variant="outline" onClick={function () { setEditingId(null); }}>Cancelar</Button>}
-						<Button onClick={saveQuote} disabled={!hasVolume} className={flash ? "bg-[var(--success)] hover:bg-[var(--success)]" : ""}>
-							{flash ? <><Check className="size-4" /> Guardada</> : editingId ? "Actualizar cotización" : "Guardar cotización"}
-						</Button>
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* Volumen comprometido */}
-			<Card>
-				<CardContent>
-					<div className="mb-3 text-sm font-semibold">Volumen anual comprometido</div>
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Producto</TableHead>
-								<TableHead className="text-right">Lista USD</TableHead>
-								<TableHead className="text-right">Certs / u</TableHead>
-								<TableHead className="text-right">Firmas / u</TableHead>
-								<TableHead className="text-right">Cant. / año</TableHead>
-								<TableHead className="text-right">Certs total</TableHead>
-								<TableHead className="text-right">Firmas total</TableHead>
-								<TableHead className="text-right">Facturación lista</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{WEB_PRODUCTS.filter(function (p) { return p.precioARS != null; }).map(function (p) {
-								const q = Number(qtys[p.id]) || 0;
-								const listaUSD = p.precioARS / tc;
-								const firmasU = p.ilimitadas ? "ilim." : (p.firmas || 0);
-								return (
-									<TableRow key={p.id}>
-										<TableCell className="font-semibold">{p.label}</TableCell>
-										<TableCell className="text-right tabular-nums">{fMoney(listaUSD)}</TableCell>
-										<TableCell className="text-right tabular-nums text-muted-foreground">{p.certs || 1}</TableCell>
-										<TableCell className="text-right tabular-nums text-muted-foreground">{firmasU}</TableCell>
-										<TableCell className="text-right">
-											<Input type="number" min={0} value={qtys[p.id] || ""} placeholder="0" onChange={function (e) { setQty(p.id, e.target.value); }} className="ml-auto h-8 w-24 text-right tabular-nums" />
-										</TableCell>
-										<TableCell className="text-right tabular-nums">{q > 0 ? (q * (p.certs || 1)).toLocaleString("es-AR") : "—"}</TableCell>
-										<TableCell className="text-right tabular-nums">{q > 0 ? (p.ilimitadas ? "ilim." : (q * (p.firmas || 0)).toLocaleString("es-AR")) : "—"}</TableCell>
-										<TableCell className={"text-right tabular-nums " + (q > 0 ? "font-semibold" : "text-muted-foreground")}>{q > 0 ? fMoney(q * listaUSD) : "—"}</TableCell>
+					{/* Tabla de packs */}
+					<div>
+						<p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Volumen anual comprometido</p>
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Producto</TableHead>
+									<TableHead className="text-right">Lista USD</TableHead>
+									<TableHead className="text-right">Certs / u</TableHead>
+									<TableHead className="text-right">Firmas / u</TableHead>
+									<TableHead className="text-right">Cant. / año</TableHead>
+									<TableHead className="text-right">Certs total</TableHead>
+									<TableHead className="text-right">Firmas total</TableHead>
+									<TableHead className="text-right">Facturación lista</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{WEB_PRODUCTS.filter(function (p) { return p.precioARS != null; }).map(function (p) {
+									const q = Number(qtys[p.id]) || 0;
+									const listaUSD = p.precioARS / tc;
+									const firmasU = p.ilimitadas ? "ilim." : (p.firmas || 0);
+									return (
+										<TableRow key={p.id}>
+											<TableCell className="font-semibold">{p.label}</TableCell>
+											<TableCell className="text-right tabular-nums">{fMoney(listaUSD)}</TableCell>
+											<TableCell className="text-right tabular-nums text-muted-foreground">{p.certs || 1}</TableCell>
+											<TableCell className="text-right tabular-nums text-muted-foreground">{firmasU}</TableCell>
+											<TableCell className="text-right">
+												<Input type="number" min={0} value={qtys[p.id] || ""} placeholder="0" onChange={function (e) { setQty(p.id, e.target.value); }} className="ml-auto h-8 w-24 text-right tabular-nums" />
+											</TableCell>
+											<TableCell className="text-right tabular-nums">{q > 0 ? (q * (p.certs || 1)).toLocaleString("es-AR") : "—"}</TableCell>
+											<TableCell className="text-right tabular-nums">{q > 0 ? (p.ilimitadas ? "ilim." : (q * (p.firmas || 0)).toLocaleString("es-AR")) : "—"}</TableCell>
+											<TableCell className={"text-right tabular-nums " + (q > 0 ? "font-semibold" : "text-muted-foreground")}>{q > 0 ? fMoney(q * listaUSD) : "—"}</TableCell>
+										</TableRow>
+									);
+								})}
+								{/* Fila de totales */}
+								{hasVolume && (
+									<TableRow className="border-t-2 bg-muted/30">
+										<TableCell className="font-semibold text-sm" colSpan={4}>Total</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground text-xs">—</TableCell>
+										<TableCell className="text-right tabular-nums font-semibold">{calc.certsTotal.toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums font-semibold">{calc.ilimitadasUsadas ? "ilim." : calc.firmasTotal.toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums font-semibold">{fMoney(calc.facturacionLista)}</TableCell>
 									</TableRow>
-								);
-							})}
-						</TableBody>
-					</Table>
+								)}
+							</TableBody>
+						</Table>
+					</div>
+
+					<Separator />
+
+					{/* Footer: nivel derivado + acción */}
+					<div className="flex items-center justify-between gap-4">
+						{hasVolume ? (
+							<div className="flex items-center gap-3 text-sm">
+								<span className="text-muted-foreground">Nivel:</span>
+								<Badge variant={TIER_BADGE[tier.id] || "default"} className="text-sm px-2.5 py-0.5">{tier.label}</Badge>
+								<span className="text-muted-foreground">·</span>
+								<span className="text-muted-foreground">Descuento</span>
+								<span className="font-semibold">{(tier.descuento * 100).toFixed(0)}%</span>
+								<span className="text-muted-foreground">·</span>
+								<span className="text-muted-foreground">Neto Lakaut</span>
+								<span className="font-semibold">{fMoney(netoLakaut)}</span>
+							</div>
+						) : (
+							<p className="text-sm text-muted-foreground">Cargá al menos un producto para guardar la cotización.</p>
+						)}
+						<div className="flex gap-2 shrink-0">
+							{editingId && <Button variant="outline" onClick={function () { setEditingId(null); }}>Cancelar</Button>}
+							<Button onClick={saveQuote} disabled={!hasVolume} className={flash ? "bg-[var(--success)] hover:bg-[var(--success)]" : ""}>
+								{flash ? <><Check className="size-4 mr-1.5" /> Guardada</> : editingId ? "Actualizar cotización" : "Guardar cotización"}
+							</Button>
+						</div>
+					</div>
 				</CardContent>
 			</Card>
 
