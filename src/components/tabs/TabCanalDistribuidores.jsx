@@ -10,28 +10,36 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { NumberField, StatCard } from "@/components/ui/field";
+import { ClientSelector } from "@/components/ui/ClientSelector";
 
 const TIER_BADGE = { azul: "default", bronce: "warning", plata: "secondary", oro: "warning", platinum: "default" };
 function margClass(pct) { return pct >= 0.4 ? "text-[var(--success)]" : pct >= 0.15 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.4 ? "success" : pct >= 0.15 ? "warning" : "destructive"; }
 
-export function TabCanalDistribuidores({ costs, currency, tc, quotesApi, pendingEdit, onConsumeEdit }) {
+export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsApi, pendingEdit, onConsumeEdit }) {
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
-	const [clientName, setClientName] = useState("");
-	const [certsActivos, setCertsActivos] = useState(200);
+	const [selectedClient, setSelectedClient] = useState(null);
+	const [certsActivos, setCertsActivos] = useState(0);
 	const [qtys, setQtys] = useState({});
 	const [firmasAdic, setFirmasAdic] = useState(0);
 	const [precioFirmaUSD, setPrecioFirmaUSD] = useState(1);
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 
+	// Auto-fill certsActivos when client changes
+	useEffect(function () {
+		if (selectedClient && !pendingEdit) {
+			setCertsActivos(selectedClient.certs_activos || 0);
+		}
+	}, [selectedClient]);
+
 	useEffect(function () {
 		if (!pendingEdit) return;
 		const i = pendingEdit.inputs || {};
-		setClientName(pendingEdit.clientName === "(sin nombre)" ? "" : pendingEdit.clientName);
+		if (pendingEdit.clients) setSelectedClient(pendingEdit.clients);
 		setCertsActivos(i.certsActivos || 0);
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
@@ -67,18 +75,31 @@ export function TabCanalDistribuidores({ costs, currency, tc, quotesApi, pending
 	const margenPct = netoLakaut > 0 ? margenLakaut / netoLakaut : 0;
 	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || (Number(firmasAdic) || 0) > 0 || (Number(certsActivos) || 0) > 0;
 
-	function saveQuote() {
+	async function saveQuote() {
 		const now = new Date().toISOString();
-		const prev = editingId ? quotesApi.quotes.find(function (q) { return q.id === editingId; }) : null;
-		quotesApi.save({
+		const prev = editingId ? dealsApi.deals.find(function (d) { return d.id === editingId; }) : null;
+
+		let client = selectedClient;
+		if (!client && clientsApi) {
+			client = await clientsApi.create("(sin nombre)", "distribuidores");
+			setSelectedClient(client);
+		}
+
+		// Update client certs_activos
+		if (client && clientsApi) {
+			const updated = await clientsApi.update(client.id, { certs_activos: Number(certsActivos) || 0 });
+			if (updated) setSelectedClient(updated);
+		}
+
+		await dealsApi.save({
 			id: editingId || Date.now().toString(36),
 			channel: "distribuidores",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			clientName: clientName || "(sin nombre)",
 			inputs: { certsActivos, qtys, firmasAdic, precioFirmaUSD },
 			resumen: { tier: tier.label, certsActivos, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
-		});
+		}, client?.id || null);
+
 		setEditingId(null);
 		setFlash(true);
 		setTimeout(function () { setFlash(false); }, 1500);
@@ -94,13 +115,19 @@ export function TabCanalDistribuidores({ costs, currency, tc, quotesApi, pending
 					<p className="text-sm text-muted-foreground">Cargá el volumen anual comprometido. El compromiso de facturación se <strong>calcula</strong> a precios de lista y, junto con los certificados activos, define el nivel (gana el mayor). El descuento aplica sobre toda la lista.</p>
 				</CardHeader>
 				<CardContent className="space-y-5">
-					{/* Nombre del cliente — al inicio */}
+					{/* Cliente */}
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">
-							Nombre del cliente
+							Cliente
 							{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 						</Label>
-						<Input placeholder="Ej: Distribuidora Mendoza S.A." value={clientName} onChange={function (e) { setClientName(e.target.value); }} />
+						<ClientSelector
+							channel="distribuidores"
+							clients={clientsApi?.clients || []}
+							onCreate={clientsApi?.create}
+							value={selectedClient}
+							onChange={setSelectedClient}
+						/>
 					</div>
 
 					<Separator />

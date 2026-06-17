@@ -44,7 +44,7 @@ function summaryCols(channel, fMoney) {
 	];
 }
 
-export function TabHistorial({ quotesApi, currency, tc, onEditQuote }) {
+export function TabHistorial({ dealsApi, currency, tc, onEditQuote }) {
 	const { fMoney } = makeMoney(currency, tc);
 
 	const [openFilter, setOpenFilter] = useState(null);
@@ -56,7 +56,7 @@ export function TabHistorial({ quotesApi, currency, tc, onEditQuote }) {
 	const [idcMin, setIdcMin] = useState("");
 	const [idcMax, setIdcMax] = useState("");
 
-	const quotes = quotesApi.quotes;
+	const quotes = dealsApi?.deals || [];
 
 	const months = useMemo(function () {
 		const set = new Set(quotes.map(function (q) { return q.fecha.slice(0, 7); }));
@@ -163,7 +163,7 @@ export function TabHistorial({ quotesApi, currency, tc, onEditQuote }) {
 	}
 
 	function del(q) {
-		if (window.confirm("¿Borrar la cotización de " + (q.clientName || "(sin nombre)") + "?")) quotesApi.remove(q.id);
+		if (window.confirm("¿Borrar la cotización de " + (q.clientName || "(sin nombre)") + "?")) dealsApi.remove(q.id);
 	}
 
 	const orderedChannels = Object.keys(groups).sort();
@@ -312,7 +312,7 @@ export function TabHistorial({ quotesApi, currency, tc, onEditQuote }) {
 				</CardContent>
 			</Card>
 
-			{quotesApi.loading ? (
+			{dealsApi?.loading ? (
 				<p className="text-sm text-muted-foreground">Cargando historial…</p>
 			) : filtered.length === 0 ? (
 				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Distribuidores o B2B2C y tocá <strong>Guardar cotización</strong>.</CardContent></Card>

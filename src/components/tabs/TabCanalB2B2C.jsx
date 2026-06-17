@@ -10,16 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { NumberField, SelectField, StatCard } from "@/components/ui/field";
+import { ClientSelector } from "@/components/ui/ClientSelector";
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
 
-export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onConsumeEdit }) {
+export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendingEdit, onConsumeEdit }) {
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
-	const [clientName, setClientName] = useState("");
+	const [selectedClient, setSelectedClient] = useState(null);
 	const [frecuencia, setFrecuencia] = useState("mensual");
 	const [idcMensuales, setIdcMensuales] = useState(5500);
 	const [fee, setFee] = useState(3250);
@@ -39,7 +40,7 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 	useEffect(function () {
 		if (!pendingEdit) return;
 		const i = pendingEdit.inputs || {};
-		setClientName(pendingEdit.clientName === "(sin nombre)" ? "" : pendingEdit.clientName);
+		if (pendingEdit.clients) setSelectedClient(pendingEdit.clients);
 		setFrecuencia(i.frecuencia || "mensual");
 		setIdcMensuales(i.idcMensuales || 0);
 		setFee(i.fee != null ? i.fee : 3250);
@@ -79,18 +80,25 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 	const costoUnica = costoMes;
 	const margenUnica = margenMes;
 
-	function saveQuote() {
+	async function saveQuote() {
 		const now = new Date().toISOString();
-		const prev = editingId ? quotesApi.quotes.find(function (q) { return q.id === editingId; }) : null;
-		quotesApi.save({
+		const prev = editingId ? dealsApi.deals.find(function (d) { return d.id === editingId; }) : null;
+
+		let client = selectedClient;
+		if (!client && clientsApi) {
+			client = await clientsApi.create("(sin nombre)", "b2b2c");
+			setSelectedClient(client);
+		}
+
+		await dealsApi.save({
 			id: editingId || Date.now().toString(36),
 			channel: "b2b2c",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			clientName: clientName || "(sin nombre)",
 			inputs: { frecuencia, idcMensuales, fee, slaId, firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic },
 			resumen: { segmento: seg.label, frecuencia, idcMensuales, firmasMes, precioIDC, revMesTotal: esUnica ? revUnica : revMesTotal, revAnual: esUnica ? revUnica : revAnual, margenMes: esUnica ? margenUnica : margenMes, margenPct },
-		});
+		}, client?.id || null);
+
 		setEditingId(null);
 		setFlash(true);
 		setTimeout(function () { setFlash(false); }, 1500);
@@ -116,13 +124,19 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 					</p>
 				</CardHeader>
 				<CardContent className="space-y-5">
-					{/* Nombre del cliente — al inicio */}
+					{/* Cliente */}
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">
-							Nombre del cliente
+							Cliente
 							{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 						</Label>
-						<Input placeholder="Ej: Banco XYZ S.A." value={clientName} onChange={function (e) { setClientName(e.target.value); }} />
+						<ClientSelector
+							channel="b2b2c"
+							clients={clientsApi?.clients || []}
+							onCreate={clientsApi?.create}
+							value={selectedClient}
+							onChange={setSelectedClient}
+						/>
 					</div>
 
 					<Separator />

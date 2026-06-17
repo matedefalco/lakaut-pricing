@@ -8,7 +8,8 @@ import { PACKS } from "./data/packs";
 import { engine } from "./engine/engine";
 import { modelToInp } from "./utils/modelToInp";
 import { ModelsProvider, useModels } from "./context/ModelsContext";
-import { useQuotes } from "./lib/useQuotes";
+import { useDeals } from "./lib/useDeals";
+import { useClients } from "./lib/useClients";
 import { DiscountProvider } from "./context/DiscountContext";
 import { InfoTooltip } from "./components/ui/InfoTooltip";
 import { Sec } from "./components/ui/Sec";
@@ -31,6 +32,7 @@ import { TabCanalWeb } from "./components/tabs/TabCanalWeb";
 import { TabCanalDistribuidores } from "./components/tabs/TabCanalDistribuidores";
 import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
 import { TabHistorial } from "./components/tabs/TabHistorial";
+import { TabClientes } from "./components/tabs/TabClientes";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import { DEFAULT_VOLUME_TIERS } from "./data/volumeTiers";
 
@@ -39,7 +41,8 @@ const ARCH_TO_PACK = { bolsa: "A", sub: "B", ppu: "C", anual: "D", free: "E", hi
 
 function LakautCalcInner() {
 	const { models } = useModels();
-	const quotesApi = useQuotes();
+	const dealsApi = useDeals();
+	const clientsApi = useClients();
 
 	useEffect(function () {
 		var urls = [
@@ -544,13 +547,15 @@ function LakautCalcInner() {
 								<TabsTrigger value="distribuidores">Distribuidores</TabsTrigger>
 								<TabsTrigger value="b2b2c">B2B2C (IDC)</TabsTrigger>
 								<TabsTrigger value="historial">Historial</TabsTrigger>
+								<TabsTrigger value="clientes">Clientes</TabsTrigger>
 							</TabsList>
 						</div>
 						<div className="p-6">
 							<TabsContent value="web"><TabCanalWeb costs={costs} currency={currency} tc={tc} /></TabsContent>
-							<TabsContent value="distribuidores"><TabCanalDistribuidores costs={costs} currency={currency} tc={tc} quotesApi={quotesApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
-							<TabsContent value="b2b2c"><TabCanalB2B2C costs={costs} currency={currency} tc={tc} quotesApi={quotesApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
-							<TabsContent value="historial"><TabHistorial quotesApi={quotesApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); setCotizadoraMode(q.channel); }} /></TabsContent>
+							<TabsContent value="distribuidores"><TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
+							<TabsContent value="b2b2c"><TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
+							<TabsContent value="historial"><TabHistorial dealsApi={dealsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); setCotizadoraMode(q.channel); }} /></TabsContent>
+							<TabsContent value="clientes"><TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); setCotizadoraMode(d.channel); }} /></TabsContent>
 						</div>
 					</Tabs>
 				</div>
