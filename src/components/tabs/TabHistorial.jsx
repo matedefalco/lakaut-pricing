@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pencil, Trash2, Download, ChevronDown, X } from "lucide-react";
+import { Pencil, Trash2, Download, FileText, ChevronDown, X } from "lucide-react";
+import { exportProposal } from "@/utils/exportProposal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +45,7 @@ function summaryCols(channel, fMoney) {
 	];
 }
 
-export function TabHistorial({ dealsApi, currency, tc, onEditQuote }) {
+export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }) {
 	const { fMoney } = makeMoney(currency, tc);
 
 	const [openFilter, setOpenFilter] = useState(null);
@@ -346,6 +347,9 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote }) {
 													<TableCell className="font-medium">{q.clientName || "(sin nombre)"}</TableCell>
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
+														{(q.channel === "b2b2c" || q.channel === "distribuidores") && (
+															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, q.clients || null, currency, tc); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
+														)}
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>
 													</TableCell>

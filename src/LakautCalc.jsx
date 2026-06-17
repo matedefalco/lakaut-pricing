@@ -554,7 +554,7 @@ function LakautCalcInner() {
 							<TabsContent value="web"><TabCanalWeb costs={costs} currency={currency} tc={tc} /></TabsContent>
 							<TabsContent value="distribuidores"><TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
 							<TabsContent value="b2b2c"><TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
-							<TabsContent value="historial"><TabHistorial dealsApi={dealsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); setCotizadoraMode(q.channel); }} /></TabsContent>
+							<TabsContent value="historial"><TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); setCotizadoraMode(q.channel); }} /></TabsContent>
 							<TabsContent value="clientes"><TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); setCotizadoraMode(d.channel); }} /></TabsContent>
 						</div>
 					</Tabs>

@@ -26,6 +26,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const [qtys, setQtys] = useState({});
 	const [firmasAdic, setFirmasAdic] = useState(0);
 	const [precioFirmaUSD, setPrecioFirmaUSD] = useState(1);
+	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 
@@ -45,6 +46,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
 		setPrecioFirmaUSD(i.precioFirmaUSD != null ? i.precioFirmaUSD : 1);
+		setCasosDeUso(i.casosDeUso || "");
 		setEditingId(pendingEdit.id);
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
@@ -91,7 +93,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			channel: "distribuidores",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			inputs: { certsActivos, qtys, firmasAdic, precioFirmaUSD },
+			inputs: { certsActivos, qtys, firmasAdic, precioFirmaUSD, casosDeUso },
 			resumen: { tier: tier.label, certsActivos, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
 		}, client?.id || null);
 
@@ -185,6 +187,20 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 								)}
 							</TableBody>
 						</Table>
+					</div>
+
+					<Separator />
+
+					{/* Casos de uso para propuesta */}
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
+						<textarea
+							value={casosDeUso}
+							onChange={function (e) { setCasosDeUso(e.target.value); }}
+							rows={2}
+							placeholder="Ej: gestión de empleados, contratos de distribución, acuerdos comerciales..."
+							className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground"
+						/>
 					</div>
 
 					<Separator />

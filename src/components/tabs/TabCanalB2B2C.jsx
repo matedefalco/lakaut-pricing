@@ -28,6 +28,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const [firmasInclPorIDC, setFirmasInclPorIDC] = useState(4);
 	const [firmasAdicPorIDC, setFirmasAdicPorIDC] = useState(0);
 	const [precioFirmaAdic, setPrecioFirmaAdic] = useState(0.5);
+	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 
@@ -48,6 +49,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 		setFirmasInclPorIDC(i.firmasInclPorIDC != null ? i.firmasInclPorIDC : 4);
 		setFirmasAdicPorIDC(i.firmasAdicPorIDC || 0);
 		setPrecioFirmaAdic(i.precioFirmaAdic != null ? i.precioFirmaAdic : 0.5);
+		setCasosDeUso(i.casosDeUso || "");
 		setEditingId(pendingEdit.id);
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
@@ -95,7 +97,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			channel: "b2b2c",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			inputs: { frecuencia, idcMensuales, fee, slaId, firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic },
+			inputs: { frecuencia, idcMensuales, fee, slaId, firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic, casosDeUso },
 			resumen: { segmento: seg.label, frecuencia, idcMensuales, firmasMes, precioIDC, revMesTotal: esUnica ? revUnica : revMesTotal, revAnual: esUnica ? revUnica : revAnual, margenMes: esUnica ? margenUnica : margenMes, margenPct },
 		}, client?.id || null);
 
@@ -152,6 +154,20 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 						<NumberField label="Firmas incluidas por IDC" value={firmasInclPorIDC} onChange={setFirmasInclPorIDC} note="Firma inicial + activación (editable)" />
 						<NumberField label="Firmas adicionales por IDC / mes" value={firmasAdicPorIDC} onChange={setFirmasAdicPorIDC} note="Se cobran aparte" />
 						<NumberField label="Precio firma adicional" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" />
+					</div>
+
+					<Separator />
+
+					{/* Casos de uso para propuesta */}
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
+						<textarea
+							value={casosDeUso}
+							onChange={function (e) { setCasosDeUso(e.target.value); }}
+							rows={2}
+							placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..."
+							className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground"
+						/>
 					</div>
 
 					<Separator />
