@@ -42,7 +42,6 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		if (!pendingEdit) return;
 		const i = pendingEdit.inputs || {};
 		if (pendingEdit.clients) setSelectedClient(pendingEdit.clients);
-		setCertsActivos(i.certsActivos || 0);
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
 		setPrecioFirmaUSD(i.precioFirmaUSD != null ? i.precioFirmaUSD : 1);
@@ -75,7 +74,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const cvTotal = calc.certsTotal * cvCert + calc.firmasTotal * cvFirma;
 	const margenLakaut = netoLakaut - cvTotal;
 	const margenPct = netoLakaut > 0 ? margenLakaut / netoLakaut : 0;
-	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || (Number(firmasAdic) || 0) > 0 || (Number(certsActivos) || 0) > 0;
+	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || (Number(firmasAdic) || 0) > 0;
 
 	async function saveQuote() {
 		const now = new Date().toISOString();
@@ -131,8 +130,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 					<Separator />
 
 					{/* Parámetros adicionales */}
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-						<NumberField label="Certificados activos administrados" value={certsActivos} onChange={setCertsActivos} note="Define el nivel por cartera actual" />
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<NumberField label="Firmas adicionales / año" value={firmasAdic} onChange={setFirmasAdic} />
 						<NumberField label="Precio firma adicional" value={precioFirmaUSD} onChange={setPrecioFirmaUSD} prefix="USD" />
 					</div>
