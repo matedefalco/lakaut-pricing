@@ -1,27 +1,14 @@
 import { WEB_PRODUCTS, B2B2C_API_TIERS, SLA_PLANS, DISTRIBUTOR_TIERS } from "@/data/channels";
 
-// ─── Tokens ───────────────────────────────────────────────────────────────────
-const BLUE      = "#3535D5";
-const BLUE_DK   = "#1E2299";
-const BLUE_BG   = "#EEF0FB";
-const DARK      = "#1C1F35";
-const GRAY      = "#5A6178";
-const BORDER    = "#DDE1F0";
-const WHITE     = "#FFFFFF";
-
-// ─── SVG icons (inline) ───────────────────────────────────────────────────────
-const ic = {
-	check:  function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`; },
-	shield: function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`; },
-	mobile: function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`; },
-	code:   function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`; },
-	clock:  function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`; },
-	file:   function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`; },
-	users:  function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`; },
-	zap:    function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`; },
-	mail:   function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`; },
-	phone:  function(c, s) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`; },
-};
+// ─── Color tokens (from PPTX) ────────────────────────────────────────────────
+const B   = "#3041D5";   // primary blue
+const BLT = "#BCC3F4";  // light blue / text on dark
+const DK  = "#36383A";  // dark text
+const GR  = "#7F828E";  // medium gray
+const GRL = "#E1E3E8";  // light gray border
+const OW  = "#F7F8FA";  // off-white background
+const W   = "#FFFFFF";  // white
+const NG  = "#565961";  // numeric gray
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fm(v, currency, tc) {
@@ -29,371 +16,424 @@ function fm(v, currency, tc) {
 	if (currency === "ARS") return "$ " + (v * tc).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 	return "USD " + Number(v).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
-
 function fd(iso) {
 	try { return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }); }
 	catch (e) { return ""; }
 }
 
-// ─── Layout primitives ────────────────────────────────────────────────────────
-// PPTX widescreen: 33.87cm × 19.05cm
-function mkSlide(content, bg) {
-	bg = bg || WHITE;
-	return `<div style="width:33.87cm;height:19.05cm;overflow:hidden;position:relative;background:${bg};display:flex;flex-direction:column;">${content}</div>`;
-}
+// ─── Inline SVG icons ─────────────────────────────────────────────────────────
+const SVG = {
+	check:  (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+	shield: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`,
+	mobile: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`,
+	code:   (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+	clock:  (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+	file:   (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+	users:  (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+	zap:    (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+	mail:   (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
+	phone:  (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+};
 
-// Blue sidebar (left) + main content area (right) — used in slides 2-4
-function withSidebar(sideContent, mainContent) {
-	return `<div style="display:flex;flex:1;overflow:hidden;">
-  <div style="width:5.8cm;background:${BLUE};padding:0.8cm 0.7cm;display:flex;flex-direction:column;">${sideContent}</div>
-  <div style="flex:1;padding:0.7cm 0.9cm;overflow:hidden;display:flex;flex-direction:column;">${mainContent}</div>
-</div>`;
-}
-
-function slideFooter(pageNum) {
-	return `<div style="padding:0.2cm 0.8cm;border-top:1px solid ${BORDER};display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-  <div style="display:flex;align-items:baseline;gap:4px;">
-    <span style="font-size:10pt;font-weight:800;color:${BLUE};letter-spacing:-0.5px;">FID</span>
-    <span style="font-size:7pt;color:${GRAY};">by Lakaut</span>
-  </div>
-  <div style="font-size:7pt;color:${GRAY};">0${pageNum}</div>
-</div>`;
-}
-
-function sideLabel(num, title, sub) {
-	return `<div style="font-size:7pt;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.2cm;">${num}</div>
-<div style="font-size:14pt;font-weight:700;color:${WHITE};line-height:1.2;margin-bottom:0.4cm;">${title}</div>
-<div style="width:1.8cm;height:2px;background:rgba(255,255,255,0.3);margin-bottom:0.4cm;"></div>
-${sub ? `<div style="font-size:8pt;color:rgba(255,255,255,0.65);line-height:1.5;">${sub}</div>` : ""}`;
-}
-
-function sectionHeader(text) {
-	return `<div style="font-size:6.5pt;font-weight:700;color:${BLUE};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.25cm;">${text}</div>`;
-}
-
-// ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
-function slideCover(clientName, fecha) {
-	var badges = [
-		{ text: "100% Remoto",        svg: ic.check(  "rgba(255,255,255,0.8)", 12) },
-		{ text: "Firma embebida",      svg: ic.code(   "rgba(255,255,255,0.8)", 12) },
-		{ text: "Validez legal plena", svg: ic.shield( "rgba(255,255,255,0.8)", 12) },
-	];
-	return mkSlide(`
-  <div style="position:absolute;top:-4cm;right:-2cm;width:14cm;height:14cm;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
-  <div style="position:absolute;top:2cm;right:4cm;width:5cm;height:5cm;border-radius:50%;background:rgba(255,255,255,0.06);"></div>
-  <div style="position:absolute;bottom:-3cm;right:0;width:10cm;height:10cm;border-radius:50%;background:rgba(255,255,255,0.03);"></div>
-
-  <div style="flex:1;display:flex;flex-direction:column;padding:1cm 1.2cm;">
-    <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:1cm;">
-      <span style="font-size:13pt;font-weight:800;color:${WHITE};letter-spacing:-0.5px;">FID</span>
-      <span style="font-size:7.5pt;color:rgba(255,255,255,0.45);">by Lakaut</span>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-      <div style="font-size:8.5pt;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.35cm;">Propuesta Comercial</div>
-      <div style="font-size:40pt;font-weight:700;color:${WHITE};line-height:1.1;margin-bottom:0.4cm;letter-spacing:-0.5px;">${clientName}</div>
-      <div style="font-size:10.5pt;color:rgba(255,255,255,0.7);max-width:16cm;line-height:1.55;margin-bottom:0.8cm;">Integración de firma digital con validez legal, embebida en tu flujo y 100% remota.</div>
-      <div style="display:flex;gap:0.5cm;">
-        ${badges.map(function(b) { return `<div style="display:flex;align-items:center;gap:0.2cm;background:rgba(255,255,255,0.11);padding:0.2cm 0.45cm;border-radius:20px;">${b.svg}<span style="font-size:8pt;color:${WHITE};font-weight:500;">${b.text}</span></div>`; }).join("")}
-      </div>
-    </div>
-  </div>
-
-  <div style="padding:0.3cm 1.2cm;border-top:1px solid rgba(255,255,255,0.12);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-    <div style="font-size:8pt;color:rgba(255,255,255,0.45);">${fecha ? fd(fecha) : ""}</div>
-    <div style="font-size:7pt;color:rgba(255,255,255,0.35);">Autoridad Certificante Licenciada · Infraestructura de Firma Digital · Ley N° 25.506</div>
-  </div>
-`, `linear-gradient(145deg, ${BLUE} 0%, ${BLUE_DK} 55%, #14116B 100%)`);
-}
-
-// ─── SLIDE 2: INTEGRACIÓN DE FIRMA DIGITAL ────────────────────────────────────
-function slideIntegracion(clientName) {
-	var feats = [
-		{ svg: ic.zap(WHITE, 16),    title: "Habilitación sin fricción",    desc: "Firma con validez legal plena, lista para operar a escala." },
-		{ svg: ic.check(WHITE, 16),  title: "Onboarding 100% remoto",       desc: "Alta del usuario desde cualquier lugar, sin trámites presenciales." },
-		{ svg: ic.mobile(WHITE, 16), title: "Certificado en tiempo real",   desc: "Certificado digital de persona física, emitido al instante." },
-		{ svg: ic.code(WHITE, 16),   title: "Firma embebida en el flujo",   desc: "El usuario firma dentro de " + clientName + ", sin salir de la experiencia." },
-		{ svg: ic.clock(WHITE, 16),  title: "Auditoría y evidencia legal",  desc: "Trazabilidad y respaldo legal por cada documento firmado." },
-	];
-
-	var sidebar = sideLabel("02", "Integración<br>de Firma<br>Digital", "Firma digital<br>en " + clientName);
-
-	var main = `
-  <div style="margin-bottom:0.45cm;">
-    ${sectionHeader("Cómo se integra")}
-    <div style="display:flex;flex-direction:column;gap:0.18cm;">
-      ${["Firma con validez legal plena (Ley 25.506)", "Integración vía API en los flujos de " + clientName, "Recibos, contratos y documentos legales en cualquier proceso"].map(function(t) {
-		return `<div style="display:flex;align-items:flex-start;gap:0.25cm;"><div style="width:5px;height:5px;border-radius:50%;background:${BLUE};margin-top:5px;flex-shrink:0;"></div><div style="font-size:9pt;color:${DARK};line-height:1.4;">${t}</div></div>`;
-	}).join("")}
-    </div>
-  </div>
-  <div style="flex:1;">
-    ${sectionHeader("Funcionalidades")}
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.4cm;">
-      ${feats.map(function(f) {
-		return `<div style="background:${BLUE_BG};border-radius:8px;padding:0.4cm;display:flex;flex-direction:column;gap:0.18cm;">
-        <div style="width:1cm;height:1cm;background:${BLUE};border-radius:7px;display:flex;align-items:center;justify-content:center;margin-bottom:0.1cm;flex-shrink:0;">${f.svg}</div>
-        <div style="font-size:8.5pt;font-weight:600;color:${DARK};line-height:1.3;">${f.title}</div>
-        <div style="font-size:7.5pt;color:${GRAY};line-height:1.4;">${f.desc}</div>
-      </div>`;
-	}).join("")}
-    </div>
-  </div>
-`;
-	return mkSlide(withSidebar(sidebar, main) + slideFooter(2));
-}
-
-// ─── SLIDE 3: MODELO COMERCIAL — DISTRIBUIDORES ───────────────────────────────
-function slideModeloDist(deal, clientName, currency, tc) {
-	var inp = deal.inputs || {};
-	var res = deal.resumen || {};
-	var qtys = inp.qtys || {};
-	var firmasAdic = Number(inp.firmasAdic) || 0;
-	var precioFirmaUSD = Number(inp.precioFirmaUSD) || 0;
-
-	var packRows = WEB_PRODUCTS.filter(function(p) {
-		return p.precioARS != null && (Number(qtys[p.id]) || 0) > 0;
-	}).map(function(p) {
-		var q = Number(qtys[p.id]);
-		var unitUSD = p.precioARS / tc;
-		return { label: p.label, qty: q, unitUSD: unitUSD, subUSD: q * unitUSD };
-	});
-
-	var tierRecord = DISTRIBUTOR_TIERS.find(function(t) { return t.label === res.tier; });
-	var descPct = tierRecord ? (tierRecord.descuento * 100).toFixed(0) : "—";
-	var facLista = res.facturacionLista || 0;
-	var neto = res.netoLakaut || 0;
-	var descMonto = facLista - neto;
-	var totalFirmas = packRows.reduce(function(s, r) { return s + r.qty; }, 0) + firmasAdic;
-	var mainPack = packRows.reduce(function(best, r) { return (!best || r.subUSD > best.subUSD) ? r : best; }, null);
-
-	var sidebar = sideLabel("03", "Modelo<br>Comercial", "Volumen anual<br>comprometido") +
-		(res.tier ? `<div style="margin-top:auto;padding:0.3cm;background:rgba(255,255,255,0.1);border-radius:7px;"><div style="font-size:7pt;color:rgba(255,255,255,0.55);margin-bottom:2px;">Nivel</div><div style="font-size:12pt;font-weight:700;color:${WHITE};">${res.tier}</div><div style="font-size:7pt;color:rgba(255,255,255,0.6);margin-top:2px;">Descuento ${descPct}% sobre lista</div></div>` : "");
-
-	var main = `
-  <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:0.7cm;flex:1;overflow:hidden;">
-    <div style="display:flex;flex-direction:column;gap:0.3cm;">
-      ${sectionHeader("Detalle de facturación")}
-      <table style="width:100%;border-collapse:collapse;font-size:8.5pt;">
-        <thead>
-          <tr style="background:${BLUE_BG};">
-            <th style="padding:5px 6px;text-align:left;border-bottom:2px solid ${BORDER};color:${DARK};font-weight:600;">Producto</th>
-            <th style="padding:5px 6px;text-align:right;border-bottom:2px solid ${BORDER};color:${DARK};font-weight:600;">P. Lista</th>
-            <th style="padding:5px 6px;text-align:right;border-bottom:2px solid ${BORDER};color:${DARK};font-weight:600;">Cant./año</th>
-            <th style="padding:5px 6px;text-align:right;border-bottom:2px solid ${BORDER};color:${DARK};font-weight:600;">Total lista</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${packRows.map(function(r, i) {
-		return `<tr style="background:${i % 2 === 1 ? BLUE_BG : WHITE};">
-            <td style="padding:5px 6px;border-bottom:1px solid ${BORDER};color:${DARK};font-weight:500;">${r.label}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${BORDER};text-align:right;color:${GRAY};">${fm(r.unitUSD, currency, tc)}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${BORDER};text-align:right;color:${DARK};">${r.qty.toLocaleString("es-AR")}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${BORDER};text-align:right;color:${DARK};font-weight:600;">${fm(r.subUSD, currency, tc)}</td>
-          </tr>`;
-	}).join("")}
-          ${firmasAdic > 0 ? `<tr><td style="padding:5px 6px;border-bottom:1px solid ${BORDER};color:${GRAY};">Firmas adicionales</td><td style="padding:5px 6px;border-bottom:1px solid ${BORDER};text-align:right;color:${GRAY};">${fm(precioFirmaUSD, currency, tc)}</td><td style="padding:5px 6px;border-bottom:1px solid ${BORDER};text-align:right;color:${DARK};">${firmasAdic.toLocaleString("es-AR")}</td><td style="padding:5px 6px;border-bottom:1px solid ${BORDER};text-align:right;color:${DARK};font-weight:600;">${fm(firmasAdic * precioFirmaUSD, currency, tc)}</td></tr>` : ""}
-          <tr style="background:${BLUE_BG};">
-            <td colspan="3" style="padding:5px 6px;font-weight:700;color:${DARK};">Total facturación a lista</td>
-            <td style="padding:5px 6px;text-align:right;font-weight:700;color:${DARK};">${fm(facLista, currency, tc)}</td>
-          </tr>
-        </tbody>
-      </table>
-      ${mainPack ? `<div style="background:${BLUE};border-radius:8px;padding:0.3cm 0.5cm;"><div style="font-size:11pt;font-weight:700;color:${WHITE};">${mainPack.label}</div><div style="font-size:8pt;color:rgba(255,255,255,0.7);">${totalFirmas.toLocaleString("es-AR")} firmas / año</div></div>` : ""}
-    </div>
-
-    <div style="background:${BLUE_BG};border-radius:10px;padding:0.5cm;display:flex;flex-direction:column;">
-      ${sectionHeader("Resumen")}
-      <div style="margin-bottom:0.3cm;">
-        <div style="font-size:8pt;color:${GRAY};margin-bottom:2px;">Nivel alcanzado</div>
-        <div style="font-size:13pt;font-weight:700;color:${DARK};">${res.tier || "—"}</div>
-      </div>
-      <div style="border-top:1px solid ${BORDER};padding-top:0.2cm;margin-bottom:0.2cm;">
-        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:8.5pt;"><span style="color:${GRAY};">Total a lista</span><span style="color:${DARK};font-weight:500;">${fm(facLista, currency, tc)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:8.5pt;"><span style="color:${GRAY};">Descuento (${descPct}%)</span><span style="color:#DC2626;font-weight:500;">−${fm(descMonto, currency, tc)}</span></div>
-      </div>
-      <div style="border-top:2px solid ${BLUE};padding-top:0.3cm;margin-top:auto;">
-        <div style="font-size:7.5pt;color:${BLUE};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.2cm;">Precio neto a pagar</div>
-        <div style="font-size:24pt;font-weight:800;color:${BLUE};line-height:1;">${fm(neto, currency, tc)}</div>
-        <div style="font-size:7.5pt;color:${GRAY};margin-top:0.2cm;">Compromiso anual · ahorro de ${fm(descMonto, currency, tc)} sobre lista.</div>
-      </div>
-      <div style="margin-top:0.35cm;padding-top:0.25cm;border-top:1px solid ${BORDER};font-size:6.5pt;color:${GRAY};line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
-    </div>
-  </div>
-`;
-	return mkSlide(withSidebar(sidebar, main) + slideFooter(3));
-}
-
-// ─── SLIDE 3: MODELO COMERCIAL — B2B2C ───────────────────────────────────────
-function slideModeloB2B2C(deal, clientName, currency, tc) {
-	var inp = deal.inputs || {};
-	var res = deal.resumen || {};
-	var esUnica = inp.frecuencia === "unica";
-	var api = B2B2C_API_TIERS.slice().reverse().find(function(t) { return (Number(inp.fee) || 0) >= t.feeMin; }) || B2B2C_API_TIERS[0];
-	var sla = SLA_PLANS.find(function(s) { return s.id === inp.slaId; }) || SLA_PLANS[0];
-	var idcMensuales = Number(inp.idcMensuales) || 0;
-	var fee = Number(inp.fee) || 0;
-	var firmasIncl = Number(inp.firmasInclPorIDC) || 0;
-	var firmasAdic = Number(inp.firmasAdicPorIDC) || 0;
-	var precioFirmaAdic = Number(inp.precioFirmaAdic) || 0;
-	var precioIDC = res.precioIDC || 0;
-	var revMesTotal = res.revMesTotal || 0;
-	var revAnual = res.revAnual || 0;
-	var slaText = sla.precioMes ? (sla.label + " · " + fm(sla.precioMes, currency, tc) + "/mes") : (sla.label + " · incluido");
-
-	var detailItems = [
-		{ label: "Modalidad",                value: esUnica ? "Adquisición única" : "Recurrente mensual" },
-		{ label: esUnica ? "Total IDC" : "IDC por mes", value: idcMensuales.toLocaleString("es-AR") },
-		{ label: "Tipo de integración API",  value: api.label },
-		{ label: "Fee de implementación",    value: fm(fee, currency, tc) + " · una sola vez" },
-		{ label: "Plan de soporte / SLA",    value: slaText },
-		{ label: "Firmas incluidas por IDC", value: firmasIncl.toString() },
-	];
-	if (firmasAdic > 0) detailItems.push({ label: "Firmas adicionales por IDC", value: firmasAdic + " · " + fm(precioFirmaAdic, currency, tc) + " c/u" });
-
-	var sidebar = sideLabel("03", "Modelo<br>Comercial", "B2B2C · Identidades<br>Digitales") +
-		`<div style="margin-top:auto;padding:0.3cm;background:rgba(255,255,255,0.1);border-radius:7px;"><div style="font-size:7pt;color:rgba(255,255,255,0.55);margin-bottom:2px;">Integración API</div><div style="font-size:11pt;font-weight:700;color:${WHITE};">${api.label}</div></div>`;
-
-	var main = `
-  <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:0.7cm;flex:1;overflow:hidden;">
-    <div>
-      ${sectionHeader("Detalle de la propuesta")}
-      <table style="width:100%;border-collapse:collapse;font-size:8.5pt;">
-        <tbody>
-          ${detailItems.map(function(r, i) {
-		return `<tr style="background:${i % 2 === 1 ? BLUE_BG : WHITE};">
-            <td style="padding:6px 8px;border-bottom:1px solid ${BORDER};color:${GRAY};width:46%;">${r.label}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid ${BORDER};color:${DARK};font-weight:500;">${r.value}</td>
-          </tr>`;
-	}).join("")}
-        </tbody>
-      </table>
-    </div>
-
-    <div style="background:${BLUE_BG};border-radius:10px;padding:0.5cm;display:flex;flex-direction:column;">
-      ${sectionHeader("Resumen")}
-      <div style="margin-bottom:0.35cm;">
-        <div style="font-size:7.5pt;color:${GRAY};margin-bottom:3px;">Precio por IDC</div>
-        <div style="font-size:24pt;font-weight:800;color:${BLUE};line-height:1;">${fm(precioIDC, currency, tc)}</div>
-      </div>
-      <div style="border-top:1px solid ${BORDER};padding-top:0.25cm;display:flex;flex-direction:column;gap:0.1cm;">
-        ${esUnica
-		? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;padding:3px 0;"><span style="color:${GRAY};">Total única vez</span><span style="color:${DARK};font-weight:600;">${fm(revMesTotal, currency, tc)}</span></div>`
-		: `<div style="display:flex;justify-content:space-between;font-size:8.5pt;padding:3px 0;"><span style="color:${GRAY};">Revenue mensual</span><span style="color:${DARK};font-weight:600;">${fm(revMesTotal, currency, tc)}</span></div><div style="display:flex;justify-content:space-between;font-size:8.5pt;padding:3px 0;"><span style="color:${GRAY};">Revenue año 1</span><span style="color:${DARK};font-weight:600;">${fm(revAnual, currency, tc)}</span></div>`
-	}
-      </div>
-      <div style="margin-top:auto;padding-top:0.25cm;border-top:1px solid ${BORDER};font-size:6.5pt;color:${GRAY};line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
-    </div>
-  </div>
-`;
-	return mkSlide(withSidebar(sidebar, main) + slideFooter(3));
-}
-
-// ─── SLIDE 4: PRÓXIMOS PASOS ──────────────────────────────────────────────────
-function slideProximosPasos(clientName) {
-	var steps = [
-		{ num: "01", svg: ic.file(WHITE, 22),  title: "Contrato de integración", desc: "Revisión y firma del Contrato de Integración y sus Anexos." },
-		{ num: "02", svg: ic.users(WHITE, 22), title: "Kick-off técnico",         desc: "Arranque con el equipo de desarrollo: SLAs, servicio técnico y puesta a punto." },
-		{ num: "03", svg: ic.zap(WHITE, 22),   title: "Go-Live",                  desc: "Pase a producción y puesta en marcha de la firma digital en " + clientName + "." },
-	];
-
-	var sidebar = sideLabel("04", "Próximos<br>Pasos", "Cómo<br>avanzamos");
-
-	var main = `
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.65cm;">
-      ${steps.map(function(s) {
-		return `<div style="background:${BLUE_BG};border-radius:10px;padding:0.55cm;position:relative;overflow:hidden;">
-        <div style="font-size:40pt;font-weight:900;color:rgba(53,53,213,0.07);position:absolute;top:-5px;right:8px;line-height:1;">${s.num}</div>
-        <div style="width:1.1cm;height:1.1cm;background:${BLUE};border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:0.35cm;">${s.svg}</div>
-        <div style="font-size:11pt;font-weight:700;color:${DARK};margin-bottom:0.2cm;">${s.title}</div>
-        <div style="font-size:8.5pt;color:${GRAY};line-height:1.5;">${s.desc}</div>
-      </div>`;
-	}).join("")}
-    </div>
-  </div>
-`;
-	return mkSlide(withSidebar(sidebar, main) + slideFooter(4));
-}
-
-// ─── SLIDE 5: CIERRE ──────────────────────────────────────────────────────────
-function slideCierre() {
-	return mkSlide(`
-  <div style="display:flex;flex:1;overflow:hidden;">
-    <div style="width:55%;background:linear-gradient(145deg,${BLUE} 0%,${BLUE_DK} 100%);padding:1cm 1.1cm;display:flex;flex-direction:column;justify-content:space-between;">
-      <div>
-        <div style="font-size:8pt;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.35cm;">05</div>
-        <div style="font-size:30pt;font-weight:700;color:${WHITE};line-height:1.15;margin-bottom:0.4cm;">Gracias por<br>su tiempo</div>
-        <div style="font-size:10.5pt;color:rgba(255,255,255,0.65);line-height:1.6;max-width:12cm;">Quedamos a disposición para avanzar con la integración.</div>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:5px;">
-        <span style="font-size:13pt;font-weight:800;color:${WHITE};letter-spacing:-0.5px;">FID</span>
-        <span style="font-size:7.5pt;color:rgba(255,255,255,0.45);">by Lakaut</span>
-      </div>
-    </div>
-
-    <div style="flex:1;background:#F8F9FD;display:flex;align-items:center;justify-content:center;padding:1cm;">
-      <div style="background:${WHITE};border-radius:12px;padding:0.7cm 0.8cm;box-shadow:0 4px 20px rgba(53,53,213,0.09);width:100%;max-width:10cm;">
-        <div style="width:1.4cm;height:1.4cm;background:${BLUE};border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:0.4cm;">
-          <span style="font-size:13pt;font-weight:700;color:${WHITE};letter-spacing:-0.5px;">MD</span>
-        </div>
-        <div style="font-size:14pt;font-weight:700;color:${DARK};margin-bottom:0.1cm;">Mateo De Falco</div>
-        <div style="font-size:8.5pt;color:${GRAY};margin-bottom:0.45cm;">Consultoría Comercial · Lakaut</div>
-        <div style="display:flex;flex-direction:column;gap:0.22cm;">
-          <div style="display:flex;align-items:center;gap:0.25cm;">${ic.mail(BLUE, 13)}<span style="font-size:9pt;color:${DARK};">mateodefalco@lakaut.com.ar</span></div>
-          <div style="display:flex;align-items:center;gap:0.25cm;">${ic.phone(BLUE, 13)}<span style="font-size:9pt;color:${DARK};">+54 11 3635-8577</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-`);
-}
-
-// ─── CSS ──────────────────────────────────────────────────────────────────────
-var CSS = `
+// ─── Layout ───────────────────────────────────────────────────────────────────
+const SLIDE_CSS = `
 @page { size: 33.87cm 19.05cm; margin: 0; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 33.87cm; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: ${DARK}; }
-body > div { page-break-after: always; break-after: page; }
-body > div:last-child { page-break-after: avoid; break-after: avoid; }
+body { font-family: -apple-system, "Segoe UI", Arial, Helvetica, sans-serif; }
+.slide { width: 33.87cm; height: 19.05cm; overflow: hidden; position: relative; display: flex; flex-direction: column; page-break-after: always; break-after: page; }
+.slide:last-child { page-break-after: avoid; break-after: avoid; }
 `;
 
-// ─── Entry point ──────────────────────────────────────────────────────────────
+// Shared footer for slides 2-4
+function foot(n) {
+	return `<div style="flex-shrink:0;border-top:1px solid ${GRL};padding:0.2cm 1cm;display:flex;justify-content:space-between;align-items:center;">
+  <div style="display:flex;align-items:baseline;gap:4px;"><span style="font-size:10pt;font-weight:800;color:${B};letter-spacing:-0.5px;">FID</span><span style="font-size:7pt;color:${GR};">by Lakaut</span></div>
+  <span style="font-size:7.5pt;color:${GRL};">0${n}</span>
+</div>`;
+}
+
+// Icon square (used in funcionalidades + steps)
+function iconBox(svg, bg, size) {
+	bg = bg || B;
+	size = size || "0.95cm";
+	return `<div style="width:${size};height:${size};background:${bg};border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">${svg}</div>`;
+}
+
+// ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
+function s1Cover(clientName, fecha) {
+	const badges = [
+		{ text: "100% Remoto",        icon: SVG.check( "rgba(255,255,255,0.85)", 11) },
+		{ text: "Firma embebida",      icon: SVG.code(  "rgba(255,255,255,0.85)", 11) },
+		{ text: "Validez legal plena", icon: SVG.shield("rgba(255,255,255,0.85)", 11) },
+	];
+	return `<div class="slide" style="background:${B};">
+  <!-- decorative circles -->
+  <div style="position:absolute;top:-5cm;right:-2.5cm;width:16cm;height:16cm;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+  <div style="position:absolute;bottom:-3cm;right:1cm;width:9cm;height:9cm;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+
+  <!-- brand top -->
+  <div style="padding:0.8cm 1.3cm 0;flex-shrink:0;">
+    <div style="display:flex;align-items:baseline;gap:5px;">
+      <span style="font-size:12pt;font-weight:800;color:${W};letter-spacing:-0.5px;">FID</span>
+      <span style="font-size:7pt;color:rgba(255,255,255,0.45);">by Lakaut</span>
+    </div>
+  </div>
+
+  <!-- main content -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 1.3cm;">
+    <div style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.35cm;">Propuesta Comercial</div>
+    <div style="font-size:44pt;font-weight:700;color:${W};line-height:1.05;letter-spacing:-0.5px;margin-bottom:0.45cm;">${clientName}</div>
+    <div style="font-size:10pt;color:rgba(255,255,255,0.72);max-width:15cm;line-height:1.6;margin-bottom:0.9cm;">Integración de firma digital con validez legal,<br>embebida en tu flujo y 100% remota.</div>
+    <!-- badges -->
+    <div style="display:flex;gap:0.45cm;">
+      ${badges.map(b => `<div style="display:flex;align-items:center;gap:0.2cm;border:1.5px solid rgba(255,255,255,0.38);border-radius:20px;padding:0.18cm 0.45cm;">${b.icon}<span style="font-size:8pt;color:${W};font-weight:500;">${b.text}</span></div>`).join("")}
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="flex-shrink:0;padding:0.3cm 1.3cm;border-top:1px solid rgba(255,255,255,0.18);display:flex;justify-content:space-between;align-items:center;">
+    <span style="font-size:8pt;color:rgba(255,255,255,0.5);">${fecha ? fd(fecha) : ""}</span>
+    <span style="font-size:7pt;color:rgba(255,255,255,0.32);">Autoridad Certificante Licenciada · Infraestructura de Firma Digital · Ley N° 25.506</span>
+  </div>
+</div>`;
+}
+
+// ─── SLIDE 2: INTEGRACIÓN DE FIRMA DIGITAL ────────────────────────────────────
+function s2Integracion(clientName) {
+	const feats = [
+		{ icon: SVG.zap(B,16),    title: "Habilitación sin fricción",    desc: "Firma con validez legal plena, lista para operar a escala." },
+		{ icon: SVG.check(B,16),  title: "Onboarding 100% remoto",       desc: "Alta del usuario desde cualquier lugar, sin trámites presenciales." },
+		{ icon: SVG.mobile(B,16), title: "Certificado en tiempo real",   desc: "Certificado digital de persona física, emitido al instante." },
+		{ icon: SVG.code(B,16),   title: "Firma embebida en el flujo",   desc: `El usuario firma dentro de ${clientName}, sin salir de la experiencia.` },
+		{ icon: SVG.clock(B,16),  title: "Auditoría y evidencia legal",  desc: "Trazabilidad y respaldo legal por cada documento firmado." },
+	];
+	return `<div class="slide" style="background:${OW};">
+  <!-- slide header -->
+  <div style="flex-shrink:0;padding:0.65cm 1cm 0.4cm;">
+    <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.12cm;">Integración de Firma Digital</div>
+    <div style="font-size:9pt;color:${GR};">Firma digital en ${clientName}</div>
+  </div>
+
+  <!-- two columns -->
+  <div style="flex:1;display:flex;gap:0.5cm;padding:0 1cm 0.5cm;overflow:hidden;">
+
+    <!-- LEFT: blue box (Cómo se integra) -->
+    <div style="width:42%;background:${B};border-radius:12px;padding:0.75cm;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.4cm;">Cómo se integra</div>
+      <div style="display:flex;flex-direction:column;gap:0.3cm;margin-bottom:0.6cm;">
+        ${["Firma con validez legal plena (Ley 25.506)", `Integración vía API en los flujos de ${clientName}`, "Recibos, contratos y documentos legales en cualquier proceso"].map(t =>
+			`<div style="display:flex;align-items:flex-start;gap:0.28cm;">
+            <div style="width:6px;height:6px;border-radius:50%;background:${BLT};margin-top:4px;flex-shrink:0;"></div>
+            <span style="font-size:9pt;color:rgba(255,255,255,0.85);line-height:1.45;">${t}</span>
+          </div>`).join("")}
+      </div>
+      <!-- quote -->
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.15);padding-top:0.4cm;">
+        <div style="font-size:22pt;color:${BLT};line-height:1;margin-bottom:0.1cm;">"</div>
+        <div style="font-size:9pt;color:rgba(255,255,255,0.78);line-height:1.5;font-style:italic;">El usuario siempre permanece dentro del flujo de ${clientName}.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: white card (Funcionalidades) -->
+    <div style="flex:1;background:${W};border:1px solid ${GRL};border-radius:12px;box-shadow:0 2px 10px rgba(48,65,213,0.07);padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.35cm;">Funcionalidades</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:0.25cm;">
+        ${feats.map((f,i) => `<div style="display:flex;align-items:flex-start;gap:0.4cm;padding:0.25cm 0;${i < feats.length-1 ? `border-bottom:1px solid ${GRL};` : ""}">
+          ${iconBox(f.icon, OW, "0.85cm")}
+          <div>
+            <div style="font-size:9pt;font-weight:600;color:${DK};margin-bottom:2px;">${f.title}</div>
+            <div style="font-size:8pt;color:${GR};line-height:1.4;">${f.desc}</div>
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>
+
+  </div>
+  ${foot(2)}
+</div>`;
+}
+
+// ─── SLIDE 3: MODELO COMERCIAL — DISTRIBUIDORES ───────────────────────────────
+function s3Dist(deal, clientName, currency, tc) {
+	const inp = deal.inputs || {};
+	const res = deal.resumen || {};
+	const qtys = inp.qtys || {};
+	const firmasAdic = Number(inp.firmasAdic) || 0;
+	const precioFirmaUSD = Number(inp.precioFirmaUSD) || 0;
+
+	const packRows = WEB_PRODUCTS
+		.filter(p => p.precioARS != null && (Number(qtys[p.id]) || 0) > 0)
+		.map(p => ({ label: p.label, qty: Number(qtys[p.id]), unit: p.precioARS / tc, sub: Number(qtys[p.id]) * p.precioARS / tc }));
+
+	const tierRecord = DISTRIBUTOR_TIERS.find(t => t.label === res.tier);
+	const descPct = tierRecord ? (tierRecord.descuento * 100).toFixed(0) : "—";
+	const lista = res.facturacionLista || 0;
+	const neto = res.netoLakaut || 0;
+	const desc = lista - neto;
+	const totalFirmas = packRows.reduce((s,r) => s + r.qty, 0) + firmasAdic;
+	const mainPack = packRows.reduce((b,r) => (!b || r.sub > b.sub) ? r : b, null);
+
+	return `<div class="slide" style="background:${OW};">
+  <!-- slide header -->
+  <div style="flex-shrink:0;padding:0.55cm 1cm 0.35cm;">
+    <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Modelo Comercial</div>
+    <div style="font-size:9pt;color:${GR};">Volumen anual comprometido${res.tier ? ` · <strong style="color:${DK};">${res.tier}</strong> · descuento del ${descPct}% sobre precio de lista.` : ""}</div>
+  </div>
+
+  <!-- two columns -->
+  <div style="flex:1;display:flex;gap:0.5cm;padding:0 1cm 0.5cm;overflow:hidden;">
+
+    <!-- LEFT: white card (Detalle de facturación) -->
+    <div style="flex:1;background:${W};border:1px solid ${GRL};border-radius:12px;box-shadow:0 2px 10px rgba(48,65,213,0.07);padding:0.6cm;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.35cm;">Detalle de facturación</div>
+      <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:0.35cm;">
+        <thead>
+          <tr style="border-bottom:1.5px solid ${GRL};">
+            <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">PRODUCTO</th>
+            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">P. LISTA</th>
+            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">CANT./AÑO</th>
+            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL LISTA</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${packRows.map((r,i) => `<tr style="background:${i%2===0?OW:W};">
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};font-weight:600;color:${DK};">${r.label}</td>
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(r.unit, currency, tc)}</td>
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${r.qty.toLocaleString("es-AR")}</td>
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(r.sub, currency, tc)}</td>
+          </tr>`).join("")}
+          ${firmasAdic > 0 ? `<tr style="background:${packRows.length%2===0?OW:W};">
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};color:${GR};">Firmas adicionales</td>
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(precioFirmaUSD, currency, tc)}</td>
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${firmasAdic.toLocaleString("es-AR")}</td>
+            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(firmasAdic*precioFirmaUSD, currency, tc)}</td>
+          </tr>` : ""}
+          <tr>
+            <td colspan="3" style="padding:7px 6px;font-weight:700;color:${DK};font-size:9pt;">Total facturación a lista</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:${DK};font-size:9pt;">${fm(lista, currency, tc)}</td>
+          </tr>
+        </tbody>
+      </table>
+      ${mainPack ? `<div style="margin-top:auto;background:${B};border-radius:8px;padding:0.3cm 0.5cm;">
+        <div style="font-size:10.5pt;font-weight:700;color:${W};">${mainPack.label}</div>
+        <div style="font-size:8pt;color:rgba(255,255,255,0.7);">${totalFirmas.toLocaleString("es-AR")} firmas / año</div>
+      </div>` : ""}
+    </div>
+
+    <!-- RIGHT: blue box (Resumen) -->
+    <div style="width:41%;background:${B};border-radius:12px;padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
+
+      <!-- nivel tag -->
+      ${res.tier ? `<div style="display:inline-flex;align-items:center;border:1.5px solid rgba(255,255,255,0.35);border-radius:20px;padding:0.12cm 0.4cm;width:fit-content;margin-bottom:0.35cm;">
+        <span style="font-size:9pt;font-weight:600;color:${W};">Nivel ${res.tier}</span>
+      </div>` : ""}
+
+      <!-- line items -->
+      <div style="display:flex;flex-direction:column;gap:0.15cm;margin-bottom:0.35cm;">
+        <div style="display:flex;justify-content:space-between;font-size:9pt;">
+          <span style="color:rgba(255,255,255,0.65);">Total a lista</span>
+          <span style="color:${W};font-weight:500;">${fm(lista, currency, tc)}</span>
+        </div>
+        <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.05cm 0;"></div>
+        <div style="display:flex;justify-content:space-between;font-size:9pt;">
+          <span style="color:rgba(255,255,255,0.65);">Descuento (${descPct}%)</span>
+          <span style="color:rgba(255,255,255,0.85);font-weight:500;">−${fm(desc, currency, tc)}</span>
+        </div>
+      </div>
+
+      <!-- big price -->
+      <div style="border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;margin-top:auto;">
+        <div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">Precio neto a pagar</div>
+        <div style="font-size:26pt;font-weight:800;color:${W};line-height:1;">${fm(neto, currency, tc)}</div>
+        <div style="font-size:7.5pt;color:rgba(255,255,255,0.6);margin-top:0.2cm;">Compromiso anual · ahorro de ${fm(desc, currency, tc)} sobre lista.</div>
+      </div>
+
+      <div style="margin-top:0.4cm;padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
+    </div>
+
+  </div>
+  ${foot(3)}
+</div>`;
+}
+
+// ─── SLIDE 3: MODELO COMERCIAL — B2B2C ───────────────────────────────────────
+function s3B2B2C(deal, clientName, currency, tc) {
+	const inp = deal.inputs || {};
+	const res = deal.resumen || {};
+	const esUnica = inp.frecuencia === "unica";
+	const api = [...B2B2C_API_TIERS].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || B2B2C_API_TIERS[0];
+	const sla = SLA_PLANS.find(s => s.id === inp.slaId) || SLA_PLANS[0];
+	const slaText = sla.precioMes ? `${sla.label} · ${fm(sla.precioMes, currency, tc)}/mes` : `${sla.label} · incluido`;
+
+	const rows = [
+		{ l: "Modalidad",                v: esUnica ? "Adquisición única" : "Recurrente mensual" },
+		{ l: esUnica ? "Total IDC" : "IDC por mes", v: (Number(inp.idcMensuales)||0).toLocaleString("es-AR") },
+		{ l: "Tipo de integración API",  v: api.label },
+		{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)} · una sola vez` },
+		{ l: "Plan de soporte / SLA",    v: slaText },
+		{ l: "Firmas incluidas por IDC", v: String(Number(inp.firmasInclPorIDC)||0) },
+		...((Number(inp.firmasAdicPorIDC)||0) > 0 ? [{ l: "Firmas adicionales por IDC", v: `${inp.firmasAdicPorIDC} · ${fm(Number(inp.precioFirmaAdic)||0, currency, tc)} c/u` }] : []),
+	];
+
+	const precioIDC = res.precioIDC || 0;
+	const revMes = res.revMesTotal || 0;
+	const revAnual = res.revAnual || 0;
+
+	return `<div class="slide" style="background:${OW};">
+  <!-- slide header -->
+  <div style="flex-shrink:0;padding:0.55cm 1cm 0.35cm;">
+    <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Modelo Comercial</div>
+    <div style="font-size:9pt;color:${GR};">B2B2C · Identidades Digitales · integración <strong style="color:${DK};">${api.label}</strong></div>
+  </div>
+
+  <!-- two columns -->
+  <div style="flex:1;display:flex;gap:0.5cm;padding:0 1cm 0.5cm;overflow:hidden;">
+
+    <!-- LEFT: white card (Detalle) -->
+    <div style="flex:1;background:${W};border:1px solid ${GRL};border-radius:12px;box-shadow:0 2px 10px rgba(48,65,213,0.07);padding:0.6cm;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.35cm;">Detalle de la propuesta</div>
+      <table style="width:100%;border-collapse:collapse;font-size:9pt;">
+        <tbody>
+          ${rows.map((r,i) => `<tr style="background:${i%2===0?OW:W};">
+            <td style="padding:7px 8px;border-bottom:1px solid ${GRL};color:${GR};width:46%;">${r.l}</td>
+            <td style="padding:7px 8px;border-bottom:1px solid ${GRL};color:${DK};font-weight:500;">${r.v}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RIGHT: blue box (Resumen) -->
+    <div style="width:41%;background:${B};border-radius:12px;padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
+
+      <div style="margin-bottom:0.4cm;">
+        <div style="font-size:8pt;color:${BLT};margin-bottom:0.15cm;">Precio por IDC</div>
+        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${fm(precioIDC, currency, tc)}</div>
+      </div>
+
+      <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.35cm;"></div>
+
+      <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.5cm;">
+        ${esUnica
+		? `<div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Total única vez</span><span style="color:${W};font-weight:600;">${fm(revMes, currency, tc)}</span></div>`
+		: `<div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Revenue mensual</span><span style="color:${W};font-weight:600;">${fm(revMes, currency, tc)}</span></div>
+           <div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Revenue año 1</span><span style="color:${W};font-weight:600;">${fm(revAnual, currency, tc)}</span></div>`
+	}
+      </div>
+
+      <div style="margin-top:auto;padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
+    </div>
+
+  </div>
+  ${foot(3)}
+</div>`;
+}
+
+// ─── SLIDE 4: PRÓXIMOS PASOS ──────────────────────────────────────────────────
+function s4Pasos(clientName) {
+	const steps = [
+		{ n:"01", icon: SVG.file( W, 20), title:"Contrato de integración", desc:"Revisión y firma del Contrato de Integración y sus Anexos.",           dark:false },
+		{ n:"02", icon: SVG.users(W, 20), title:"Kick-off técnico",         desc:"Arranque con el equipo de desarrollo: SLAs, servicio técnico y puesta a punto.", dark:false },
+		{ n:"03", icon: SVG.zap(  W, 20), title:"Go-Live",                  desc:`Pase a producción y puesta en marcha de la firma digital en ${clientName}.`, dark:true  },
+	];
+	return `<div class="slide" style="background:${W};">
+  <!-- slide header -->
+  <div style="flex-shrink:0;padding:0.65cm 1cm 0.4cm;">
+    <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Próximos Pasos</div>
+    <div style="font-size:9pt;color:${GR};">Cómo avanzamos</div>
+  </div>
+
+  <!-- three step cards -->
+  <div style="flex:1;display:flex;gap:0.5cm;padding:0 1cm 0.5cm;overflow:hidden;">
+    ${steps.map(s => {
+		const bg   = s.dark ? B : OW;
+		const bd   = s.dark ? "none" : `1px solid ${GRL}`;
+		const nClr = s.dark ? BLT : B;
+		const tClr = s.dark ? W : DK;
+		const dClr = s.dark ? "rgba(255,255,255,0.75)" : GR;
+		const iBox = s.dark
+			? `<div style="width:1.1cm;height:1.1cm;background:rgba(255,255,255,0.16);border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:0.45cm;">${s.icon}</div>`
+			: iconBox(SVG[s.n==="01"?"file":"users"](W,20), B, "1.1cm") + `<div style="margin-bottom:0.45cm;"></div>`;
+		return `<div style="flex:1;background:${bg};border:${bd};border-radius:12px;padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="font-size:11pt;font-weight:800;color:${nClr};margin-bottom:0.35cm;">${s.n}</div>
+          <div style="width:1.1cm;height:1.1cm;background:${s.dark?"rgba(255,255,255,0.16)":B};border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:0.45cm;">${s.icon}</div>
+          <div style="font-size:12pt;font-weight:700;color:${tClr};margin-bottom:0.2cm;">${s.title}</div>
+          <div style="font-size:9pt;color:${dClr};line-height:1.55;">${s.desc}</div>
+        </div>`;
+	}).join("")}
+  </div>
+  ${foot(4)}
+</div>`;
+}
+
+// ─── SLIDE 5: CIERRE ──────────────────────────────────────────────────────────
+function s5Cierre() {
+	return `<div class="slide" style="background:${B};">
+  <!-- decorative circle -->
+  <div style="position:absolute;bottom:-3.5cm;left:-2cm;width:12cm;height:12cm;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+
+  <!-- main content -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 1.3cm;">
+    <div style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.3cm;">Gracias por su tiempo</div>
+    <div style="font-size:36pt;font-weight:700;color:${W};line-height:1.1;margin-bottom:0.4cm;">Muchas gracias</div>
+    <div style="font-size:10pt;color:rgba(255,255,255,0.7);line-height:1.6;max-width:14cm;">Quedamos a disposición para avanzar con la integración.</div>
+  </div>
+
+  <!-- divider + contact -->
+  <div style="flex-shrink:0;border-top:1px solid rgba(255,255,255,0.18);padding:0.5cm 1.3cm;display:flex;align-items:center;gap:1cm;">
+    <!-- avatar -->
+    <div style="width:1.35cm;height:1.35cm;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.35);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <span style="font-size:11pt;font-weight:700;color:${W};letter-spacing:-0.5px;">MD</span>
+    </div>
+    <!-- info -->
+    <div>
+      <div style="font-size:11pt;font-weight:700;color:${W};margin-bottom:0.15cm;">Mateo De Falco</div>
+      <div style="display:flex;gap:1cm;">
+        <div style="display:flex;align-items:center;gap:0.2cm;">${SVG.mail("rgba(255,255,255,0.7)",12)}<span style="font-size:8.5pt;color:rgba(255,255,255,0.8);">mateodefalco@lakaut.com.ar</span></div>
+        <div style="display:flex;align-items:center;gap:0.2cm;">${SVG.phone("rgba(255,255,255,0.7)",12)}<span style="font-size:8.5pt;color:rgba(255,255,255,0.8);">+54 11 3635-8577</span></div>
+      </div>
+    </div>
+    <!-- brand right -->
+    <div style="margin-left:auto;display:flex;align-items:baseline;gap:4px;">
+      <span style="font-size:12pt;font-weight:800;color:${W};letter-spacing:-0.5px;">FID</span>
+      <span style="font-size:7.5pt;color:rgba(255,255,255,0.45);">by Lakaut</span>
+    </div>
+  </div>
+</div>`;
+}
+
+// ─── Builder ──────────────────────────────────────────────────────────────────
 function buildHTML(deal, client, currency, tc) {
-	var clientName = (client && client.name) || deal.clientName || (deal.clients && deal.clients.name) || "Cliente";
-	var ch = deal.channel;
-
-	var slide3 = ch === "b2b2c"
-		? slideModeloB2B2C(deal, clientName, currency, tc)
-		: slideModeloDist(deal, clientName, currency, tc);
-
-	var slides = [
-		slideCover(clientName, deal.fecha),
-		slideIntegracion(clientName),
-		slide3,
-		slideProximosPasos(clientName),
-		slideCierre(),
-	].join("\n");
+	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
+	const s3 = deal.channel === "b2b2c"
+		? s3B2B2C(deal, clientName, currency, tc)
+		: s3Dist(deal, clientName, currency, tc);
 
 	return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <title>Propuesta Comercial — ${clientName}</title>
-<style>${CSS}</style>
+<style>${SLIDE_CSS}</style>
 </head>
 <body>
-${slides}
+${s1Cover(clientName, deal.fecha)}
+${s2Integracion(clientName)}
+${s3}
+${s4Pasos(clientName)}
+${s5Cierre()}
 </body>
 </html>`;
 }
 
 export function exportProposal(deal, client, currency, tc) {
-	var html = buildHTML(deal, client, currency, tc);
-	var win = window.open("", "_blank");
+	const html = buildHTML(deal, client, currency, tc);
+	const win = window.open("", "_blank");
 	if (!win) { alert("Habilitá ventanas emergentes para exportar la propuesta."); return; }
 	win.document.open();
 	win.document.write(html);
 	win.document.close();
-	setTimeout(function() { win.print(); }, 400);
+	setTimeout(() => win.print(), 400);
 }
