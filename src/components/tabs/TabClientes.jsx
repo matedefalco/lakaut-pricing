@@ -25,8 +25,6 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	const [selectedId, setSelectedId] = useState(null);
 	const [editingName, setEditingName] = useState(false);
 	const [nameInput, setNameInput] = useState("");
-	const [editingCerts, setEditingCerts] = useState(false);
-	const [certsInput, setCertsInput] = useState("");
 
 	const clients = clientsApi?.clients || [];
 	const deals = dealsApi?.deals || [];
@@ -63,12 +61,6 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 		setEditingName(false);
 	}
 
-	async function saveCerts() {
-		if (!selected) return;
-		await clientsApi.update(selected.id, { certs_activos: Number(certsInput) || 0 });
-		setEditingCerts(false);
-	}
-
 	async function deleteClient(id) {
 		if (!window.confirm("¿Eliminar este cliente y desvincular sus deals?")) return;
 		await clientsApi.remove(id);
@@ -98,7 +90,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 						return (
 							<button
 								key={c.id}
-								onClick={function () { setSelectedId(c.id); setEditingName(false); setEditingCerts(false); }}
+								onClick={function () { setSelectedId(c.id); setEditingName(false); }}
 								className={"text-left px-3 py-2 rounded-md text-sm transition-colors " + (act ? "bg-accent font-semibold" : "hover:bg-muted")}
 							>
 								<div className="truncate">{c.name}</div>
@@ -142,36 +134,29 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 						<button onClick={function () { deleteClient(selected.id); }} className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="size-4" /></button>
 					</div>
 
-					{/* Certs activos (solo distribuidores) */}
-					{selected.channel === "distribuidores" && (
-						<Card>
-							<CardContent className="pt-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<p className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos administrados</p>
-										{editingCerts ? (
-											<div className="flex items-center gap-2 mt-1">
-												<Input autoFocus type="number" value={certsInput} onChange={function (e) { setCertsInput(e.target.value); }} onKeyDown={function (e) { if (e.key === "Enter") saveCerts(); if (e.key === "Escape") setEditingCerts(false); }} className="h-7 text-sm w-28" />
-												<button onClick={saveCerts} className="text-[var(--success)]"><Check className="size-4" /></button>
-												<button onClick={function () { setEditingCerts(false); }} className="text-muted-foreground"><X className="size-4" /></button>
-											</div>
-										) : (
-											<div className="flex items-center gap-2 mt-1">
-												<span className="text-xl font-semibold tabular-nums">{(selected.certs_activos || 0).toLocaleString("es-AR")}</span>
-												<button onClick={function () { setCertsInput(selected.certs_activos || 0); setEditingCerts(true); }} className="text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+					{/* Certs activos (solo distribuidores) — derivado de deals */}
+					{selected.channel === "distribuidores" && (function () {
+						const certsTotal = clientDeals.reduce(function (s, d) { return s + (d.resumen?.certsComprados || 0); }, 0);
+						return (
+							<Card>
+								<CardContent className="pt-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos administrados</p>
+											<p className="text-[10px] text-muted-foreground mt-0.5">Calculado de todos los deals del cliente</p>
+											<span className="text-xl font-semibold tabular-nums mt-1 block">{certsTotal.toLocaleString("es-AR")}</span>
+										</div>
+										{certsTotal > 0 && (
+											<div className="text-right">
+												<p className="text-xs text-muted-foreground">Nivel actual</p>
+												<p className="text-sm font-semibold">{getDistributorTier(certsTotal, 0).label}</p>
 											</div>
 										)}
 									</div>
-									{selected.certs_activos > 0 && (
-										<div className="text-right">
-											<p className="text-xs text-muted-foreground">Nivel actual</p>
-											<p className="text-sm font-semibold">{getDistributorTier(selected.certs_activos, 0).label}</p>
-										</div>
-									)}
-								</div>
-							</CardContent>
-						</Card>
-					)}
+								</CardContent>
+							</Card>
+						);
+					})()}
 
 					{/* KPIs */}
 					{stats && (

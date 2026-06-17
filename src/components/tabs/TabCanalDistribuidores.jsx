@@ -29,10 +29,12 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 
-	// Auto-fill certsActivos when client changes
+	// Auto-fill certsActivos from sum of past deals for this client
 	useEffect(function () {
 		if (selectedClient && !pendingEdit) {
-			setCertsActivos(selectedClient.certs_activos || 0);
+			const past = (dealsApi?.deals || []).filter(function (d) { return d.client_id === selectedClient.id; });
+			const sum = past.reduce(function (s, d) { return s + (d.resumen?.certsComprados || 0); }, 0);
+			setCertsActivos(sum);
 		}
 	}, [selectedClient]);
 
@@ -85,19 +87,13 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			setSelectedClient(client);
 		}
 
-		// Update client certs_activos
-		if (client && clientsApi) {
-			const updated = await clientsApi.update(client.id, { certs_activos: Number(certsActivos) || 0 });
-			if (updated) setSelectedClient(updated);
-		}
-
 		await dealsApi.save({
 			id: editingId || Date.now().toString(36),
 			channel: "distribuidores",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
 			inputs: { certsActivos, qtys, firmasAdic, precioFirmaUSD },
-			resumen: { tier: tier.label, certsActivos, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
+			resumen: { tier: tier.label, certsActivos, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
 		}, client?.id || null);
 
 		setEditingId(null);
