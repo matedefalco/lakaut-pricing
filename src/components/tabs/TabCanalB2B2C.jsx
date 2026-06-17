@@ -22,7 +22,7 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 	const [clientName, setClientName] = useState("");
 	const [frecuencia, setFrecuencia] = useState("mensual");
 	const [idcMensuales, setIdcMensuales] = useState(5500);
-	const [apiId, setApiId] = useState("standard");
+	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [firmasInclPorIDC, setFirmasInclPorIDC] = useState(4);
 	const [firmasAdicPorIDC, setFirmasAdicPorIDC] = useState(0);
@@ -32,8 +32,7 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 
 	const esUnica = frecuencia === "unica";
 
-	const api = B2B2C_API_TIERS.find(function (t) { return t.id === apiId; }) || B2B2C_API_TIERS[0];
-	const [fee, setFee] = useState(api.feeDefault);
+	const api = B2B2C_API_TIERS.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || B2B2C_API_TIERS[0];
 	const sla = SLA_PLANS.find(function (s) { return s.id === slaId; }) || SLA_PLANS[0];
 	const seg = getB2B2CSegment(idcMensuales);
 
@@ -43,8 +42,7 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 		setClientName(pendingEdit.clientName === "(sin nombre)" ? "" : pendingEdit.clientName);
 		setFrecuencia(i.frecuencia || "mensual");
 		setIdcMensuales(i.idcMensuales || 0);
-		setApiId(i.apiId || "standard");
-		setFee(i.fee != null ? i.fee : api.feeDefault);
+		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setFirmasInclPorIDC(i.firmasInclPorIDC != null ? i.firmasInclPorIDC : 4);
 		setFirmasAdicPorIDC(i.firmasAdicPorIDC || 0);
@@ -81,12 +79,6 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 	const costoUnica = costoMes;
 	const margenUnica = margenMes;
 
-	function onApi(id) {
-		setApiId(id);
-		const t = B2B2C_API_TIERS.find(function (x) { return x.id === id; });
-		if (t) setFee(t.feeDefault);
-	}
-
 	function saveQuote() {
 		const now = new Date().toISOString();
 		const prev = editingId ? quotesApi.quotes.find(function (q) { return q.id === editingId; }) : null;
@@ -96,7 +88,7 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
 			clientName: clientName || "(sin nombre)",
-			inputs: { frecuencia, idcMensuales, apiId, fee, slaId, firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic },
+			inputs: { frecuencia, idcMensuales, fee, slaId, firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic },
 			resumen: { segmento: seg.label, frecuencia, idcMensuales, firmasMes, precioIDC, revMesTotal: esUnica ? revUnica : revMesTotal, revAnual: esUnica ? revUnica : revAnual, margenMes: esUnica ? margenUnica : margenMes, margenPct },
 		});
 		setEditingId(null);
@@ -138,9 +130,9 @@ export function TabCanalB2B2C({ costs, currency, tc, quotesApi, pendingEdit, onC
 					{/* Parámetros */}
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						<NumberField label={esUnica ? "Total IDC (única vez)" : "IDC nuevas por mes"} value={idcMensuales} onChange={setIdcMensuales} note={esUnica ? "Cantidad total del lote" : undefined} />
-						<SelectField label="Tipo de instalación (API)" value={apiId} onValueChange={onApi}
-							options={B2B2C_API_TIERS.map(function (t) { return { value: t.id, label: t.label + " (USD " + t.feeMin.toLocaleString("es-AR") + "–" + t.feeMax.toLocaleString("es-AR") + ")" }; })} />
-						<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" note={"Rango " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+						<div className="flex flex-col gap-1.5">
+							<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+						</div>
 						<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
 							options={SLA_PLANS.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
 						<NumberField label="Firmas incluidas por IDC" value={firmasInclPorIDC} onChange={setFirmasInclPorIDC} note="Firma inicial + activación (editable)" />

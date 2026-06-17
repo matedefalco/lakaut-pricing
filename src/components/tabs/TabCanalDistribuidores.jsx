@@ -65,7 +65,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, quotesApi, pending
 	const cvTotal = calc.certsTotal * cvCert + calc.firmasTotal * cvFirma;
 	const margenLakaut = netoLakaut - cvTotal;
 	const margenPct = netoLakaut > 0 ? margenLakaut / netoLakaut : 0;
-	const hasVolume = calc.facturacionLista > 0;
+	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || (Number(firmasAdic) || 0) > 0 || (Number(certsActivos) || 0) > 0;
 
 	function saveQuote() {
 		const now = new Date().toISOString();
