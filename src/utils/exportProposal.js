@@ -225,19 +225,19 @@ function s3Dist(deal, clientName, currency, tc) {
           </tr>
         </tbody>
       </table>
-      <!-- desglose de volumen -->
+      <!-- desglose de valor -->
       <div style="margin-top:auto;display:flex;gap:0.35cm;">
         <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
-          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Packs / año</div>
-          <div style="font-size:12pt;font-weight:700;color:${DK};">${totalPacks.toLocaleString("es-AR")}</div>
-        </div>
-        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
-          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Certificados</div>
+          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Certificados digitales</div>
           <div style="font-size:12pt;font-weight:700;color:${DK};">${totalCerts.toLocaleString("es-AR")}</div>
         </div>
+        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
+          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Firmas incluidas</div>
+          <div style="font-size:12pt;font-weight:700;color:${DK};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
+        </div>
         <div style="flex:1;background:${B};border-radius:8px;padding:0.3cm 0.4cm;">
-          <div style="font-size:7pt;color:${BLT};margin-bottom:2px;">Firmas incluidas</div>
-          <div style="font-size:12pt;font-weight:700;color:${W};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
+          <div style="font-size:7pt;color:${BLT};margin-bottom:2px;">Ahorro sobre lista</div>
+          <div style="font-size:12pt;font-weight:700;color:${W};">${fm(desc, currency, tc)}</div>
         </div>
       </div>
     </div>
