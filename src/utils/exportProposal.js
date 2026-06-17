@@ -235,10 +235,6 @@ function s3Dist(deal, clientName, currency, tc) {
           <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Firmas incluidas</div>
           <div style="font-size:12pt;font-weight:700;color:${DK};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
         </div>
-        <div style="flex:1;background:${B};border-radius:8px;padding:0.3cm 0.4cm;">
-          <div style="font-size:7pt;color:${BLT};margin-bottom:2px;">Ahorro sobre lista</div>
-          <div style="font-size:12pt;font-weight:700;color:${W};">${fm(desc, currency, tc)}</div>
-        </div>
       </div>
     </div>
 
@@ -268,7 +264,6 @@ function s3Dist(deal, clientName, currency, tc) {
       <div style="border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;margin-top:auto;">
         <div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">Precio neto a pagar</div>
         <div style="font-size:26pt;font-weight:800;color:${W};line-height:1;">${fm(neto, currency, tc)}</div>
-        <div style="font-size:7.5pt;color:rgba(255,255,255,0.6);margin-top:0.2cm;">Compromiso anual · ahorro de ${fm(desc, currency, tc)} sobre lista.</div>
       </div>
 
       <div style="margin-top:0.4cm;padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
