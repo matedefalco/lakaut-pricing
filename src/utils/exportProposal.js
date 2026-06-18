@@ -169,6 +169,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 			label: p.label, qty: Number(qtys[p.id]),
 			unit: p.priceUSD, sub: Number(qtys[p.id]) * p.priceUSD,
 			certs: p.certs || 0, firmas: p.firmas || 0, ilimitadas: p.ilimitadas,
+			segment: p.segment || "persona",
 		}));
 
 	const tierRecord = distributorTiers.find(t => t.label === res.tier);
@@ -180,7 +181,8 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 
 	// desglose totales
 	const totalPacks = packRows.reduce((s,r) => s + r.qty, 0);
-	const totalCerts = packRows.reduce((s,r) => s + r.qty * r.certs, 0);
+	const totalCertsF = packRows.filter(r => r.segment !== "empresa").reduce((s,r) => s + r.qty * r.certs, 0);
+	const totalCertsJ = packRows.filter(r => r.segment === "empresa").reduce((s,r) => s + r.qty * r.certs, 0);
 	const hayIlimitadas = packRows.some(r => r.ilimitadas);
 	const totalFirmasIncl = hayIlimitadas ? null : packRows.reduce((s,r) => s + r.qty * r.firmas, 0);
 	const totalFirmasConAdic = totalFirmasIncl != null ? totalFirmasIncl + firmasAdic : null;
@@ -202,39 +204,52 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
         <thead>
           <tr style="border-bottom:1.5px solid ${GRL};">
             <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">PRODUCTO</th>
+            <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">INCLUYE</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">P. LISTA</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">CANT./AÑO</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL LISTA</th>
           </tr>
         </thead>
         <tbody>
-          ${packRows.map((r,i) => `<tr style="background:${i%2===0?OW:W};">
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};font-weight:600;color:${DK};">${r.label}</td>
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(r.unit, currency, tc)}</td>
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${r.qty.toLocaleString("es-AR")}</td>
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(r.sub, currency, tc)}</td>
-          </tr>`).join("")}
+          ${packRows.map((r,i) => {
+            const inclParts = [];
+            if (r.certs > 0) inclParts.push(r.certs + " cert" + (r.segment === "empresa" ? " jur." : " fís."));
+            if (r.ilimitadas) inclParts.push("firmas ilimitadas");
+            else if (r.firmas > 0) inclParts.push(r.firmas.toLocaleString("es-AR") + " firmas");
+            return `<tr style="background:${i%2===0?OW:W};">
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};font-weight:600;color:${DK};">${r.label}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};color:${GR};font-size:7.5pt;">${inclParts.join(" · ")}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(r.unit, currency, tc)}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${r.qty.toLocaleString("es-AR")}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(r.sub, currency, tc)}</td>
+          </tr>`;
+          }).join("")}
           ${firmasAdic > 0 ? `<tr style="background:${packRows.length%2===0?OW:W};">
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};color:${GR};">Firmas adicionales</td>
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(precioFirmaUSD, currency, tc)}</td>
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${firmasAdic.toLocaleString("es-AR")}</td>
-            <td style="padding:6px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(firmasAdic*precioFirmaUSD, currency, tc)}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};color:${GR};">Firmas adicionales</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};color:${GR};font-size:7.5pt;"></td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(precioFirmaUSD, currency, tc)}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${firmasAdic.toLocaleString("es-AR")}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(firmasAdic*precioFirmaUSD, currency, tc)}</td>
           </tr>` : ""}
           <tr>
-            <td colspan="3" style="padding:7px 6px;font-weight:700;color:${DK};font-size:9pt;">Total facturación a lista</td>
+            <td colspan="4" style="padding:7px 6px;font-weight:700;color:${DK};font-size:9pt;">Total facturación a lista</td>
             <td style="padding:7px 6px;text-align:right;font-weight:700;color:${DK};font-size:9pt;">${fm(lista, currency, tc)}</td>
           </tr>
         </tbody>
       </table>
       <!-- desglose de valor -->
-      <div style="margin-top:auto;display:flex;gap:0.35cm;">
-        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
-          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Certificados digitales</div>
-          <div style="font-size:12pt;font-weight:700;color:${DK};">${totalCerts.toLocaleString("es-AR")}</div>
-        </div>
-        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.3cm 0.4cm;">
-          <div style="font-size:7pt;color:${GR};margin-bottom:2px;">Firmas incluidas</div>
-          <div style="font-size:12pt;font-weight:700;color:${DK};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
+      <div style="margin-top:auto;display:flex;gap:0.3cm;">
+        ${totalCertsF > 0 ? `<div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
+          <div style="font-size:6.5pt;color:${GR};margin-bottom:2px;">Certs físicos</div>
+          <div style="font-size:11pt;font-weight:700;color:${DK};">${totalCertsF.toLocaleString("es-AR")}</div>
+        </div>` : ""}
+        ${totalCertsJ > 0 ? `<div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
+          <div style="font-size:6.5pt;color:${GR};margin-bottom:2px;">Certs jurídicos</div>
+          <div style="font-size:11pt;font-weight:700;color:${DK};">${totalCertsJ.toLocaleString("es-AR")}</div>
+        </div>` : ""}
+        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
+          <div style="font-size:6.5pt;color:${GR};margin-bottom:2px;">Firmas incluidas</div>
+          <div style="font-size:11pt;font-weight:700;color:${DK};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
         </div>
       </div>
     </div>
