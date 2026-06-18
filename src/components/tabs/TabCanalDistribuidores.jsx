@@ -94,9 +94,9 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas, precioFirmaAdic };
 	}, [models, qtys, firmasAdic]);
 
-	const tier = getDistributorTierLocal(certsActivos, calc.facturacionLista, distributorTiers);
-	const tierByCertsOnly = getDistributorTierLocal(certsActivos, 0, distributorTiers);
-	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "compromiso anual" : (calc.facturacionLista > 0 ? "certs y compromiso" : "certificados activos");
+	const tier = getDistributorTierLocal(calc.certsTotal, calc.facturacionLista, distributorTiers);
+	const tierByCertsOnly = getDistributorTierLocal(calc.certsTotal, 0, distributorTiers);
+	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "compromiso anual" : (calc.certsTotal > 0 ? "certs cotizados" : "sin volumen");
 
 	const netoLakaut = calc.facturacionLista * (1 - tier.descuento);
 	const cvTotal = calc.certsTotal * cvCert + calc.firmasTotal * cvFirma;
