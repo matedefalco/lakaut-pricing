@@ -120,7 +120,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
 			inputs: { certsActivos, qtys, firmasAdic, casosDeUso },
-			resumen: { tier: tier.label, certsActivos, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
+			resumen: { tier: tier.label, certsActivos: calc.certsTotal, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
 		}, client?.id || null);
 
 		setEditingId(null);
