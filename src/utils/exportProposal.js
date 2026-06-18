@@ -206,7 +206,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
             <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">PRODUCTO</th>
             <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">INCLUYE</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">P. LISTA</th>
-            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">CANT./AÑO</th>
+            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">CANTIDAD</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL LISTA</th>
           </tr>
         </thead>
