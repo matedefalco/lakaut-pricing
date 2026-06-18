@@ -1,5 +1,5 @@
 import { makeMoney } from "@/utils/useMoney";
-import { WEB_PRODUCTS } from "@/data/channels";
+import { useModels } from "@/context/ModelsContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -7,18 +7,23 @@ import { Badge } from "@/components/ui/badge";
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
 export function TabCanalWeb({ costs, currency, tc }) {
+	const { models } = useModels();
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
-	function econ(p) {
-		if (p.precioARS == null) return null;
-		const precioUSD = p.precioARS / tc;
-		const certCost = (p.certs || 1) * cvCert;
-		const firmasCost = p.ilimitadas ? 0 : (p.firmas || 0) * cvFirma;
+	function isConsultar(m) { return !m.priceUSD || m.priceUSD <= 0; }
+
+	function econ(m) {
+		if (isConsultar(m)) return null;
+		const precioUSD = m.priceUSD;
+		// Use stored ARS price if available, otherwise derive from TC
+		const precioARS = m.precioARS || Math.round(precioUSD * tc);
+		const certCost = (m.certs || 1) * cvCert;
+		const firmasCost = m.ilimitadas ? 0 : (m.firmas || 0) * cvFirma;
 		const cvTotal = certCost + firmasCost;
 		const margenPct = precioUSD > 0 ? (precioUSD - cvTotal) / precioUSD : 0;
-		return { precioUSD, cvTotal, margenPct };
+		return { precioUSD, precioARS, cvTotal, margenPct };
 	}
 
 	return (
@@ -44,21 +49,30 @@ export function TabCanalWeb({ costs, currency, tc }) {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{WEB_PRODUCTS.map(function (p) {
-								const e = econ(p);
+							{models.map(function (m) {
+								const e = econ(m);
+								const selloComp = m.ilimitadas && !m.extraFirmaPrice;
 								return (
-									<TableRow key={p.id}>
+									<TableRow key={m.id}>
 										<TableCell>
-											<div className="font-semibold">{p.label}</div>
-											<div className="text-[11px] text-muted-foreground">{p.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
+											<div className="font-semibold">{m.label}</div>
+											<div className="text-[11px] text-muted-foreground">{m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{p.precioARS == null ? <Badge variant="outline">Consultar</Badge> : "$ " + p.precioARS.toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums">
+											{e == null ? <Badge variant="outline">Consultar</Badge> : "$ " + e.precioARS.toLocaleString("es-AR")}
+										</TableCell>
 										<TableCell className="text-right tabular-nums">{e == null ? "—" : fMoney(e.precioUSD)}</TableCell>
-										<TableCell className="text-right tabular-nums">{p.certs == null ? "—" : p.certs}</TableCell>
-										<TableCell className="text-right tabular-nums">{p.ilimitadas ? "Ilimitadas" : (p.firmas == null ? "—" : p.firmas)}</TableCell>
-										<TableCell className="text-right tabular-nums">{p.firmaExtraARS == null ? (p.selloCompetencia ? "Sello comp." : "—") : "$ " + p.firmaExtraARS.toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums">{m.certs == null || m.certs === 0 ? "—" : m.certs}</TableCell>
+										<TableCell className="text-right tabular-nums">{m.ilimitadas ? "Ilimitadas" : (m.firmas == null ? "—" : m.firmas)}</TableCell>
+										<TableCell className="text-right tabular-nums">
+											{m.extraFirmaPrice
+												? "$ " + (m.firmaExtraARS || Math.round(m.extraFirmaPrice * tc)).toLocaleString("es-AR")
+												: (selloComp ? "Sello comp." : "—")}
+										</TableCell>
 										<TableCell className="text-right tabular-nums">{e == null ? "—" : fMoney2(e.cvTotal)}</TableCell>
-										<TableCell className={"text-right tabular-nums font-semibold " + (e == null ? "text-muted-foreground" : margClass(e.margenPct))}>{e == null ? "—" : (e.margenPct * 100).toFixed(0) + "%"}</TableCell>
+										<TableCell className={"text-right tabular-nums font-semibold " + (e == null ? "text-muted-foreground" : margClass(e.margenPct))}>
+											{e == null ? "—" : (e.margenPct * 100).toFixed(0) + "%"}
+										</TableCell>
 									</TableRow>
 								);
 							})}

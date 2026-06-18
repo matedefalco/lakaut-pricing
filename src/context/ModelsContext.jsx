@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { DEFAULT_MODELS } from "../data/defaultModels";
+import { loadConfig, saveConfig, subscribeConfig } from "../lib/supabase";
 
 const ModelsContext = createContext(null);
 const STORAGE_KEY = "lakaut_models_v2";
@@ -16,10 +17,26 @@ export function ModelsProvider({ children }) {
 		return DEFAULT_MODELS;
 	});
 
+	useEffect(function () {
+		loadConfig("models").then(function (remote) {
+			if (Array.isArray(remote) && remote.length > 0) {
+				setModels(remote);
+				try { localStorage.setItem(STORAGE_KEY, JSON.stringify(remote)); } catch (e) {}
+			}
+		});
+		return subscribeConfig("models", function (remote) {
+			if (Array.isArray(remote) && remote.length > 0) {
+				setModels(remote);
+				try { localStorage.setItem(STORAGE_KEY, JSON.stringify(remote)); } catch (e) {}
+			}
+		});
+	}, []);
+
 	function persist(updater) {
 		setModels(function (prev) {
 			const next = typeof updater === "function" ? updater(prev) : updater;
 			try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) {}
+			saveConfig("models", next);
 			return next;
 		});
 	}
