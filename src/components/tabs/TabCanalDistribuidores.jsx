@@ -47,7 +47,6 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const [certsActivos, setCertsActivos] = useState(0);
 	const [qtys, setQtys] = useState({});
 	const [firmasAdic, setFirmasAdic] = useState(0);
-	const [precioFirmaUSD, setPrecioFirmaUSD] = useState(1);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
@@ -67,7 +66,6 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		if (pendingEdit.clients) setSelectedClient(pendingEdit.clients);
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
-		setPrecioFirmaUSD(i.precioFirmaUSD != null ? i.precioFirmaUSD : 1);
 		setCasosDeUso(i.casosDeUso || "");
 		setEditingId(pendingEdit.id);
 		onConsumeEdit && onConsumeEdit();
@@ -77,6 +75,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 	const calc = useMemo(function () {
 		let facturacionLista = 0, certsTotal = 0, firmasIncl = 0, ilimitadasUsadas = false;
+		let weightedFirmaPrice = 0, totalQtyWithPrice = 0;
 		models.forEach(function (p) {
 			const q = Number(qtys[p.id]) || 0;
 			if (q <= 0 || !p.priceUSD) return;
@@ -84,11 +83,16 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			certsTotal += q * (p.certs || 1);
 			if (p.ilimitadas) ilimitadasUsadas = true;
 			else firmasIncl += q * (p.firmas || 0);
+			if (p.extraFirmaPrice != null) {
+				weightedFirmaPrice += q * p.extraFirmaPrice;
+				totalQtyWithPrice += q;
+			}
 		});
+		const precioFirmaAdic = totalQtyWithPrice > 0 ? weightedFirmaPrice / totalQtyWithPrice : 0;
 		const firmasTotal = firmasIncl + (Number(firmasAdic) || 0);
-		facturacionLista += (Number(firmasAdic) || 0) * (Number(precioFirmaUSD) || 0);
-		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas };
-	}, [models, qtys, firmasAdic, precioFirmaUSD]);
+		facturacionLista += (Number(firmasAdic) || 0) * precioFirmaAdic;
+		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas, precioFirmaAdic };
+	}, [models, qtys, firmasAdic]);
 
 	const tier = getDistributorTierLocal(certsActivos, calc.facturacionLista, distributorTiers);
 	const tierByCertsOnly = getDistributorTierLocal(certsActivos, 0, distributorTiers);
@@ -115,7 +119,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			channel: "distribuidores",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			inputs: { certsActivos, qtys, firmasAdic, precioFirmaUSD, casosDeUso },
+			inputs: { certsActivos, qtys, firmasAdic, casosDeUso },
 			resumen: { tier: tier.label, certsActivos, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
 		}, client?.id || null);
 
@@ -156,7 +160,6 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 					{/* Parámetros adicionales */}
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<NumberField label="Firmas adicionales / año" value={firmasAdic} onChange={setFirmasAdic} />
-						<NumberField label="Precio firma adicional" value={precioFirmaUSD} onChange={setPrecioFirmaUSD} prefix="USD" />
 					</div>
 
 					<Separator />
