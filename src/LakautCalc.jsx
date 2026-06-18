@@ -602,6 +602,8 @@ function LakautCalcInner() {
 									setSelectedModelId(id);
 									if (id) { setModTab("análisis"); setSection("modelos"); }
 								}}
+								currency={currency}
+								tc={tc}
 							/>
 						)}
 					</div>

@@ -74,8 +74,9 @@ function TextInput({ value, onChange, placeholder }) {
 	);
 }
 
-function ModelEditor({ model, onSave, onCancel, isNew }) {
+function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 	const [draft, setDraft] = useState(model);
+	const isARS = currency === "ARS";
 
 	function upd(key, val) {
 		setDraft(function (prev) { return Object.assign({}, prev, { [key]: val }); });
@@ -87,6 +88,33 @@ function ModelEditor({ model, onSave, onCancel, isNew }) {
 			});
 		});
 	}
+
+	function updPrecio(val) {
+		if (isARS) {
+			const ars = val || 0;
+			const usd = tc > 0 ? Math.round((ars / tc) * 100) / 100 : 0;
+			setDraft(function (prev) { return Object.assign({}, prev, { precioARS: ars, priceUSD: usd }); });
+		} else {
+			const usd = val || 0;
+			const ars = Math.round(usd * tc);
+			setDraft(function (prev) { return Object.assign({}, prev, { priceUSD: usd, precioARS: ars }); });
+		}
+	}
+
+	function updFirmaExtra(val) {
+		if (isARS) {
+			const ars = val || 0;
+			const usd = tc > 0 ? Math.round((ars / tc) * 100) / 100 : 0;
+			setDraft(function (prev) { return Object.assign({}, prev, { firmaExtraARS: ars, extraFirmaPrice: usd }); });
+		} else {
+			const usd = val || 0;
+			const ars = Math.round(usd * tc);
+			setDraft(function (prev) { return Object.assign({}, prev, { extraFirmaPrice: usd, firmaExtraARS: ars }); });
+		}
+	}
+
+	const precioDisplay = isARS ? (draft.precioARS || Math.round((draft.priceUSD || 0) * tc)) : (draft.priceUSD || 0);
+	const firmaExtraDisplay = isARS ? (draft.firmaExtraARS || Math.round((draft.extraFirmaPrice || 0) * tc)) : (draft.extraFirmaPrice || 0);
 
 	const isDirty = JSON.stringify(draft) !== JSON.stringify(model);
 
@@ -232,8 +260,16 @@ function ModelEditor({ model, onSave, onCancel, isNew }) {
 								})}
 							</select>
 						</FieldRow>
-						<FieldRow label="Precio (USD)">
-							<NumInput value={draft.priceUSD} onChange={function (v) { upd("priceUSD", v); }} prefix="USD" />
+						<FieldRow label={"Precio (" + (isARS ? "ARS" : "USD") + ")"}>
+							<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+								<NumInput value={precioDisplay} onChange={updPrecio} prefix={isARS ? "$" : "USD"} />
+								<span style={Object.assign({}, os(10, 400, GRAY))}>
+									{isARS
+										? ("≈ USD " + (draft.priceUSD || 0).toFixed(2))
+										: ("≈ $ " + (draft.precioARS || Math.round((draft.priceUSD || 0) * tc)).toLocaleString("es-AR") + " ARS")
+									}
+								</span>
+							</div>
 						</FieldRow>
 						<FieldRow label="Vigencia">
 							<NumInput value={draft.vigencia} onChange={function (v) { upd("vigencia", v); }} suffix="meses" />
@@ -272,8 +308,18 @@ function ModelEditor({ model, onSave, onCancel, isNew }) {
 						<FieldRow label="Admins">
 							<NumInput value={draft.admins || 0} onChange={function (v) { upd("admins", v || null); }} suffix="admin" />
 						</FieldRow>
-						<FieldRow label="Firma adicional">
-							<NumInput value={draft.extraFirmaPrice || 0} onChange={function (v) { upd("extraFirmaPrice", v); }} prefix="USD" suffix="/ firma" />
+						<FieldRow label={"Firma adicional (" + (isARS ? "ARS" : "USD") + ")"}>
+							<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+								<NumInput value={firmaExtraDisplay} onChange={updFirmaExtra} prefix={isARS ? "$" : "USD"} suffix="/ firma" />
+								{firmaExtraDisplay > 0 && (
+									<span style={Object.assign({}, os(10, 400, GRAY))}>
+										{isARS
+											? ("≈ USD " + (draft.extraFirmaPrice || 0).toFixed(2))
+											: ("≈ $ " + (draft.firmaExtraARS || Math.round((draft.extraFirmaPrice || 0) * tc)).toLocaleString("es-AR") + " ARS")
+										}
+									</span>
+								)}
+							</div>
 						</FieldRow>
 
 						<div style={{ marginTop: 20 }}>
@@ -460,7 +506,7 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 	);
 }
 
-export function TabGuardados({ selectedId, onSelect }) {
+export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 	const { models, upsert, remove, duplicate, resetToDefaults, exportJSON, importJSON } = useModels();
 	const [editingId, setEditingId] = useState(null); // null | "new" | model.id
 	const [importError, setImportError] = useState(null);
@@ -590,6 +636,8 @@ export function TabGuardados({ selectedId, onSelect }) {
 					isNew={true}
 					onSave={handleSave}
 					onCancel={function () { setEditingId(null); }}
+					currency={currency}
+					tc={tc}
 				/>
 			)}
 			{editingId && editingId !== "new" && (function () {
@@ -601,6 +649,8 @@ export function TabGuardados({ selectedId, onSelect }) {
 						isNew={false}
 						onSave={handleSave}
 						onCancel={function () { setEditingId(null); }}
+						currency={currency}
+						tc={tc}
 					/>
 				) : null;
 			})()}
