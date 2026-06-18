@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useDolarTC } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, BG, OK, WN, ER, os, mont } from "./theme/tokens";
 import { fD2, fP, fK } from "./utils/formatters";
@@ -82,7 +83,7 @@ function LakautCalcInner() {
 	const [users, setUsers] = useState(20000);
 	const [tab, setTab] = useState("costos");
 	const [currency, setCurrency] = useState("USD");
-	const [tc, setTc] = useState(1410);
+	const { tc, setTc, source, setSource, loading: tcLoading, error: tcError, lastUpdated: tcLastUpdated, refresh: tcRefresh } = useDolarTC();
 	const [svc, setSvc] = useState({ cloudStorage: false, mailCert: false, paywall: false });
 	const [inp, setInp] = useState(PACKS.B.defaults);
 	const [projParams, setProjParams] = useState({ usersM1: 1000, growthRate: 10, churnRate: 5 });
@@ -230,16 +231,8 @@ function LakautCalcInner() {
 						Calculadora de Pricing · Modelos y Planes Comerciales
 					</div>
 				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-					<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
-						{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
-					</div>
-					<button
-						onClick={function () { window.print(); }}
-						style={{ padding: "6px 14px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, color: WHITE, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-					>
-						Exportar PDF
-					</button>
+				<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
+					{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
 				</div>
 			</div>
 
@@ -266,10 +259,7 @@ function LakautCalcInner() {
 						);
 					})}
 					{currency === "ARS" && (
-						<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-							<span style={os(11, 400, GRAY)}>TC:</span>
-							<input type="number" value={tc} onChange={function (e) { setTc(Number(e.target.value) || 1); }} style={{ width: 72, padding: "3px 7px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 12, color: BLACK }} />
-						</div>
+						<span style={os(11, 400, GRAY)}>TC: {tcLoading ? "..." : tc}</span>
 					)}
 				</div>
 			</div>
@@ -593,14 +583,13 @@ function LakautCalcInner() {
 					</div>
 
 					<div style={{ padding: 24 }}>
-						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
+						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 						{cfgTab === "precios" && <TabDescuentos volumeTiers={volumeTiers} onUpdateVolumeTiers={updateVolumeTiers} />}
 						{cfgTab === "modelos" && (
 							<TabGuardados
 								selectedId={selectedModelId}
 								onSelect={function (id) {
 									setSelectedModelId(id);
-									if (id) { setModTab("análisis"); setSection("modelos"); }
 								}}
 								currency={currency}
 								tc={tc}
