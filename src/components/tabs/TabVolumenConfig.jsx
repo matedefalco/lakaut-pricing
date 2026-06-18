@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, os, mont } from "../../theme/tokens";
-import { DEFAULT_VOLUME_TIERS, PRECIO_CERT_JURIDICA } from "../../data/volumeTiers";
+import { DEFAULT_VOLUME_TIERS } from "../../data/volumeTiers";
+import { useChannelConfig } from "../../context/ChannelConfigContext";
 
 function InlineNum({ value, onChange, placeholder, step, min }) {
 	return (
@@ -39,6 +40,8 @@ const TIER_COLORS = {
 };
 
 export function TabVolumenConfig({ volumeTiers, onUpdate }) {
+	const { channelConfig, update: channelConfigUpdate } = useChannelConfig();
+	const precioCertJuridica = channelConfig.precioCertJuridica;
 	const [savedFlash, setSavedFlash] = useState(false);
 
 	function updTier(idx, field, val) {
@@ -119,9 +122,15 @@ export function TabVolumenConfig({ volumeTiers, onUpdate }) {
 					</table>
 				</div>
 
-				<div style={{ marginTop: 16, padding: "12px 14px", background: BLUEL, borderRadius: 8, border: "1px solid " + BLUE }}>
-					<span style={os(11, 700, BLACK)}>Cert jurídica: </span>
-					<span style={os(11, 400, GRAY)}>precio fijo de <strong>$70/empresa/año</strong> — no es tier-based. Para modificarlo, editá <code>PRECIO_CERT_JURIDICA</code> en <code>volumeTiers.js</code>.</span>
+				<div style={{ marginTop: 16, padding: "12px 14px", background: BLUEL, borderRadius: 8, border: "1px solid " + BLUE, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+					<span style={os(11, 700, BLACK)}>Cert jurídica (USD/empresa/año):</span>
+					<InlineNum
+						value={precioCertJuridica}
+						onChange={function (v) { channelConfigUpdate({ precioCertJuridica: v }); }}
+						step={0.5}
+						min={0}
+					/>
+					<span style={os(11, 400, GRAY)}>No es tier-based — aplica en todas las cotizaciones B2B.</span>
 				</div>
 
 				<div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>

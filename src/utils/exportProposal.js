@@ -1,4 +1,3 @@
-import { WEB_PRODUCTS, B2B2C_API_TIERS, SLA_PLANS, DISTRIBUTOR_TIERS } from "@/data/channels";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -155,22 +154,24 @@ function s2Integracion(clientName) {
 }
 
 // ─── SLIDE 3: MODELO COMERCIAL — DISTRIBUIDORES ───────────────────────────────
-function s3Dist(deal, clientName, currency, tc) {
+function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const qtys = inp.qtys || {};
 	const firmasAdic = Number(inp.firmasAdic) || 0;
 	const precioFirmaUSD = Number(inp.precioFirmaUSD) || 0;
 
-	const packRows = WEB_PRODUCTS
-		.filter(p => p.precioARS != null && (Number(qtys[p.id]) || 0) > 0)
+	const webProducts = models || [];
+	const distributorTiers = (channelConfig && channelConfig.distributorTiers) || [];
+	const packRows = webProducts
+		.filter(p => p.priceUSD > 0 && (Number(qtys[p.id]) || 0) > 0)
 		.map(p => ({
 			label: p.label, qty: Number(qtys[p.id]),
-			unit: p.precioARS / tc, sub: Number(qtys[p.id]) * p.precioARS / tc,
+			unit: p.priceUSD, sub: Number(qtys[p.id]) * p.priceUSD,
 			certs: p.certs || 0, firmas: p.firmas || 0, ilimitadas: p.ilimitadas,
 		}));
 
-	const tierRecord = DISTRIBUTOR_TIERS.find(t => t.label === res.tier);
+	const tierRecord = distributorTiers.find(t => t.label === res.tier);
 	const descPct = tierRecord ? (tierRecord.descuento * 100).toFixed(0) : "—";
 	const lista = res.facturacionLista || 0;
 	const neto = res.netoLakaut || 0;
@@ -275,12 +276,14 @@ function s3Dist(deal, clientName, currency, tc) {
 }
 
 // ─── SLIDE 3: MODELO COMERCIAL — B2B2C ───────────────────────────────────────
-function s3B2B2C(deal, clientName, currency, tc) {
+function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const esUnica = inp.frecuencia === "unica";
-	const api = [...B2B2C_API_TIERS].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || B2B2C_API_TIERS[0];
-	const sla = SLA_PLANS.find(s => s.id === inp.slaId) || SLA_PLANS[0];
+	const apiTiers = (channelConfig && channelConfig.b2b2cApiTiers) || [];
+	const slaPlans = (channelConfig && channelConfig.slaPlans) || [];
+	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "API Standard" };
+	const sla = slaPlans.find(s => s.id === inp.slaId) || slaPlans[0] || { label: "Standard", precioMes: 0, desc: "" };
 	const slaText = sla.precioMes ? `${sla.label} · ${fm(sla.precioMes, currency, tc)}/mes` : `${sla.label} · incluido`;
 
 	const rows = [
@@ -421,11 +424,11 @@ function s5Cierre() {
 }
 
 // ─── Builder ──────────────────────────────────────────────────────────────────
-function buildHTML(deal, client, currency, tc) {
+function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
 	const s3 = deal.channel === "b2b2c"
-		? s3B2B2C(deal, clientName, currency, tc)
-		: s3Dist(deal, clientName, currency, tc);
+		? s3B2B2C(deal, clientName, currency, tc, channelConfig)
+		: s3Dist(deal, clientName, currency, tc, channelConfig, models);
 
 	return `<!DOCTYPE html>
 <html lang="es">
@@ -444,8 +447,8 @@ ${s5Cierre()}
 </html>`;
 }
 
-export function exportProposal(deal, client, currency, tc) {
-	const html = buildHTML(deal, client, currency, tc);
+export function exportProposal(deal, client, currency, tc, channelConfig, models) {
+	const html = buildHTML(deal, client, currency, tc, channelConfig, models);
 	const win = window.open("", "_blank");
 	if (!win) { alert("Habilitá ventanas emergentes para exportar la propuesta."); return; }
 	win.document.open();

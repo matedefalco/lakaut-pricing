@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { makeMoney } from "@/utils/useMoney";
 import { cn } from "@/lib/utils";
+import { useChannelConfig } from "@/context/ChannelConfigContext";
+import { useModels } from "@/context/ModelsContext";
 
 const CHANNELS = {
 	distribuidores: { label: "Distribuidores", variant: "secondary" },
@@ -46,6 +48,8 @@ function summaryCols(channel, fMoney) {
 }
 
 export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }) {
+	const { channelConfig } = useChannelConfig();
+	const { models } = useModels();
 	const { fMoney } = makeMoney(currency, tc);
 
 	const [openFilter, setOpenFilter] = useState(null);
@@ -348,7 +352,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
 														{(q.channel === "b2b2c" || q.channel === "distribuidores") && (
-															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, q.clients || null, currency, tc); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
+															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 														)}
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>

@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { BLUE, BLUEL, BORD, GRAY, BLACK, WHITE, OK, OKBG, WN, WNBG, ER, ERBG, os, mont } from "../theme/tokens";
-import { PLANS } from "../data/plans";
+import { useModels } from "../context/ModelsContext";
 import { makeMoney } from "../utils/useMoney";
 import { fP, fK } from "../utils/formatters";
 
 function planMetrics(plan, costs) {
 	const { cvCertBase, cvFirmaBase, cfDirecto } = costs;
-	const periodo = plan.inp.periodo || 24;
-	const precio  = plan.inp.precio;
-	const firmas  = plan.inp.firmas || 0;
+	const periodo = plan.vigencia || plan.billingPeriod || 24;
+	const precio  = plan.priceUSD;
+	const firmas  = plan.firmas || 0;
 	const certs   = typeof plan.certs === "number" ? plan.certs : 4;
 
 	const revMes    = precio / periodo;
@@ -32,11 +32,12 @@ function planMetrics(plan, costs) {
 }
 
 export function Comparison({ costs, currency, tc }) {
+	const { models } = useModels();
 	const { fMoney2 } = makeMoney(currency, tc);
-	const plans = Object.values(PLANS);
+	const plans = models.filter(function (m) { return m.priceUSD > 0; });
 	const metrics = useMemo(function () {
 		return plans.map(function (p) { return planMetrics(p, costs); });
-	}, [costs]);
+	}, [costs, models]);
 
 	const ROWS = [
 		{
@@ -57,7 +58,7 @@ export function Comparison({ costs, currency, tc }) {
 		},
 		{
 			label: "Vigencia",
-			render: function (p) { return (p.inp.periodo || 24) + " meses"; },
+			render: function (p) { return (p.vigencia || p.billingPeriod || 24) + " meses"; },
 			align: "right",
 		},
 		{
@@ -222,7 +223,7 @@ export function Comparison({ costs, currency, tc }) {
 							<div style={{ background: p.color, padding: "8px 14px" }}>
 								<span style={Object.assign({}, mont(14), { color: WHITE })}>{p.label}</span>
 								<span style={Object.assign({}, os(10, 400, WHITE), { opacity: 0.8, marginLeft: 8 })}>
-									{p.priceUSD} USD · {p.inp.periodo}m
+									{p.priceUSD} USD · {p.vigencia || p.billingPeriod || 24}m
 								</span>
 							</div>
 							<div style={{ padding: "12px 14px" }}>

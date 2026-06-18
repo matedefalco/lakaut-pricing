@@ -11,6 +11,7 @@ import { ModelsProvider, useModels } from "./context/ModelsContext";
 import { useDeals } from "./lib/useDeals";
 import { useClients } from "./lib/useClients";
 import { DiscountProvider } from "./context/DiscountContext";
+import { ChannelConfigProvider, useChannelConfig } from "./context/ChannelConfigContext";
 import { InfoTooltip } from "./components/ui/InfoTooltip";
 import { Sec } from "./components/ui/Sec";
 import { PackFields } from "./components/ui/PackFields";
@@ -41,6 +42,7 @@ const ARCH_TO_PACK = { bolsa: "A", sub: "B", ppu: "C", anual: "D", free: "E", hi
 
 function LakautCalcInner() {
 	const { models } = useModels();
+	const { channelConfig, update: updateChannelConfig } = useChannelConfig();
 	const dealsApi = useDeals();
 	const clientsApi = useClients();
 
@@ -591,7 +593,7 @@ function LakautCalcInner() {
 					</div>
 
 					<div style={{ padding: 24 }}>
-						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} />}
+						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 						{cfgTab === "precios" && <TabDescuentos volumeTiers={volumeTiers} onUpdateVolumeTiers={updateVolumeTiers} />}
 						{cfgTab === "modelos" && (
 							<TabGuardados
@@ -613,7 +615,9 @@ export default function LakautCalc() {
 	return (
 		<ModelsProvider>
 			<DiscountProvider>
-				<LakautCalcInner />
+				<ChannelConfigProvider>
+					<LakautCalcInner />
+				</ChannelConfigProvider>
 			</DiscountProvider>
 		</ModelsProvider>
 	);

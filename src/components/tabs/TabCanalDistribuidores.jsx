@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Check } from "lucide-react";
 import { makeMoney } from "@/utils/useMoney";
-import { WEB_PRODUCTS, DISTRIBUTOR_TIERS, getDistributorTier } from "@/data/channels";
+import { useModels } from "@/context/ModelsContext";
+import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,28 @@ const TIER_BADGE = { azul: "default", bronce: "warning", plata: "secondary", oro
 function margClass(pct) { return pct >= 0.4 ? "text-[var(--success)]" : pct >= 0.15 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.4 ? "success" : pct >= 0.15 ? "warning" : "destructive"; }
 
+function getDistributorTierLocal(certsActivos, compromisoAnualUSD, tiers) {
+	function tierByCerts(certs) {
+		return tiers.find(function (t) {
+			return certs >= t.certsMin && (t.certsMax === null || certs <= t.certsMax);
+		}) || tiers[0];
+	}
+	function tierByCompromiso(usd) {
+		return tiers.find(function (t) {
+			return usd >= t.compromisoMin && (t.compromisoMax === null || usd <= t.compromisoMax);
+		}) || tiers[0];
+	}
+	const a = tierByCerts(certsActivos || 0);
+	const b = tierByCompromiso(compromisoAnualUSD || 0);
+	const ia = tiers.indexOf(a);
+	const ib = tiers.indexOf(b);
+	return ia >= ib ? a : b;
+}
+
 export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsApi, pendingEdit, onConsumeEdit }) {
+	const { models } = useModels();
+	const { channelConfig } = useChannelConfig();
+	const distributorTiers = channelConfig.distributorTiers;
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
@@ -55,10 +77,10 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 	const calc = useMemo(function () {
 		let facturacionLista = 0, certsTotal = 0, firmasIncl = 0, ilimitadasUsadas = false;
-		WEB_PRODUCTS.forEach(function (p) {
+		models.forEach(function (p) {
 			const q = Number(qtys[p.id]) || 0;
-			if (q <= 0 || p.precioARS == null) return;
-			facturacionLista += q * (p.precioARS / tc);
+			if (q <= 0 || !p.priceUSD) return;
+			facturacionLista += q * p.priceUSD;
 			certsTotal += q * (p.certs || 1);
 			if (p.ilimitadas) ilimitadasUsadas = true;
 			else firmasIncl += q * (p.firmas || 0);
@@ -66,10 +88,10 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		const firmasTotal = firmasIncl + (Number(firmasAdic) || 0);
 		facturacionLista += (Number(firmasAdic) || 0) * (Number(precioFirmaUSD) || 0);
 		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas };
-	}, [qtys, firmasAdic, precioFirmaUSD, tc]);
+	}, [models, qtys, firmasAdic, precioFirmaUSD]);
 
-	const tier = getDistributorTier(certsActivos, calc.facturacionLista);
-	const tierByCertsOnly = getDistributorTier(certsActivos, 0);
+	const tier = getDistributorTierLocal(certsActivos, calc.facturacionLista, distributorTiers);
+	const tierByCertsOnly = getDistributorTierLocal(certsActivos, 0, distributorTiers);
 	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "compromiso anual" : (calc.facturacionLista > 0 ? "certs y compromiso" : "certificados activos");
 
 	const netoLakaut = calc.facturacionLista * (1 - tier.descuento);
@@ -156,14 +178,13 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{WEB_PRODUCTS.filter(function (p) { return p.precioARS != null; }).map(function (p) {
+								{models.filter(function (p) { return p.priceUSD > 0; }).map(function (p) {
 									const q = Number(qtys[p.id]) || 0;
-									const listaUSD = p.precioARS / tc;
 									const firmasU = p.ilimitadas ? "ilim." : (p.firmas || 0);
 									return (
 										<TableRow key={p.id}>
 											<TableCell className="font-semibold">{p.label}</TableCell>
-											<TableCell className="text-right tabular-nums">{fMoney(listaUSD)}</TableCell>
+											<TableCell className="text-right tabular-nums">{fMoney(p.priceUSD)}</TableCell>
 											<TableCell className="text-right tabular-nums text-muted-foreground">{p.certs || 1}</TableCell>
 											<TableCell className="text-right tabular-nums text-muted-foreground">{firmasU}</TableCell>
 											<TableCell className="text-right">
@@ -171,7 +192,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 											</TableCell>
 											<TableCell className="text-right tabular-nums">{q > 0 ? (q * (p.certs || 1)).toLocaleString("es-AR") : "—"}</TableCell>
 											<TableCell className="text-right tabular-nums">{q > 0 ? (p.ilimitadas ? "ilim." : (q * (p.firmas || 0)).toLocaleString("es-AR")) : "—"}</TableCell>
-											<TableCell className={"text-right tabular-nums " + (q > 0 ? "font-semibold" : "text-muted-foreground")}>{q > 0 ? fMoney(q * listaUSD) : "—"}</TableCell>
+											<TableCell className={"text-right tabular-nums " + (q > 0 ? "font-semibold" : "text-muted-foreground")}>{q > 0 ? fMoney(q * p.priceUSD) : "—"}</TableCell>
 										</TableRow>
 									);
 								})}
@@ -264,7 +285,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 					<Table>
 						<TableHeader><TableRow><TableHead>Nivel</TableHead><TableHead className="text-right">Certificados activos</TableHead><TableHead className="text-right">Descuento</TableHead><TableHead className="text-right">Compromiso anual USD</TableHead></TableRow></TableHeader>
 						<TableBody>
-							{DISTRIBUTOR_TIERS.map(function (t) {
+							{distributorTiers.map(function (t) {
 								const act = t.id === tier.id;
 								return (
 									<TableRow key={t.id} className={act ? "bg-accent" : ""}>

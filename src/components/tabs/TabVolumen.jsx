@@ -3,7 +3,8 @@ import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, ERBG, os
 import { fD2 } from "../../utils/formatters";
 import { makeMoney } from "../../utils/useMoney";
 import { loadConfig, saveConfig } from "../../lib/supabase";
-import { getTierForCerts, calcVolumenDeal, PRECIO_CERT_JURIDICA } from "../../data/volumeTiers";
+import { getTierForCerts, calcVolumenDeal } from "../../data/volumeTiers";
+import { useChannelConfig } from "../../context/ChannelConfigContext";
 
 const QUOTES_KEY = "b2b_quotes";
 
@@ -159,6 +160,8 @@ function openB2BExportWindow({ clientName, tier, certsAnuales, certsJuridicas, f
 }
 
 export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
+	const { channelConfig } = useChannelConfig();
+	const precioCertJuridica = channelConfig.precioCertJuridica;
 	const [certsAnuales, setCertsAnuales] = useState(4000);
 	const [certsJuridicas, setCertsJuridicas] = useState(0);
 	const [modalidad, setModalidad] = useState("bundle");
@@ -303,7 +306,7 @@ export function TabVolumen({ volumeTiers, costs, currency, tc: tcRate }) {
 			modalidad,
 			firmasPorCert,
 			precioCertFisica,
-			precioCertJuridica: PRECIO_CERT_JURIDICA,
+			precioCertJuridica: precioCertJuridica,
 			firmasIncluidas,
 			precioFirmaExtra,
 			setupFee,

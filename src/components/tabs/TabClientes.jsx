@@ -7,10 +7,28 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { DISTRIBUTOR_TIERS, getDistributorTier } from "@/data/channels";
+import { useChannelConfig } from "@/context/ChannelConfigContext";
 
 const CHANNEL_LABEL = { web: "Canal Web", distribuidores: "Distribuidores", b2b2c: "B2B2C (IDC)" };
 const CHANNEL_BADGE = { web: "secondary", distribuidores: "default", b2b2c: "default" };
+
+function getDistributorTierLocal(certsActivos, compromisoAnualUSD, tiers) {
+	function tierByCerts(certs) {
+		return tiers.find(function (t) {
+			return certs >= t.certsMin && (t.certsMax === null || certs <= t.certsMax);
+		}) || tiers[0];
+	}
+	function tierByCompromiso(usd) {
+		return tiers.find(function (t) {
+			return usd >= t.compromisoMin && (t.compromisoMax === null || usd <= t.compromisoMax);
+		}) || tiers[0];
+	}
+	const a = tierByCerts(certsActivos || 0);
+	const b = tierByCompromiso(compromisoAnualUSD || 0);
+	const ia = tiers.indexOf(a);
+	const ib = tiers.indexOf(b);
+	return ia >= ib ? a : b;
+}
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -18,6 +36,8 @@ function fDate(iso) {
 }
 
 export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) {
+	const { channelConfig } = useChannelConfig();
+	const distributorTiers = channelConfig.distributorTiers;
 	const { fMoney } = makeMoney(currency, tc);
 
 	const [search, setSearch] = useState("");
@@ -149,7 +169,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										{certsTotal > 0 && (
 											<div className="text-right">
 												<p className="text-xs text-muted-foreground">Nivel actual</p>
-												<p className="text-sm font-semibold">{getDistributorTier(certsTotal, 0).label}</p>
+												<p className="text-sm font-semibold">{getDistributorTierLocal(certsTotal, 0, distributorTiers).label}</p>
 											</div>
 										)}
 									</div>

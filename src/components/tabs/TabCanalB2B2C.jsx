@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Check } from "lucide-react";
 import { makeMoney } from "@/utils/useMoney";
-import { B2B2C_SEGMENTS, B2B2C_API_TIERS, SLA_PLANS, getB2B2CSegment, COSTO_IDC_REF } from "@/data/channels";
+import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,18 @@ import { ClientSelector } from "@/components/ui/ClientSelector";
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
 
+function getB2B2CSegmentLocal(idcMensuales, segments) {
+	return segments.find(function (s) {
+		return idcMensuales >= s.idcMin && (s.idcMax === null || idcMensuales <= s.idcMax);
+	}) || segments[0];
+}
+
 export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendingEdit, onConsumeEdit }) {
+	const { channelConfig } = useChannelConfig();
+	const b2b2cSegments = channelConfig.b2b2cSegments;
+	const b2b2cApiTiers = channelConfig.b2b2cApiTiers;
+	const slaPlans = channelConfig.slaPlans;
+	const costoIdcRef = channelConfig.costoIdcRef;
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
@@ -34,9 +45,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 
 	const esUnica = frecuencia === "unica";
 
-	const api = B2B2C_API_TIERS.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || B2B2C_API_TIERS[0];
-	const sla = SLA_PLANS.find(function (s) { return s.id === slaId; }) || SLA_PLANS[0];
-	const seg = getB2B2CSegment(idcMensuales);
+	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
+	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
+	const seg = getB2B2CSegmentLocal(idcMensuales, b2b2cSegments);
 
 	useEffect(function () {
 		if (!pendingEdit) return;
@@ -150,7 +161,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 							<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
 						</div>
 						<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
-							options={SLA_PLANS.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
+							options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
 						<NumberField label="Firmas incluidas por IDC" value={firmasInclPorIDC} onChange={setFirmasInclPorIDC} note="Firma inicial + activación (editable)" />
 						<NumberField label="Firmas adicionales por IDC / mes" value={firmasAdicPorIDC} onChange={setFirmasAdicPorIDC} note="Se cobran aparte" />
 						<NumberField label="Precio firma adicional" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" />
@@ -237,7 +248,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					<Table>
 						<TableHeader><TableRow><TableHead>Segmento</TableHead><TableHead className="text-right">IDC/mes</TableHead><TableHead className="text-right">Precio USD</TableHead><TableHead className="text-right">Margen ref. doc</TableHead><TableHead className="text-right">Margen real (costo {fMoney2(costoIDC)})</TableHead></TableRow></TableHeader>
 						<TableBody>
-							{B2B2C_SEGMENTS.map(function (s) {
+							{b2b2cSegments.map(function (s) {
 								const act = s.id === seg.id;
 								const mReal = s.precioIDC > 0 ? (s.precioIDC - costoIDC) / s.precioIDC : 0;
 								return (
@@ -254,7 +265,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasMes.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "Margen real" recalcula con costo cotizadora: cert {fMoney2(cvCert)} + {incl} firmas × {fMoney2(cvFirma)} = {fMoney2(costoIDC)}. Referencia doc (USD {COSTO_IDC_REF.toFixed(4)}). Modo: {esUnica ? "única vez" : "recurrente mensual"}.</p>
+			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasMes.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "Margen real" recalcula con costo cotizadora: cert {fMoney2(cvCert)} + {incl} firmas × {fMoney2(cvFirma)} = {fMoney2(costoIDC)}. Referencia doc (USD {costoIdcRef.toFixed(4)}). Modo: {esUnica ? "única vez" : "recurrente mensual"}.</p>
 		</div>
 	);
 }
