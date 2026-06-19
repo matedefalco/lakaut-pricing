@@ -24,6 +24,7 @@ import { TabProyeccion } from "./components/tabs/TabProyeccion";
 import { TabBreakEven } from "./components/tabs/TabBreakEven";
 import { TabConfig } from "./components/tabs/TabConfig";
 import { TabCanalesConfig } from "./components/tabs/TabCanalesConfig";
+import { TabGeneral } from "./components/tabs/TabGeneral";
 import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
@@ -70,7 +71,7 @@ function LakautCalcInner() {
 	const [modTab, setModTab] = useState("análisis");
 
 	// Configuración sub-nav
-	const [cfgTab, setCfgTab] = useState("costos");
+	const [cfgTab, setCfgTab] = useState("general");
 
 
 	// Selected model id in análisis mode
@@ -208,6 +209,7 @@ function LakautCalcInner() {
 	];
 	const activeModTab = MOD_TABS.find(function (t) { return t.k === modTab; });
 	const CFG_TABS = [
+		{ k: "general", label: "General" },
 		{ k: "costos", label: "Costos" },
 		{ k: "precios", label: "Precios" },
 		{ k: "modelos", label: "Modelos pre-cargados" },
@@ -583,7 +585,8 @@ function LakautCalcInner() {
 					</div>
 
 					<div style={{ padding: 24 }}>
-						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
+						{cfgTab === "general" && <TabGeneral tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} />}
+					{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 						{cfgTab === "precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 						{cfgTab === "modelos" && (
 							<TabGuardados

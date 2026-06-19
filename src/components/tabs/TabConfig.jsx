@@ -52,7 +52,7 @@ const DEFAULT_COST_CONFIG = {
 	capacidadFirmasAnual: CAPACIDAD_FIRMAS_ANUAL,
 };
 
-export function TabConfig({ costConfig, setCostConfig, tc, setTc, tcSource, setTcSource, tcLoading, tcError, tcLastUpdated, tcRefresh, channelConfig, updateChannelConfig }) {
+export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChannelConfig }) {
 	const activosTotal = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 	const [isDirty, setIsDirty] = useState(false);
 
@@ -416,29 +416,6 @@ export function TabConfig({ costConfig, setCostConfig, tc, setTc, tcSource, setT
 						</table>
 						<button style={addBtn} onClick={function () { addRow("cvFirmaItems", { item: "", v: 0, tipo: "directo" }); }}>+ Agregar componente</button>
 
-					</div>
-				</div>
-			</div>
-
-			{/* Cotizaciones */}
-			<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 20, marginTop: 24 }}>
-				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 })}>Cotizaciones</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-					<div style={{ flex: "0 0 auto" }}>
-						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>Tipo de cambio USD → ARS</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<span style={os(12, 400, GRAY)}>1 USD =</span>
-							<input
-								type="number"
-								value={tc}
-								onChange={function (e) { setTc(Number(e.target.value) || 1); }}
-								style={{ width: 100, padding: "6px 10px", border: "1px solid " + BORD, borderRadius: 6, fontFamily: "'Open Sans',sans-serif", fontSize: 13, color: BLACK }}
-							/>
-							<span style={os(12, 400, GRAY)}>ARS</span>
-						</div>
-					</div>
-					<div style={Object.assign({}, os(11, 400, GRAY), { flex: 1, minWidth: 200 })}>
-						El toggle USD/ARS en la barra de navegación usa este valor para convertir todos los precios de la herramienta.
 					</div>
 				</div>
 			</div>
