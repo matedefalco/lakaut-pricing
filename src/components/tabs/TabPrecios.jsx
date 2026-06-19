@@ -422,6 +422,7 @@ export function TabPrecios({ calcs, users, costs, currency, tc, arch, inp }) {
 					})}
 				</tbody>
 			</table>
+
 		</div>
 	);
 }

@@ -23,7 +23,7 @@ import { TabPrecios } from "./components/tabs/TabPrecios";
 import { TabProyeccion } from "./components/tabs/TabProyeccion";
 import { TabBreakEven } from "./components/tabs/TabBreakEven";
 import { TabConfig } from "./components/tabs/TabConfig";
-import { TabDescuentos } from "./components/tabs/TabDescuentos";
+import { TabCanalesConfig } from "./components/tabs/TabCanalesConfig";
 import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
@@ -584,7 +584,7 @@ function LakautCalcInner() {
 
 					<div style={{ padding: 24 }}>
 						{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
-						{cfgTab === "precios" && <TabDescuentos volumeTiers={volumeTiers} onUpdateVolumeTiers={updateVolumeTiers} />}
+						{cfgTab === "precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 						{cfgTab === "modelos" && (
 							<TabGuardados
 								selectedId={selectedModelId}
