@@ -16,7 +16,7 @@ const ALL_COLS = [
 	{ key: "firmaExtra", label: "Firma extra" },
 	{ key: "cvTotal", label: "CV total" },
 	{ key: "margen", label: "Cont. marginal" },
-	{ key: "beAnual", label: "BE anual" },
+	{ key: "beAnual", label: "BE" },
 ];
 
 function ColFilterDropdown({ visible, onToggle }) {
@@ -351,14 +351,14 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 										{show("firmaExtra") && <TableHead className="text-right">Firma extra<InfoTooltip dir="down" text="Precio por firma adicional fuera del límite incluido. Si no aplica o no está configurado, se muestra —." /></TableHead>}
 										{show("cvTotal") && <TableHead className="text-right">CV total<InfoTooltip dir="down" text={"Costo Variable total = (certs × CV cert) + (firmas incluidas × CV firma).\nCV cert: " + fMoney2(cvCert) + " · CV firma: " + fMoney2(cvFirma) + ".\nPara planes con firmas ilimitadas, el CV de firmas es 0."} /></TableHead>}
 										{show("margen") && <TableHead className="text-right">Cont. marginal<InfoTooltip dir="down" text="Contribución marginal = Precio USD − CV total. Es la ganancia antes de cubrir costos fijos. Se muestra como % sobre el precio." /></TableHead>}
-										{show("beAnual") && <TableHead className="text-right">BE anual<InfoTooltip dir="down" text={"Break-even anual = CF anual ÷ Contribución marginal por pack.\nCuántos packs de este tipo necesitás vender por año para cubrir todos los costos fijos del canal (" + fMoney2(costs.cfDirecto * 12) + "/año)."} /></TableHead>}
+										{show("beAnual") && <TableHead className="text-right">BE<InfoTooltip dir="down" text={"Break-even = CF total ÷ Contribución marginal por pack.\nCuántos packs de este tipo necesitás vender para cubrir todos los costos fijos del canal (" + fMoney2(costs.cfTotal) + ")."} /></TableHead>}
 									</TableRow>
 								</TableHeader>
 								<TableBody>
 									{models.filter(function (m) { return m.activo !== false; }).map(function (m) {
 										const e = econ(m);
 										const cm = e ? e.precioUSD - e.cvTotal : null;
-										const beAnual = cm && cm > 0 ? Math.ceil(costs.cfDirecto * 12 / cm) : null;
+										const beAnual = cm && cm > 0 ? Math.ceil(costs.cfTotal / cm) : null;
 										return (
 											<TableRow key={m.id}>
 												<TableCell>
@@ -393,7 +393,7 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 							</Table>
 						</CardContent>
 					</Card>
-					<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas, sobre la vigencia de 2 años. BE anual = packs/año necesarios para cubrir CF anual. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
+					<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas. BE = CF total ÷ CM unitario (packs necesarios para cubrir todos los costos fijos). CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
 				</>
 			)}
 
