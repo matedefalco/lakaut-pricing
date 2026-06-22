@@ -47,15 +47,15 @@ export function TabCanalWeb({ costs, currency, tc }) {
 								<TableHead className="text-right">Firma extra</TableHead>
 								<TableHead className="text-right">CV total</TableHead>
 								<TableHead className="text-right">Cont. marginal</TableHead>
-								<TableHead className="text-right">EBITDA</TableHead>
+								<TableHead className="text-right">BE anual</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{models.filter(function (m) { return m.activo !== false; }).map(function (m) {
 								const e = econ(m);
 								const selloComp = m.ilimitadas && !m.extraFirmaPrice;
-								const cfPack = costs.cfDirecto * (m.firmas || 0) * 12 / costs.capacidadNegocio;
-								const ebitda = e ? e.precioUSD - e.cvTotal - cfPack : null;
+								const cm = e ? e.precioUSD - e.cvTotal : null;
+								const beAnual = cm && cm > 0 ? Math.ceil(costs.cfDirecto * 12 / cm) : null;
 								return (
 									<TableRow key={m.id}>
 										<TableCell>
@@ -79,7 +79,7 @@ export function TabCanalWeb({ costs, currency, tc }) {
 										<TableCell className={"text-right tabular-nums font-semibold " + (e == null ? "text-muted-foreground" : margClass(e.margenPct))}>
 											{e == null ? "—" : (e.margenPct * 100).toFixed(0) + "%"}
 										</TableCell>
-										<TableCell className={"text-right tabular-nums font-semibold " + (ebitda == null ? "text-muted-foreground" : ebitda >= 0 ? "text-[var(--success)]" : "text-destructive")}>{ebitda == null ? "—" : fMoney2(ebitda)}</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground">{beAnual == null ? "—" : beAnual.toLocaleString("es-AR") + " u."}</TableCell>
 									</TableRow>
 								);
 							})}
@@ -87,7 +87,7 @@ export function TabCanalWeb({ costs, currency, tc }) {
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas, sobre la vigencia de 2 años. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
+			<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas, sobre la vigencia de 2 años. BE anual = packs/año necesarios para cubrir CF anual. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
 		</div>
 	);
 }

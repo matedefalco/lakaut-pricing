@@ -561,6 +561,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 							{ l: "Cont. marginal", v: fMoney2(targetRow.margenPack) },
 							{ l: "$/firma", v: fMoney2(targetRow.unitFirma) },
 							{ l: "$/cert", v: fMoney2(targetRow.unitCert) },
+					{ l: "Packs p/CF", v: targetRow.be === Infinity ? "∞" : targetRow.be.toLocaleString("es-AR") + " packs" },
 						].map(function (k) {
 							return (
 								<div key={k.l}>
@@ -609,7 +610,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 							<th style={thStyle}>Subtotal cert</th>
 							<th style={thStyle}>Total</th>
 					<th style={thStyle}>Cont. marginal</th>
-					<th style={thStyle}>EBITDA</th>
+					<th style={thStyle}>Packs p/CF</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -633,7 +634,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert * r.certs)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: isTarget ? OK : "inherit" }}>{fMoney2(r.priceSug)}</td>
 								<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: r.margenPack > 0 ? OK : ER }}>{fMoney2(r.margenPack)}</td>
-								<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: ebitda > 0 ? OK : ER }}>{fMoney2(ebitda)}</td>
+								<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: r.be === Infinity ? ER : GRAY }}>{bePacks}</td>
 								</tr>
 							);
 						})}
