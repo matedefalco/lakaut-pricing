@@ -297,7 +297,7 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 	function econ(m) {
 		if (isConsultar(m)) return null;
 		const precioUSD = m.priceUSD;
-		const precioARS = m.precioARS || Math.round(precioUSD * tc);
+		const precioARS = Math.round(precioUSD * tc);
 		const certCost = (m.certs || 1) * cvCert;
 		const firmasCost = m.ilimitadas ? 0 : (m.firmas || 0) * cvFirma;
 		const cvTotal = certCost + firmasCost;
