@@ -1,7 +1,21 @@
+import { useState, useEffect } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, os, mont } from "../../theme/tokens";
 import { DOLAR_SOURCES } from "../../lib/useDolarTC";
 
 export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcError, tcLastUpdated, tcRefresh }) {
+	const [draft, setDraft] = useState(tc);
+	const [saved, setSaved] = useState(false);
+
+	useEffect(function () { setDraft(tc); }, [tc]);
+
+	function applyManual() {
+		const val = Number(draft) || 1;
+		setTc(val);
+		setDraft(val);
+		setSaved(true);
+		setTimeout(function () { setSaved(false); }, 2500);
+	}
+
 	return (
 		<div style={{ maxWidth: 600 }}>
 			<div style={Object.assign({}, mont(14), { color: WHITE, background: BLACK, padding: "10px 16px", borderRadius: "8px 8px 0 0" })}>
@@ -43,18 +57,22 @@ export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcErro
 				<div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
 					<div>
 						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>
-							Valor actual (venta)
+							{tcSource === "manual" ? "Ingresá el valor" : "Valor actual (venta)"}
 						</div>
 						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 							<span style={os(12, 400, GRAY)}>1 USD =</span>
 							<input
 								type="number"
-								value={tc}
-								onChange={function (e) { setTc(Number(e.target.value) || 1); }}
+								value={tcSource === "manual" ? draft : tc}
+								onChange={function (e) {
+									if (tcSource === "manual") setDraft(e.target.value);
+									else setTc(Number(e.target.value) || 1);
+								}}
+								onKeyDown={function (e) { if (tcSource === "manual" && e.key === "Enter") applyManual(); }}
 								style={{
 									width: 110,
 									padding: "8px 12px",
-									border: "1.5px solid " + BORD,
+									border: "1.5px solid " + (tcSource === "manual" && draft != tc ? BLUE : BORD),
 									borderRadius: 8,
 									fontFamily: "Courier New,monospace",
 									fontSize: 16,
@@ -66,24 +84,51 @@ export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcErro
 							<span style={os(12, 400, GRAY)}>ARS</span>
 						</div>
 					</div>
-					<button
-						onClick={tcRefresh}
-						disabled={tcLoading}
-						style={{
-							marginTop: 18,
-							padding: "8px 18px",
-							background: tcLoading ? "#f1f5f9" : BLUE,
-							color: tcLoading ? GRAY : WHITE,
-							border: "none",
-							borderRadius: 8,
-							fontFamily: "'Open Sans',sans-serif",
-							fontSize: 12,
-							fontWeight: 700,
-							cursor: tcLoading ? "default" : "pointer",
-						}}
-					>
-						{tcLoading ? "Actualizando..." : "↺ Actualizar"}
-					</button>
+					{tcSource === "manual" ? (
+						<div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 18 }}>
+							<button
+								onClick={applyManual}
+								style={{
+									padding: "8px 18px",
+									background: saved ? OK : BLUE,
+									color: WHITE,
+									border: "none",
+									borderRadius: 8,
+									fontFamily: "'Open Sans',sans-serif",
+									fontSize: 12,
+									fontWeight: 700,
+									cursor: "pointer",
+									transition: "background 0.2s",
+								}}
+							>
+								{saved ? "✓ Guardado" : "Aplicar"}
+							</button>
+							{saved && (
+								<div style={Object.assign({}, os(10, 400, OK), { textAlign: "center" })}>
+									TC activo: {tc.toLocaleString("es-AR")}
+								</div>
+							)}
+						</div>
+					) : (
+						<button
+							onClick={tcRefresh}
+							disabled={tcLoading}
+							style={{
+								marginTop: 18,
+								padding: "8px 18px",
+								background: tcLoading ? "#f1f5f9" : BLUE,
+								color: tcLoading ? GRAY : WHITE,
+								border: "none",
+								borderRadius: 8,
+								fontFamily: "'Open Sans',sans-serif",
+								fontSize: 12,
+								fontWeight: 700,
+								cursor: tcLoading ? "default" : "pointer",
+							}}
+						>
+							{tcLoading ? "Actualizando..." : "↺ Actualizar"}
+						</button>
+					)}
 				</div>
 
 				{/* Estado */}
