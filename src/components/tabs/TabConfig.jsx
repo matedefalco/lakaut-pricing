@@ -219,6 +219,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 							<th style={Object.assign({}, thR, { width: 60 })}>Cant.</th>
 							<th style={Object.assign({}, thR, { width: 130 })}>Costo unit. (USD)</th>
 							<th style={Object.assign({}, thR, { width: 110 })}>Total / mes</th>
+							<th style={Object.assign({}, thStyle, { width: 70 })}>Frec.</th>
 							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
@@ -239,7 +240,10 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 										<InlineNum value={r.v} decimals={0} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
 									</td>
 									<td style={Object.assign({}, os(12, 700, BLACK), { padding: "4px 10px", width: 110, textAlign: "right", fontFamily: "Courier New,monospace" })}>
-										{fD(qty * r.v)}
+										{fD(rowTotal(r))}
+									</td>
+									<td style={{ padding: "4px 6px", width: 70, textAlign: "center" }}>
+										<button style={frecStyle(r.frecuencia || "mensual")} onClick={function () { updRow("fixedItems", i, "frecuencia", r.frecuencia === "anual" ? "mensual" : "anual"); }}>{r.frecuencia === "anual" ? "anual" : "mensual"}</button>
 									</td>
 									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
 										<button style={tipoStyle(r.tipo || "indirecto")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "indirecto"}</button>
@@ -254,7 +258,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 							<td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal sueldos</td>
 							<td colSpan={2} />
 							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfSalary)}</td>
-							<td colSpan={2} />
+							<td colSpan={3} />
 						</tr>
 					</tbody>
 				</table>
@@ -272,6 +276,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 							<th style={Object.assign({}, thR, { width: 60 })}>Cant.</th>
 							<th style={Object.assign({}, thR, { width: 130 })}>Costo unit. (USD)</th>
 							<th style={Object.assign({}, thR, { width: 110 })}>Total / mes</th>
+							<th style={Object.assign({}, thStyle, { width: 70 })}>Frec.</th>
 							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
@@ -299,7 +304,10 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 										<InlineNum value={r.v} decimals={2} onChange={function (v) { updRow("fixedItems", i, "v", v); }} />
 									</td>
 									<td style={Object.assign({}, os(12, 700, BLACK), { padding: "4px 10px", width: 110, textAlign: "right", fontFamily: "Courier New,monospace" })}>
-										{fD(qty * r.v)}
+										{fD(rowTotal(r))}
+									</td>
+									<td style={{ padding: "4px 6px", width: 70, textAlign: "center" }}>
+										<button style={frecStyle(r.frecuencia || "mensual")} onClick={function () { updRow("fixedItems", i, "frecuencia", r.frecuencia === "anual" ? "mensual" : "anual"); }}>{r.frecuencia === "anual" ? "anual" : "mensual"}</button>
 									</td>
 									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
 										<button style={tipoStyle(r.tipo || "directo")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "directo"}</button>
@@ -314,7 +322,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 							<td /><td style={Object.assign({}, os(11, 700, BLUE), { padding: "6px 10px" })}>Subtotal operativos</td>
 							<td colSpan={2} />
 							<td style={Object.assign({}, os(12, 700, BLUE), { padding: "6px 10px", textAlign: "right", fontFamily: "Courier New,monospace" })}>{fD(cfOps)}</td>
-							<td colSpan={2} />
+							<td colSpan={3} />
 						</tr>
 					</tbody>
 				</table>
