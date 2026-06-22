@@ -122,34 +122,34 @@ function LakautCalcInner() {
 
 	const ALL_NAV = [
 		{
-			groupKey: "canales", groupLabel: "CANALES",
+			groupKey: "canales", groupLabel: "🌐 CANALES",
 			items: [
 				{
-					key: "web", label: "🌐 Canal Web",
+					key: "web", label: "Canal Web",
 					children: [
-						{ key: "web-precios", label: "📋 Tabla de precios" },
-						{ key: "web-simulador", label: "🧮 Simulador de portfolio" },
+						{ key: "web-precios", label: "Tabla de precios" },
+						{ key: "web-simulador", label: "Simulador de portfolio" },
 					],
 				},
-				{ key: "distribuidores", label: "🤝 Distribuidores" },
-				{ key: "b2b2c", label: "🏢 B2B2C (IDC)" },
-				{ key: "comparación", label: "⚖️ Comparación" },
+				{ key: "distribuidores", label: "Distribuidores" },
+				{ key: "b2b2c", label: "B2B2C (IDC)" },
+				{ key: "comparación", label: "Comparación" },
 			],
 		},
 		{
-			groupKey: "bases", groupLabel: "BASES DE DATOS",
+			groupKey: "bases", groupLabel: "🗄️ BASES DE DATOS",
 			items: [
-				{ key: "historial", label: "📜 Historial" },
-				{ key: "clientes", label: "👥 Clientes" },
+				{ key: "historial", label: "Historial" },
+				{ key: "clientes", label: "Clientes" },
 			],
 		},
 		{
-			groupKey: "configuracion", groupLabel: "CONFIGURACIÓN",
+			groupKey: "configuracion", groupLabel: "⚙️ CONFIGURACIÓN",
 			items: [
-				{ key: "cfg-general", label: "⚙️ General" },
-				{ key: "cfg-costos", label: "💰 Costos" },
-				{ key: "cfg-precios", label: "🏷️ Precios" },
-				{ key: "cfg-modelos", label: "📦 Modelos" },
+				{ key: "cfg-general", label: "General" },
+				{ key: "cfg-costos", label: "Costos" },
+				{ key: "cfg-precios", label: "Precios" },
+				{ key: "cfg-modelos", label: "Modelos" },
 			],
 		},
 	];
