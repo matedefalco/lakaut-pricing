@@ -128,6 +128,9 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		setTimeout(function () { setFlash(false); }, 1500);
 	}
 
+	const cfAllocAnual = costs.cfDirecto * 12 * calc.firmasTotal / costs.capacidadNegocio;
+	const ebitdaDistrib = margenLakaut - cfAllocAnual;
+
 	return (
 		<div className="space-y-6">
 
@@ -275,7 +278,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 								<TableRow><TableCell className="font-semibold">Ingreso neto Lakaut</TableCell><TableCell className="text-right tabular-nums font-semibold">{fMoney(netoLakaut)}</TableCell></TableRow>
 								<TableRow><TableCell>Costo variable ({calc.certsTotal.toLocaleString("es-AR")} certs + {calc.firmasTotal.toLocaleString("es-AR")} firmas)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(cvTotal)}</TableCell></TableRow>
 								<TableRow className="bg-success/5"><TableCell className="font-semibold text-[var(--success)]">Margen Lakaut</TableCell><TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fMoney(margenLakaut)} ({(margenPct * 100).toFixed(0)}%)</TableCell></TableRow>
-										<TableRow className={"" + (margenLakaut - costs.cfDirecto >= 0 ? "bg-success/5" : "bg-destructive/5")}><TableCell className={"font-semibold " + (margenLakaut - costs.cfDirecto >= 0 ? "text-[var(--success)]" : "text-destructive")}>EBITDA (CF incl.)</TableCell><TableCell className={"text-right tabular-nums font-semibold " + (margenLakaut - costs.cfDirecto >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margenLakaut - costs.cfDirecto)}</TableCell></TableRow>
+										<TableRow className={ebitdaDistrib >= 0 ? "bg-success/5" : "bg-destructive/5"}><TableCell className={"font-semibold " + (ebitdaDistrib >= 0 ? "text-[var(--success)]" : "text-destructive")}>EBITDA (CF incl.)</TableCell><TableCell className={"text-right tabular-nums font-semibold " + (ebitdaDistrib >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(ebitdaDistrib)}</TableCell></TableRow>
 							</TableBody>
 						</Table>
 					</CardContent>

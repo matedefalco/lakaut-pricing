@@ -235,6 +235,12 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 								<span style={os(11, 400, GRAY)}>Mostrar badge "Recomendado"</span>
 							</label>
 						</FieldRow>
+						<FieldRow label="Activo">
+							<label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+								<input type="checkbox" checked={draft.activo !== false} onChange={function (e) { upd("activo", e.target.checked); }} />
+								<span style={os(11, 400, GRAY)}>Visible en cotizadora y Canal Web</span>
+							</label>
+						</FieldRow>
 					</div>
 
 					{/* Col 2: Financiero + Pack + Servicios */}

@@ -616,7 +616,8 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 						{rows.map(function (r) {
 							var isTarget = r.firmas === firmas;
 							var hasDisc = (r.discount || 0) > 0;
-							var ebitda = r.margenPack - costs.cfDirecto;
+							var cfPack = costs.cfDirecto * r.firmas * 12 / costs.capacidadNegocio;
+								var ebitda = r.margenPack - cfPack;
 							return (
 								<tr key={r.firmas} style={{ background: isTarget ? "#eaecfb" : r.firmas % 2 === 0 ? "#fafafa" : WHITE }}>
 									<td style={Object.assign({}, os(13, isTarget ? 700 : 400, isTarget ? BLUE : BLACK), { padding: "9px 10px" })}>
@@ -807,20 +808,21 @@ export function Cotizadora({ costs, currency, tc }) {
 		return false;
 	}, [readyToRecommend, profile, firmaType, certsCount, firmasEstimadas]);
 
+	var activeModels = models.filter(function (m) { return m.activo !== false; });
 	var recommendations = useMemo(function () {
 		if (!readyToRecommend || isVolume) return [];
 		if (profile === "persona") {
-			var smart = models.find(function (m) { return m.id === "smart"; });
-			var prof = models.find(function (m) { return m.id === "profesional"; });
+			var smart = activeModels.find(function (m) { return m.id === "smart"; });
+			var prof = activeModels.find(function (m) { return m.id === "profesional"; });
 			return firmasEstimadas < 50 ? [smart, prof].filter(Boolean) : [prof, smart].filter(Boolean);
 		}
 		if (profile === "empresa" && firmaType === "juridica") {
-			var pyme = models.find(function (m) { return m.id === "pyme"; });
-			var ent = models.find(function (m) { return m.id === "enterprise"; });
+			var pyme = activeModels.find(function (m) { return m.id === "pyme"; });
+			var ent = activeModels.find(function (m) { return m.id === "enterprise"; });
 			return (certsCount <= 1 && firmasEstimadas < 300) ? [pyme, ent].filter(Boolean) : [ent, pyme].filter(Boolean);
 		}
 		return [];
-	}, [readyToRecommend, isVolume, profile, firmaType, certsCount, firmasEstimadas, models]);
+	}, [readyToRecommend, isVolume, profile, firmaType, certsCount, firmasEstimadas, activeModels]);
 
 	var totalCerts = certsCount * PERIODO;
 	var totalFirmas = firmasEstimadas * PERIODO;

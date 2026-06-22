@@ -51,10 +51,11 @@ export function TabCanalWeb({ costs, currency, tc }) {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{models.map(function (m) {
+							{models.filter(function (m) { return m.activo !== false; }).map(function (m) {
 								const e = econ(m);
 								const selloComp = m.ilimitadas && !m.extraFirmaPrice;
-								const ebitda = e ? e.precioUSD - e.cvTotal - costs.cfDirecto : null;
+								const cfPack = costs.cfDirecto * (m.firmas || 0) * 12 / costs.capacidadNegocio;
+								const ebitda = e ? e.precioUSD - e.cvTotal - cfPack : null;
 								return (
 									<TableRow key={m.id}>
 										<TableCell>
@@ -69,7 +70,9 @@ export function TabCanalWeb({ costs, currency, tc }) {
 										<TableCell className="text-right tabular-nums">{m.ilimitadas ? "Ilimitadas" : (m.firmas == null ? "—" : m.firmas)}</TableCell>
 										<TableCell className="text-right tabular-nums">
 											{m.extraFirmaPrice
+												? (currency === "ARS"
 												? "$ " + (m.firmaExtraARS || Math.round(m.extraFirmaPrice * tc)).toLocaleString("es-AR")
+												: fUSD(m.extraFirmaPrice))
 												: (selloComp ? "Sello comp." : "—")}
 										</TableCell>
 										<TableCell className="text-right tabular-nums">{e == null ? "—" : fMoney2(e.cvTotal)}</TableCell>

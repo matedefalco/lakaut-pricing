@@ -156,7 +156,8 @@ function LakautCalcInner() {
 		const cvFirmaBase = (costConfig.cvFirmaItems || []).filter(function (r) { return r.tipo !== "indirecto"; }).reduce(function (s, r) { return s + r.v; }, 0);
 		const activosTotal = cfAmort;
 		const capacidadFirmasAnual = costConfig.capacidadFirmasAnual || CAPACIDAD_FIRMAS_ANUAL;
-		return { cfTotal, cfSegmento, cfDirecto, cvCertBase, cvFirmaBase, activosTotal, capacidadFirmasAnual };
+		const capacidadNegocio = costConfig.capacidadNegocio || 4_000_000;
+		return { cfTotal, cfSegmento, cfDirecto, cvCertBase, cvFirmaBase, activosTotal, capacidadFirmasAnual, capacidadNegocio };
 	}, [costConfig]);
 
 	const cfg = PACKS[family] || PACKS.A;
