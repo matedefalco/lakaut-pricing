@@ -122,6 +122,13 @@ function LakautCalcInner() {
 
 	const ALL_NAV = [
 		{
+			groupKey: "cotizadora", groupLabel: "📋 COTIZADORA",
+			items: [
+				{ key: "distribuidores", label: "Distribuidores" },
+				{ key: "b2b2c", label: "B2B2C (IDC)" },
+			],
+		},
+		{
 			groupKey: "canales", groupLabel: "🌐 CANALES",
 			items: [
 				{
@@ -131,8 +138,6 @@ function LakautCalcInner() {
 						{ key: "web-simulador", label: "Simulador de portfolio" },
 					],
 				},
-				{ key: "distribuidores", label: "Distribuidores" },
-				{ key: "b2b2c", label: "B2B2C (IDC)" },
 				{ key: "comparación", label: "Comparación" },
 			],
 		},

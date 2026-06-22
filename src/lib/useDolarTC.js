@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { loadConfig, saveConfig, subscribeConfig } from "./supabase";
 
 // Available rate sources from dolarapi.com/v1/dolares/:casa
 export const DOLAR_SOURCES = [
@@ -11,26 +12,33 @@ export const DOLAR_SOURCES = [
 	{ k: "manual", label: "Manual" },
 ];
 
-const STORAGE_KEY = "lakaut_tc_source";
-const STORAGE_KEY_VAL = "lakaut_tc_val";
 const DEFAULT_SOURCE = "oficial";
 const FALLBACK_TC = 1410;
 
 export function useDolarTC() {
-	const [source, setSourceState] = useState(function () {
-		try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_SOURCE; } catch (e) { return DEFAULT_SOURCE; }
-	});
-	const [tc, setTcRaw] = useState(function () {
-		try { return Number(localStorage.getItem(STORAGE_KEY_VAL)) || FALLBACK_TC; } catch (e) { return FALLBACK_TC; }
-	});
-
-	function setTc(val) {
-		setTcRaw(val);
-		try { localStorage.setItem(STORAGE_KEY_VAL, String(val)); } catch (e) {}
-	}
+	const [source, setSourceState] = useState(DEFAULT_SOURCE);
+	const [tc, setTcState] = useState(FALLBACK_TC);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
 	const [lastUpdated, setLastUpdated] = useState(null);
+	const [ready, setReady] = useState(false);
+
+	// Load TC config from Supabase on mount; subscribe to realtime changes
+	useEffect(function () {
+		loadConfig("tcConfig").then(function (remote) {
+			if (remote) {
+				if (remote.source) setSourceState(remote.source);
+				if (remote.tc && remote.tc > 0) setTcState(remote.tc);
+			}
+			setReady(true);
+		});
+		return subscribeConfig("tcConfig", function (remote) {
+			if (remote) {
+				if (remote.source) setSourceState(remote.source);
+				if (remote.tc && remote.tc > 0) setTcState(remote.tc);
+			}
+		});
+	}, []);
 
 	const fetchRate = useCallback(function (src) {
 		setLoading(true);
@@ -41,11 +49,12 @@ export function useDolarTC() {
 				return r.json();
 			})
 			.then(function (data) {
-				// Use venta (sell price) as the reference rate
 				const rate = data.venta || data.compra;
 				if (rate && rate > 0) {
-					setTc(Math.round(rate));
+					const val = Math.round(rate);
+					setTcState(val);
 					setLastUpdated(data.fechaActualizacion || new Date().toISOString());
+					saveConfig("tcConfig", { source: src, tc: val });
 				}
 				setLoading(false);
 			})
@@ -55,13 +64,23 @@ export function useDolarTC() {
 			});
 	}, []);
 
+	// When source changes and it's not manual, fetch the rate
 	useEffect(function () {
-		if (source !== "manual") fetchRate(source);
-	}, [source, fetchRate]);
+		if (ready && source !== "manual") fetchRate(source);
+	}, [source, ready, fetchRate]);
+
+	function setTc(val) {
+		setTcState(val);
+		saveConfig("tcConfig", { source, tc: val });
+	}
 
 	function setSource(src) {
 		setSourceState(src);
-		try { localStorage.setItem(STORAGE_KEY, src); } catch (e) {}
+		if (src === "manual") {
+			// Persist source change immediately (tc stays as-is)
+			saveConfig("tcConfig", { source: src, tc });
+		}
+		// Non-manual sources trigger fetchRate via useEffect
 	}
 
 	return { tc, setTc, source, setSource, loading, error, lastUpdated, refresh: function () { fetchRate(source); } };
