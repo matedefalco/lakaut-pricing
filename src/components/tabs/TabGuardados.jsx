@@ -399,7 +399,7 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 						Cancelar
 					</button>
 					<button
-						onClick={function () { onSave(Object.assign({}, draft, { priceUSD: derivedPriceUSD, priceARS: derivedPriceARS, extraFirmaPrice: derivedFirmaExtraUSD, firmaExtraARS: derivedFirmaExtraARS })); }}
+						onClick={function () { onSave(Object.assign({}, draft, { priceUSD: derivedPriceUSD, priceARS: derivedPriceARS, priceDefinedIn: priceTruth.currency, extraFirmaPrice: derivedFirmaExtraUSD, firmaExtraARS: derivedFirmaExtraARS })); }}
 						disabled={!isDirty && !isNew}
 						style={{
 							padding: "8px 20px",

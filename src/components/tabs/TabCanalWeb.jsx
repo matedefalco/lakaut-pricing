@@ -298,7 +298,10 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 	function econ(m) {
 		if (isConsultar(m)) return null;
 		const precioUSD = m.priceUSD;
-		const precioARS = Math.round(precioUSD * tc);
+		// Use stored ARS value when price was defined in ARS to avoid USD round-trip drift
+		const precioARS = (m.priceDefinedIn === "ARS" && m.priceARS != null)
+			? m.priceARS
+			: Math.round(precioUSD * tc);
 		const precioARSiva = Math.round(precioARS * 1.21);
 		const certCost = (m.certs || 1) * cvCert;
 		const firmasCost = m.ilimitadas ? 0 : (m.firmas || 0) * cvFirma;
