@@ -28,15 +28,11 @@ import { TabGeneral } from "./components/tabs/TabGeneral";
 import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabSuscripcion } from "./components/tabs/TabSuscripcion";
 import { TabComparacion } from "./components/tabs/TabComparacion";
-import { TabVolumen } from "./components/tabs/TabVolumen";
-import { TabVolumenConfig } from "./components/tabs/TabVolumenConfig";
-import { Cotizadora } from "./components/Cotizadora";
 import { TabCanalWeb } from "./components/tabs/TabCanalWeb";
 import { TabCanalDistribuidores } from "./components/tabs/TabCanalDistribuidores";
 import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
 import { TabHistorial } from "./components/tabs/TabHistorial";
 import { TabClientes } from "./components/tabs/TabClientes";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import { DEFAULT_VOLUME_TIERS } from "./data/volumeTiers";
 
 // ─── Archive mapping arch → pack key for strategy text ─────────────────────────
@@ -64,14 +60,6 @@ function LakautCalcInner() {
 		});
 	}, []);
 
-	// Top-level navigation
-	const [section, setSection] = useState("cotizadora");
-
-	// Modelos sub-nav
-	const [modTab, setModTab] = useState("análisis");
-
-	// Configuración sub-nav
-	const [cfgTab, setCfgTab] = useState("general");
 
 
 	// Selected model id in análisis mode
@@ -116,27 +104,16 @@ function LakautCalcInner() {
 		});
 	}
 
-	const COTI_NAV = [
-		{
-			key: "web", label: "Canal Web",
-			children: [
-				{ key: "web-precios", label: "Tabla de precios" },
-				{ key: "web-simulador", label: "Simulador de portfolio" },
-			],
-		},
-		{ key: "distribuidores", label: "Distribuidores" },
-		{ key: "b2b2c", label: "B2B2C (IDC)" },
-		{ key: "sep" },
-		{ key: "historial", label: "Historial" },
-		{ key: "clientes", label: "Clientes" },
-	];
-
 	function navTo(key) {
 		setActiveNavItem(key);
-		const parent = COTI_NAV.find(function (n) { return n.children && n.children.some(function (c) { return c.key === key; }); });
-		if (parent) {
-			setExpandedGroups(function (prev) { const next = new Set(prev); next.add(parent.key); return next; });
-		}
+		// Auto-expand parent group if item is a child
+		ALL_NAV.forEach(function (group) {
+			group.items.forEach(function (item) {
+				if (item.children && item.children.some(function (c) { return c.key === key; })) {
+					setExpandedGroups(function (prev) { const next = new Set(prev); next.add(item.key); return next; });
+				}
+			});
+		});
 	}
 
 	const [volumeTiers, setVolumeTiers] = useState(function () {
@@ -230,206 +207,208 @@ function LakautCalcInner() {
 	const scaleLabel = scaleLabels[cfg.arch] || "Usuarios activos";
 
 	const ANALYSIS_TABS = ["costos", "break-even", "precios", "proyección"];
-	const SECTIONS = [
-		{ k: "cotizadora", label: "Cotizadora" },
-		{ k: "configuración", label: "Configuración" },
-	];
-	const MOD_TABS = [
-		// Grupo gestión
-		{ k: "análisis", label: "Simulador", group: "gestión" },
-		// Grupo herramientas
-		{ k: "suscripción", label: "Suscripción", group: "herramientas" },
-		{ k: "comparación", label: "Comparación", group: "herramientas" },
-	];
-	const activeModTab = MOD_TABS.find(function (t) { return t.k === modTab; });
-	const CFG_TABS = [
-		{ k: "general", label: "General" },
-		{ k: "costos", label: "Costos" },
-		{ k: "precios", label: "Precios" },
-		{ k: "modelos", label: "Modelos pre-cargados" },
+
+	const ALL_NAV = [
+		{
+			groupKey: "canales", groupLabel: "CANALES",
+			items: [
+				{
+					key: "web", label: "Canal Web",
+					children: [
+						{ key: "web-precios", label: "Tabla de precios" },
+						{ key: "web-simulador", label: "Simulador de portfolio" },
+					],
+				},
+				{ key: "distribuidores", label: "Distribuidores" },
+				{ key: "b2b2c", label: "B2B2C (IDC)" },
+				{ key: "sep-coti" },
+				{ key: "historial", label: "Historial" },
+				{ key: "clientes", label: "Clientes" },
+			],
+		},
+		{
+			groupKey: "analisis", groupLabel: "ANÁLISIS",
+			items: [
+				{ key: "análisis", label: "Simulador de modelos" },
+				{ key: "suscripción", label: "Suscripción" },
+				{ key: "comparación", label: "Comparación" },
+			],
+		},
+		{
+			groupKey: "configuracion", groupLabel: "CONFIGURACIÓN",
+			items: [
+				{ key: "cfg-general", label: "General" },
+				{ key: "cfg-costos", label: "Costos" },
+				{ key: "cfg-precios", label: "Precios" },
+				{ key: "cfg-modelos", label: "Modelos" },
+			],
+		},
 	];
 
 	const selectedModel = models.find(function (m) { return m.id === selectedModelId; });
 
-	// Description text: prefer model tagline, fallback to pack strategy
-	const strategyText = selectedModel && modTab === "análisis"
+	const strategyText = selectedModel && activeNavItem === "análisis"
 		? (selectedModel.tagline || cfg.strategy)
 		: cfg.strategy;
 
 	return (
-		<div style={{ background: BG, minHeight: "100vh", fontFamily: "'Open Sans',sans-serif", boxSizing: "border-box" }}>
+		<div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Open Sans',sans-serif" }}>
 
-			{/* ─── Header ────────────────────────────────────────────────────────── */}
-			<div className="no-print" style={{ background: BLUE, padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-				<div>
-					<div style={Object.assign({}, mont(22), { color: WHITE })}>LAKAUT</div>
-					<div style={Object.assign({}, os(13, 400, WHITE), { opacity: 0.75, marginTop: 2 })}>
-						Calculadora de Pricing · Modelos y Planes Comerciales
+			{/* ── Sidebar ── */}
+			{sidebarOpen && (
+				<div className="no-print" style={{ width: 220, flexShrink: 0, borderRight: "1px solid " + BORD, background: WHITE, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+					{/* Brand header */}
+					<div style={{ background: BLUE, padding: "16px 16px 14px", flexShrink: 0 }}>
+						<div style={Object.assign({}, mont(18), { color: WHITE })}>LAKAUT</div>
+						<div style={Object.assign({}, os(11, 400, WHITE), { opacity: 0.7, marginTop: 2 })}>Pricing Calculator</div>
 					</div>
-				</div>
-				<div style={Object.assign({}, os(12, 400, WHITE), { opacity: 0.6 })}>
-					{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
-				</div>
-			</div>
-
-			{/* ─── Top-level nav ──────────────────────────────────────────────────── */}
-			<div className="no-print" style={{ background: WHITE, borderBottom: "2px solid " + BORD, padding: "0 24px", display: "flex", gap: 0, alignItems: "center" }}>
-				<div style={{ display: "flex", flex: 1 }}>
-					{SECTIONS.map(function (s) {
-						const act = section === s.k;
-						return (
-							<button
-								key={s.k}
-								onClick={function () { setSection(s.k); }}
-								style={{ padding: "14px 24px", fontFamily: "'Open Sans',sans-serif", fontSize: 14, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: "transparent", border: "none", cursor: "pointer", borderBottom: "3px solid " + (act ? BLUE : "transparent"), marginBottom: -2 }}
-							>
-								{s.label}
-							</button>
-						);
-					})}
-				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-					{["USD", "ARS"].map(function (c) {
-						return (
-							<button key={c} onClick={function () { setCurrency(c); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (currency === c ? BLUE : BORD), background: currency === c ? BLUE : WHITE, color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
-						);
-					})}
-					{currency === "ARS" && (
-						<span style={os(11, 400, GRAY)}>TC: {tcLoading ? "..." : tc}</span>
-					)}
-				</div>
-			</div>
-
-			{/* ════════════════════════════════════════════════════════════════════════
-			    MODELOS
-			    ════════════════════════════════════════════════════════════════════════ */}
-			{section === "modelos" && (
-				<div>
-					{/* Modelos sub-nav */}
-					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", alignItems: "stretch", gap: 0 }}>
-						{MOD_TABS.map(function (t, i) {
-							const act = modTab === t.k;
-							const prevGroup = i > 0 ? MOD_TABS[i - 1].group : t.group;
-							const groupBreak = i > 0 && t.group !== prevGroup;
+					{/* Nav groups */}
+					<nav style={{ flex: 1, overflowY: "auto", paddingTop: 8, paddingBottom: 16 }}>
+						{ALL_NAV.map(function (group) {
 							return (
-								<div key={t.k} style={{ display: "flex", alignItems: "stretch" }}>
-									{groupBreak && (
-										<div style={{ width: 1, background: BORD, margin: "8px 6px" }} />
-									)}
-									<button
-										onClick={function () { setModTab(t.k); }}
-										style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
-									>
-										{t.label}
-									</button>
+								<div key={group.groupKey} style={{ marginBottom: 4 }}>
+									<div style={Object.assign({}, os(9, 700, GRAY), { padding: "8px 14px 4px", textTransform: "uppercase", letterSpacing: "0.6px" })}>
+										{group.groupLabel}
+									</div>
+									{group.items.map(function (item) {
+										if (item.key === "sep-coti") {
+											return <div key="sep-coti" style={{ height: 1, background: BORD, margin: "4px 10px" }} />;
+										}
+										const isActive = activeNavItem === item.key;
+										const isGroup = item.children && item.children.length > 0;
+										const expanded = expandedGroups.has(item.key);
+										if (isGroup) {
+											return (
+												<div key={item.key}>
+													<button onClick={function () { toggleGroup(item.key); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600, color: expanded ? BLUE : BLACK, textAlign: "left" }}>
+														<span>{item.label}</span>
+														<span style={{ fontSize: 9, color: GRAY, display: "inline-block", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>▶</span>
+													</button>
+													{expanded && (
+														<div style={{ paddingLeft: 8 }}>
+															{item.children.map(function (child) {
+																const childActive = activeNavItem === child.key;
+																return (
+																	<button key={child.key} onClick={function () { navTo(child.key); }} style={{ width: "100%", display: "block", padding: "6px 12px 6px 18px", background: childActive ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (childActive ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: childActive ? 700 : 400, color: childActive ? BLUE : GRAY, textAlign: "left" }}>
+																		{child.label}
+																	</button>
+																);
+															})}
+														</div>
+													)}
+												</div>
+											);
+										}
+										return (
+											<button key={item.key} onClick={function () { navTo(item.key); }} style={{ width: "100%", display: "block", padding: "7px 14px", background: isActive ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (isActive ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: isActive ? 700 : 400, color: isActive ? BLUE : BLACK, textAlign: "left" }}>
+												{item.label}
+											</button>
+										);
+									})}
 								</div>
 							);
 						})}
-					</div>
-					{/* Breadcrumb */}
-					<div style={{ background: "#f8fafc", borderBottom: "1px solid " + BORD, padding: "5px 24px" }}>
-						<span style={os(10, 400, GRAY)}>Modelos</span>
-						<span style={Object.assign({}, os(10, 400, GRAY), { margin: "0 5px" })}>·</span>
-						<span style={os(10, 700, GRAY)}>{activeModTab ? activeModTab.label : ""}</span>
-					</div>
+					</nav>
+				</div>
+			)}
 
-					{/* ── Análisis ──────────────────────────────────────────────────────── */}
-					{modTab === "análisis" && (
+			{/* ── Content ── */}
+			<div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: BG }}>
+				{/* Top bar */}
+				<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "8px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+					<button onClick={function () { setSidebarOpen(function (o) { return !o; }); }} style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, padding: "4px 6px", borderRadius: 6, display: "flex", alignItems: "center" }} title={sidebarOpen ? "Cerrar menú" : "Abrir menú"}>
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+							<line x1="2" y1="4" x2="14" y2="4" /><line x1="2" y1="8" x2="14" y2="8" /><line x1="2" y1="12" x2="14" y2="12" />
+						</svg>
+					</button>
+					<div style={{ flex: 1 }} />
+					<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+						{["USD", "ARS"].map(function (c) {
+							return (
+								<button key={c} onClick={function () { setCurrency(c); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (currency === c ? BLUE : BORD), background: currency === c ? BLUE : WHITE, color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
+							);
+						})}
+						{currency === "ARS" && <span style={os(11, 400, GRAY)}>TC: {tcLoading ? "..." : tc}</span>}
+					</div>
+					<div style={Object.assign({}, os(11, 400, GRAY), { opacity: 0.7 })}>
+						{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
+					</div>
+				</div>
+
+				{/* Content area */}
+				<div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+
+					{/* ── CANALES ── */}
+					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
+					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
+					{activeNavItem === "distribuidores" && <TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "b2b2c" && <TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
+					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
+
+					{/* ── ANÁLISIS ── */}
+					{activeNavItem === "análisis" && (
 						<div>
 							{/* Model selector strip */}
-							<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "10px 24px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-								<span style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginRight: 4 })}>
-									Modelo:
-								</span>
+							<div className="no-print" style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 10, padding: "10px 16px", marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+								<span style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginRight: 4 })}>Modelo:</span>
 								{models.map(function (m) {
 									const act = selectedModelId === m.id;
 									return (
-										<button
-											key={m.id}
-											onClick={function () { setSelectedModelId(m.id); }}
-											style={{ padding: "5px 14px", borderRadius: 20, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: act ? 700 : 400, color: act ? WHITE : GRAY, background: act ? (m.color || BLUE) : WHITE, border: "1.5px solid " + (act ? (m.color || BLUE) : BORD), cursor: "pointer" }}
-										>
+										<button key={m.id} onClick={function () { setSelectedModelId(m.id); }} style={{ padding: "5px 14px", borderRadius: 20, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: act ? 700 : 400, color: act ? WHITE : GRAY, background: act ? (m.color || BLUE) : WHITE, border: "1.5px solid " + (act ? (m.color || BLUE) : BORD), cursor: "pointer" }}>
 											{m.label}
 										</button>
 									);
 								})}
-								{models.length === 0 && (
-									<span style={os(12, 400, GRAY)}>Sin modelos guardados · creá uno en "Configuración › Modelos pre-cargados"</span>
-								)}
+								{models.length === 0 && <span style={os(12, 400, GRAY)}>Sin modelos guardados · creá uno en "Configuración › Modelos pre-cargados"</span>}
 							</div>
 
-							{/* Strategy / tagline banner */}
-							<div style={{ background: BLUEL, borderBottom: "1px solid " + BORD, padding: "10px 24px", display: "flex", gap: 12, alignItems: "flex-start" }}>
-								<div style={Object.assign({}, mont(13), { color: selectedModel ? (selectedModel.color || BLUE) : BLUE, flexShrink: 0, marginTop: 1 })}>
-									{selectedModel ? selectedModel.label : "Estrategia"}
-								</div>
+							{/* Strategy banner */}
+							<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "10px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
+								<div style={Object.assign({}, mont(13), { color: selectedModel ? (selectedModel.color || BLUE) : BLUE, flexShrink: 0, marginTop: 1 })}>{selectedModel ? selectedModel.label : "Estrategia"}</div>
 								<div style={os(12, 400, BLACK)}>{strategyText}</div>
 							</div>
 
 							{/* Body */}
-							<div style={{ display: "flex", gap: 16, padding: "16px 24px", alignItems: "flex-start" }}>
+							<div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
 								{/* Left panel */}
 								<div className="no-print" style={{ width: "clamp(200px, 20vw, 248px)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-									{/* Model info */}
 									{selectedModel && (
 										<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 16, borderLeft: "3px solid " + (selectedModel.color || BLUE) }}>
 											<Sec title={selectedModel.label} />
-											<div style={Object.assign({}, os(10, 400, GRAY), { marginBottom: 8 })}>
-												{selectedModel.segment === "persona" ? "Persona" : "Empresa"} · {selectedModel.arch || "bolsa"} · {selectedModel.vigencia || 24}m
-											</div>
-											<div style={Object.assign({}, os(9, 400, GRAY), { background: BLUEL, borderRadius: 6, padding: "6px 8px" })}>
-												Editando en modo sandbox. Los cambios aquí no modifican el modelo guardado.
-											</div>
+											<div style={Object.assign({}, os(10, 400, GRAY), { marginBottom: 8 })}>{selectedModel.segment === "persona" ? "Persona" : "Empresa"} · {selectedModel.arch || "bolsa"} · {selectedModel.vigencia || 24}m</div>
+											<div style={Object.assign({}, os(9, 400, GRAY), { background: BLUEL, borderRadius: 6, padding: "6px 8px" })}>Editando en modo sandbox. Los cambios aquí no modifican el modelo guardado.</div>
 										</div>
 									)}
-
-									{/* Pack config (sandbox) */}
 									<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 16 }}>
 										<Sec title="Parámetros (sandbox)" />
 										<PackFields arch={cfg.arch} inp={inp} update={updInp} currency={currency} tc={tc} />
 										<NumInput label={scaleLabel} value={users} onChange={setUsers} suffix="usu" />
 										{cfg.arch === "free" && (
 											<div style={{ background: "#fee2e2", border: "1px solid " + ER + "44", borderRadius: 10, padding: "10px 12px", marginTop: 8 }}>
-												<div style={Object.assign({}, os(10, 700, ER), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>
-													Costo asumido / usuario / mes
-												</div>
+												<div style={Object.assign({}, os(10, 700, ER), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 })}>Costo asumido / usuario / mes</div>
 												<div style={Object.assign({}, mont(20), { color: ER })}>{fMoney2(calcs.cvMes)}</div>
-												<div style={Object.assign({}, os(11, 400, ER), { marginTop: 3, opacity: 0.85 })}>
-													{users.toLocaleString()} usuarios → {fMoney(calcs.cvTotal)} / mes sin revenue
-												</div>
+												<div style={Object.assign({}, os(11, 400, ER), { marginTop: 3, opacity: 0.85 })}>{users.toLocaleString()} usuarios → {fMoney(calcs.cvTotal)} / mes sin revenue</div>
 											</div>
 										)}
-
-										{/* Margen objetivo — dentro de parámetros */}
 										<div style={{ borderTop: "1px solid " + BORD, marginTop: 12, paddingTop: 12 }}>
 											<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: margenDeseado !== null ? 10 : 0 }}>
 												<span style={os(11, 400, GRAY)}>Margen objetivo</span>
 												<label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-													<input
-														type="checkbox"
-														checked={margenDeseado !== null}
-														onChange={function (e) { setMargenDeseado(e.target.checked ? 40 : null); }}
-													/>
+													<input type="checkbox" checked={margenDeseado !== null} onChange={function (e) { setMargenDeseado(e.target.checked ? 40 : null); }} />
 													<span style={os(11, 400, GRAY)}>{margenDeseado !== null ? "Activo" : "Activar"}</span>
 												</label>
 											</div>
-											{margenDeseado !== null && (
-												<NumInput value={margenDeseado} onChange={setMargenDeseado} suffix="%" />
-											)}
+											{margenDeseado !== null && <NumInput value={margenDeseado} onChange={setMargenDeseado} suffix="%" />}
 										</div>
 									</div>
-
-									{/* Optional services */}
 									<div style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: 12, padding: 16 }}>
 										<Sec title="Servicios opcionales" />
 										{Object.entries(SERVICES_DEF).map(function (entry) {
 											var k = entry[0], s = entry[1];
-											return (
-												<Toggle key={k} label={s.label} cost={s.cost} costType={s.costType} checked={svc[k]} onChange={function (v) { updSvc(k, v); }} />
-											);
+											return <Toggle key={k} label={s.label} cost={s.cost} costType={s.costType} checked={svc[k]} onChange={function (v) { updSvc(k, v); }} />;
 										})}
 									</div>
-
 								</div>
 
 								{/* Right panel: analysis tabs */}
@@ -437,11 +416,7 @@ function LakautCalcInner() {
 									<div className="no-print" style={{ background: WHITE, border: "1px solid " + BORD, borderRadius: "12px 12px 0 0", display: "flex", overflowX: "auto" }}>
 										{ANALYSIS_TABS.map(function (t) {
 											return (
-												<button
-													key={t}
-													onClick={function () { setTab(t); }}
-													style={{ padding: "12px 18px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: tab === t ? 700 : 400, color: tab === t ? BLUE : GRAY, background: "transparent", border: "none", cursor: "pointer", whiteSpace: "nowrap", borderBottom: "3px solid " + (tab === t ? BLUE : "transparent"), textTransform: "capitalize" }}
-												>
+												<button key={t} onClick={function () { setTab(t); }} style={{ padding: "12px 18px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: tab === t ? 700 : 400, color: tab === t ? BLUE : GRAY, background: "transparent", border: "none", cursor: "pointer", whiteSpace: "nowrap", borderBottom: "3px solid " + (tab === t ? BLUE : "transparent"), textTransform: "capitalize" }}>
 													{t}
 												</button>
 											);
@@ -450,82 +425,52 @@ function LakautCalcInner() {
 									<div style={{ background: WHITE, border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 12px 12px", padding: 20 }}>
 										{tab === "costos" && <TabCostos calcs={calcs} users={users} costConfig={costConfig} costs={costs} currency={currency} tc={tc} />}
 										{tab === "precios" && <TabPrecios calcs={calcs} users={users} costs={costs} currency={currency} tc={tc} arch={cfg.arch} inp={inp} />}
-										{tab === "proyección" && (
-											<TabProyeccion
-												proj={calcs.proj} beMes={calcs.beMes} calcs={calcs} costs={costs}
-												currency={currency} tc={tc} projParams={projParams}
-												setProjParams={setProjParams} arch={cfg.arch}
-											/>
-										)}
+										{tab === "proyección" && <TabProyeccion proj={calcs.proj} beMes={calcs.beMes} calcs={calcs} costs={costs} currency={currency} tc={tc} projParams={projParams} setProjParams={setProjParams} arch={cfg.arch} />}
 										{tab === "break-even" && <TabBreakEven arch={cfg.arch} inp={inp} svc={svc} currentUsers={users} costs={costs} />}
-										</div>
+									</div>
 								</div>
 
-								{/* Right KPI panel */}
+								{/* KPI panel */}
 								<div className="no-print" style={{ width: 188, flexShrink: 0, background: WHITE, border: "1px solid " + BORD, borderRadius: 12, overflow: "hidden", position: "sticky", top: 16 }}>
 									{(function () {
 										var costoTotal = costs.cfDirecto + calcs.cvMes * users + (calcs.cvExtras || 0);
 										var hasExtras = (calcs.extraRevMes || 0) > 0;
-										var ingresoRows = [
-											{ label: "Revenue / mes", value: fMoney(calcs.revTotal), color: BLUE, big: true },
-										];
+										var ingresoRows = [{ label: "Revenue / mes", value: fMoney(calcs.revTotal), color: BLUE, big: true }];
 										if (hasExtras) {
 											ingresoRows.push({ label: "Packs", value: fMoney(calcs.revPackTotal), color: BLUE });
 											ingresoRows.push({ label: "Firmas extra", value: fMoney(calcs.extraRevMes), color: "#15803d" });
 										} else {
 											ingresoRows.push({ label: "por usuario", value: fMoney2(calcs.revMes) + " / usu", color: GRAY });
 										}
-										var sections = [
-											{
-												title: "Ingresos",
-												color: BLUE,
-												rows: ingresoRows,
-											},
-											{
-												title: "Rentabilidad",
-												color: ec,
-												rows: [
-													{ label: "EBITDA / mes", value: fMoney(calcs.ebitda), color: ec, big: true },
-													{ label: "Margen EBITDA", value: fP(calcs.ebitdaPct), color: ec },
-													{ label: "Margen unitario", value: fP(calcs.margenPct), color: mc },
-													{ label: "por usuario", value: fMoney2(calcs.margenUnit) + " / usu", color: GRAY },
-												],
-											},
-											{
-												title: "Costos",
-												color: GRAY,
-												rows: [
-													{ label: "CF directo / mes", value: fMoney(costs.cfDirecto), color: BLUE },
-													{ label: "CV por usuario", value: fMoney2(calcs.cvMes) + " / usu", color: WN },
-													{ label: "Costo total / mes", value: fMoney(costoTotal), color: BLACK, big: true },
-													{ label: "por usuario", value: fMoney2(users > 0 ? costoTotal / users : 0) + " / usu", color: GRAY },
-												],
-											},
-											{
-												title: "Break-even",
-												color: bc,
-												rows: [
-													{ label: "Usuarios necesarios", value: isFinite(calcs.beUsuarios) ? fK(calcs.beUsuarios) + " usu." : "∞", color: bc, big: true },
-													{ label: "Alcance", value: calcs.beMes ? "Mes " + calcs.beMes : "No en 24M", color: bc },
-												],
-											},
+										var kpiSections = [
+											{ title: "Ingresos", color: BLUE, rows: ingresoRows },
+											{ title: "Rentabilidad", color: ec, rows: [
+												{ label: "EBITDA / mes", value: fMoney(calcs.ebitda), color: ec, big: true },
+												{ label: "Margen EBITDA", value: fP(calcs.ebitdaPct), color: ec },
+												{ label: "Margen unitario", value: fP(calcs.margenPct), color: mc },
+												{ label: "por usuario", value: fMoney2(calcs.margenUnit) + " / usu", color: GRAY },
+											]},
+											{ title: "Costos", color: GRAY, rows: [
+												{ label: "CF directo / mes", value: fMoney(costs.cfDirecto), color: BLUE },
+												{ label: "CV por usuario", value: fMoney2(calcs.cvMes) + " / usu", color: WN },
+												{ label: "Costo total / mes", value: fMoney(costoTotal), color: BLACK, big: true },
+												{ label: "por usuario", value: fMoney2(users > 0 ? costoTotal / users : 0) + " / usu", color: GRAY },
+											]},
+											{ title: "Break-even", color: bc, rows: [
+												{ label: "Usuarios necesarios", value: isFinite(calcs.beUsuarios) ? fK(calcs.beUsuarios) + " usu." : "∞", color: bc, big: true },
+												{ label: "Alcance", value: calcs.beMes ? "Mes " + calcs.beMes : "No en 24M", color: bc },
+											]},
 										];
 										if (precioSugerido !== null) {
-											sections.push({
-												title: "Precio " + margenDeseado + "% margen",
-												color: OK,
-												rows: [
-													{ label: "Precio sugerido", value: fMoney2(precioSugerido), color: OK, big: true },
-													{ label: "vs. actual", value: "Δ " + fMoney2(precioSugerido - (inp.precio || 0)), color: GRAY },
-												],
-											});
+											kpiSections.push({ title: "Precio " + margenDeseado + "% margen", color: OK, rows: [
+												{ label: "Precio sugerido", value: fMoney2(precioSugerido), color: OK, big: true },
+												{ label: "vs. actual", value: "Δ " + fMoney2(precioSugerido - (inp.precio || 0)), color: GRAY },
+											]});
 										}
-										return sections.map(function (sec, si) {
+										return kpiSections.map(function (sec, si) {
 											return (
 												<div key={sec.title} style={{ borderTop: si > 0 ? "1px solid " + BORD : "none" }}>
-													<div style={Object.assign({}, os(8, 700, WHITE), { background: sec.color, padding: "4px 12px", textTransform: "uppercase", letterSpacing: "0.6px", opacity: 0.92 })}>
-														{sec.title}
-													</div>
+													<div style={Object.assign({}, os(8, 700, WHITE), { background: sec.color, padding: "4px 12px", textTransform: "uppercase", letterSpacing: "0.6px", opacity: 0.92 })}>{sec.title}</div>
 													<div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
 														{sec.rows.map(function (row) {
 															return (
@@ -544,174 +489,16 @@ function LakautCalcInner() {
 							</div>
 						</div>
 					)}
+					{activeNavItem === "suscripción" && <TabSuscripcion costs={costs} currency={currency} tc={tc} users={users} />}
+					{activeNavItem === "comparación" && <TabComparacion costs={costs} currency={currency} tc={tc} />}
 
-					{/* ── Suscripción ───────────────────────────────────────────────── */}
-					{modTab === "suscripción" && (
-						<div style={{ padding: 24 }}>
-							<TabSuscripcion costs={costs} currency={currency} tc={tc} users={users} />
-						</div>
-					)}
-
-					{/* ── Comparación ───────────────────────────────────────────────── */}
-					{modTab === "comparación" && (
-						<div style={{ padding: 24 }}>
-							<TabComparacion costs={costs} currency={currency} tc={tc} />
-						</div>
-					)}
-
-
-					</div>
-			)}
-
-			{/* ════════════════════════════════════════════════════════════════════════
-			    OTHER SECTIONS
-			    ════════════════════════════════════════════════════════════════════════ */}
-			{section === "cotizadora" && (
-				<div style={{ display: "flex", minHeight: "calc(100vh - 120px)" }}>
-					{/* ── Sidebar ── */}
-					{sidebarOpen && (
-						<div className="no-print" style={{ width: 220, flexShrink: 0, borderRight: "1px solid " + BORD, background: WHITE, display: "flex", flexDirection: "column" }}>
-							<div style={{ padding: "12px 10px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-								<span style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px" })}>Canales</span>
-								<button onClick={function () { setSidebarOpen(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, fontSize: 14, padding: "2px 4px", lineHeight: 1 }} title="Cerrar panel">←</button>
-							</div>
-							<nav style={{ flex: 1, overflowY: "auto" }}>
-								{COTI_NAV.map(function (item) {
-									if (item.key === "sep") {
-										return <div key="sep" style={{ height: 1, background: BORD, margin: "8px 10px" }} />;
-									}
-									const isGroup = item.children && item.children.length > 0;
-									const expanded = expandedGroups.has(item.key);
-									const isActive = activeNavItem === item.key;
-									if (isGroup) {
-										return (
-											<div key={item.key}>
-												<button
-													onClick={function () { toggleGroup(item.key); }}
-													style={{
-														width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-														padding: "7px 12px", background: "none", border: "none", cursor: "pointer",
-														fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600,
-														color: expanded ? BLUE : BLACK, textAlign: "left",
-													}}
-												>
-													<span>{item.label}</span>
-													<span style={{ fontSize: 10, color: GRAY, transition: "transform 0.15s", display: "inline-block", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
-												</button>
-												{expanded && (
-													<div style={{ paddingLeft: 8 }}>
-														{item.children.map(function (child) {
-															const childActive = activeNavItem === child.key;
-															return (
-																<button
-																	key={child.key}
-																	onClick={function () { navTo(child.key); }}
-																	style={{
-																		width: "100%", display: "block", padding: "6px 12px 6px 16px",
-																		background: childActive ? BLUEL : "none",
-																		border: "none", borderLeft: "2px solid " + (childActive ? BLUE : "transparent"),
-																		cursor: "pointer", fontFamily: "'Open Sans',sans-serif",
-																		fontSize: 12, fontWeight: childActive ? 700 : 400,
-																		color: childActive ? BLUE : GRAY, textAlign: "left",
-																	}}
-																>
-																	{child.label}
-																</button>
-															);
-														})}
-													</div>
-												)}
-											</div>
-										);
-									}
-									return (
-										<button
-											key={item.key}
-											onClick={function () { navTo(item.key); }}
-											style={{
-												width: "100%", display: "block", padding: "7px 12px",
-												background: isActive ? BLUEL : "none",
-												border: "none", borderLeft: "2px solid " + (isActive ? BLUE : "transparent"),
-												cursor: "pointer", fontFamily: "'Open Sans',sans-serif",
-												fontSize: 13, fontWeight: isActive ? 700 : 400,
-												color: isActive ? BLUE : BLACK, textAlign: "left",
-											}}
-										>
-											{item.label}
-										</button>
-									);
-								})}
-							</nav>
-						</div>
-					)}
-
-					{/* ── Content ── */}
-					<div style={{ flex: 1, minWidth: 0 }}>
-						{!sidebarOpen && (
-							<div className="no-print" style={{ borderBottom: "1px solid " + BORD, padding: "8px 16px" }}>
-								<button onClick={function () { setSidebarOpen(true); }} style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-									<span style={{ fontSize: 14 }}>→</span> Canales
-								</button>
-							</div>
-						)}
-						<div style={{ padding: 24 }}>
-							{(activeNavItem === "web-precios") && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
-							{(activeNavItem === "web-simulador") && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
-							{activeNavItem === "distribuidores" && <TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-							{activeNavItem === "b2b2c" && <TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-							{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
-							{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
-						</div>
-					</div>
+					{/* ── CONFIGURACIÓN ── */}
+					{activeNavItem === "cfg-general" && <TabGeneral tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} />}
+					{activeNavItem === "cfg-costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
+					{activeNavItem === "cfg-precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
+					{activeNavItem === "cfg-modelos" && <TabGuardados selectedId={selectedModelId} onSelect={function (id) { setSelectedModelId(id); }} currency={currency} tc={tc} />}
 				</div>
-			)}
-
-			{section === "configuración" && (
-				<div>
-					{/* Configuración sub-nav */}
-					<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "0 24px", display: "flex", alignItems: "stretch", gap: 0 }}>
-						{CFG_TABS.map(function (t) {
-							const act = cfgTab === t.k;
-							return (
-								<button
-									key={t.k}
-									onClick={function () { setCfgTab(t.k); }}
-									style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: act ? 700 : 400, color: act ? BLUE : GRAY, background: act ? BLUEL : "transparent", border: "none", cursor: "pointer", borderBottom: "2px solid " + (act ? BLUE : "transparent"), whiteSpace: "nowrap" }}
-								>
-									{t.label}
-									{t.k === "modelos" && (
-										<span style={{ background: act ? BLUE : "#e2e8f0", color: act ? WHITE : GRAY, fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px", lineHeight: "14px" }}>
-											{models.length}
-										</span>
-									)}
-								</button>
-							);
-						})}
-					</div>
-					{/* Breadcrumb */}
-					<div style={{ background: "#f8fafc", borderBottom: "1px solid " + BORD, padding: "5px 24px" }}>
-						<span style={os(10, 400, GRAY)}>Configuración</span>
-						<span style={Object.assign({}, os(10, 400, GRAY), { margin: "0 5px" })}>·</span>
-						<span style={os(10, 700, GRAY)}>{(CFG_TABS.find(function (t) { return t.k === cfgTab; }) || {}).label}</span>
-					</div>
-
-					<div style={{ padding: 24 }}>
-						{cfgTab === "general" && <TabGeneral tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} />}
-					{cfgTab === "costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
-						{cfgTab === "precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
-						{cfgTab === "modelos" && (
-							<TabGuardados
-								selectedId={selectedModelId}
-								onSelect={function (id) {
-									setSelectedModelId(id);
-								}}
-								currency={currency}
-								tc={tc}
-							/>
-						)}
-					</div>
-				</div>
-			)}
+			</div>
 		</div>
 	);
 }
