@@ -145,7 +145,7 @@ function LakautCalcInner() {
 	}, [selectedModelId, models]);
 
 	const costs = useMemo(function () {
-		const rowTot = function (r) { return (r.qty || 1) * r.v; };
+		const rowTot = function (r) { return (r.qty || 1) * r.v * (r.frecuencia === "anual" ? 1 / 12 : 1); };
 		const cfOps = costConfig.fixedItems.reduce(function (s, r) { return s + rowTot(r); }, 0);
 		const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
 		const cfTotal = cfOps + cfAmort;
