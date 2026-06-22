@@ -91,8 +91,15 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 
 	// priceTruth tracks the value as entered by the user (in whichever currency they chose).
 	// When TC changes, the entered value stays fixed and only the conversion hint updates.
-	const [priceTruth, setPriceTruth] = useState({ value: model.priceUSD || 0, currency: "USD" });
-	const [firmaExtraTruth, setFirmaExtraTruth] = useState({ value: model.extraFirmaPrice || 0, currency: "USD" });
+	// On reopen: restore from model.priceARS if available (preserves exact ARS value entered).
+	const [priceTruth, setPriceTruth] = useState(function () {
+		if (isARS && model.priceARS != null) return { value: model.priceARS, currency: "ARS" };
+		return { value: model.priceUSD || 0, currency: "USD" };
+	});
+	const [firmaExtraTruth, setFirmaExtraTruth] = useState(function () {
+		if (isARS && model.firmaExtraARS != null) return { value: model.firmaExtraARS, currency: "ARS" };
+		return { value: model.extraFirmaPrice || 0, currency: "USD" };
+	});
 
 	function updPrecio(val) {
 		setPriceTruth({ value: val || 0, currency: isARS ? "ARS" : "USD" });
@@ -111,21 +118,27 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 		? (firmaExtraTruth.currency === "ARS" ? firmaExtraTruth.value : Math.round((firmaExtraTruth.value || 0) * tc))
 		: (firmaExtraTruth.currency === "USD" ? firmaExtraTruth.value : (tc > 0 ? Math.round((firmaExtraTruth.value || 0) / tc * 100) / 100 : 0));
 
-	// Canonical USD values used when saving the model
-	const derivedPriceUSD = priceTruth.currency === "USD"
-		? (priceTruth.value || 0)
-		: (tc > 0 ? Math.round((priceTruth.value || 0) / tc * 100) / 100 : 0);
-	const derivedFirmaExtraUSD = firmaExtraTruth.currency === "USD"
-		? (firmaExtraTruth.value || 0)
-		: (tc > 0 ? Math.round((firmaExtraTruth.value || 0) / tc * 100) / 100 : 0);
+	// 4-decimal precision avoids ARS→USD→ARS rounding loss (e.g. 50001/1500 = 33.3340, not 33.33)
+	function toUSD4(arsVal) { return tc > 0 ? Math.round(arsVal / tc * 10000) / 10000 : 0; }
+
+	const derivedPriceUSD = priceTruth.currency === "USD" ? (priceTruth.value || 0) : toUSD4(priceTruth.value || 0);
+	const derivedFirmaExtraUSD = firmaExtraTruth.currency === "USD" ? (firmaExtraTruth.value || 0) : toUSD4(firmaExtraTruth.value || 0);
+	const derivedPriceARS = priceTruth.currency === "ARS" ? priceTruth.value : Math.round((priceTruth.value || 0) * tc);
+	const derivedFirmaExtraARS = firmaExtraTruth.currency === "ARS" ? firmaExtraTruth.value : Math.round((firmaExtraTruth.value || 0) * tc);
 
 	// Hint shown below the field (the other currency)
-	const precioHintARS = priceTruth.currency === "ARS" ? priceTruth.value : Math.round((priceTruth.value || 0) * tc);
+	const precioHintARS = derivedPriceARS;
 	const precioHintUSD = priceTruth.currency === "USD" ? (priceTruth.value || 0) : (tc > 0 ? (priceTruth.value || 0) / tc : 0);
 
-	const isDirty = JSON.stringify(draft) !== JSON.stringify(model)
-		|| derivedPriceUSD !== (model.priceUSD || 0)
-		|| derivedFirmaExtraUSD !== (model.extraFirmaPrice || 0);
+	// isDirty: compare ARS when truth is ARS (more stable than USD floating point)
+	const priceChanged = priceTruth.currency === "ARS"
+		? derivedPriceARS !== (model.priceARS ?? Math.round((model.priceUSD || 0) * tc))
+		: Math.abs(derivedPriceUSD - (model.priceUSD || 0)) > 0.00001;
+	const firmaExtraChanged = firmaExtraTruth.currency === "ARS"
+		? derivedFirmaExtraARS !== (model.firmaExtraARS ?? Math.round((model.extraFirmaPrice || 0) * tc))
+		: Math.abs(derivedFirmaExtraUSD - (model.extraFirmaPrice || 0)) > 0.00001;
+
+	const isDirty = JSON.stringify(draft) !== JSON.stringify(model) || priceChanged || firmaExtraChanged;
 
 	const SectionTitle = function ({ text }) {
 		return (
@@ -386,7 +399,7 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 						Cancelar
 					</button>
 					<button
-						onClick={function () { onSave(Object.assign({}, draft, { priceUSD: derivedPriceUSD, extraFirmaPrice: derivedFirmaExtraUSD })); }}
+						onClick={function () { onSave(Object.assign({}, draft, { priceUSD: derivedPriceUSD, priceARS: derivedPriceARS, extraFirmaPrice: derivedFirmaExtraUSD, firmaExtraARS: derivedFirmaExtraARS })); }}
 						disabled={!isDirty && !isNew}
 						style={{
 							padding: "8px 20px",
