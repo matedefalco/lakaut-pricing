@@ -101,7 +101,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 	}
 	const salaryRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat === "RRHH"; });
 	const opsRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat !== "RRHH"; });
-	const rowTotal = function (r) { return (r.qty || 1) * r.v; };
+	const rowTotal = function (r) { return (r.qty || 1) * r.v * (r.frecuencia === "anual" ? 1 / 12 : 1); };
 	const cfSalary = salaryRows.reduce(function (s, r) { return s + rowTotal(r); }, 0);
 	const cfOps = opsRows.reduce(function (s, r) { return s + rowTotal(r); }, 0);
 	const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
@@ -115,6 +115,10 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 	const thR = Object.assign({}, thStyle, { textAlign: "right" });
 	const tipoStyle = function (t) {
 		return { padding: "2px 5px", border: "1px solid " + BORD, borderRadius: 4, fontSize: 10, fontWeight: 700, fontFamily: "'Open Sans',sans-serif", cursor: "pointer", background: t === "directo" ? OKBG : WNBG, color: t === "directo" ? OK : WN };
+	};
+
+	const frecStyle = function (f) {
+		return { padding: "2px 5px", border: "1px solid " + BORD, borderRadius: 4, fontSize: 10, fontWeight: 700, fontFamily: "'Open Sans',sans-serif", cursor: "pointer", background: f === "anual" ? "#ede9fe" : "#f0f9ff", color: f === "anual" ? "#7c3aed" : "#0369a1" };
 	};
 
 	const inputText = {
@@ -254,7 +258,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0, qty: 1, tipo: "indirecto" }); }}>+ Agregar sueldo</button>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "RRHH", item: "", v: 0, qty: 1, tipo: "indirecto", frecuencia: "mensual" }); }}>+ Agregar sueldo</button>
 
 				{/* Costos fijos operativos */}
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", margin: "20px 0 8px" })}>
@@ -314,7 +318,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 						</tr>
 					</tbody>
 				</table>
-				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0, qty: 1, tipo: "directo" }); }}>+ Agregar costo operativo</button>
+				<button style={addBtn} onClick={function () { addRow("fixedItems", { cat: "Ops", item: "", v: 0, qty: 1, tipo: "directo", frecuencia: "mensual" }); }}>+ Agregar costo operativo</button>
 
 				{/* CF summary */}
 				<div style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 10, padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", marginTop: 20 }}>
