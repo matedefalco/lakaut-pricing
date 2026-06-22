@@ -350,26 +350,6 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							</div>
 						</FieldRow>
 
-						<div style={{ marginTop: 20 }}>
-							<SectionTitle text="Servicios incluidos" />
-						</div>
-						{[
-							{ k: "cloudStorage", label: "Almacenamiento en nube" },
-							{ k: "mailCert", label: "Mail certificado" },
-						].map(function (svc) {
-							return (
-								<FieldRow key={svc.k} label={svc.label}>
-									<label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-										<input
-											type="checkbox"
-											checked={draft.services[svc.k] || false}
-											onChange={function (e) { updSvc(svc.k, e.target.checked); }}
-										/>
-										<span style={os(11, 400, GRAY)}>{draft.services[svc.k] ? "Incluido" : "No incluido"}</span>
-									</label>
-								</FieldRow>
-							);
-						})}
 					</div>
 				</div>
 
@@ -537,6 +517,13 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 	const { models, upsert, remove, duplicate, resetToDefaults } = useModels();
 	const [editingId, setEditingId] = useState(null); // null | "new" | model.id
+	const [toast, setToast] = useState(null); // { msg, id }
+
+	function showToast(msg) {
+		const id = Date.now();
+		setToast({ msg, id });
+		setTimeout(function () { setToast(function (t) { return t && t.id === id ? null : t; }); }, 3000);
+	}
 
 	function handleSave(draft) {
 		const model = editingId === "new"
@@ -544,11 +531,30 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 			: draft;
 		upsert(model);
 		setEditingId(null);
-		if (editingId === "new") onSelect(model.id);
+		if (editingId === "new") {
+			onSelect(model.id);
+			showToast("Modelo \"" + model.label + "\" creado");
+		} else {
+			showToast("Cambios guardados en \"" + model.label + "\"");
+		}
 	}
 
 	return (
 		<div>
+			{/* Toast */}
+			{toast && (
+				<div style={{
+					position: "fixed", bottom: 28, right: 28, zIndex: 9999,
+					background: "#1a2b4a", color: WHITE, borderRadius: 10,
+					padding: "12px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+					display: "flex", alignItems: "center", gap: 10,
+					fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600,
+					animation: "fadeInUp 0.2s ease",
+				}}>
+					<span style={{ fontSize: 16 }}>✓</span>
+					{toast.msg}
+				</div>
+			)}
 			{/* Toolbar */}
 			<div style={{
 				display: "flex",
