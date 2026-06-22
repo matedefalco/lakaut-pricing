@@ -46,7 +46,7 @@ export function TabCanalWeb({ costs, currency, tc }) {
 								<TableHead className="text-right">Firmas incl.</TableHead>
 								<TableHead className="text-right">Firma extra</TableHead>
 								<TableHead className="text-right">CV total</TableHead>
-								<TableHead className="text-right">Margen</TableHead>
+								<TableHead className="text-right">Cont. marginal</TableHead>
 								<TableHead className="text-right">EBITDA</TableHead>
 							</TableRow>
 						</TableHeader>
@@ -87,7 +87,7 @@ export function TabCanalWeb({ costs, currency, tc }) {
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Margen = (precio USD − CV certificados − CV firmas incluidas) / precio USD, sobre la vigencia de 2 años. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
+			<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas, sobre la vigencia de 2 años. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
 		</div>
 	);
 }

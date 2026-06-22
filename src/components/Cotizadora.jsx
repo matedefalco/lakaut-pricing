@@ -558,7 +558,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 					<div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
 						{[
 							{ l: "CV pack", v: fMoney2(targetRow.cvPack) },
-							{ l: "Margen bruto", v: fMoney2(targetRow.margenPack) },
+							{ l: "Cont. marginal", v: fMoney2(targetRow.margenPack) },
 							{ l: "$/firma", v: fMoney2(targetRow.unitFirma) },
 							{ l: "$/cert", v: fMoney2(targetRow.unitCert) },
 						].map(function (k) {
@@ -608,7 +608,7 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 							<th style={thStyle}>Subtotal firmas</th>
 							<th style={thStyle}>Subtotal cert</th>
 							<th style={thStyle}>Total</th>
-					<th style={thStyle}>Margen</th>
+					<th style={thStyle}>Cont. marginal</th>
 					<th style={thStyle}>EBITDA</th>
 						</tr>
 					</thead>

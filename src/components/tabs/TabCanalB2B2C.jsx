@@ -201,7 +201,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			<div className="flex flex-wrap gap-3">
 				<StatCard label="Segmento" value={seg.label} sub={seg.idcMin.toLocaleString("es-AR") + "–" + (seg.idcMax == null ? "+" : seg.idcMax.toLocaleString("es-AR")) + " IDC" + (esUnica ? "" : "/mes")} accent="primary" />
 				<StatCard label="Precio por IDC" value={fMoney2(precioIDC)} sub={"Costo " + fMoney2(costoIDC)} accent="primary" />
-				<StatCard label="Margen por IDC" value={(margenPctIDC * 100).toFixed(0) + "%"} sub={fMoney2(margenIDC) + "/IDC"} accent={margAccent(margenPctIDC)} valueClass={margClass(margenPctIDC)} />
+				<StatCard label="Cont. marginal por IDC" value={(margenPctIDC * 100).toFixed(0) + "%"} sub={fMoney2(margenIDC) + "/IDC"} accent={margAccent(margenPctIDC)} valueClass={margClass(margenPctIDC)} />
 				<StatCard label="Total firmas" value={firmasMes.toLocaleString("es-AR")} sub={idcMensuales.toLocaleString("es-AR") + " IDC × " + firmasPorIDC + " firmas"} accent="muted" />
 				{esUnica
 					? <StatCard label="Revenue total (única vez)" value={fMoney(revUnica)} sub={"IDC + firmas + fee + SLA"} accent="success" />
@@ -252,7 +252,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 				<CardContent>
 					<div className="mb-3 text-sm font-semibold">Pricing por segmento (Borrador v5)</div>
 					<Table>
-						<TableHeader><TableRow><TableHead>Segmento</TableHead><TableHead className="text-right">IDC/mes</TableHead><TableHead className="text-right">Precio USD</TableHead><TableHead className="text-right">Margen ref. doc</TableHead><TableHead className="text-right">Margen real (costo {fMoney2(costoIDC)})</TableHead></TableRow></TableHeader>
+						<TableHeader><TableRow><TableHead>Segmento</TableHead><TableHead className="text-right">IDC/mes</TableHead><TableHead className="text-right">Precio USD</TableHead><TableHead className="text-right">C. Marginal ref.</TableHead><TableHead className="text-right">C. Marginal real (costo {fMoney2(costoIDC)})</TableHead></TableRow></TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
 								const act = s.id === seg.id;
@@ -271,7 +271,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasMes.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "Margen real" recalcula con costo cotizadora: cert {fMoney2(cvCert)} + {incl} firmas × {fMoney2(cvFirma)} = {fMoney2(costoIDC)}. Referencia doc (USD {costoIdcRef.toFixed(4)}). Modo: {esUnica ? "única vez" : "recurrente mensual"}.</p>
+			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasMes.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "C. Marginal real" recalcula con costo cotizadora: cert {fMoney2(cvCert)} + {incl} firmas × {fMoney2(cvFirma)} = {fMoney2(costoIDC)}. Referencia doc (USD {costoIdcRef.toFixed(4)}). Modo: {esUnica ? "única vez" : "recurrente mensual"}.</p>
 		</div>
 	);
 }
