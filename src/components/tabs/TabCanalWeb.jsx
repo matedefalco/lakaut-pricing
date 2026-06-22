@@ -3,6 +3,7 @@ import { useModels } from "@/context/ModelsContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -40,14 +41,14 @@ export function TabCanalWeb({ costs, currency, tc }) {
 						<TableHeader>
 							<TableRow>
 								<TableHead>Producto</TableHead>
-								<TableHead className="text-right">Precio ARS</TableHead>
-								<TableHead className="text-right">Precio USD</TableHead>
-								<TableHead className="text-right">Certs</TableHead>
-								<TableHead className="text-right">Firmas incl.</TableHead>
-								<TableHead className="text-right">Firma extra</TableHead>
-								<TableHead className="text-right">CV total</TableHead>
-								<TableHead className="text-right">Cont. marginal</TableHead>
-								<TableHead className="text-right">BE anual</TableHead>
+								<TableHead className="text-right">Precio ARS<InfoTooltip text="Precio de lista en pesos. Si el pack tiene precio ARS definido en configuración, se usa ese valor. Si no, se deriva: Precio USD × TC." /></TableHead>
+								<TableHead className="text-right">Precio USD<InfoTooltip text="Precio de lista en dólares, definido directamente en la configuración del pack." /></TableHead>
+								<TableHead className="text-right">Certs<InfoTooltip text="Cantidad de certificados de firma incluidos en el pack. Cada certificado tiene un costo variable de CV cert." /></TableHead>
+								<TableHead className="text-right">Firmas incl.<InfoTooltip text="Firmas digitales incluidas en el plan. Si es 'Ilimitadas', no se cobra costo variable por firmas adicionales." /></TableHead>
+								<TableHead className="text-right">Firma extra<InfoTooltip text="Precio por firma adicional fuera del límite incluido. Si el plan es de sellos de competencia, se indica 'Sello comp.' en lugar de precio." /></TableHead>
+								<TableHead className="text-right">CV total<InfoTooltip text={"Costo Variable total = (certs × CV cert) + (firmas incluidas × CV firma).\nCV cert: " + fMoney2(cvCert) + " · CV firma: " + fMoney2(cvFirma) + ".\nPara planes con firmas ilimitadas, el CV de firmas es 0."} /></TableHead>
+								<TableHead className="text-right">Cont. marginal<InfoTooltip text="Contribución marginal = Precio USD − CV total. Es la ganancia antes de cubrir costos fijos. Se muestra como % sobre el precio." /></TableHead>
+								<TableHead className="text-right">BE anual<InfoTooltip text={"Break-even anual = CF anual ÷ Contribución marginal por pack.\nCuántos packs de este tipo necesitás vender por año para cubrir todos los costos fijos del canal (" + fMoney2(costs.cfDirecto * 12) + "/año)."} /></TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
