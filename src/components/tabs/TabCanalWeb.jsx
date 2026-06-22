@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { BLUE, BLUEL, BORD, GRAY, BLACK, WHITE, OK, WN, ER, os } from "@/theme/tokens";
 
 const ALL_COLS = [
 	{ key: "precioARS", label: "Precio ARS" },
@@ -131,19 +132,19 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 	const cfPct = cf > 0 ? (totalCM / cf) * 100 : 0;
 	const cfCovered = cfPct >= 100;
 
-	const kpiCls = "rounded-md p-3 text-sm";
-	const kpiBg = "bg-muted/50";
+	const barColor = cfCovered ? OK : cfPct >= 60 ? WN : ER;
 
 	return (
-		<div className="space-y-4">
-			<div className="flex items-center justify-between">
+		<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
 				<div>
-					<h3 className="font-semibold text-foreground text-base">Simulador de portfolio</h3>
-					<p className="text-xs text-muted-foreground mt-0.5">Estimá cuántas unidades vendés por mes de cada pack y verás si el mix cubre costos fijos.</p>
+					<div style={Object.assign({}, os(13, 400, GRAY), { marginTop: 2 })}>
+						Estimá cuántas unidades vendés por mes de cada pack y verás si el mix cubre costos fijos.
+					</div>
 				</div>
 				<button
 					onClick={function () { const z = {}; activeModels.forEach(function (m) { z[m.id] = 0; }); setUnits(z); }}
-					className="text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1"
+					style={{ fontSize: 12, color: GRAY, border: "1px solid " + BORD, borderRadius: 6, background: WHITE, cursor: "pointer", padding: "4px 10px", flexShrink: 0 }}
 				>
 					Limpiar
 				</button>
@@ -167,19 +168,19 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 						<TableBody>
 							{rows.map(function (r) {
 								const mix = totalUnits > 0 ? Math.round(r.u / totalUnits * 100) : 0;
-								const cmColor = r.cmUnit >= 0 ? "text-[var(--success)]" : "text-destructive";
+								const cmColor = r.cmUnit >= 0 ? OK : ER;
 								return (
 									<TableRow key={r.m.id}>
 										<TableCell>
-											<div className="flex items-center gap-2">
-												<span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
-												<span className="font-semibold">{r.m.label}</span>
+											<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+												<span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: r.color, flexShrink: 0 }} />
+												<span style={{ fontWeight: 600 }}>{r.m.label}</span>
 											</div>
-											<div className="text-[11px] text-muted-foreground pl-4">{r.m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
+											<div style={Object.assign({}, os(11, 400, GRAY), { paddingLeft: 16 })}>{r.m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
 										</TableCell>
 										<TableCell className="text-right tabular-nums">{fUSD(r.m.priceUSD)}</TableCell>
-										<TableCell className="text-right tabular-nums text-muted-foreground">{fMoney2(r.cvTotal)}</TableCell>
-										<TableCell className={"text-right tabular-nums font-semibold " + cmColor}>{fMoney2(r.cmUnit)}</TableCell>
+										<TableCell className="text-right tabular-nums" style={{ color: GRAY }}>{fMoney2(r.cvTotal)}</TableCell>
+										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: cmColor }}>{fMoney2(r.cmUnit)}</TableCell>
 										<TableCell className="text-right">
 											<input
 												type="number"
@@ -187,70 +188,79 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 												step="1"
 												value={r.u}
 												onChange={function (e) { setUnit(r.m.id, e.target.value); }}
-												className="w-20 text-right text-sm border border-border rounded px-2 py-1 bg-background text-foreground tabular-nums"
+												style={{ width: 80, textAlign: "right", fontSize: 13, border: "1px solid " + BORD, borderRadius: 6, padding: "4px 8px", background: WHITE, fontFamily: "'Open Sans',sans-serif" }}
 											/>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{r.u > 0 ? fUSD(Math.round(r.rev)) : <span className="text-muted-foreground">—</span>}</TableCell>
-										<TableCell className={"text-right tabular-nums font-semibold " + (r.u > 0 ? cmColor : "text-muted-foreground")}>{r.u > 0 ? fMoney2(Math.round(r.cmTot)) : "—"}</TableCell>
-										<TableCell className="text-right tabular-nums text-muted-foreground text-xs">{r.u > 0 ? mix + "%" : "—"}</TableCell>
+										<TableCell className="text-right tabular-nums">{r.u > 0 ? fUSD(Math.round(r.rev)) : <span style={{ color: GRAY }}>—</span>}</TableCell>
+										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: r.u > 0 ? cmColor : GRAY }}>{r.u > 0 ? fMoney2(Math.round(r.cmTot)) : "—"}</TableCell>
+										<TableCell className="text-right tabular-nums" style={{ color: GRAY, fontSize: 12 }}>{r.u > 0 ? mix + "%" : "—"}</TableCell>
 									</TableRow>
 								);
 							})}
 						</TableBody>
 						<tfoot>
-							<tr className="border-t border-border bg-muted/30">
-								<td colSpan={4} className="px-4 py-2.5 text-sm font-semibold text-foreground">Total</td>
-								<td className="px-4 py-2.5 text-right text-sm font-semibold tabular-nums text-foreground">{totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—"}</td>
-								<td className="px-4 py-2.5 text-right text-sm font-semibold tabular-nums text-foreground">{totalRev > 0 ? fUSD(Math.round(totalRev)) : "—"}</td>
-								<td className="px-4 py-2.5 text-right text-sm font-semibold tabular-nums text-foreground">{totalCM !== 0 ? fMoney2(Math.round(totalCM)) : "—"}</td>
-								<td className="px-4 py-2.5 text-right text-xs text-muted-foreground">100%</td>
+							<tr style={{ borderTop: "1px solid " + BORD, background: BLUEL }}>
+								<td colSpan={4} style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 16px" })}>Total</td>
+								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—"}</td>
+								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalRev > 0 ? fUSD(Math.round(totalRev)) : "—"}</td>
+								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalCM !== 0 ? fMoney2(Math.round(totalCM)) : "—"}</td>
+								<td style={Object.assign({}, os(12, 400, GRAY), { padding: "10px 8px", textAlign: "right" })}>100%</td>
 							</tr>
 						</tfoot>
 					</Table>
 				</CardContent>
 			</Card>
 
-			<div className="grid grid-cols-4 gap-3">
-				<div className={kpiCls + " " + kpiBg}>
-					<div className="text-xs text-muted-foreground mb-1">CM ponderado</div>
-					<div className="font-semibold text-foreground">{totalUnits > 0 ? fMoney2(Math.round(cmPond * 100) / 100) + " / u." : "—"}</div>
-				</div>
-				<div className={kpiCls + " " + kpiBg}>
-					<div className="text-xs text-muted-foreground mb-1">BE portfolio</div>
-					<div className="font-semibold text-foreground">{isFinite(beUnits) ? beUnits.toLocaleString("es-AR") + " u." : "—"}</div>
-					{isFinite(beUnits) && totalUnits > 0 && (
-						<div className={"text-xs mt-0.5 " + (totalUnits >= beUnits ? "text-[var(--success)]" : "text-[var(--warning)]")}>
-							{totalUnits >= beUnits ? "Cubierto" : "Faltan " + (beUnits - totalUnits).toLocaleString("es-AR") + " u."}
+			{/* KPI row */}
+			<div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+				{[
+					{
+						label: "CM ponderado",
+						value: totalUnits > 0 ? fMoney2(Math.round(cmPond * 100) / 100) + " / u." : "—",
+						color: BLACK,
+					},
+					{
+						label: "BE portfolio",
+						value: isFinite(beUnits) ? beUnits.toLocaleString("es-AR") + " u." : "—",
+						sub: isFinite(beUnits) && totalUnits > 0
+							? (totalUnits >= beUnits ? "✓ Cubierto" : "Faltan " + (beUnits - totalUnits).toLocaleString("es-AR") + " u.")
+							: null,
+						subColor: isFinite(beUnits) && totalUnits >= beUnits ? OK : WN,
+					},
+					{
+						label: "Unidades actuales",
+						value: totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—",
+						color: BLACK,
+					},
+					{
+						label: "EBITDA mensual",
+						value: totalUnits > 0 ? (ebitda >= 0 ? "+" : "") + fMoney2(Math.round(ebitda)) : "—",
+						color: totalUnits > 0 ? (ebitda >= 0 ? OK : ER) : BLACK,
+					},
+				].map(function (kpi) {
+					return (
+						<div key={kpi.label} style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 8, padding: "12px 14px" }}>
+							<div style={os(11, 400, GRAY)}>{kpi.label}</div>
+							<div style={Object.assign({}, os(15, 700, kpi.color || BLACK), { marginTop: 4 })}>{kpi.value}</div>
+							{kpi.sub && <div style={Object.assign({}, os(11, 400, kpi.subColor), { marginTop: 3 })}>{kpi.sub}</div>}
 						</div>
-					)}
-				</div>
-				<div className={kpiCls + " " + kpiBg}>
-					<div className="text-xs text-muted-foreground mb-1">Unidades actuales</div>
-					<div className="font-semibold text-foreground">{totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—"}</div>
-				</div>
-				<div className={kpiCls + " " + kpiBg}>
-					<div className="text-xs text-muted-foreground mb-1">EBITDA mensual</div>
-					<div className={"font-semibold " + (ebitda >= 0 ? "text-[var(--success)]" : "text-destructive")}>
-						{totalUnits > 0 ? (ebitda >= 0 ? "+" : "") + fMoney2(Math.round(ebitda)) : "—"}
-					</div>
-				</div>
+					);
+				})}
 			</div>
 
-			<div className="rounded-md border border-border p-4 space-y-2">
-				<div className="flex justify-between items-center text-xs">
-					<span className="text-muted-foreground font-medium">Cobertura de CF mensual</span>
-					<span className="font-semibold text-foreground">{totalUnits > 0 ? Math.round(cfPct) + "%" : "0%"} <span className="text-muted-foreground font-normal">de {fMoney2(cf)}</span></span>
+			{/* CF coverage bar */}
+			<div style={{ border: "1px solid " + BORD, borderRadius: 8, padding: "14px 16px" }}>
+				<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+					<span style={os(12, 700, GRAY)}>Cobertura de CF mensual</span>
+					<span style={os(12, 700, BLACK)}>
+						{totalUnits > 0 ? Math.round(cfPct) + "%" : "0%"}
+						<span style={Object.assign({}, os(12, 400, GRAY), { marginLeft: 6 })}>de {fMoney2(cf)}</span>
+					</span>
 				</div>
-				<div className="h-2 rounded-full bg-muted overflow-hidden">
-					<div
-						className="h-full rounded-full transition-all duration-200"
-						style={{
-							width: Math.min(cfPct, 100) + "%",
-							background: cfCovered ? "var(--success)" : cfPct >= 60 ? "var(--warning)" : "var(--destructive)",
-						}}
-					/>
+				<div style={{ height: 8, borderRadius: 99, background: BORD, overflow: "hidden" }}>
+					<div style={{ height: "100%", borderRadius: 99, width: Math.min(cfPct, 100) + "%", background: barColor, transition: "width 0.2s" }} />
 				</div>
-				<p className="text-xs text-muted-foreground">
+				<p style={Object.assign({}, os(12, 400, GRAY), { marginTop: 8 })}>
 					{totalUnits === 0
 						? "Ingresá unidades para ver la cobertura."
 						: cfCovered
@@ -259,16 +269,16 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 				</p>
 			</div>
 
-			<p className="text-[11px] text-muted-foreground">
+			<p style={os(11, 400, GRAY)}>
 				CM ponderado = Σ(CM unit × unidades) / Σ unidades · BE portfolio = CF directo / CM ponderado · CF directo mensual: {fMoney2(cf)}
 			</p>
 		</div>
 	);
 }
 
-export function TabCanalWeb({ costs, currency, tc }) {
+export function TabCanalWeb({ costs, currency, tc, view }) {
 	const { models } = useModels();
-	const { fMoney, fMoney2 } = makeMoney(currency, tc);
+	const { fMoney2 } = makeMoney(currency, tc);
 	const { fMoney: fUSD } = makeMoney("USD", tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
@@ -287,7 +297,6 @@ export function TabCanalWeb({ costs, currency, tc }) {
 	function econ(m) {
 		if (isConsultar(m)) return null;
 		const precioUSD = m.priceUSD;
-		// Use stored ARS price if available, otherwise derive from TC
 		const precioARS = m.precioARS || Math.round(precioUSD * tc);
 		const certCost = (m.certs || 1) * cvCert;
 		const firmasCost = m.ilimitadas ? 0 : (m.firmas || 0) * cvFirma;
@@ -296,73 +305,88 @@ export function TabCanalWeb({ costs, currency, tc }) {
 		return { precioUSD, precioARS, cvTotal, margenPct };
 	}
 
+	const showPrecios = !view || view === "precios";
+	const showSimulador = !view || view === "simulador";
+
 	return (
 		<div className="space-y-6">
-			<div>
-				<h2 className="font-heading text-lg font-semibold text-foreground">Canal Web Lakaut · venta directa</h2>
-				<p className="text-sm text-muted-foreground">Personas, profesionales y PyMEs que contratan sin intermediación, abonando con tarjeta. Precios de lista en ARS, USD derivado por TC.</p>
-			</div>
-
-			<div className="flex justify-end mb-2">
-				<ColFilterDropdown visible={visibleCols} onToggle={toggleCol} />
-			</div>
-			<Card>
-				<CardContent>
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Producto</TableHead>
-								{show("precioARS") && <TableHead className="text-right">Precio ARS<InfoTooltip dir="down" text="Precio de lista en pesos. Si el pack tiene precio ARS definido en configuración, se usa ese valor. Si no, se deriva: Precio USD × TC." /></TableHead>}
-								{show("precioUSD") && <TableHead className="text-right">Precio USD<InfoTooltip dir="down" text="Precio de lista en dólares, definido directamente en la configuración del pack." /></TableHead>}
-								{show("certs") && <TableHead className="text-right">Certs<InfoTooltip dir="down" text="Cantidad de certificados de firma incluidos en el pack. Cada certificado tiene un costo variable de CV cert." /></TableHead>}
-								{show("firmas") && <TableHead className="text-right">Firmas incl.<InfoTooltip dir="down" text="Firmas digitales incluidas en el plan. Si es 'Ilimitadas', no se cobra costo variable por firmas adicionales." /></TableHead>}
-								{show("firmaExtra") && <TableHead className="text-right">Firma extra<InfoTooltip dir="down" text="Precio por firma adicional fuera del límite incluido. Si no aplica o no está configurado, se muestra —." /></TableHead>}
-								{show("cvTotal") && <TableHead className="text-right">CV total<InfoTooltip dir="down" text={"Costo Variable total = (certs × CV cert) + (firmas incluidas × CV firma).\nCV cert: " + fMoney2(cvCert) + " · CV firma: " + fMoney2(cvFirma) + ".\nPara planes con firmas ilimitadas, el CV de firmas es 0."} /></TableHead>}
-								{show("margen") && <TableHead className="text-right">Cont. marginal<InfoTooltip dir="down" text="Contribución marginal = Precio USD − CV total. Es la ganancia antes de cubrir costos fijos. Se muestra como % sobre el precio." /></TableHead>}
-								{show("beAnual") && <TableHead className="text-right">BE anual<InfoTooltip dir="down" text={"Break-even anual = CF anual ÷ Contribución marginal por pack.\nCuántos packs de este tipo necesitás vender por año para cubrir todos los costos fijos del canal (" + fMoney2(costs.cfDirecto * 12) + "/año)."} /></TableHead>}
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{models.filter(function (m) { return m.activo !== false; }).map(function (m) {
-								const e = econ(m);
-										const cm = e ? e.precioUSD - e.cvTotal : null;
-								const beAnual = cm && cm > 0 ? Math.ceil(costs.cfDirecto * 12 / cm) : null;
-								return (
-									<TableRow key={m.id}>
-										<TableCell>
-											<div className="font-semibold">{m.label}</div>
-											<div className="text-[11px] text-muted-foreground">{m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
-										</TableCell>
-										{show("precioARS") && <TableCell className="text-right tabular-nums">
-											{e == null ? <Badge variant="outline">Consultar</Badge> : "$ " + e.precioARS.toLocaleString("es-AR")}
-										</TableCell>}
-										{show("precioUSD") && <TableCell className="text-right tabular-nums">{e == null ? "—" : fUSD(e.precioUSD)}</TableCell>}
-										{show("certs") && <TableCell className="text-right tabular-nums">{m.certs == null || m.certs === 0 ? "—" : m.certs}</TableCell>}
-										{show("firmas") && <TableCell className="text-right tabular-nums">{m.ilimitadas ? "Ilimitadas" : (m.firmas == null ? "—" : m.firmas)}</TableCell>}
-										{show("firmaExtra") && <TableCell className="text-right tabular-nums">
-											{m.extraFirmaPrice
-												? (currency === "ARS"
-												? "$ " + (m.firmaExtraARS || Math.round(m.extraFirmaPrice * tc)).toLocaleString("es-AR")
-												: fUSD(m.extraFirmaPrice))
-												: "—"}
-										</TableCell>}
-										{show("cvTotal") && <TableCell className="text-right tabular-nums">{e == null ? "—" : fMoney2(e.cvTotal)}</TableCell>}
-										{show("margen") && <TableCell className={"text-right tabular-nums font-semibold " + (e == null ? "text-muted-foreground" : margClass(e.margenPct))}>
-											{e == null ? "—" : (e.margenPct * 100).toFixed(0) + "%"}
-										</TableCell>}
-										{show("beAnual") && <TableCell className="text-right tabular-nums text-muted-foreground">{beAnual == null ? "—" : beAnual.toLocaleString("es-AR") + " u."}</TableCell>}
+			{showPrecios && (
+				<>
+					<div>
+						<h2 className="font-heading text-lg font-semibold text-foreground">Tabla de precios · Canal Web</h2>
+						<p className="text-sm text-muted-foreground">Personas, profesionales y PyMEs que contratan sin intermediación, abonando con tarjeta. Precios de lista en ARS, USD derivado por TC.</p>
+					</div>
+					<div className="flex justify-end mb-2">
+						<ColFilterDropdown visible={visibleCols} onToggle={toggleCol} />
+					</div>
+					<Card>
+						<CardContent>
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Producto</TableHead>
+										{show("precioARS") && <TableHead className="text-right">Precio ARS<InfoTooltip dir="down" text="Precio de lista en pesos. Si el pack tiene precio ARS definido en configuración, se usa ese valor. Si no, se deriva: Precio USD × TC." /></TableHead>}
+										{show("precioUSD") && <TableHead className="text-right">Precio USD<InfoTooltip dir="down" text="Precio de lista en dólares, definido directamente en la configuración del pack." /></TableHead>}
+										{show("certs") && <TableHead className="text-right">Certs<InfoTooltip dir="down" text="Cantidad de certificados de firma incluidos en el pack. Cada certificado tiene un costo variable de CV cert." /></TableHead>}
+										{show("firmas") && <TableHead className="text-right">Firmas incl.<InfoTooltip dir="down" text="Firmas digitales incluidas en el plan. Si es 'Ilimitadas', no se cobra costo variable por firmas adicionales." /></TableHead>}
+										{show("firmaExtra") && <TableHead className="text-right">Firma extra<InfoTooltip dir="down" text="Precio por firma adicional fuera del límite incluido. Si no aplica o no está configurado, se muestra —." /></TableHead>}
+										{show("cvTotal") && <TableHead className="text-right">CV total<InfoTooltip dir="down" text={"Costo Variable total = (certs × CV cert) + (firmas incluidas × CV firma).\nCV cert: " + fMoney2(cvCert) + " · CV firma: " + fMoney2(cvFirma) + ".\nPara planes con firmas ilimitadas, el CV de firmas es 0."} /></TableHead>}
+										{show("margen") && <TableHead className="text-right">Cont. marginal<InfoTooltip dir="down" text="Contribución marginal = Precio USD − CV total. Es la ganancia antes de cubrir costos fijos. Se muestra como % sobre el precio." /></TableHead>}
+										{show("beAnual") && <TableHead className="text-right">BE anual<InfoTooltip dir="down" text={"Break-even anual = CF anual ÷ Contribución marginal por pack.\nCuántos packs de este tipo necesitás vender por año para cubrir todos los costos fijos del canal (" + fMoney2(costs.cfDirecto * 12) + "/año)."} /></TableHead>}
 									</TableRow>
-								);
-							})}
-						</TableBody>
-					</Table>
-				</CardContent>
-			</Card>
-			<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas, sobre la vigencia de 2 años. BE anual = packs/año necesarios para cubrir CF anual. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
+								</TableHeader>
+								<TableBody>
+									{models.filter(function (m) { return m.activo !== false; }).map(function (m) {
+										const e = econ(m);
+										const cm = e ? e.precioUSD - e.cvTotal : null;
+										const beAnual = cm && cm > 0 ? Math.ceil(costs.cfDirecto * 12 / cm) : null;
+										return (
+											<TableRow key={m.id}>
+												<TableCell>
+													<div className="font-semibold">{m.label}</div>
+													<div className="text-[11px] text-muted-foreground">{m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
+												</TableCell>
+												{show("precioARS") && <TableCell className="text-right tabular-nums">
+													{e == null ? <Badge variant="outline">Consultar</Badge> : "$ " + e.precioARS.toLocaleString("es-AR")}
+												</TableCell>}
+												{show("precioUSD") && <TableCell className="text-right tabular-nums">{e == null ? "—" : fUSD(e.precioUSD)}</TableCell>}
+												{show("certs") && <TableCell className="text-right tabular-nums">{m.certs == null || m.certs === 0 ? "—" : m.certs}</TableCell>}
+												{show("firmas") && <TableCell className="text-right tabular-nums">{m.ilimitadas ? "Ilimitadas" : (m.firmas == null ? "—" : m.firmas)}</TableCell>}
+												{show("firmaExtra") && <TableCell className="text-right tabular-nums">
+													{m.extraFirmaPrice
+														? (currency === "ARS"
+														? "$ " + (m.firmaExtraARS || Math.round(m.extraFirmaPrice * tc)).toLocaleString("es-AR")
+														: fUSD(m.extraFirmaPrice))
+														: "—"}
+												</TableCell>}
+												{show("cvTotal") && <TableCell className="text-right tabular-nums">{e == null ? "—" : fMoney2(e.cvTotal)}</TableCell>}
+												{show("margen") && <TableCell className={"text-right tabular-nums font-semibold " + (e == null ? "text-muted-foreground" : margClass(e.margenPct))}>
+													{e == null ? "—" : (e.margenPct * 100).toFixed(0) + "%"}
+												</TableCell>}
+												{show("beAnual") && <TableCell className="text-right tabular-nums text-muted-foreground">{beAnual == null ? "—" : beAnual.toLocaleString("es-AR") + " u."}</TableCell>}
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+						</CardContent>
+					</Card>
+					<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas, sobre la vigencia de 2 años. BE anual = packs/año necesarios para cubrir CF anual. CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
+				</>
+			)}
 
-			<div className="border-t border-border pt-6">
-				<PortfolioSimulator models={models} costs={costs} currency={currency} tc={tc} />
-			</div>
+			{showSimulador && (
+				<>
+					{!view && <div style={{ borderTop: "1px solid var(--border)", paddingTop: 24 }} />}
+					{view === "simulador" && (
+						<div>
+							<h2 className="font-heading text-lg font-semibold text-foreground">Simulador de portfolio · Canal Web</h2>
+							<p className="text-sm text-muted-foreground mb-4">Break-even con mezcla de ventas. Estimá el volumen por pack y verás si el mix cubre costos fijos.</p>
+						</div>
+					)}
+					<PortfolioSimulator models={models} costs={costs} currency={currency} tc={tc} />
+				</>
+			)}
 		</div>
 	);
 }

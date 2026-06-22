@@ -103,8 +103,41 @@ function LakautCalcInner() {
 		};
 	});
 
-	const [cotizadoraMode, setCotizadoraMode] = useState("web");
+	const [activeNavItem, setActiveNavItem] = useState("web-precios");
+	const [sidebarOpen, setSidebarOpen] = useState(true);
+	const [expandedGroups, setExpandedGroups] = useState(function () { return new Set(["web"]); });
 	const [pendingEdit, setPendingEdit] = useState(null);
+
+	function toggleGroup(key) {
+		setExpandedGroups(function (prev) {
+			const next = new Set(prev);
+			if (next.has(key)) { next.delete(key); } else { next.add(key); }
+			return next;
+		});
+	}
+
+	const COTI_NAV = [
+		{
+			key: "web", label: "Canal Web",
+			children: [
+				{ key: "web-precios", label: "Tabla de precios" },
+				{ key: "web-simulador", label: "Simulador de portfolio" },
+			],
+		},
+		{ key: "distribuidores", label: "Distribuidores" },
+		{ key: "b2b2c", label: "B2B2C (IDC)" },
+		{ key: "sep" },
+		{ key: "historial", label: "Historial" },
+		{ key: "clientes", label: "Clientes" },
+	];
+
+	function navTo(key) {
+		setActiveNavItem(key);
+		const parent = COTI_NAV.find(function (n) { return n.children && n.children.some(function (c) { return c.key === key; }); });
+		if (parent) {
+			setExpandedGroups(function (prev) { const next = new Set(prev); next.add(parent.key); return next; });
+		}
+	}
 
 	const [volumeTiers, setVolumeTiers] = useState(function () {
 		try {
@@ -534,25 +567,102 @@ function LakautCalcInner() {
 			    OTHER SECTIONS
 			    ════════════════════════════════════════════════════════════════════════ */}
 			{section === "cotizadora" && (
-				<div>
-					<Tabs value={cotizadoraMode} onValueChange={setCotizadoraMode}>
-						<div className="no-print border-b bg-card px-6 pt-3 pb-3">
-							<TabsList>
-								<TabsTrigger value="web">Canal Web</TabsTrigger>
-								<TabsTrigger value="distribuidores">Distribuidores</TabsTrigger>
-								<TabsTrigger value="b2b2c">B2B2C (IDC)</TabsTrigger>
-								<TabsTrigger value="historial">Historial</TabsTrigger>
-								<TabsTrigger value="clientes">Clientes</TabsTrigger>
-							</TabsList>
+				<div style={{ display: "flex", minHeight: "calc(100vh - 120px)" }}>
+					{/* ── Sidebar ── */}
+					{sidebarOpen && (
+						<div className="no-print" style={{ width: 220, flexShrink: 0, borderRight: "1px solid " + BORD, background: WHITE, display: "flex", flexDirection: "column" }}>
+							<div style={{ padding: "12px 10px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+								<span style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px" })}>Canales</span>
+								<button onClick={function () { setSidebarOpen(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, fontSize: 14, padding: "2px 4px", lineHeight: 1 }} title="Cerrar panel">←</button>
+							</div>
+							<nav style={{ flex: 1, overflowY: "auto" }}>
+								{COTI_NAV.map(function (item) {
+									if (item.key === "sep") {
+										return <div key="sep" style={{ height: 1, background: BORD, margin: "8px 10px" }} />;
+									}
+									const isGroup = item.children && item.children.length > 0;
+									const expanded = expandedGroups.has(item.key);
+									const isActive = activeNavItem === item.key;
+									if (isGroup) {
+										return (
+											<div key={item.key}>
+												<button
+													onClick={function () { toggleGroup(item.key); }}
+													style={{
+														width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+														padding: "7px 12px", background: "none", border: "none", cursor: "pointer",
+														fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600,
+														color: expanded ? BLUE : BLACK, textAlign: "left",
+													}}
+												>
+													<span>{item.label}</span>
+													<span style={{ fontSize: 10, color: GRAY, transition: "transform 0.15s", display: "inline-block", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+												</button>
+												{expanded && (
+													<div style={{ paddingLeft: 8 }}>
+														{item.children.map(function (child) {
+															const childActive = activeNavItem === child.key;
+															return (
+																<button
+																	key={child.key}
+																	onClick={function () { navTo(child.key); }}
+																	style={{
+																		width: "100%", display: "block", padding: "6px 12px 6px 16px",
+																		background: childActive ? BLUEL : "none",
+																		border: "none", borderLeft: "2px solid " + (childActive ? BLUE : "transparent"),
+																		cursor: "pointer", fontFamily: "'Open Sans',sans-serif",
+																		fontSize: 12, fontWeight: childActive ? 700 : 400,
+																		color: childActive ? BLUE : GRAY, textAlign: "left",
+																	}}
+																>
+																	{child.label}
+																</button>
+															);
+														})}
+													</div>
+												)}
+											</div>
+										);
+									}
+									return (
+										<button
+											key={item.key}
+											onClick={function () { navTo(item.key); }}
+											style={{
+												width: "100%", display: "block", padding: "7px 12px",
+												background: isActive ? BLUEL : "none",
+												border: "none", borderLeft: "2px solid " + (isActive ? BLUE : "transparent"),
+												cursor: "pointer", fontFamily: "'Open Sans',sans-serif",
+												fontSize: 13, fontWeight: isActive ? 700 : 400,
+												color: isActive ? BLUE : BLACK, textAlign: "left",
+											}}
+										>
+											{item.label}
+										</button>
+									);
+								})}
+							</nav>
 						</div>
-						<div className="p-6">
-							<TabsContent value="web"><TabCanalWeb costs={costs} currency={currency} tc={tc} /></TabsContent>
-							<TabsContent value="distribuidores"><TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
-							<TabsContent value="b2b2c"><TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} /></TabsContent>
-							<TabsContent value="historial"><TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); setCotizadoraMode(q.channel); }} /></TabsContent>
-							<TabsContent value="clientes"><TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); setCotizadoraMode(d.channel); }} /></TabsContent>
+					)}
+
+					{/* ── Content ── */}
+					<div style={{ flex: 1, minWidth: 0 }}>
+						{!sidebarOpen && (
+							<div className="no-print" style={{ borderBottom: "1px solid " + BORD, padding: "8px 16px" }}>
+								<button onClick={function () { setSidebarOpen(true); }} style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+									<span style={{ fontSize: 14 }}>→</span> Canales
+								</button>
+							</div>
+						)}
+						<div style={{ padding: 24 }}>
+							{(activeNavItem === "web-precios") && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
+							{(activeNavItem === "web-simulador") && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
+							{activeNavItem === "distribuidores" && <TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+							{activeNavItem === "b2b2c" && <TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+							{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
+							{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
 						</div>
-					</Tabs>
+					</div>
 				</div>
 			)}
 
