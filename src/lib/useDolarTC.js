@@ -12,6 +12,7 @@ export const DOLAR_SOURCES = [
 ];
 
 const STORAGE_KEY = "lakaut_tc_source";
+const STORAGE_KEY_VAL = "lakaut_tc_val";
 const DEFAULT_SOURCE = "oficial";
 const FALLBACK_TC = 1410;
 
@@ -19,7 +20,14 @@ export function useDolarTC() {
 	const [source, setSourceState] = useState(function () {
 		try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_SOURCE; } catch (e) { return DEFAULT_SOURCE; }
 	});
-	const [tc, setTc] = useState(FALLBACK_TC);
+	const [tc, setTcRaw] = useState(function () {
+		try { return Number(localStorage.getItem(STORAGE_KEY_VAL)) || FALLBACK_TC; } catch (e) { return FALLBACK_TC; }
+	});
+
+	function setTc(val) {
+		setTcRaw(val);
+		try { localStorage.setItem(STORAGE_KEY_VAL, String(val)); } catch (e) {}
+	}
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
 	const [lastUpdated, setLastUpdated] = useState(null);
