@@ -177,7 +177,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 		<div className="space-y-6">
 			<div className="flex flex-wrap items-end justify-between gap-3">
 				<div>
-					<h2 className="font-heading text-lg font-semibold text-foreground">Historial de cotizaciones</h2>
+					<h2 className="font-heading text-lg font-semibold text-foreground">Cotizaciones</h2>
 					<p className="text-sm text-muted-foreground">Todas las cotizaciones guardadas, sincronizadas vía Supabase para el equipo.</p>
 				</div>
 				<Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>

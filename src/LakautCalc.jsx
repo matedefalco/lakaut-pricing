@@ -144,7 +144,7 @@ function LakautCalcInner() {
 		{
 			groupKey: "bases", groupLabel: "🗄️ BASES DE DATOS",
 			items: [
-				{ key: "historial", label: "Historial" },
+				{ key: "historial", label: "Cotizaciones" },
 				{ key: "clientes", label: "Clientes" },
 				{ key: "cfg-costos", label: "Costos" },
 				{ key: "cfg-modelos", label: "Modelos" },
