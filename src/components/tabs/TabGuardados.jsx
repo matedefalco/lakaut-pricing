@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, WN, WNBG, ER, ERBG, os, mont } from "../../theme/tokens";
+import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, ER, ERBG, os, mont } from "../../theme/tokens";
 import { useModels } from "../../context/ModelsContext";
 import { NumInput } from "../ui/NumInput";
 
@@ -535,10 +535,8 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 }
 
 export function TabGuardados({ selectedId, onSelect, currency, tc }) {
-	const { models, upsert, remove, duplicate, resetToDefaults, exportJSON, importJSON } = useModels();
+	const { models, upsert, remove, duplicate, resetToDefaults } = useModels();
 	const [editingId, setEditingId] = useState(null); // null | "new" | model.id
-	const [importError, setImportError] = useState(null);
-	const [importSuccess, setImportSuccess] = useState(false);
 
 	function handleSave(draft) {
 		const model = editingId === "new"
@@ -547,35 +545,6 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 		upsert(model);
 		setEditingId(null);
 		if (editingId === "new") onSelect(model.id);
-	}
-
-	function handleExport() {
-		const blob = new Blob([exportJSON()], { type: "application/json" });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = "lakaut-modelos.json";
-		a.click();
-		URL.revokeObjectURL(url);
-	}
-
-	function handleImportFile(e) {
-		const file = e.target.files[0];
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = function (ev) {
-			const err = importJSON(ev.target.result);
-			if (err) {
-				setImportError(err);
-				setImportSuccess(false);
-			} else {
-				setImportError(null);
-				setImportSuccess(true);
-				setTimeout(function () { setImportSuccess(false); }, 2500);
-			}
-		};
-		reader.readAsText(file);
-		e.target.value = "";
 	}
 
 	return (
@@ -610,16 +579,6 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 						+ Nuevo modelo
 					</button>
 					<button
-						onClick={handleExport}
-						style={{ padding: "6px 14px", background: WHITE, color: GRAY, border: "1.5px solid " + BORD, borderRadius: 7, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-					>
-						Exportar JSON
-					</button>
-					<label style={{ padding: "6px 14px", background: WHITE, color: GRAY, border: "1.5px solid " + BORD, borderRadius: 7, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-						Importar JSON
-						<input type="file" accept=".json" onChange={handleImportFile} style={{ display: "none" }} />
-					</label>
-					<button
 						onClick={function () { if (window.confirm("¿Restaurar modelos por defecto? Se perderán los cambios.")) resetToDefaults(); }}
 						style={{ padding: "6px 14px", background: WHITE, color: GRAY, border: "1.5px solid " + BORD, borderRadius: 7, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
 					>
@@ -627,17 +586,6 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 					</button>
 				</div>
 			</div>
-
-			{importError && (
-				<div style={{ background: ERBG, border: "1px solid " + ER + "44", borderRadius: 8, padding: "8px 14px", marginBottom: 12 }}>
-					<span style={os(11, 700, ER)}>{importError}</span>
-				</div>
-			)}
-			{importSuccess && (
-				<div style={{ background: "#d1fae5", border: "1px solid " + OK + "44", borderRadius: 8, padding: "8px 14px", marginBottom: 12 }}>
-					<span style={os(11, 700, OK)}>Modelos importados correctamente.</span>
-				</div>
-			)}
 
 			{/* Model list */}
 			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>

@@ -87,7 +87,58 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 		if (selectedId === id) setSelectedId(null);
 	}
 
+	const globalStats = useMemo(function () {
+		const totalClients = clients.length;
+		const totalDeals = deals.length;
+		let totalRevenue = 0;
+		deals.forEach(function (d) {
+			totalRevenue += d.resumen?.revMesTotal || d.resumen?.revAnual || d.resumen?.netoLakaut || 0;
+		});
+		const byChannel = {
+			web: clients.filter(function (c) { return c.channel === "web"; }).length,
+			distribuidores: clients.filter(function (c) { return c.channel === "distribuidores"; }).length,
+			b2b2c: clients.filter(function (c) { return c.channel === "b2b2c"; }).length,
+		};
+		return { totalClients, totalDeals, totalRevenue, byChannel };
+	}, [clients, deals]);
+
 	return (
+		<div>
+		{/* KPI summary */}
+		<div className="flex gap-3 flex-wrap mb-6">
+			<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[120px]">
+				<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Clientes</span>
+				<span className="text-2xl font-semibold tabular-nums">{globalStats.totalClients}</span>
+			</div>
+			<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[120px]">
+				<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Deals</span>
+				<span className="text-2xl font-semibold tabular-nums">{globalStats.totalDeals}</span>
+			</div>
+			{globalStats.totalRevenue > 0 && (
+				<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[160px]">
+					<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Revenue acumulado</span>
+					<span className="text-2xl font-semibold tabular-nums">{fMoney(globalStats.totalRevenue)}</span>
+				</div>
+			)}
+			{globalStats.byChannel.web > 0 && (
+				<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[110px]">
+					<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Canal Web</span>
+					<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.web}</span>
+				</div>
+			)}
+			{globalStats.byChannel.distribuidores > 0 && (
+				<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[130px]">
+					<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Distribuidores</span>
+					<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.distribuidores}</span>
+				</div>
+			)}
+			{globalStats.byChannel.b2b2c > 0 && (
+				<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[110px]">
+					<span className="text-[11px] text-muted-foreground uppercase tracking-wide">B2B2C</span>
+					<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.b2b2c}</span>
+				</div>
+			)}
+		</div>
 		<div className="flex gap-6 min-h-[600px]">
 			{/* Panel izquierdo — lista */}
 			<div className="w-64 shrink-0 flex flex-col gap-3">
@@ -244,6 +295,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					)}
 				</div>
 			)}
+		</div>
 		</div>
 	);
 }

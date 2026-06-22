@@ -146,15 +146,15 @@ function LakautCalcInner() {
 			items: [
 				{ key: "historial", label: "Historial" },
 				{ key: "clientes", label: "Clientes" },
+				{ key: "cfg-costos", label: "Costos" },
+				{ key: "cfg-modelos", label: "Modelos" },
 			],
 		},
 		{
 			groupKey: "configuracion", groupLabel: "⚙️ CONFIGURACIÓN",
 			items: [
 				{ key: "cfg-general", label: "General" },
-				{ key: "cfg-costos", label: "Costos" },
 				{ key: "cfg-precios", label: "Precios" },
-				{ key: "cfg-modelos", label: "Modelos" },
 			],
 		},
 	];
