@@ -97,6 +97,9 @@ const PACK_COLORS = ["#378ADD", "#1D9E75", "#BA7517", "#993556", "#534AB7", "#D8
 function PortfolioSimulator({ models, costs, currency, tc }) {
 	const { fMoney2 } = makeMoney(currency, tc);
 	const { fMoney: fUSD } = makeMoney("USD", tc);
+	const isARS = currency === "ARS";
+	// Formats a raw ARS value (no TC conversion needed — value is already in ARS)
+	function fARSraw(n) { return "$ " + Math.round(n).toLocaleString("es-AR"); }
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 	const cf = costs.cfDirecto;
@@ -121,11 +124,14 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 		const u = units[m.id] || 0;
 		const rev = m.priceUSD * u;
 		const cmTot = cmUnit * u;
-		return { m, cvTotal, cmUnit, u, rev, cmTot, color: PACK_COLORS[i % PACK_COLORS.length] };
+		// Precio display: use exact ARS value when price was defined in ARS
+		const precioARS = (m.priceDefinedIn === "ARS" && m.priceARS != null) ? m.priceARS : Math.round(m.priceUSD * tc);
+		return { m, cvTotal, cmUnit, u, rev, cmTot, precioARS, color: PACK_COLORS[i % PACK_COLORS.length] };
 	});
 
 	const totalUnits = rows.reduce(function (s, r) { return s + r.u; }, 0);
 	const totalRev = rows.reduce(function (s, r) { return s + r.rev; }, 0);
+	const totalRevARS = rows.reduce(function (s, r) { return s + r.precioARS * r.u; }, 0);
 	const totalCM = rows.reduce(function (s, r) { return s + r.cmTot; }, 0);
 	const cmPond = totalUnits > 0 ? totalCM / totalUnits : 0;
 	const beUnits = cmPond > 0 ? Math.ceil(cf / cmPond) : Infinity;
@@ -157,9 +163,9 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 						<TableHeader>
 							<TableRow>
 								<TableHead>Pack</TableHead>
-								<TableHead className="text-right">Precio USD</TableHead>
+								<TableHead className="text-right">{isARS ? "Precio ARS s/IVA" : "Precio USD"}</TableHead>
 								<TableHead className="text-right">CV unit<InfoTooltip dir="down" text="Costo variable unitario = (certs × CV cert) + (firmas × CV firma)." /></TableHead>
-								<TableHead className="text-right">CM unit<InfoTooltip dir="down" text="Contribución marginal unitaria = Precio USD − CV unit. Lo que aporta cada venta antes de cubrir CF." /></TableHead>
+								<TableHead className="text-right">CM unit<InfoTooltip dir="down" text={"Contribución marginal unitaria = Precio " + (isARS ? "ARS" : "USD") + " − CV unit. Lo que aporta cada venta antes de cubrir CF."} /></TableHead>
 								<TableHead className="text-right">Unid / mes</TableHead>
 								<TableHead className="text-right">Rev. mensual</TableHead>
 								<TableHead className="text-right">CM mensual</TableHead>
@@ -179,7 +185,7 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 											</div>
 											<div style={Object.assign({}, os(11, 400, GRAY), { paddingLeft: 16 })}>{r.m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{fUSD(r.m.priceUSD)}</TableCell>
+										<TableCell className="text-right tabular-nums">{isARS ? fARSraw(r.precioARS) : fUSD(r.m.priceUSD)}</TableCell>
 										<TableCell className="text-right tabular-nums" style={{ color: GRAY }}>{fMoney2(r.cvTotal)}</TableCell>
 										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: cmColor }}>{fMoney2(r.cmUnit)}</TableCell>
 										<TableCell className="text-right">
@@ -192,7 +198,7 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 												style={{ width: 80, textAlign: "right", fontSize: 13, border: "1px solid " + BORD, borderRadius: 6, padding: "4px 8px", background: WHITE, fontFamily: "'Open Sans',sans-serif" }}
 											/>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{r.u > 0 ? fUSD(Math.round(r.rev)) : <span style={{ color: GRAY }}>—</span>}</TableCell>
+										<TableCell className="text-right tabular-nums">{r.u > 0 ? (isARS ? fARS(r.precioARS * r.u) : fUSD(Math.round(r.rev))) : <span style={{ color: GRAY }}>—</span>}</TableCell>
 										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: r.u > 0 ? cmColor : GRAY }}>{r.u > 0 ? fMoney2(Math.round(r.cmTot)) : "—"}</TableCell>
 										<TableCell className="text-right tabular-nums" style={{ color: GRAY, fontSize: 12 }}>{r.u > 0 ? mix + "%" : "—"}</TableCell>
 									</TableRow>
@@ -203,7 +209,7 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 							<tr style={{ borderTop: "1px solid " + BORD, background: BLUEL }}>
 								<td colSpan={4} style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 16px" })}>Total</td>
 								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—"}</td>
-								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalRev > 0 ? fUSD(Math.round(totalRev)) : "—"}</td>
+								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{isARS ? (totalRevARS > 0 ? fARSraw(totalRevARS) : "—") : (totalRev > 0 ? fUSD(Math.round(totalRev)) : "—")}</td>
 								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalCM !== 0 ? fMoney2(Math.round(totalCM)) : "—"}</td>
 								<td style={Object.assign({}, os(12, 400, GRAY), { padding: "10px 8px", textAlign: "right" })}>100%</td>
 							</tr>
