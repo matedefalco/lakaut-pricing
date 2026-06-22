@@ -8,7 +8,8 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { BLUE, BLUEL, BORD, GRAY, BLACK, WHITE, OK, WN, ER, os } from "@/theme/tokens";
 
 const ALL_COLS = [
-	{ key: "precioARS", label: "Precio ARS" },
+	{ key: "precioARS", label: "Precio ARS s/IVA" },
+	{ key: "precioARSiva", label: "Precio ARS c/IVA" },
 	{ key: "precioUSD", label: "Precio USD" },
 	{ key: "certs", label: "Certs" },
 	{ key: "firmas", label: "Firmas incl." },
@@ -298,11 +299,12 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 		if (isConsultar(m)) return null;
 		const precioUSD = m.priceUSD;
 		const precioARS = Math.round(precioUSD * tc);
+		const precioARSiva = Math.round(precioARS * 1.21);
 		const certCost = (m.certs || 1) * cvCert;
 		const firmasCost = m.ilimitadas ? 0 : (m.firmas || 0) * cvFirma;
 		const cvTotal = certCost + firmasCost;
 		const margenPct = precioUSD > 0 ? (precioUSD - cvTotal) / precioUSD : 0;
-		return { precioUSD, precioARS, cvTotal, margenPct };
+		return { precioUSD, precioARS, precioARSiva, cvTotal, margenPct };
 	}
 
 	const showPrecios = !view || view === "precios";
@@ -325,7 +327,8 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 								<TableHeader>
 									<TableRow>
 										<TableHead>Producto</TableHead>
-										{show("precioARS") && <TableHead className="text-right">Precio ARS<InfoTooltip dir="down" text="Precio de lista en pesos. Si el pack tiene precio ARS definido en configuración, se usa ese valor. Si no, se deriva: Precio USD × TC." /></TableHead>}
+										{show("precioARS") && <TableHead className="text-right">Precio ARS s/IVA<InfoTooltip dir="down" text="Precio en pesos sin IVA. Se deriva de: Precio USD × TC." /></TableHead>}
+										{show("precioARSiva") && <TableHead className="text-right">Precio ARS c/IVA<InfoTooltip dir="down" text="Precio en pesos con IVA incluido (21%). Precio s/IVA × 1,21." /></TableHead>}
 										{show("precioUSD") && <TableHead className="text-right">Precio USD<InfoTooltip dir="down" text="Precio de lista en dólares, definido directamente en la configuración del pack." /></TableHead>}
 										{show("certs") && <TableHead className="text-right">Certs<InfoTooltip dir="down" text="Cantidad de certificados de firma incluidos en el pack. Cada certificado tiene un costo variable de CV cert." /></TableHead>}
 										{show("firmas") && <TableHead className="text-right">Firmas incl.<InfoTooltip dir="down" text="Firmas digitales incluidas en el plan. Si es 'Ilimitadas', no se cobra costo variable por firmas adicionales." /></TableHead>}
@@ -348,6 +351,9 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 												</TableCell>
 												{show("precioARS") && <TableCell className="text-right tabular-nums">
 													{e == null ? <Badge variant="outline">Consultar</Badge> : "$ " + e.precioARS.toLocaleString("es-AR")}
+												</TableCell>}
+												{show("precioARSiva") && <TableCell className="text-right tabular-nums">
+													{e == null ? "—" : "$ " + e.precioARSiva.toLocaleString("es-AR")}
 												</TableCell>}
 												{show("precioUSD") && <TableCell className="text-right tabular-nums">{e == null ? "—" : fUSD(e.precioUSD)}</TableCell>}
 												{show("certs") && <TableCell className="text-right tabular-nums">{m.certs == null || m.certs === 0 ? "—" : m.certs}</TableCell>}
