@@ -101,8 +101,10 @@ export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcErro
 				)}
 
 				<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 8 })}>
-					Fuente: <strong>dolarapi.com</strong>. El valor se carga automáticamente al entrar y se puede forzar con "Actualizar".
-					El toggle USD/ARS en la barra superior usa este tipo de cambio para convertir todos los precios.
+					{tcSource === "manual"
+						? <>Modo <strong>Manual</strong>: ingresá el valor directamente en el campo. No se consulta ninguna API.</>
+						: <>Fuente: <strong>dolarapi.com</strong>. El valor se carga automáticamente al entrar y se puede forzar con "Actualizar". El toggle USD/ARS usa este tipo de cambio para convertir todos los precios.</>
+					}
 				</div>
 			</div>
 		</div>

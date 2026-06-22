@@ -8,6 +8,7 @@ export const DOLAR_SOURCES = [
 	{ k: "contadoconliqui", label: "CCL" },
 	{ k: "mayorista", label: "Mayorista" },
 	{ k: "tarjeta", label: "Tarjeta" },
+	{ k: "manual", label: "Manual" },
 ];
 
 const STORAGE_KEY = "lakaut_tc_source";
@@ -47,7 +48,7 @@ export function useDolarTC() {
 	}, []);
 
 	useEffect(function () {
-		fetchRate(source);
+		if (source !== "manual") fetchRate(source);
 	}, [source, fetchRate]);
 
 	function setSource(src) {

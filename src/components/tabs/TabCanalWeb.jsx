@@ -9,6 +9,7 @@ function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0
 export function TabCanalWeb({ costs, currency, tc }) {
 	const { models } = useModels();
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
+	const { fMoney: fUSD } = makeMoney("USD", tc);
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
@@ -46,12 +47,14 @@ export function TabCanalWeb({ costs, currency, tc }) {
 								<TableHead className="text-right">Firma extra</TableHead>
 								<TableHead className="text-right">CV total</TableHead>
 								<TableHead className="text-right">Margen</TableHead>
+								<TableHead className="text-right">EBITDA</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{models.map(function (m) {
 								const e = econ(m);
 								const selloComp = m.ilimitadas && !m.extraFirmaPrice;
+								const ebitda = e ? e.precioUSD - e.cvTotal - costs.cfDirecto : null;
 								return (
 									<TableRow key={m.id}>
 										<TableCell>
@@ -61,7 +64,7 @@ export function TabCanalWeb({ costs, currency, tc }) {
 										<TableCell className="text-right tabular-nums">
 											{e == null ? <Badge variant="outline">Consultar</Badge> : "$ " + e.precioARS.toLocaleString("es-AR")}
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{e == null ? "—" : fMoney(e.precioUSD)}</TableCell>
+										<TableCell className="text-right tabular-nums">{e == null ? "—" : fUSD(e.precioUSD)}</TableCell>
 										<TableCell className="text-right tabular-nums">{m.certs == null || m.certs === 0 ? "—" : m.certs}</TableCell>
 										<TableCell className="text-right tabular-nums">{m.ilimitadas ? "Ilimitadas" : (m.firmas == null ? "—" : m.firmas)}</TableCell>
 										<TableCell className="text-right tabular-nums">
@@ -73,6 +76,7 @@ export function TabCanalWeb({ costs, currency, tc }) {
 										<TableCell className={"text-right tabular-nums font-semibold " + (e == null ? "text-muted-foreground" : margClass(e.margenPct))}>
 											{e == null ? "—" : (e.margenPct * 100).toFixed(0) + "%"}
 										</TableCell>
+										<TableCell className={"text-right tabular-nums font-semibold " + (ebitda == null ? "text-muted-foreground" : ebitda >= 0 ? "text-[var(--success)]" : "text-destructive")}>{ebitda == null ? "—" : fMoney2(ebitda)}</TableCell>
 									</TableRow>
 								);
 							})}

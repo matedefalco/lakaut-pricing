@@ -608,12 +608,15 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 							<th style={thStyle}>Subtotal firmas</th>
 							<th style={thStyle}>Subtotal cert</th>
 							<th style={thStyle}>Total</th>
+					<th style={thStyle}>Margen</th>
+					<th style={thStyle}>EBITDA</th>
 						</tr>
 					</thead>
 					<tbody>
 						{rows.map(function (r) {
 							var isTarget = r.firmas === firmas;
 							var hasDisc = (r.discount || 0) > 0;
+							var ebitda = r.margenPack - costs.cfDirecto;
 							return (
 								<tr key={r.firmas} style={{ background: isTarget ? "#eaecfb" : r.firmas % 2 === 0 ? "#fafafa" : WHITE }}>
 									<td style={Object.assign({}, os(13, isTarget ? 700 : 400, isTarget ? BLUE : BLACK), { padding: "9px 10px" })}>
@@ -628,6 +631,8 @@ function VolumeSection({ certs, firmas, periodo, marginFirma, marginCert, setMar
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitFirma * r.firmas)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px" }}>{fMoney2(r.unitCert * r.certs)}</td>
 									<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: isTarget ? OK : "inherit" }}>{fMoney2(r.priceSug)}</td>
+								<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: r.margenPack > 0 ? OK : ER }}>{fMoney2(r.margenPack)}</td>
+								<td style={{ fontFamily: "Courier New,monospace", textAlign: "right", padding: "9px 10px", fontWeight: isTarget ? 700 : 400, color: ebitda > 0 ? OK : ER }}>{fMoney2(ebitda)}</td>
 								</tr>
 							);
 						})}
