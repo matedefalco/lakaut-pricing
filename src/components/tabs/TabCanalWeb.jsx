@@ -166,9 +166,9 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 								<TableHead className="text-right">{isARS ? "Precio ARS s/IVA" : "Precio USD"}</TableHead>
 								<TableHead className="text-right">CV unit<InfoTooltip dir="down" text="Costo variable unitario = (certs × CV cert) + (firmas × CV firma)." /></TableHead>
 								<TableHead className="text-right">CM unit<InfoTooltip dir="down" text={"Contribución marginal unitaria = Precio " + (isARS ? "ARS" : "USD") + " − CV unit. Lo que aporta cada venta antes de cubrir CF."} /></TableHead>
-								<TableHead className="text-right">Unid / mes</TableHead>
-								<TableHead className="text-right">Rev. mensual</TableHead>
-								<TableHead className="text-right">CM mensual</TableHead>
+								<TableHead className="text-right">Unidades</TableHead>
+								<TableHead className="text-right">Ingresos</TableHead>
+								<TableHead className="text-right">CM</TableHead>
 								<TableHead className="text-right">Mix</TableHead>
 							</TableRow>
 						</TableHeader>
@@ -223,11 +223,13 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 				{[
 					{
 						label: "CM ponderado",
+						tooltip: "Contribución marginal promedio ponderada por el mix de ventas.\nFórmula: Σ(CM unit × unidades) ÷ Σ unidades.\nRepresenta cuánto aporta en promedio cada unidad vendida, considerando el mix actual.",
 						value: totalUnits > 0 ? fMoney2(Math.round(cmPond * 100) / 100) + " / u." : "—",
 						color: BLACK,
 					},
 					{
 						label: "BE portfolio",
+						tooltip: "Break-even del portfolio: cuántas unidades totales (con este mix) se necesitan para cubrir los costos fijos directos del canal.\nFórmula: CF directo ÷ CM ponderado.\nCF directo: " + fMoney2(cf) + ".",
 						value: isFinite(beUnits) ? beUnits.toLocaleString("es-AR") + " u." : "—",
 						sub: isFinite(beUnits) && totalUnits > 0
 							? (totalUnits >= beUnits ? "✓ Cubierto" : "Faltan " + (beUnits - totalUnits).toLocaleString("es-AR") + " u.")
@@ -236,18 +238,23 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 					},
 					{
 						label: "Unidades actuales",
+						tooltip: "Total de unidades ingresadas en el simulador, sumando todos los packs.",
 						value: totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—",
 						color: BLACK,
 					},
 					{
-						label: "EBITDA mensual",
+						label: "EBITDA",
+						tooltip: "Resultado estimado para el volumen ingresado, antes de impuestos y amortizaciones.\nFórmula: CM total − CF directo.\nCM total: " + (totalUnits > 0 ? fMoney2(Math.round(totalCM)) : "—") + " · CF directo: " + fMoney2(cf) + ".",
 						value: totalUnits > 0 ? (ebitda >= 0 ? "+" : "") + fMoney2(Math.round(ebitda)) : "—",
 						color: totalUnits > 0 ? (ebitda >= 0 ? OK : ER) : BLACK,
 					},
 				].map(function (kpi) {
 					return (
 						<div key={kpi.label} style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 8, padding: "12px 14px" }}>
-							<div style={os(11, 400, GRAY)}>{kpi.label}</div>
+							<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+							<span style={os(11, 400, GRAY)}>{kpi.label}</span>
+							{kpi.tooltip && <InfoTooltip dir="down" text={kpi.tooltip} />}
+						</div>
 							<div style={Object.assign({}, os(15, 700, kpi.color || BLACK), { marginTop: 4 })}>{kpi.value}</div>
 							{kpi.sub && <div style={Object.assign({}, os(11, 400, kpi.subColor), { marginTop: 3 })}>{kpi.sub}</div>}
 						</div>
@@ -258,7 +265,7 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 			{/* CF coverage bar */}
 			<div style={{ border: "1px solid " + BORD, borderRadius: 8, padding: "14px 16px" }}>
 				<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-					<span style={os(12, 700, GRAY)}>Cobertura de CF mensual</span>
+					<span style={os(12, 700, GRAY)}>Cobertura de CF</span>
 					<span style={os(12, 700, BLACK)}>
 						{totalUnits > 0 ? Math.round(cfPct) + "%" : "0%"}
 						<span style={Object.assign({}, os(12, 400, GRAY), { marginLeft: 6 })}>de {fMoney2(cf)}</span>
@@ -271,13 +278,13 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 					{totalUnits === 0
 						? "Ingresá unidades para ver la cobertura."
 						: cfCovered
-							? "El mix actual cubre CF y genera " + fMoney2(Math.round(ebitda)) + " de EBITDA mensual."
+							? "El mix actual cubre CF y genera " + fMoney2(Math.round(ebitda)) + " de EBITDA."
 							: "Falta " + fMoney2(Math.round(cf - totalCM)) + " de CM para cubrir CF. Ajustá volumen o mix de packs."}
 				</p>
 			</div>
 
 			<p style={os(11, 400, GRAY)}>
-				CM ponderado = Σ(CM unit × unidades) / Σ unidades · BE portfolio = CF directo / CM ponderado · CF directo mensual: {fMoney2(cf)}
+				CM ponderado = Σ(CM unit × unidades) / Σ unidades · BE portfolio = CF directo / CM ponderado · CF directo: {fMoney2(cf)}
 			</p>
 		</div>
 	);
