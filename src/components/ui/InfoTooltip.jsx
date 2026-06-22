@@ -8,9 +8,15 @@ export function InfoTooltip({ text, dir = "up" }) {
 	function handleEnter() {
 		if (!ref.current) return;
 		const r = ref.current.getBoundingClientRect();
+		const TIP_W = 220;
+		const MARGIN = 8;
+		let left = r.left + r.width / 2;
+		// Clamp so tooltip stays within viewport
+		left = Math.min(left, window.innerWidth - TIP_W / 2 - MARGIN);
+		left = Math.max(left, TIP_W / 2 + MARGIN);
 		setPos(dir === "down"
-			? { top: r.bottom + 6, left: r.left + r.width / 2 }
-			: { top: r.top - 6, left: r.left + r.width / 2 });
+			? { top: r.bottom + 6, left }
+			: { top: r.top - 6, left });
 	}
 
 	return (
