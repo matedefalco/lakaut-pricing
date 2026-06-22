@@ -110,17 +110,21 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 		? cfDirecto * firmasMesUsr / capFirmasMes
 		: 0);
 
-	const { usersM1 = null, growthRate = 15, churnRate = 0 } = projConfig || {};
+	const { usersM1 = null, growthRate = 15, churnRate = 0, cac = 0 } = projConfig || {};
 	const pU1 = usersM1 !== null ? usersM1 : Math.max(Math.round(users * 0.05), 10);
 	const netRate = (growthRate - (arch === "sub" ? churnRate : 0)) / 100;
 
 	let acum = 0;
+	let prevU = 0;
 	const proj = Array.from({ length: 24 }, function (_, i) {
 		const uM = Math.max(0, Math.round(pU1 * Math.pow(1 + netRate, i)));
+		const newUsers = Math.max(0, uM - prevU);
+		prevU = uM;
+		const cacCost = Math.round((cac || 0) * newUsers);
 		const rPack = Math.round(revMes * uM);
 		const rExtras = Math.round(extraRevMes);
 		const rM = rPack + rExtras;
-		const cM = Math.round(cvMes * uM + cfDirecto + cvExtras);
+		const cM = Math.round(cvMes * uM + cfDirecto + cvExtras) + cacCost;
 		const eM = rM - cM;
 		acum += eM;
 		return {
@@ -129,6 +133,7 @@ export function engine({ arch, inp, svc, users, costs, projConfig }) {
 			"Rev Pack": rPack,
 			"Rev Extras": rExtras,
 			Costo: cM,
+			CAC: cacCost,
 			EBITDA: Math.round(eM),
 			Acumulado: Math.round(acum),
 		};

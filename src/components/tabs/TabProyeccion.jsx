@@ -69,6 +69,19 @@ export function TabProyeccion({ proj, beMes, calcs, costs, currency, tc, projPar
 						Neto: {(params.growthRate - params.churnRate).toFixed(1)}% / mes
 					</div>
 				)}
+				<div style={{ flex: "0 0 140px" }}>
+					<NumInput
+						label="CAC por usuario"
+						value={params.cac || 0}
+						onChange={function (v) { setParam("cac", Math.max(0, v)); }}
+						suffix="USD"
+					/>
+				</div>
+				{(params.cac || 0) > 0 && (
+					<div style={Object.assign({}, os(10, 400, GRAY), { alignSelf: "flex-end", paddingBottom: 10, maxWidth: 200 })}>
+						Costo de adquisición descontado del EBITDA mensual según nuevos usuarios
+					</div>
+				)}
 			</div>
 
 			{/* Chart 1: Revenue / Costo / EBITDA */}
