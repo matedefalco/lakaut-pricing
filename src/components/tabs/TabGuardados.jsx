@@ -113,7 +113,7 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 		}
 	}
 
-	const precioDisplay = isARS ? (draft.precioARS || Math.round((draft.priceUSD || 0) * tc)) : (draft.priceUSD || 0);
+	const precioDisplay = isARS ? Math.round((draft.priceUSD || 0) * tc) : (draft.priceUSD || 0);
 	const firmaExtraDisplay = isARS ? (draft.firmaExtraARS || Math.round((draft.extraFirmaPrice || 0) * tc)) : (draft.extraFirmaPrice || 0);
 
 	const isDirty = JSON.stringify(draft) !== JSON.stringify(model);
@@ -266,13 +266,13 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 								})}
 							</select>
 						</FieldRow>
-						<FieldRow label={"Precio (" + (isARS ? "ARS" : "USD") + ")"}>
+						<FieldRow label={"Precio s/IVA (" + (isARS ? "ARS" : "USD") + ")"}>
 							<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
 								<NumInput value={precioDisplay} onChange={updPrecio} prefix={isARS ? "$" : "USD"} />
 								<span style={Object.assign({}, os(10, 400, GRAY))}>
 									{isARS
 										? ("≈ USD " + (draft.priceUSD || 0).toFixed(2))
-										: ("≈ $ " + (draft.precioARS || Math.round((draft.priceUSD || 0) * tc)).toLocaleString("es-AR") + " ARS")
+										: ("≈ $ " + Math.round((draft.priceUSD || 0) * tc).toLocaleString("es-AR") + " ARS")
 									}
 								</span>
 							</div>
