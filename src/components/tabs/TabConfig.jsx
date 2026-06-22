@@ -101,7 +101,10 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 	}
 	const salaryRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat === "RRHH"; });
 	const opsRows = costConfig.fixedItems.map(function (r, i) { return Object.assign({}, r, { _i: i }); }).filter(function (r) { return r.cat !== "RRHH"; });
-	const rowTotal = function (r) { return (r.qty || 1) * r.v * (r.frecuencia === "anual" ? 1 / 12 : 1); };
+	const rowTotal = function (r) {
+		if (r.frecuencia === "único") return 0;
+		return (r.qty || 1) * r.v * (r.frecuencia === "anual" ? 1 / 12 : 1);
+	};
 	const cfSalary = salaryRows.reduce(function (s, r) { return s + rowTotal(r); }, 0);
 	const cfOps = opsRows.reduce(function (s, r) { return s + rowTotal(r); }, 0);
 	const cfAmort = costConfig.assetItems.reduce(function (s, r) { return s + r.amort; }, 0);
@@ -117,9 +120,29 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 		return { padding: "2px 5px", border: "1px solid " + BORD, borderRadius: 4, fontSize: 10, fontWeight: 700, fontFamily: "'Open Sans',sans-serif", cursor: "pointer", background: t === "directo" ? OKBG : WNBG, color: t === "directo" ? OK : WN };
 	};
 
-	const frecStyle = function (f) {
-		return { padding: "2px 5px", border: "1px solid " + BORD, borderRadius: 4, fontSize: 10, fontWeight: 700, fontFamily: "'Open Sans',sans-serif", cursor: "pointer", background: f === "anual" ? "#ede9fe" : "#f0f9ff", color: f === "anual" ? "#7c3aed" : "#0369a1" };
-	};
+	const FREC_OPTS = [
+		{ k: "mensual", label: "mensual", bg: "#f0f9ff", color: "#0369a1" },
+		{ k: "anual",   label: "anual",   bg: "#ede9fe", color: "#7c3aed" },
+		{ k: "único",   label: "único",   bg: "#fef3c7", color: "#b45309" },
+	];
+	function FrecToggle({ value, onChange }) {
+		const cur = value || "mensual";
+		return (
+			<div style={{ display: "inline-flex", border: "1px solid " + BORD, borderRadius: 5, overflow: "hidden" }}>
+				{FREC_OPTS.map(function (o) {
+					const active = cur === o.k;
+					return (
+						<button key={o.k} onClick={function () { onChange(o.k); }} style={{
+							padding: "2px 7px", border: "none", borderRight: "1px solid " + BORD, fontSize: 10, fontWeight: 700,
+							fontFamily: "'Open Sans',sans-serif", cursor: "pointer", lineHeight: 1.6,
+							background: active ? o.bg : WHITE, color: active ? o.color : GRAY,
+							outline: "none",
+						}}>{o.label}</button>
+					);
+				})}
+			</div>
+		);
+	}
 
 	const inputText = {
 		width: "100%",
@@ -219,7 +242,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 							<th style={Object.assign({}, thR, { width: 60 })}>Cant.</th>
 							<th style={Object.assign({}, thR, { width: 130 })}>Costo unit. (USD)</th>
 							<th style={Object.assign({}, thR, { width: 110 })}>Total / mes</th>
-							<th style={Object.assign({}, thStyle, { width: 70 })}>Frec.</th>
+							<th style={Object.assign({}, thStyle, { width: 160 })}>Frec.</th>
 							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
@@ -242,8 +265,8 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 									<td style={Object.assign({}, os(12, 700, BLACK), { padding: "4px 10px", width: 110, textAlign: "right", fontFamily: "Courier New,monospace" })}>
 										{fD(rowTotal(r))}
 									</td>
-									<td style={{ padding: "4px 6px", width: 70, textAlign: "center" }}>
-										<button style={frecStyle(r.frecuencia || "mensual")} onClick={function () { updRow("fixedItems", i, "frecuencia", r.frecuencia === "anual" ? "mensual" : "anual"); }}>{r.frecuencia === "anual" ? "anual" : "mensual"}</button>
+									<td style={{ padding: "4px 6px", width: 160 }}>
+										<FrecToggle value={r.frecuencia} onChange={function (v) { updRow("fixedItems", i, "frecuencia", v); }} />
 									</td>
 									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
 										<button style={tipoStyle(r.tipo || "indirecto")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "indirecto"}</button>
@@ -276,7 +299,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 							<th style={Object.assign({}, thR, { width: 60 })}>Cant.</th>
 							<th style={Object.assign({}, thR, { width: 130 })}>Costo unit. (USD)</th>
 							<th style={Object.assign({}, thR, { width: 110 })}>Total / mes</th>
-							<th style={Object.assign({}, thStyle, { width: 70 })}>Frec.</th>
+							<th style={Object.assign({}, thStyle, { width: 160 })}>Frec.</th>
 							<th style={Object.assign({}, thStyle, { width: 80 })}>Tipo</th>
 							<th style={Object.assign({}, thStyle, { width: 28 })} />
 						</tr>
@@ -306,8 +329,8 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 									<td style={Object.assign({}, os(12, 700, BLACK), { padding: "4px 10px", width: 110, textAlign: "right", fontFamily: "Courier New,monospace" })}>
 										{fD(rowTotal(r))}
 									</td>
-									<td style={{ padding: "4px 6px", width: 70, textAlign: "center" }}>
-										<button style={frecStyle(r.frecuencia || "mensual")} onClick={function () { updRow("fixedItems", i, "frecuencia", r.frecuencia === "anual" ? "mensual" : "anual"); }}>{r.frecuencia === "anual" ? "anual" : "mensual"}</button>
+									<td style={{ padding: "4px 6px", width: 160 }}>
+										<FrecToggle value={r.frecuencia} onChange={function (v) { updRow("fixedItems", i, "frecuencia", v); }} />
 									</td>
 									<td style={{ padding: "4px 6px", width: 80, textAlign: "center" }}>
 										<button style={tipoStyle(r.tipo || "directo")} onClick={function () { updRow("fixedItems", i, "tipo", r.tipo === "directo" ? "indirecto" : "directo"); }}>{r.tipo || "directo"}</button>
