@@ -1,7 +1,23 @@
+import { useState, useRef, useEffect } from "react";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+
+// Firmas incluidas por IDC usadas como referencia en esta tabla (misma default que la Cotizadora)
+const FIRMAS_INCL_REF = 4;
+
+const ALL_COLS = [
+	{ key: "precioIDC",   label: "Precio (USD/IDC)" },
+	{ key: "costoRef",    label: "Costo ref. (USD/IDC)" },
+	{ key: "cmRef",       label: "CM ref. (USD/IDC)" },
+	{ key: "margenRef",   label: "Margen ref. %" },
+	{ key: "costoReal",   label: "Costo real (USD/IDC)" },
+	{ key: "cmReal",      label: "CM real (USD/IDC)" },
+	{ key: "margenReal",  label: "Margen real %" },
+];
+
+const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "margenReal"]);
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -17,9 +33,98 @@ const API_STYLES = {
 	enterprise:   { background: "#6D28D9", color: "#fff" },
 };
 
-export function TabCanalB2B2CPrecios() {
+function ColFilterDropdown({ visible, onToggle }) {
+	const [open, setOpen] = useState(false);
+	const ref = useRef(null);
+	useEffect(function () {
+		function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+		document.addEventListener("mousedown", handler);
+		return function () { document.removeEventListener("mousedown", handler); };
+	}, []);
+	return (
+		<div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+			<button
+				onClick={function () { setOpen(function (o) { return !o; }); }}
+				style={{
+					display: "flex", alignItems: "center", gap: 5, padding: "5px 12px",
+					border: "1px solid var(--border)", borderRadius: 6,
+					background: open ? "var(--accent)" : "var(--background)",
+					cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--foreground)",
+				}}
+			>
+				<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+					<line x1="2" y1="4" x2="14" y2="4" /><line x1="4" y1="8" x2="12" y2="8" /><line x1="6" y1="12" x2="10" y2="12" />
+				</svg>
+				Propiedades
+				<span style={{ fontSize: 10, background: "var(--muted)", borderRadius: 10, padding: "1px 6px", color: "var(--muted-foreground)" }}>
+					{visible.size}/{ALL_COLS.length}
+				</span>
+			</button>
+			{open && (
+				<div style={{
+					position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50,
+					background: "var(--background)", border: "1px solid var(--border)",
+					borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 220, padding: "6px 0",
+				}}>
+					<div style={{ padding: "4px 12px 6px", fontSize: 11, fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+						Columnas visibles
+					</div>
+					{ALL_COLS.map(function (col) {
+						const checked = visible.has(col.key);
+						return (
+							<label key={col.key} style={{
+								display: "flex", alignItems: "center", gap: 9, padding: "6px 12px",
+								cursor: "pointer", fontSize: 13, color: "var(--foreground)",
+								background: checked ? "var(--accent)" : "transparent",
+							}}>
+								<input
+									type="checkbox"
+									checked={checked}
+									onChange={function () { onToggle(col.key); }}
+									style={{ accentColor: "var(--primary)", width: 14, height: 14, cursor: "pointer" }}
+								/>
+								{col.label}
+							</label>
+						);
+					})}
+					<div style={{ borderTop: "1px solid var(--border)", margin: "4px 0" }} />
+					<div style={{ display: "flex", gap: 6, padding: "4px 12px" }}>
+						<button onClick={function () { ALL_COLS.forEach(function (c) { if (!visible.has(c.key)) onToggle(c.key); }); }}
+							style={{ fontSize: 11, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+							Mostrar todas
+						</button>
+						<span style={{ color: "var(--muted-foreground)" }}>·</span>
+						<button onClick={function () { ALL_COLS.forEach(function (c) { if (visible.has(c.key)) onToggle(c.key); }); }}
+							style={{ fontSize: 11, color: "var(--muted-foreground)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+							Ocultar todas
+						</button>
+					</div>
+				</div>
+			)}
+		</div>
+	);
+}
+
+export function TabCanalB2B2CPrecios({ costs }) {
 	const { channelConfig } = useChannelConfig();
 	const { b2b2cSegments, b2b2cApiTiers, slaPlans, costoIdcRef } = channelConfig;
+
+	const cvCert = costs?.cvCertBase ?? 0;
+	const cvFirma = costs?.cvFirmaBase ?? 0;
+	// Costo real por IDC = cert + firmas incluidas por defecto
+	const costoRealIDC = cvCert + FIRMAS_INCL_REF * cvFirma;
+
+	const [visible, setVisible] = useState(DEFAULT_VISIBLE);
+	function toggleCol(key) {
+		setVisible(function (prev) {
+			const next = new Set(prev);
+			if (next.has(key)) { next.delete(key); } else { next.add(key); }
+			return next;
+		});
+	}
+
+	function fUSD(n) { return "USD " + n.toFixed(2); }
+	function fPct(n) { return (n * 100).toFixed(0) + "%"; }
 
 	return (
 		<div className="space-y-6 max-w-4xl">
@@ -31,21 +136,37 @@ export function TabCanalB2B2CPrecios() {
 			{/* ── Pricing por segmento ────────────────────────────────── */}
 			<Card>
 				<CardContent>
-					<div className="mb-3">
-						<div className="text-sm font-semibold">Pricing por segmento</div>
-						<p className="text-xs text-muted-foreground mt-0.5">El segmento se asigna automáticamente según el volumen mensual de IDC. Costo de referencia: USD {costoIdcRef.toFixed(4)} / IDC.</p>
+					<div className="flex items-start justify-between gap-4 mb-3">
+						<div>
+							<div className="text-sm font-semibold">Pricing por segmento</div>
+							<p className="text-xs text-muted-foreground mt-0.5">
+								El segmento se asigna por volumen mensual de IDC.
+								Costo real = cert USD {cvCert.toFixed(4)} + {FIRMAS_INCL_REF} firmas × USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)} / IDC.
+								Costo ref. doc: USD {costoIdcRef.toFixed(4)}.
+							</p>
+						</div>
+						<ColFilterDropdown visible={visible} onToggle={toggleCol} />
 					</div>
 					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead>Segmento</TableHead>
 								<TableHead className="text-right">IDC / mes</TableHead>
-								<TableHead className="text-right">Precio (USD / IDC)</TableHead>
-								<TableHead className="text-right">Margen ref.</TableHead>
+								{visible.has("precioIDC")  && <TableHead className="text-right">Precio (USD/IDC)</TableHead>}
+								{visible.has("costoRef")   && <TableHead className="text-right">Costo ref.</TableHead>}
+								{visible.has("cmRef")      && <TableHead className="text-right">CM ref. (USD)</TableHead>}
+								{visible.has("margenRef")  && <TableHead className="text-right">Margen ref. %</TableHead>}
+								{visible.has("costoReal")  && <TableHead className="text-right">Costo real</TableHead>}
+								{visible.has("cmReal")     && <TableHead className="text-right">CM real (USD)</TableHead>}
+								{visible.has("margenReal") && <TableHead className="text-right">Margen real %</TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
+								const cmRefVal   = s.precioIDC - costoIdcRef;
+								const cmRealVal  = s.precioIDC - costoRealIDC;
+								const mRefPct    = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
+								const mRealPct   = s.precioIDC > 0 ? cmRealVal / s.precioIDC : 0;
 								return (
 									<TableRow key={s.id}>
 										<TableCell className="font-semibold">{s.label}</TableCell>
@@ -53,18 +174,21 @@ export function TabCanalB2B2CPrecios() {
 											{s.idcMin.toLocaleString("es-AR")}
 											{s.idcMax == null ? "+" : " – " + s.idcMax.toLocaleString("es-AR")}
 										</TableCell>
-										<TableCell className="text-right tabular-nums font-semibold">
-											{"USD " + s.precioIDC.toFixed(2)}
-										</TableCell>
-										<TableCell className={"text-right tabular-nums font-semibold " + margClass(s.margenRef)}>
-											{(s.margenRef * 100).toFixed(0) + "%"}
-										</TableCell>
+										{visible.has("precioIDC")  && <TableCell className="text-right tabular-nums font-semibold">{fUSD(s.precioIDC)}</TableCell>}
+										{visible.has("costoRef")   && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoIdcRef)}</TableCell>}
+										{visible.has("cmRef")      && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
+										{visible.has("margenRef")  && <TableCell className={"text-right tabular-nums font-semibold " + margClass(s.margenRef)}>{fPct(s.margenRef)}</TableCell>}
+										{visible.has("costoReal")  && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
+										{visible.has("cmReal")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fUSD(cmRealVal)}</TableCell>}
+										{visible.has("margenReal") && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fPct(mRealPct)}</TableCell>}
 									</TableRow>
 								);
 							})}
 						</TableBody>
 					</Table>
-					<p className="text-[11px] text-muted-foreground mt-2">El margen real se recalcula en la Cotizadora con los costos variables actuales del motor.</p>
+					<p className="text-[11px] text-muted-foreground mt-2">
+						"Costo ref." y "Margen ref." provienen del Borrador v5. "Costo real" y "CM real" usan los costos variables actuales del motor ({FIRMAS_INCL_REF} firmas incluidas por IDC por defecto).
+					</p>
 				</CardContent>
 			</Card>
 
@@ -73,7 +197,7 @@ export function TabCanalB2B2CPrecios() {
 				<CardContent>
 					<div className="mb-3">
 						<div className="text-sm font-semibold">Integración API · Fee de implementación</div>
-						<p className="text-xs text-muted-foreground mt-0.5">Cargo único al inicio del contrato. El tier se asigna según el fee acordado. Los rangos son orientativos; el valor puntual se define en la Cotizadora.</p>
+						<p className="text-xs text-muted-foreground mt-0.5">Cargo único al inicio del contrato. Los rangos son orientativos; el valor puntual se define en la Cotizadora.</p>
 					</div>
 					<Table>
 						<TableHeader>
