@@ -311,7 +311,10 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 		...((Number(inp.firmasAdicPorIDC)||0) > 0 ? [{ l: "Firmas adicionales por IDC", v: `${inp.firmasAdicPorIDC} · ${fm(Number(inp.precioFirmaAdic)||0, currency, tc)} c/u` }] : []),
 	];
 
-	const precioIDC = res.precioIDC || 0;
+	const precioIDC = res.precioIDC != null ? res.precioIDC : 0;
+	const precioIDCFmt = currency === "ARS"
+		? "$ " + Math.round(precioIDC * tc).toLocaleString("es-AR")
+		: "USD " + precioIDC.toFixed(2);
 	const revMes = res.revMesTotal || 0;
 	const revAnual = res.revAnual || 0;
 
@@ -344,7 +347,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 
       <div style="margin-bottom:0.4cm;">
         <div style="font-size:8pt;color:${BLT};margin-bottom:0.15cm;">Precio por IDC</div>
-        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${fm(precioIDC, currency, tc)}</div>
+        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${precioIDCFmt}</div>
       </div>
 
       <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.35cm;"></div>
