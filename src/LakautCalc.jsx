@@ -15,7 +15,9 @@ import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabComparacion } from "./components/tabs/TabComparacion";
 import { TabCanalWeb } from "./components/tabs/TabCanalWeb";
 import { TabCanalDistribuidores } from "./components/tabs/TabCanalDistribuidores";
+import { TabCanalDistribuidoresPrecios } from "./components/tabs/TabCanalDistribuidoresPrecios";
 import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
+import { TabCanalB2B2CPrecios } from "./components/tabs/TabCanalB2B2CPrecios";
 import { TabHistorial } from "./components/tabs/TabHistorial";
 import { TabClientes } from "./components/tabs/TabClientes";
 
@@ -64,9 +66,9 @@ function LakautCalcInner() {
 		};
 	});
 
-	const [activeNavItem, setActiveNavItem] = useState("web-precios");
+	const [activeNavItem, setActiveNavItem] = useState("distribuidores");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
-	const [expandedGroups, setExpandedGroups] = useState(function () { return new Set(["web"]); });
+	const [expandedGroups, setExpandedGroups] = useState(function () { return new Set(["cotizadora"]); });
 	const [pendingEdit, setPendingEdit] = useState(null);
 
 	function toggleGroup(key) {
@@ -124,6 +126,7 @@ function LakautCalcInner() {
 		{
 			groupKey: "cotizadora", groupLabel: "📋 COTIZADORA",
 			items: [
+				{ key: "web-simulador", label: "Canal Web" },
 				{ key: "distribuidores", label: "Distribuidores" },
 				{ key: "b2b2c", label: "B2B2C (IDC)" },
 			],
@@ -131,13 +134,9 @@ function LakautCalcInner() {
 		{
 			groupKey: "canales", groupLabel: "🌐 CANALES",
 			items: [
-				{
-					key: "web", label: "Canal Web",
-					children: [
-						{ key: "web-precios", label: "Tabla de precios" },
-						{ key: "web-simulador", label: "Simulador de portfolio" },
-					],
-				},
+				{ key: "web-precios", label: "Canal Web" },
+				{ key: "distribuidores-precios", label: "Distribuidores" },
+				{ key: "b2b2c-precios", label: "B2B2C (IDC)" },
 				{ key: "comparación", label: "Comparación" },
 			],
 		},
@@ -250,7 +249,9 @@ function LakautCalcInner() {
 					{/* ── CANALES ── */}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
 					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
+					{activeNavItem === "distribuidores-precios" && <TabCanalDistribuidoresPrecios />}
 					{activeNavItem === "distribuidores" && <TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "b2b2c-precios" && <TabCanalB2B2CPrecios />}
 					{activeNavItem === "b2b2c" && <TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
