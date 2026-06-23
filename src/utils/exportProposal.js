@@ -322,7 +322,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
   <!-- slide header -->
   <div style="flex-shrink:0;padding:0.55cm 1cm 0.35cm;">
     <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Modelo Comercial</div>
-    <div style="font-size:9pt;color:${GR};">B2B2C · Identidades Digitales · integración <strong style="color:${DK};">${api.label}</strong></div>
+    <div style="font-size:9pt;color:${GR};">B2B2C · IDC <span style="font-weight:400;">(Identidad Digital Certificada)</span> · integración <strong style="color:${DK};">${api.label}</strong></div>
   </div>
 
   <!-- two columns -->
@@ -346,17 +346,17 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
       <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
 
       <div style="margin-bottom:0.4cm;">
-        <div style="font-size:8pt;color:${BLT};margin-bottom:0.15cm;">Precio por IDC</div>
-        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${precioIDCFmt}</div>
+        <div style="font-size:8pt;color:${BLT};margin-bottom:0.15cm;">${esUnica ? "Total única vez" : "Precio mensual"}</div>
+        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${fm(revMes, currency, tc)}</div>
       </div>
 
       <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.35cm;"></div>
 
       <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.5cm;">
+        <div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC/mes)</span><span style="color:${W};font-weight:600;">${precioIDCFmt}</span></div>
         ${esUnica
-		? `<div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Total única vez</span><span style="color:${W};font-weight:600;">${fm(revMes, currency, tc)}</span></div>`
-		: `<div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Revenue mensual</span><span style="color:${W};font-weight:600;">${fm(revMes, currency, tc)}</span></div>
-           <div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Revenue año 1</span><span style="color:${W};font-weight:600;">${fm(revAnual, currency, tc)}</span></div>`
+		? ""
+		: `<div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Precio año 1</span><span style="color:${W};font-weight:600;">${fm(revAnual, currency, tc)}</span></div>`
 	}
       </div>
 
