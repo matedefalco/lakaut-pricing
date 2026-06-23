@@ -66,9 +66,9 @@ function LakautCalcInner() {
 		};
 	});
 
-	const [activeNavItem, setActiveNavItem] = useState("distribuidores");
+	const [activeNavItem, setActiveNavItem] = useState("web-precios");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
-	const [expandedGroups, setExpandedGroups] = useState(function () { return new Set(["cotizadora"]); });
+	const [expandedGroups, setExpandedGroups] = useState(function () { return new Set(["web"]); });
 	const [pendingEdit, setPendingEdit] = useState(null);
 
 	function toggleGroup(key) {
@@ -124,24 +124,34 @@ function LakautCalcInner() {
 
 	const ALL_NAV = [
 		{
-			groupKey: "cotizadora", groupLabel: "📋 COTIZADORA",
-			items: [
-				{ key: "web-simulador", label: "Canal Web" },
-				{ key: "distribuidores", label: "Distribuidores" },
-				{ key: "b2b2c", label: "B2B2C (IDC)" },
-			],
-		},
-		{
 			groupKey: "canales", groupLabel: "🌐 CANALES",
 			items: [
-				{ key: "web-precios", label: "Canal Web" },
-				{ key: "distribuidores-precios", label: "Distribuidores" },
-				{ key: "b2b2c-precios", label: "B2B2C (IDC)" },
+				{
+					key: "web", label: "Canal Web",
+					children: [
+						{ key: "web-precios", label: "Tabla de precios" },
+						{ key: "web-simulador", label: "Simulador" },
+					],
+				},
+				{
+					key: "distribuidores-group", label: "Distribuidores",
+					children: [
+						{ key: "distribuidores-precios", label: "Referencia" },
+						{ key: "distribuidores", label: "Cotizadora" },
+					],
+				},
+				{
+					key: "b2b2c-group", label: "B2B2C (IDC)",
+					children: [
+						{ key: "b2b2c-precios", label: "Referencia" },
+						{ key: "b2b2c", label: "Cotizadora" },
+					],
+				},
 				{ key: "comparación", label: "Comparación" },
 			],
 		},
 		{
-			groupKey: "bases", groupLabel: "🗄️ BASES DE DATOS",
+			groupKey: "bases", groupLabel: "🗄️ REGISTROS",
 			items: [
 				{ key: "historial", label: "Cotizaciones" },
 				{ key: "clientes", label: "Clientes" },
