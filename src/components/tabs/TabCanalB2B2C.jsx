@@ -201,10 +201,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 
 					{/* Ajuste de precios personalizado */}
 					<div className="flex flex-col gap-2">
-						<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit">
-							<span className="font-medium">Ajuste de precios personalizado</span>
-							<span className="text-[10px]">{showOverrides ? "▲" : "▼"}</span>
-							{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">activo</Badge>}
+						<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-2 text-sm font-medium border border-dashed border-border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors w-full text-left">
+							<span>Ajuste de precios personalizado</span>
+							<span className="text-xs text-muted-foreground">(precio IDC, costo cert, costo firma)</span>
+							<span className="ml-auto text-muted-foreground text-xs">{showOverrides ? "▲ ocultar" : "▼ mostrar"}</span>
+							{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
 						</button>
 						{showOverrides && (
 							<div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pl-1 border-l-2 border-muted ml-1">
