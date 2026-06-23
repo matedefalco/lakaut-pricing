@@ -135,9 +135,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 		setTimeout(function () { setFlash(false); }, 1500);
 	}
 
-	const beClientesMes = margenMes > 0 ? Math.ceil(costs.cfDirecto / margenMes) : null;
-	const beClientesUnica = margenUnica > 0 ? Math.ceil(costs.cfDirecto / margenUnica) : null;
-
 	return (
 		<div className="space-y-6">
 
@@ -290,7 +287,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 							<TableRow><TableCell>Soporte / SLA ({sla.label})</TableCell><TableCell className="text-right tabular-nums">{slaMes ? fMoney(slaMes) : "incluido"}</TableCell></TableRow>
 							<TableRow><TableCell>Fee de implementación</TableCell><TableCell className="text-right tabular-nums">{fMoney(fee)}</TableCell></TableRow>
 							<TableRow className={margenUnica >= 0 ? "bg-success/5" : "bg-destructive/5"}><TableCell className={"font-semibold " + (margenUnica >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal</TableCell><TableCell className={"text-right tabular-nums font-semibold " + (margenUnica >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margenUnica)}</TableCell></TableRow>
-											<TableRow className="bg-muted/30"><TableCell className="font-semibold text-muted-foreground">Clientes p/cubrir CF mensual</TableCell><TableCell className="text-right tabular-nums text-muted-foreground">{beClientesUnica == null ? "—" : beClientesUnica.toLocaleString("es-AR") + " clientes"}</TableCell></TableRow>
 						</TableBody>
 					</Table>
 				) : (
@@ -304,7 +300,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 							<TableRow><TableCell>Soporte / SLA ({sla.label})</TableCell><TableCell className="text-right tabular-nums">{slaMes ? fMoney(slaMes) : "incluido"}</TableCell><TableCell className="text-right tabular-nums">{slaMes ? fMoney(slaMes * 12) : "incluido"}</TableCell></TableRow>
 							<TableRow><TableCell>Fee de implementación</TableCell><TableCell className="text-right tabular-nums">—</TableCell><TableCell className="text-right tabular-nums">{fMoney(fee)}</TableCell></TableRow>
 							<TableRow className={margenMes >= 0 ? "bg-success/5" : "bg-destructive/5"}><TableCell className={"font-semibold " + (margenMes >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal</TableCell><TableCell className={"text-right tabular-nums font-semibold " + (margenMes >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margenMes)}</TableCell><TableCell className={"text-right tabular-nums font-semibold " + (margenMes >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margenMes * 12)}</TableCell></TableRow>
-											<TableRow className="bg-muted/30"><TableCell className="font-semibold text-muted-foreground">Clientes p/cubrir CF mensual</TableCell><TableCell className="text-right tabular-nums text-muted-foreground">{beClientesMes == null ? "—" : beClientesMes.toLocaleString("es-AR") + " clientes"}</TableCell><TableCell></TableCell></TableRow>
 						</TableBody>
 					</Table>
 				)}
