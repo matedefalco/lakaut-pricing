@@ -132,9 +132,11 @@ export function TabComparacion({ costs, currency, tc }) {
 	const { models } = useModels();
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 
+	const activeModels = models.filter(function (m) { return m.activo !== false; });
+
 	// Selection state
 	const [selectedIds, setSelectedIds] = useState(function () {
-		return models.slice(0, Math.min(4, models.length)).map(function (m) { return m.id; });
+		return activeModels.slice(0, Math.min(4, activeModels.length)).map(function (m) { return m.id; });
 	});
 	const [refUsers, setRefUsers] = useState(1000);
 	const [growthRate, setGrowthRate] = useState(10);
@@ -281,7 +283,7 @@ export function TabComparacion({ costs, currency, tc }) {
 		});
 	}, [results, refUsers]);
 
-	if (models.length === 0) {
+	if (activeModels.length === 0) {
 		return (
 			<div style={{ textAlign: "center", padding: 40, color: GRAY }}>
 				<div style={os(13, 400, GRAY)}>No hay modelos guardados.</div>
@@ -315,7 +317,7 @@ export function TabComparacion({ costs, currency, tc }) {
 					Modelos a comparar ({selectedIds.length} activos)
 				</div>
 				<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-					{models.map(function (model) {
+					{activeModels.map(function (model) {
 						const active = selectedIds.includes(model.id);
 						return (
 							<button

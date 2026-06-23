@@ -36,12 +36,17 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const [idcMensuales, setIdcMensuales] = useState(5500);
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
+	const [slaBonificado, setSlaBonificado] = useState(false);
 	const [firmasInclPorIDC, setFirmasInclPorIDC] = useState(4);
 	const [firmasAdicPorIDC, setFirmasAdicPorIDC] = useState(0);
 	const [precioFirmaAdic, setPrecioFirmaAdic] = useState(0.5);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
+	const [showOverrides, setShowOverrides] = useState(false);
+	const [overridePrecioIDC, setOverridePrecioIDC] = useState("");
+	const [overrideCvCert, setOverrideCvCert] = useState("");
+	const [overrideCvFirma, setOverrideCvFirma] = useState("");
 
 	const esUnica = frecuencia === "unica";
 
@@ -57,10 +62,14 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 		setIdcMensuales(i.idcMensuales || 0);
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
+		setSlaBonificado(i.slaBonificado || false);
 		setFirmasInclPorIDC(i.firmasInclPorIDC != null ? i.firmasInclPorIDC : 4);
 		setFirmasAdicPorIDC(i.firmasAdicPorIDC || 0);
 		setPrecioFirmaAdic(i.precioFirmaAdic != null ? i.precioFirmaAdic : 0.5);
 		setCasosDeUso(i.casosDeUso || "");
+		if (i.overridePrecioIDC != null) { setOverridePrecioIDC(String(i.overridePrecioIDC)); setShowOverrides(true); } else { setOverridePrecioIDC(""); }
+		if (i.overrideCvCert != null) { setOverrideCvCert(String(i.overrideCvCert)); setShowOverrides(true); } else { setOverrideCvCert(""); }
+		if (i.overrideCvFirma != null) { setOverrideCvFirma(String(i.overrideCvFirma)); setShowOverrides(true); } else { setOverrideCvFirma(""); }
 		setEditingId(pendingEdit.id);
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
@@ -69,8 +78,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const adic = Number(firmasAdicPorIDC) || 0;
 	const firmasPorIDC = incl + adic;
 
-	const costoIDC = cvCert + incl * cvFirma;
-	const precioIDC = seg.precioIDC;
+	const effCvCert = overrideCvCert !== "" ? (Number(overrideCvCert) || 0) : cvCert;
+	const effCvFirma = overrideCvFirma !== "" ? (Number(overrideCvFirma) || 0) : cvFirma;
+	const effPrecioIDC = overridePrecioIDC !== "" ? (Number(overridePrecioIDC) || 0) : seg.precioIDC;
+
+	const costoIDC = effCvCert + incl * effCvFirma;
+	const precioIDC = effPrecioIDC;
 	const margenIDC = precioIDC - costoIDC;
 	const margenPctIDC = precioIDC > 0 ? margenIDC / precioIDC : 0;
 
@@ -79,10 +92,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 
 	const revIDCmes = idcMensuales * precioIDC;
 	const revFirmasMes = firmasAdicMes * (Number(precioFirmaAdic) || 0);
-	const costoCertMes = idcMensuales * cvCert;
-	const costoFirmasMes = firmasMes * cvFirma;
+	const costoCertMes = idcMensuales * effCvCert;
+	const costoFirmasMes = firmasMes * effCvFirma;
 	const costoMes = costoCertMes + costoFirmasMes;
-	const slaMes = sla.precioMes || 0;
+	const slaMes = slaBonificado ? 0 : (sla.precioMes || 0);
 	const revMesTotal = revIDCmes + revFirmasMes + slaMes;
 	const margenMes = revIDCmes + revFirmasMes - costoMes;
 	const margenPct = revIDCmes + revFirmasMes > 0 ? margenMes / (revIDCmes + revFirmasMes) : 0;
@@ -108,7 +121,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			channel: "b2b2c",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			inputs: { frecuencia, idcMensuales, fee, slaId, firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic, casosDeUso },
+			inputs: { frecuencia, idcMensuales, fee, slaId, slaBonificado,
+			firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic, casosDeUso,
+			...(overridePrecioIDC !== "" ? { overridePrecioIDC: Number(overridePrecioIDC) } : {}),
+			...(overrideCvCert !== "" ? { overrideCvCert: Number(overrideCvCert) } : {}),
+			...(overrideCvFirma !== "" ? { overrideCvFirma: Number(overrideCvFirma) } : {}),
+		},
 			resumen: { segmento: seg.label, frecuencia, idcMensuales, firmasMes, precioIDC, revMesTotal: esUnica ? revUnica : revMesTotal, revAnual: esUnica ? revUnica : revAnual, margenMes: esUnica ? margenUnica : margenMes, margenPct },
 		}, client?.id || null);
 
@@ -163,11 +181,57 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 						<div className="flex flex-col gap-1.5">
 							<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
 						</div>
-						<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
-							options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
+						<div className="flex flex-col gap-1.5">
+							<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
+								options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
+							{sla.precioMes > 0 && (
+								<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
+									<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
+									Bonificar SLA para este cliente
+									{slaBonificado && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
+								</label>
+							)}
+						</div>
 						<NumberField label="Firmas incluidas por IDC" value={firmasInclPorIDC} onChange={setFirmasInclPorIDC} note="Firma inicial + activación (editable)" />
 						<NumberField label="Firmas adicionales por IDC / mes" value={firmasAdicPorIDC} onChange={setFirmasAdicPorIDC} note="Se cobran aparte" />
 						<NumberField label="Precio firma adicional" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" />
+					</div>
+
+					<Separator />
+
+					{/* Ajuste de precios personalizado */}
+					<div className="flex flex-col gap-2">
+						<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit">
+							<span className="font-medium">Ajuste de precios personalizado</span>
+							<span className="text-[10px]">{showOverrides ? "▲" : "▼"}</span>
+							{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">activo</Badge>}
+						</button>
+						{showOverrides && (
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pl-1 border-l-2 border-muted ml-1">
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio IDC <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+									<div className="flex items-center gap-1.5">
+										<Input type="number" value={overridePrecioIDC} onChange={function (e) { setOverridePrecioIDC(e.target.value); }} placeholder={"Tabla: " + seg.precioIDC} className="h-8 text-sm" />
+										{overridePrecioIDC !== "" && <button onClick={function () { setOverridePrecioIDC(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+								</div>
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo certificado <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+									<div className="flex items-center gap-1.5">
+										<Input type="number" value={overrideCvCert} onChange={function (e) { setOverrideCvCert(e.target.value); }} placeholder={"Base: " + cvCert.toFixed(4)} className="h-8 text-sm" />
+										{overrideCvCert !== "" && <button onClick={function () { setOverrideCvCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+								</div>
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+									<div className="flex items-center gap-1.5">
+										<Input type="number" value={overrideCvFirma} onChange={function (e) { setOverrideCvFirma(e.target.value); }} placeholder={"Base: " + cvFirma.toFixed(4)} className="h-8 text-sm" />
+										{overrideCvFirma !== "" && <button onClick={function () { setOverrideCvFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+								</div>
+								<p className="text-[10px] text-muted-foreground col-span-full">Dejá en blanco para usar los valores globales. Los cambios aplican solo a esta cotización.</p>
+							</div>
+						)}
 					</div>
 
 					<Separator />
@@ -251,7 +315,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 				<CardContent>
 					<div className="mb-3 text-sm font-semibold">Pricing por segmento (Borrador v5)</div>
 					<Table>
-						<TableHeader><TableRow><TableHead>Segmento</TableHead><TableHead className="text-right">IDC/mes</TableHead><TableHead className="text-right">Precio USD</TableHead><TableHead className="text-right">C. Marginal ref.</TableHead><TableHead className="text-right">C. Marginal real (costo {fMoney2(costoIDC)})</TableHead></TableRow></TableHeader>
+						<TableHeader><TableRow><TableHead>Segmento</TableHead><TableHead className="text-right">IDC/mes</TableHead><TableHead className="text-right">Precio (USD/IDC)</TableHead><TableHead className="text-right">C. Marginal ref.</TableHead><TableHead className="text-right">C. Marginal real (costo USD {costoIDC.toFixed(4)})</TableHead></TableRow></TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
 								const act = s.id === seg.id;
@@ -260,7 +324,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 									<TableRow key={s.id} className={act ? "bg-accent" : ""}>
 										<TableCell className="font-semibold">{s.label}{act && <Badge className="ml-2">actual</Badge>}</TableCell>
 										<TableCell className="text-right tabular-nums">{s.idcMin.toLocaleString("es-AR")}–{s.idcMax == null ? "+" : s.idcMax.toLocaleString("es-AR")}</TableCell>
-										<TableCell className="text-right tabular-nums font-semibold">{fMoney2(s.precioIDC)}</TableCell>
+										<TableCell className="text-right tabular-nums font-semibold">{"USD " + s.precioIDC.toFixed(2)}</TableCell>
 										<TableCell className="text-right tabular-nums">{(s.margenRef * 100).toFixed(0)}%</TableCell>
 										<TableCell className={"text-right tabular-nums font-semibold " + margClass(mReal)}>{(mReal * 100).toFixed(0)}%</TableCell>
 									</TableRow>
@@ -270,7 +334,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasMes.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "C. Marginal real" recalcula con costo cotizadora: cert {fMoney2(cvCert)} + {incl} firmas × {fMoney2(cvFirma)} = {fMoney2(costoIDC)}. Referencia doc (USD {costoIdcRef.toFixed(4)}). Modo: {esUnica ? "única vez" : "recurrente mensual"}.</p>
+			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasMes.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "C. Marginal real" recalcula con costo cotizadora: cert USD {effCvCert.toFixed(4)} + {incl} firmas × USD {effCvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Referencia doc (USD {costoIdcRef.toFixed(4)}). Modo: {esUnica ? "única vez" : "recurrente mensual"}.{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && " ⚠ Precios personalizados activos en esta cotización."}</p>
 		</div>
 	);
 }
