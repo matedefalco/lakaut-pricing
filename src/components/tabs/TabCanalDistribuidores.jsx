@@ -190,7 +190,14 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 									const firmasU = p.ilimitadas ? "ilim." : (p.firmas || 0);
 									return (
 										<TableRow key={p.id}>
-											<TableCell className="font-semibold">{p.label}</TableCell>
+											<TableCell className="font-semibold">
+											<span>{p.label}</span>
+											{p.segment && (
+												<span className={"ml-2 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded " + (p.segment === "empresa" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700")}>
+													{p.segment === "empresa" ? "Jurídica" : "Física"}
+												</span>
+											)}
+										</TableCell>
 											<TableCell className="text-right tabular-nums">{fMoney(p.priceUSD)}</TableCell>
 											<TableCell className="text-right tabular-nums text-muted-foreground">{p.certs || 1}</TableCell>
 											<TableCell className="text-right tabular-nums text-muted-foreground">{firmasU}</TableCell>
