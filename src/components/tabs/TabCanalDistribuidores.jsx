@@ -36,7 +36,8 @@ function getDistributorTierLocal(certsActivos, compromisoAnualUSD, tiers) {
 }
 
 export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsApi, pendingEdit, onConsumeEdit }) {
-	const { models } = useModels();
+	const { models: allModels } = useModels();
+	const models = allModels.filter(function (m) { return m.activo !== false; });
 	const { channelConfig } = useChannelConfig();
 	const distributorTiers = channelConfig.distributorTiers;
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);

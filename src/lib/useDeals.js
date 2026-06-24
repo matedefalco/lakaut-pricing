@@ -97,8 +97,18 @@ export function useDeals() {
 	}, []);
 
 	const remove = useCallback(async function (id) {
-		const { error } = await supabase.from("deals").delete().eq("id", id);
-		if (!error) setDeals(function (prev) { return prev.filter(function (d) { return d.id !== id; }); });
+		const { error, count } = await supabase.from("deals").delete({ count: "exact" }).eq("id", id);
+		if (error) {
+			console.error("useDeals.remove error:", error);
+			alert("No se pudo borrar la cotización: " + (error.message || "error desconocido"));
+			return;
+		}
+		if (count === 0) {
+			console.warn("useDeals.remove: Supabase no borró ningún registro (RLS o id inválido):", id);
+			alert("No se pudo borrar la cotización (sin permisos o registro no encontrado).");
+			return;
+		}
+		setDeals(function (prev) { return prev.filter(function (d) { return d.id !== id; }); });
 	}, []);
 
 	const updateSlideUrl = useCallback(async function (id, slideUrl) {
