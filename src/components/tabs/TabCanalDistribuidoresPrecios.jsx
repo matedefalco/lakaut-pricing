@@ -1,4 +1,6 @@
 import { useChannelConfig } from "@/context/ChannelConfigContext";
+import { useModels } from "@/context/ModelsContext";
+import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,23 +13,68 @@ const TIER_STYLES = {
 	platinum: { background: "#6D28D9", color: "#fff" },
 };
 
-export function TabCanalDistribuidoresPrecios() {
+export function TabCanalDistribuidoresPrecios({ currency, tc }) {
 	const { channelConfig } = useChannelConfig();
 	const { distributorTiers } = channelConfig;
+	const { models: allModels } = useModels();
+	const models = allModels.filter(function (m) { return m.activo !== false && m.priceUSD > 0; });
+	const { fMoney } = makeMoney(currency || "USD", tc || 1);
 
 	return (
-		<div className="space-y-6 max-w-4xl">
+		<div className="space-y-6 max-w-5xl">
 			<div>
-				<h2 className="text-base font-semibold font-heading">Canal Distribuidores · Tabla de referencia</h2>
-				<p className="text-sm text-muted-foreground mt-1">Descuento sobre la lista web. El nivel se asigna automáticamente: gana el mayor entre certificados activos y compromiso anual de facturación.</p>
+				<h2 className="text-base font-semibold font-heading">Canal Distribuidores · Referencia</h2>
+				<p className="text-sm text-muted-foreground mt-1">Precios de lista web y descuentos por nivel. El descuento aplica sobre toda la orden.</p>
 			</div>
 
-			{/* ── Matriz de niveles ────────────────────────────────────── */}
+			{/* ── 1. Tabla de packs ────────────────────────────────────── */}
+			<Card>
+				<CardContent>
+					<div className="mb-3">
+						<div className="text-sm font-semibold">Packs disponibles</div>
+						<p className="text-xs text-muted-foreground mt-0.5">Precios de lista web (base de cálculo antes de descuento por nivel).</p>
+					</div>
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Pack</TableHead>
+								<TableHead>Tipo</TableHead>
+								<TableHead className="text-right">Precio USD</TableHead>
+								<TableHead className="text-right">Certs / u</TableHead>
+								<TableHead className="text-right">Firmas / u</TableHead>
+								<TableHead className="text-right">Vigencia</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{models.map(function (m) {
+								const firmasLabel = m.ilimitadas ? "Ilimitadas" : (m.firmas || 0).toLocaleString("es-AR");
+								const vigencia = (m.vigencia || m.billingPeriod || 24) + " meses";
+								return (
+									<TableRow key={m.id}>
+										<TableCell className="font-semibold">{m.label}</TableCell>
+										<TableCell>
+											<Badge variant={m.segment === "empresa" ? "default" : "secondary"} className="text-[10px]">
+												{m.segment === "empresa" ? "Jurídica" : "Física"}
+											</Badge>
+										</TableCell>
+										<TableCell className="text-right tabular-nums font-medium">USD {m.priceUSD.toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground">{(m.certs || 1)}</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground">{firmasLabel}</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground">{vigencia}</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</CardContent>
+			</Card>
+
+			{/* ── 2. Matriz de niveles ─────────────────────────────────── */}
 			<Card>
 				<CardContent>
 					<div className="mb-3">
 						<div className="text-sm font-semibold">Matriz de niveles</div>
-						<p className="text-xs text-muted-foreground mt-0.5">El descuento aplica sobre la facturación a precios de lista web (ARS). Aplica a toda la orden, sin mezcla de tiers.</p>
+						<p className="text-xs text-muted-foreground mt-0.5">El nivel se asigna automáticamente: gana el mayor entre certificados activos y compromiso anual.</p>
 					</div>
 					<Table>
 						<TableHeader>
@@ -65,7 +112,64 @@ export function TabCanalDistribuidoresPrecios() {
 				</CardContent>
 			</Card>
 
-			{/* ── Reglas de asignación ─────────────────────────────────── */}
+			{/* ── 3. Matriz combinada packs × niveles ──────────────────── */}
+			<Card>
+				<CardContent>
+					<div className="mb-3">
+						<div className="text-sm font-semibold">Precios netos por nivel</div>
+						<p className="text-xs text-muted-foreground mt-0.5">Precio neto Lakaut (USD) = precio lista × (1 − descuento del nivel). Lo que el distribuidor paga efectivamente por pack.</p>
+					</div>
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Pack</TableHead>
+									<TableHead>Tipo</TableHead>
+									<TableHead className="text-right text-muted-foreground">Lista</TableHead>
+									{distributorTiers.map(function (t) {
+										return (
+											<TableHead key={t.id} className="text-center">
+												<span className="inline-flex items-center justify-center rounded px-2 py-0.5 text-xs font-semibold" style={TIER_STYLES[t.id] || {}}>
+													{t.label}
+												</span>
+												<div className="text-[10px] font-normal text-muted-foreground mt-0.5">−{(t.descuento * 100).toFixed(0)}%</div>
+											</TableHead>
+										);
+									})}
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{models.map(function (m) {
+									return (
+										<TableRow key={m.id}>
+											<TableCell className="font-semibold whitespace-nowrap">{m.label}</TableCell>
+											<TableCell>
+												<Badge variant={m.segment === "empresa" ? "default" : "secondary"} className="text-[10px]">
+													{m.segment === "empresa" ? "Jurídica" : "Física"}
+												</Badge>
+											</TableCell>
+											<TableCell className="text-right tabular-nums text-muted-foreground">USD {m.priceUSD.toLocaleString("es-AR")}</TableCell>
+											{distributorTiers.map(function (t) {
+												const neto = m.priceUSD * (1 - t.descuento);
+												const isZeroDisc = t.descuento === 0;
+												return (
+													<TableCell key={t.id} className="text-center tabular-nums">
+														<span className={"font-semibold " + (isZeroDisc ? "text-muted-foreground" : "text-foreground")}>
+															USD {neto.toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+														</span>
+													</TableCell>
+												);
+											})}
+										</TableRow>
+									);
+								})}
+							</TableBody>
+						</Table>
+					</div>
+				</CardContent>
+			</Card>
+
+			{/* ── Reglas y condiciones ─────────────────────────────────── */}
 			<Card>
 				<CardContent>
 					<div className="mb-3 text-sm font-semibold">Reglas de asignación de nivel</div>
@@ -80,36 +184,11 @@ export function TabCanalDistribuidoresPrecios() {
 						</div>
 						<div className="flex gap-3">
 							<span className="shrink-0 font-semibold text-foreground">3.</span>
-							<span>Gana el nivel <strong className="text-foreground">más alto</strong> de los dos. Esto permite que un distribuidor suba de nivel por volumen en una sola orden aunque su historial sea bajo.</span>
+							<span>Gana el nivel <strong className="text-foreground">más alto</strong> de los dos.</span>
 						</div>
 						<div className="flex gap-3">
 							<span className="shrink-0 font-semibold text-foreground">4.</span>
-							<span>El descuento se aplica sobre la facturación total a precios de lista (no es acumulable ni escalonado por producto).</span>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* ── Qué incluye el canal ─────────────────────────────────── */}
-			<Card>
-				<CardContent>
-					<div className="mb-3 text-sm font-semibold">Qué incluye el canal</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-						<div className="space-y-2">
-							<div className="font-medium text-foreground">Acceso</div>
-							<ul className="space-y-1 text-muted-foreground">
-								<li>→ Portal de distribuidores Lakaut</li>
-								<li>→ Acceso a todos los productos de lista web</li>
-								<li>→ Soporte técnico y comercial dedicado</li>
-							</ul>
-						</div>
-						<div className="space-y-2">
-							<div className="font-medium text-foreground">Condiciones</div>
-							<ul className="space-y-1 text-muted-foreground">
-								<li>→ Contrato anual de distribuidor requerido</li>
-								<li>→ Compromiso mínimo: nivel Azul (0% descuento base)</li>
-								<li>→ Revisión de nivel: anual o por cotización</li>
-							</ul>
+							<span>El descuento se aplica sobre la facturación total a precios de lista (no escalonado por producto).</span>
 						</div>
 					</div>
 				</CardContent>

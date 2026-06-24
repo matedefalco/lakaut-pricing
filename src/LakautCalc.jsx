@@ -259,7 +259,7 @@ function LakautCalcInner() {
 					{/* ── CANALES ── */}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
 					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
-					{activeNavItem === "distribuidores-precios" && <TabCanalDistribuidoresPrecios />}
+					{activeNavItem === "distribuidores-precios" && <TabCanalDistribuidoresPrecios currency={currency} tc={tc} />}
 					{activeNavItem === "distribuidores" && <TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "b2b2c-precios" && <TabCanalB2B2CPrecios costs={costs} />}
 					{activeNavItem === "b2b2c" && <TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
