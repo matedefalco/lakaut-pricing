@@ -3,6 +3,7 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 // 1 IDC = 1 cert + 1 firma
 const FIRMAS_INCL_REF = 1;
@@ -13,11 +14,13 @@ const ALL_COLS = [
 	{ key: "cmRef",       label: "CM ref. (USD/IDC)" },
 	{ key: "margenRef",   label: "Margen ref. %" },
 	{ key: "costoReal",   label: "Costo (USD/IDC)" },
-	{ key: "cmReal",      label: "CM (USD/IDC)" },
-	{ key: "margenReal",  label: "Margen %" },
+	{ key: "cmReal",      label: "CM $" },
+	{ key: "cmRealPct",   label: "CM %" },
+	{ key: "margenReal",  label: "Margen $" },
+	{ key: "margenRealPct", label: "Margen %" },
 ];
 
-const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "margenReal"]);
+const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "cmRealPct", "margenReal", "margenRealPct"]);
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -156,17 +159,20 @@ export function TabCanalB2B2CPrecios({ costs }) {
 								{visible.has("costoRef")   && <TableHead className="text-right">Costo ref.</TableHead>}
 								{visible.has("cmRef")      && <TableHead className="text-right">CM ref. (USD)</TableHead>}
 								{visible.has("margenRef")  && <TableHead className="text-right">Margen ref. %</TableHead>}
-								{visible.has("costoReal")  && <TableHead className="text-right">Costo</TableHead>}
-								{visible.has("cmReal")     && <TableHead className="text-right">CM (USD)</TableHead>}
-								{visible.has("margenReal") && <TableHead className="text-right">Margen %</TableHead>}
+								{visible.has("costoReal")    && <TableHead className="text-right">Costo</TableHead>}
+								{visible.has("cmReal")       && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal absoluta = Precio − Costo variable por IDC." /></TableHead>}
+								{visible.has("cmRealPct")    && <TableHead className="text-right">CM %<InfoTooltip text="Markup sobre costo = (Precio − Costo) / Costo × 100. Qué tan por encima del costo está el precio." /></TableHead>}
+								{visible.has("margenReal")   && <TableHead className="text-right">Margen $<InfoTooltip text="Igual que CM $: Precio − Costo variable por IDC. Misma magnitud, etiqueta de margen." /></TableHead>}
+								{visible.has("margenRealPct") && <TableHead className="text-right">Margen %<InfoTooltip text="Margen sobre precio = (Precio − Costo) / Precio × 100. Fracción del precio que queda como contribución." /></TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
-								const cmRefVal   = s.precioIDC - costoIdcRef;
-								const cmRealVal  = s.precioIDC - costoRealIDC;
-								const mRefPct    = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
-								const mRealPct   = s.precioIDC > 0 ? cmRealVal / s.precioIDC : 0;
+								const cmRefVal      = s.precioIDC - costoIdcRef;
+								const cmRealVal     = s.precioIDC - costoRealIDC;
+								const mRefPct       = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
+								const mRealPct      = s.precioIDC > 0 ? cmRealVal / s.precioIDC : 0;
+								const cmRealMarkup  = costoRealIDC > 0 ? cmRealVal / costoRealIDC : 0;
 								return (
 									<TableRow key={s.id}>
 										<TableCell className="font-semibold">{s.label}</TableCell>
@@ -174,13 +180,15 @@ export function TabCanalB2B2CPrecios({ costs }) {
 											{s.idcMin.toLocaleString("es-AR")}
 											{s.idcMax == null ? "+" : " – " + s.idcMax.toLocaleString("es-AR")}
 										</TableCell>
-										{visible.has("precioIDC")  && <TableCell className="text-right tabular-nums font-semibold">{fUSD(s.precioIDC)}</TableCell>}
-										{visible.has("costoRef")   && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoIdcRef)}</TableCell>}
-										{visible.has("cmRef")      && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
-										{visible.has("margenRef")  && <TableCell className={"text-right tabular-nums font-semibold " + margClass(s.margenRef)}>{fPct(s.margenRef)}</TableCell>}
-										{visible.has("costoReal")  && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
-										{visible.has("cmReal")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fUSD(cmRealVal)}</TableCell>}
-										{visible.has("margenReal") && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fPct(mRealPct)}</TableCell>}
+										{visible.has("precioIDC")     && <TableCell className="text-right tabular-nums font-semibold">{fUSD(s.precioIDC)}</TableCell>}
+										{visible.has("costoRef")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoIdcRef)}</TableCell>}
+										{visible.has("cmRef")         && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
+										{visible.has("margenRef")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(s.margenRef)}>{fPct(s.margenRef)}</TableCell>}
+										{visible.has("costoReal")     && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
+										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fUSD(cmRealVal)}</TableCell>}
+										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmRealMarkup)}>{fPct(cmRealMarkup)}</TableCell>}
+										{visible.has("margenReal")    && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fUSD(cmRealVal)}</TableCell>}
+										{visible.has("margenRealPct") && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fPct(mRealPct)}</TableCell>}
 									</TableRow>
 								);
 							})}
