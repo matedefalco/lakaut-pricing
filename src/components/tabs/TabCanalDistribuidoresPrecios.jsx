@@ -74,13 +74,13 @@ export function TabCanalDistribuidoresPrecios({ currency, tc }) {
 				<CardContent>
 					<div className="mb-3">
 						<div className="text-sm font-semibold">Matriz de niveles</div>
-						<p className="text-xs text-muted-foreground mt-0.5">El nivel se asigna automáticamente: gana el mayor entre certificados activos y compromiso anual.</p>
+						<p className="text-xs text-muted-foreground mt-0.5">El nivel se asigna automáticamente: gana el mayor entre certificados activos y volumen cotizado.</p>
 					</div>
 					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead>Nivel</TableHead>
-								<TableHead className="text-right">Compromiso anual (USD)</TableHead>
+								<TableHead className="text-right">Volumen cotizado (USD)</TableHead>
 								<TableHead className="text-right">Certificados activos</TableHead>
 								<TableHead className="text-right">Descuento sobre lista</TableHead>
 							</TableRow>
@@ -176,7 +176,7 @@ export function TabCanalDistribuidoresPrecios({ currency, tc }) {
 					<div className="space-y-3 text-sm text-muted-foreground">
 						<div className="flex gap-3">
 							<span className="shrink-0 font-semibold text-foreground">1.</span>
-							<span>Se calcula el nivel por <strong className="text-foreground">compromiso anual</strong> (facturación a lista USD de la cotización, criterio principal).</span>
+							<span>Se calcula el nivel por <strong className="text-foreground">volumen cotizado</strong> (facturación a lista USD de la cotización, criterio principal).</span>
 						</div>
 						<div className="flex gap-3">
 							<span className="shrink-0 font-semibold text-foreground">2.</span>

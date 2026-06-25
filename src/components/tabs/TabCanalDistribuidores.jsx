@@ -97,7 +97,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 	const tier = getDistributorTierLocal(calc.certsTotal, calc.facturacionLista, distributorTiers);
 	const tierByCertsOnly = getDistributorTierLocal(calc.certsTotal, 0, distributorTiers);
-	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "compromiso anual" : (calc.certsTotal > 0 ? "certs cotizados" : "sin volumen");
+	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "volumen cotizado" : (calc.certsTotal > 0 ? "certs cotizados" : "sin volumen");
 
 	const netoLakaut = calc.facturacionLista * (1 - tier.descuento);
 	const cvTotal = calc.certsTotal * cvCert + calc.firmasTotal * cvFirma;
@@ -163,14 +163,14 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 					{/* Parámetros adicionales */}
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<NumberField label="Firmas adicionales / año" value={firmasAdic} onChange={setFirmasAdic} />
+						<NumberField label="Firmas adicionales" value={firmasAdic} onChange={setFirmasAdic} />
 					</div>
 
 					<Separator />
 
 					{/* Tabla de packs */}
 					<div>
-						<p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Volumen anual comprometido</p>
+						<p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Packs cotizados</p>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -178,7 +178,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 									<TableHead className="text-right">Lista USD</TableHead>
 									<TableHead className="text-right">Certs / u</TableHead>
 									<TableHead className="text-right">Firmas / u</TableHead>
-									<TableHead className="text-right">Cant. / año</TableHead>
+									<TableHead className="text-right">Cantidad</TableHead>
 									<TableHead className="text-right">Certs total</TableHead>
 									<TableHead className="text-right">Firmas total</TableHead>
 									<TableHead className="text-right">Facturación lista</TableHead>
@@ -270,8 +270,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			<div className="flex flex-wrap gap-3">
 				<StatCard label="Nivel asignado" value={tier.label} sub={"Por " + drivenBy} accent="primary" />
 				<StatCard label="Descuento" value={(tier.descuento * 100).toFixed(0) + "%"} sub="Sobre lista web" accent="primary" />
-				<StatCard label="Compromiso anual" value={hasVolume ? fMoney(calc.facturacionLista) : "—"} sub="Facturación a lista (derivada)" accent="muted" />
-				<StatCard label="Firmas / año" value={hasVolume ? calc.firmasTotal.toLocaleString("es-AR") : "—"} sub={calc.ilimitadasUsadas ? "Excl. ilimitados" : "Incluidas + adicionales"} accent="muted" />
+				<StatCard label="Volumen cotizado" value={hasVolume ? fMoney(calc.facturacionLista) : "—"} sub="Facturación a lista (derivada)" accent="muted" />
+				<StatCard label="Firmas totales" value={hasVolume ? calc.firmasTotal.toLocaleString("es-AR") : "—"} sub={calc.ilimitadasUsadas ? "Excl. ilimitados" : "Incluidas + adicionales"} accent="muted" />
 				<StatCard label="Ingreso neto Lakaut" value={hasVolume ? fMoney(netoLakaut) : "—"} sub={hasVolume ? "Cubre " + (coberturaPC * 100).toFixed(0) + "% del CF anual" : "Cargá volumen"} accent={hasVolume ? margAccent(margenPct) : "muted"} valueClass={hasVolume ? margClass(margenPct) : ""} />
 			</div>
 
@@ -279,7 +279,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 				<Card>
 					<CardContent>
 						<Table>
-							<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Anual</TableHead></TableRow></TableHeader>
+							<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Total cotizado</TableHead></TableRow></TableHeader>
 							<TableBody>
 								<TableRow><TableCell>Facturación a lista (compromiso)</TableCell><TableCell className="text-right tabular-nums">{fMoney(calc.facturacionLista)}</TableCell></TableRow>
 								<TableRow><TableCell>Descuento distribuidor ({(tier.descuento * 100).toFixed(0)}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(calc.facturacionLista - netoLakaut)}</TableCell></TableRow>
@@ -298,7 +298,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 				<CardContent>
 					<div className="mb-3 text-sm font-semibold">Matriz de niveles</div>
 					<Table>
-						<TableHeader><TableRow><TableHead>Nivel</TableHead><TableHead className="text-right">Certificados activos</TableHead><TableHead className="text-right">Descuento</TableHead><TableHead className="text-right">Compromiso anual USD</TableHead></TableRow></TableHeader>
+						<TableHeader><TableRow><TableHead>Nivel</TableHead><TableHead className="text-right">Certificados activos</TableHead><TableHead className="text-right">Descuento</TableHead><TableHead className="text-right">Volumen cotizado (USD)</TableHead></TableRow></TableHeader>
 						<TableBody>
 							{distributorTiers.map(function (t) {
 								const act = t.id === tier.id;
