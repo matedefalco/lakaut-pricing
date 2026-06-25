@@ -9,15 +9,15 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 const FIRMAS_INCL_REF = 1;
 
 const ALL_COLS = [
-	{ key: "precioIDC",   label: "Precio (USD/IDC)" },
-	{ key: "costoRef",    label: "Costo ref. (USD/IDC)" },
-	{ key: "cmRef",       label: "CM ref. (USD/IDC)" },
-	{ key: "margenRef",   label: "Margen ref. %" },
-	{ key: "costoReal",   label: "Costo (USD/IDC)" },
-	{ key: "cmReal",      label: "CM $" },
-	{ key: "cmRealPct",   label: "CM %" },
-	{ key: "margenReal",  label: "Margen $" },
+	{ key: "precioIDC",     label: "Precio (USD/IDC)" },
+	{ key: "costoReal",     label: "Costo CV (USD/IDC)" },
+	{ key: "cmReal",        label: "CM $" },
+	{ key: "cmRealPct",     label: "CM %" },
+	{ key: "margenReal",    label: "Margen $" },
 	{ key: "margenRealPct", label: "Margen %" },
+	{ key: "costoRef",      label: "Costo ref. (USD/IDC)" },
+	{ key: "cmRef",         label: "CM ref. (USD/IDC)" },
+	{ key: "margenRef",     label: "Margen ref. %" },
 ];
 
 const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "cmRealPct", "margenReal", "margenRealPct"]);
@@ -144,35 +144,39 @@ export function TabCanalB2B2CPrecios({ costs }) {
 							<div className="text-sm font-semibold">Pricing por segmento</div>
 							<p className="text-xs text-muted-foreground mt-0.5">
 								El segmento se asigna por volumen mensual de IDC.
-								Costo = cert USD {cvCert.toFixed(4)} + 1 firma USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)} / IDC.
-								Costo ref. doc: USD {costoIdcRef.toFixed(4)}.
+								CV/IDC = cert USD {cvCert.toFixed(4)} + 1 firma USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)}.
+								Margen incluye absorción de CF directo al volumen medio de cada segmento.
 							</p>
 						</div>
 						<ColFilterDropdown visible={visible} onToggle={toggleCol} />
 					</div>
+					<div className="overflow-x-auto">
 					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead>Segmento</TableHead>
 								<TableHead className="text-right">IDC / mes</TableHead>
-								{visible.has("precioIDC")  && <TableHead className="text-right">Precio (USD/IDC)</TableHead>}
-								{visible.has("costoRef")   && <TableHead className="text-right">Costo ref.</TableHead>}
-								{visible.has("cmRef")      && <TableHead className="text-right">CM ref. (USD)</TableHead>}
-								{visible.has("margenRef")  && <TableHead className="text-right">Margen ref. %</TableHead>}
-								{visible.has("costoReal")    && <TableHead className="text-right">Costo</TableHead>}
-								{visible.has("cmReal")       && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal absoluta = Precio − Costo variable por IDC." /></TableHead>}
-								{visible.has("cmRealPct")    && <TableHead className="text-right">CM %<InfoTooltip text="Markup sobre costo = (Precio − Costo) / Costo × 100. Qué tan por encima del costo está el precio." /></TableHead>}
-								{visible.has("margenReal")   && <TableHead className="text-right">Margen $<InfoTooltip text="Igual que CM $: Precio − Costo variable por IDC. Misma magnitud, etiqueta de margen." /></TableHead>}
-								{visible.has("margenRealPct") && <TableHead className="text-right">Margen %<InfoTooltip text="Margen sobre precio = (Precio − Costo) / Precio × 100. Fracción del precio que queda como contribución." /></TableHead>}
+								{visible.has("precioIDC")     && <TableHead className="text-right">Precio (USD/IDC)</TableHead>}
+								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text="Costo variable por IDC = cert + 1 firma. Sin costos fijos." /></TableHead>}
+								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV. Ganancia antes de cubrir costos fijos." /></TableHead>}
+								{visible.has("cmRealPct")     && <TableHead className="text-right">CM %<InfoTooltip text="CM como porcentaje del precio = CM / Precio × 100." /></TableHead>}
+								{visible.has("margenReal")    && <TableHead className="text-right">Margen $<InfoTooltip text="Margen neto por IDC = Precio − CV − (CF directo ÷ IDC/mes del punto medio del segmento)." /></TableHead>}
+								{visible.has("margenRealPct") && <TableHead className="text-right">Margen %<InfoTooltip text="Margen neto como porcentaje del precio. Incluye la absorción de costos fijos al volumen medio del segmento." /></TableHead>}
+								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.</TableHead>}
+								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.</TableHead>}
+								{visible.has("margenRef")     && <TableHead className="text-right">Margen ref. %</TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
-								const cmRefVal      = s.precioIDC - costoIdcRef;
-								const cmRealVal     = s.precioIDC - costoRealIDC;
-								const mRefPct       = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
-								const mRealPct      = s.precioIDC > 0 ? cmRealVal / s.precioIDC : 0;
-								const cmRealMarkup  = costoRealIDC > 0 ? cmRealVal / costoRealIDC : 0;
+								const idcMid    = s.idcMax == null ? s.idcMin * 1.5 : (s.idcMin + s.idcMax) / 2;
+								const cfPerIDC  = idcMid > 0 ? (costs?.cfDirecto ?? 0) / idcMid : 0;
+								const cmVal     = s.precioIDC - costoRealIDC;
+								const cmPct     = s.precioIDC > 0 ? cmVal / s.precioIDC : 0;
+								const margenVal = cmVal - cfPerIDC;
+								const margenPct = s.precioIDC > 0 ? margenVal / s.precioIDC : 0;
+								const cmRefVal  = s.precioIDC - costoIdcRef;
+								const mRefPct   = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
 								return (
 									<TableRow key={s.id}>
 										<TableCell className="font-semibold">{s.label}</TableCell>
@@ -181,21 +185,22 @@ export function TabCanalB2B2CPrecios({ costs }) {
 											{s.idcMax == null ? "+" : " – " + s.idcMax.toLocaleString("es-AR")}
 										</TableCell>
 										{visible.has("precioIDC")     && <TableCell className="text-right tabular-nums font-semibold">{fUSD(s.precioIDC)}</TableCell>}
+										{visible.has("costoReal")     && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
+										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fUSD(cmVal)}</TableCell>}
+										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fPct(cmPct)}</TableCell>}
+										{visible.has("margenReal")    && <TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fUSD(margenVal)}</TableCell>}
+										{visible.has("margenRealPct") && <TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fPct(margenPct)}</TableCell>}
 										{visible.has("costoRef")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoIdcRef)}</TableCell>}
 										{visible.has("cmRef")         && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
 										{visible.has("margenRef")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(s.margenRef)}>{fPct(s.margenRef)}</TableCell>}
-										{visible.has("costoReal")     && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
-										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fUSD(cmRealVal)}</TableCell>}
-										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmRealMarkup)}>{fPct(cmRealMarkup)}</TableCell>}
-										{visible.has("margenReal")    && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fUSD(cmRealVal)}</TableCell>}
-										{visible.has("margenRealPct") && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRealPct)}>{fPct(mRealPct)}</TableCell>}
 									</TableRow>
 								);
 							})}
 						</TableBody>
 					</Table>
+					</div>
 					<p className="text-[11px] text-muted-foreground mt-2">
-						"Costo ref." y "Margen ref." provienen del Borrador v5. "Costo" y "CM" usan los costos variables actuales del motor (1 cert + 1 firma por IDC).
+						CM = Precio − CV (sin CF). Margen = CM − CF directo ÷ IDC/mes del punto medio del segmento. Columnas "ref." provienen del Borrador v5.
 					</p>
 				</CardContent>
 			</Card>
