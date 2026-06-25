@@ -4,17 +4,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-// Firmas incluidas por IDC usadas como referencia en esta tabla (misma default que la Cotizadora)
-const FIRMAS_INCL_REF = 4;
+// 1 IDC = 1 cert + 1 firma
+const FIRMAS_INCL_REF = 1;
 
 const ALL_COLS = [
 	{ key: "precioIDC",   label: "Precio (USD/IDC)" },
 	{ key: "costoRef",    label: "Costo ref. (USD/IDC)" },
 	{ key: "cmRef",       label: "CM ref. (USD/IDC)" },
 	{ key: "margenRef",   label: "Margen ref. %" },
-	{ key: "costoReal",   label: "Costo real (USD/IDC)" },
-	{ key: "cmReal",      label: "CM real (USD/IDC)" },
-	{ key: "margenReal",  label: "Margen real %" },
+	{ key: "costoReal",   label: "Costo (USD/IDC)" },
+	{ key: "cmReal",      label: "CM (USD/IDC)" },
+	{ key: "margenReal",  label: "Margen %" },
 ];
 
 const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "margenReal"]);
@@ -141,7 +141,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 							<div className="text-sm font-semibold">Pricing por segmento</div>
 							<p className="text-xs text-muted-foreground mt-0.5">
 								El segmento se asigna por volumen mensual de IDC.
-								Costo real = cert USD {cvCert.toFixed(4)} + {FIRMAS_INCL_REF} firmas × USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)} / IDC.
+								Costo = cert USD {cvCert.toFixed(4)} + 1 firma USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)} / IDC.
 								Costo ref. doc: USD {costoIdcRef.toFixed(4)}.
 							</p>
 						</div>
@@ -156,9 +156,9 @@ export function TabCanalB2B2CPrecios({ costs }) {
 								{visible.has("costoRef")   && <TableHead className="text-right">Costo ref.</TableHead>}
 								{visible.has("cmRef")      && <TableHead className="text-right">CM ref. (USD)</TableHead>}
 								{visible.has("margenRef")  && <TableHead className="text-right">Margen ref. %</TableHead>}
-								{visible.has("costoReal")  && <TableHead className="text-right">Costo real</TableHead>}
-								{visible.has("cmReal")     && <TableHead className="text-right">CM real (USD)</TableHead>}
-								{visible.has("margenReal") && <TableHead className="text-right">Margen real %</TableHead>}
+								{visible.has("costoReal")  && <TableHead className="text-right">Costo</TableHead>}
+								{visible.has("cmReal")     && <TableHead className="text-right">CM (USD)</TableHead>}
+								{visible.has("margenReal") && <TableHead className="text-right">Margen %</TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -187,7 +187,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 						</TableBody>
 					</Table>
 					<p className="text-[11px] text-muted-foreground mt-2">
-						"Costo ref." y "Margen ref." provienen del Borrador v5. "Costo real" y "CM real" usan los costos variables actuales del motor ({FIRMAS_INCL_REF} firmas incluidas por IDC por defecto).
+						"Costo ref." y "Margen ref." provienen del Borrador v5. "Costo" y "CM" usan los costos variables actuales del motor (1 cert + 1 firma por IDC).
 					</p>
 				</CardContent>
 			</Card>
