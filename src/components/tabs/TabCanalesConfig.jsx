@@ -152,7 +152,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
 						<thead>
 							<tr>
-								{["IDC mín.", "IDC máx.", "Precio IDC (USD)", "Margen ref. %"].map(function (h) {
+								{["IDC mín.", "IDC máx.", "Precio IDC (USD)"].map(function (h) {
 									return <th key={h} style={thR}>{h}</th>;
 								})}
 							</tr>
@@ -170,7 +170,6 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={Math.round((seg.margenRef || 0) * 100)} decimals={0} onChange={function (v) { upd("margenRef", (v || 0) / 100); }} /></td>
 									</tr>
 								);
 							})}

@@ -13,14 +13,12 @@ const ALL_COLS = [
 	{ key: "costoReal",     label: "Costo CV (USD/IDC)" },
 	{ key: "cmReal",        label: "CM $" },
 	{ key: "cmRealPct",     label: "CM %" },
-	{ key: "margenReal",    label: "Margen $" },
-	{ key: "margenRealPct", label: "Margen %" },
+	{ key: "beReal",        label: "BE (IDC)" },
 	{ key: "costoRef",      label: "Costo ref. (USD/IDC)" },
 	{ key: "cmRef",         label: "CM ref. (USD/IDC)" },
-	{ key: "margenRef",     label: "Margen ref. %" },
 ];
 
-const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "cmRealPct", "margenReal", "margenRealPct"]);
+const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "cmRealPct", "beReal"]);
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -160,21 +158,16 @@ export function TabCanalB2B2CPrecios({ costs }) {
 								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text="Costo variable por IDC = cert + 1 firma. Sin costos fijos." /></TableHead>}
 								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV. Ganancia antes de cubrir costos fijos." /></TableHead>}
 								{visible.has("cmRealPct")     && <TableHead className="text-right">CM %<InfoTooltip text="CM como porcentaje del precio = CM / Precio × 100." /></TableHead>}
-								{visible.has("margenReal")    && <TableHead className="text-right">Margen $<InfoTooltip text="Margen neto por IDC = Precio − CV − (CF directo ÷ IDC/mes del punto medio del segmento)." /></TableHead>}
-								{visible.has("margenRealPct") && <TableHead className="text-right">Margen %<InfoTooltip text="Margen neto como porcentaje del precio. Incluye la absorción de costos fijos al volumen medio del segmento." /></TableHead>}
+								{visible.has("beReal")        && <TableHead className="text-right">BE (IDC)<InfoTooltip text="Break-even: IDC necesarios para cubrir el CF directo mensual al precio de este segmento. BE = CF / CM por IDC." /></TableHead>}
 								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.</TableHead>}
 								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.</TableHead>}
-								{visible.has("margenRef")     && <TableHead className="text-right">Margen ref. %</TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
-								const idcMid    = s.idcMax == null ? s.idcMin * 1.5 : (s.idcMin + s.idcMax) / 2;
-								const cfPerIDC  = idcMid > 0 ? (costs?.cfDirecto ?? 0) / idcMid : 0;
 								const cmVal     = s.precioIDC - costoRealIDC;
 								const cmPct     = s.precioIDC > 0 ? cmVal / s.precioIDC : 0;
-								const margenVal = cmVal - cfPerIDC;
-								const margenPct = s.precioIDC > 0 ? margenVal / s.precioIDC : 0;
+								const beVal     = cmVal > 0 ? Math.ceil((costs?.cfDirecto ?? 0) / cmVal) : null;
 								const cmRefVal  = s.precioIDC - costoIdcRef;
 								const mRefPct   = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
 								return (
@@ -188,11 +181,9 @@ export function TabCanalB2B2CPrecios({ costs }) {
 										{visible.has("costoReal")     && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
 										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fUSD(cmVal)}</TableCell>}
 										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fPct(cmPct)}</TableCell>}
-										{visible.has("margenReal")    && <TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fUSD(margenVal)}</TableCell>}
-										{visible.has("margenRealPct") && <TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fPct(margenPct)}</TableCell>}
+										{visible.has("beReal")        && <TableCell className="text-right tabular-nums font-semibold">{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</TableCell>}
 										{visible.has("costoRef")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoIdcRef)}</TableCell>}
 										{visible.has("cmRef")         && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
-										{visible.has("margenRef")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(s.margenRef)}>{fPct(s.margenRef)}</TableCell>}
 									</TableRow>
 								);
 							})}
@@ -200,7 +191,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 					</Table>
 					</div>
 					<p className="text-[11px] text-muted-foreground mt-2">
-						CM = Precio − CV (sin CF). Margen = CM − CF directo ÷ IDC/mes del punto medio del segmento. Columnas "ref." provienen del Borrador v5.
+						CM = Precio − CV (sin CF). BE = CF directo ÷ CM por IDC — IDC mínimos para cubrir costos fijos al precio de cada segmento. Columnas "ref." provienen del Borrador v5.
 					</p>
 				</CardContent>
 			</Card>
