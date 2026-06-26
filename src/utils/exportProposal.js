@@ -278,9 +278,24 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 
       <!-- big price -->
       <div style="border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;margin-top:auto;">
+        ${inp.abono && res.abonoMes ? `
+        <div style="font-size:7.5pt;color:${BLT};font-weight:600;margin-bottom:0.1cm;">Mes 1 · compra inicial</div>
+        <div style="font-size:22pt;font-weight:800;color:${W};line-height:1;margin-bottom:0.3cm;">${fm(neto, currency, tc)}</div>
+        <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.15cm 0;"></div>
+        <div style="font-size:7.5pt;color:${BLT};font-weight:600;margin-bottom:0.1cm;">Mes 2 en adelante · abono mensual</div>
+        <div style="font-size:22pt;font-weight:800;color:${W};line-height:1;">${fm(res.abonoMes, currency, tc)}<span style="font-size:9pt;font-weight:500;">/mes</span></div>
+        ` : `
         <div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">Precio neto a pagar</div>
         <div style="font-size:26pt;font-weight:800;color:${W};line-height:1;">${fm(neto, currency, tc)}</div>
+        `}
       </div>
+
+      ${inp.abono && res.abonoMes ? `
+      <div style="margin-top:0.3cm;padding:0.2cm 0.3cm;background:rgba(255,255,255,0.1);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:7pt;color:rgba(255,255,255,0.65);">Facturación año 1</span>
+        <span style="font-size:8.5pt;font-weight:700;color:${W};">${fm(res.facturacionAnio1, currency, tc)}</span>
+      </div>
+      ` : ""}
 
       <div style="margin-top:0.4cm;padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
     </div>

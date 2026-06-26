@@ -44,6 +44,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
+	const DESCUENTO_ABONO = 0.35;
+
 	const [selectedClient, setSelectedClient] = useState(null);
 	const [certsActivos, setCertsActivos] = useState(0);
 	const [qtys, setQtys] = useState({});
@@ -51,6 +53,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
+	const [abono, setAbono] = useState(false);
 
 	// Auto-fill certsActivos from sum of past deals for this client
 	useEffect(function () {
@@ -68,6 +71,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
 		setCasosDeUso(i.casosDeUso || "");
+		setAbono(i.abono || false);
 		setEditingId(pendingEdit.id);
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
@@ -95,6 +99,16 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas, precioFirmaAdic };
 	}, [models, qtys, firmasAdic]);
 
+	// Abono mensual: repone bolsa de firmas del pack cotizado a precio lista × 65%
+	const abonoMes = useMemo(function () {
+		return models.reduce(function (sum, p) {
+			const q = Number(qtys[p.id]) || 0;
+			if (q <= 0 || !p.priceUSD) return sum;
+			return sum + q * p.priceUSD * (1 - DESCUENTO_ABONO);
+		}, 0);
+	}, [models, qtys]);
+	const abonoAnual = abonoMes * 12;
+
 	const tier = getDistributorTierLocal(calc.certsTotal, calc.facturacionLista, distributorTiers);
 	const tierByCertsOnly = getDistributorTierLocal(calc.certsTotal, 0, distributorTiers);
 	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "volumen cotizado" : (calc.certsTotal > 0 ? "certs cotizados" : "sin volumen");
@@ -103,6 +117,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const cvTotal = calc.certsTotal * cvCert + calc.firmasTotal * cvFirma;
 	const margenLakaut = netoLakaut - cvTotal;
 	const margenPct = netoLakaut > 0 ? margenLakaut / netoLakaut : 0;
+	// Año 1: mes 1 (neto con descuento tier) + meses 2–12 (abono × 11)
+	const facturacionAnio1 = netoLakaut + abonoMes * 11;
 	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || (Number(firmasAdic) || 0) > 0;
 
 	async function saveQuote() {
@@ -120,8 +136,10 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			channel: "distribuidores",
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
-			inputs: { certsActivos, qtys, firmasAdic, casosDeUso },
-			resumen: { tier: tier.label, certsActivos: calc.certsTotal, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct },
+			inputs: { certsActivos, qtys, firmasAdic, casosDeUso, abono },
+			resumen: { tier: tier.label, certsActivos: calc.certsTotal, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct,
+				...(abono && abonoMes > 0 ? { abonoMes, abonoAnual, facturacionAnio1 } : {}),
+			},
 		}, client?.id || null);
 
 		setEditingId(null);
@@ -240,6 +258,38 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 					<Separator />
 
+					{/* Abono mensual */}
+					<div className="flex flex-col gap-3">
+						<label className="flex items-center gap-2.5 cursor-pointer select-none">
+							<input
+								type="checkbox"
+								checked={abono}
+								onChange={function (e) { setAbono(e.target.checked); }}
+								className="rounded"
+							/>
+							<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
+							{abono && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
+						</label>
+						{abono && abonoMes > 0 && (
+							<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1.5">
+								<p>Precio de lista × {((1 - DESCUENTO_ABONO) * 100).toFixed(0)}% ({(DESCUENTO_ABONO * 100).toFixed(0)}% de descuento). El pack se abona completo cada mes.</p>
+								<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+									<span className="text-muted-foreground">Mes 1 (compra inicial)</span>
+									<span className="font-semibold text-foreground">{fMoney(netoLakaut)} <span className="font-normal text-muted-foreground">· descuento {(tier.descuento * 100).toFixed(0)}% tier</span></span>
+									<span className="text-muted-foreground">Mes 2 en adelante</span>
+									<span className="font-semibold text-foreground">{fMoney(abonoMes)}/mes <span className="font-normal text-muted-foreground">· {fMoney(abonoAnual)}/año</span></span>
+									<span className="text-muted-foreground">Facturación año 1</span>
+									<span className="font-semibold text-foreground">{fMoney(facturacionAnio1)} <span className="font-normal text-muted-foreground">(mes 1 + abono × 11)</span></span>
+								</div>
+							</div>
+						)}
+						{abono && abonoMes === 0 && (
+							<p className="pl-6 text-xs text-muted-foreground">Cargá packs con firmas finitas para calcular el abono.</p>
+						)}
+					</div>
+
+					<Separator />
+
 					{/* Footer: nivel derivado + acción */}
 					<div className="flex items-center justify-between gap-4">
 						{hasVolume ? (
@@ -272,7 +322,16 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 				<StatCard label="Descuento" value={(tier.descuento * 100).toFixed(0) + "%"} sub="Sobre lista web" accent="primary" />
 				<StatCard label="Volumen cotizado" value={hasVolume ? fMoney(calc.facturacionLista) : "—"} sub="Facturación a lista (derivada)" accent="muted" />
 				<StatCard label="Firmas totales" value={hasVolume ? calc.firmasTotal.toLocaleString("es-AR") : "—"} sub={calc.ilimitadasUsadas ? "Excl. ilimitados" : "Incluidas + adicionales"} accent="muted" />
-				<StatCard label="Ingreso neto Lakaut" value={hasVolume ? fMoney(netoLakaut) : "—"} sub={hasVolume ? "Cubre " + (coberturaPC * 100).toFixed(0) + "% del CF anual" : "Cargá volumen"} accent={hasVolume ? margAccent(margenPct) : "muted"} valueClass={hasVolume ? margClass(margenPct) : ""} />
+				{!(abono && abonoMes > 0) && (
+					<StatCard label="Ingreso neto Lakaut" value={hasVolume ? fMoney(netoLakaut) : "—"} sub={hasVolume ? "Cubre " + (coberturaPC * 100).toFixed(0) + "% del CF anual" : "Cargá volumen"} accent={hasVolume ? margAccent(margenPct) : "muted"} valueClass={hasVolume ? margClass(margenPct) : ""} />
+				)}
+				{abono && abonoMes > 0 && (
+					<>
+						<StatCard label="Mes 1" value={fMoney(netoLakaut)} sub={"Compra inicial · descuento " + (tier.descuento * 100).toFixed(0) + "% tier"} accent="primary" />
+						<StatCard label="Mes 2 en adelante" value={fMoney(abonoMes) + "/mes"} sub={"Precio lista × " + ((1 - DESCUENTO_ABONO) * 100).toFixed(0) + "% · " + fMoney(abonoAnual) + "/año"} accent="success" />
+						<StatCard label="Facturación año 1" value={fMoney(facturacionAnio1)} sub="Mes 1 + abono × 11" accent="success" />
+					</>
+				)}
 			</div>
 
 			{hasVolume && (
