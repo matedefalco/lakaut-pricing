@@ -376,18 +376,35 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 				<CardContent>
 					<div className="mb-3 text-sm font-semibold">Pricing por segmento (Borrador v5)</div>
 					<Table>
-						<TableHeader><TableRow><TableHead>Segmento</TableHead><TableHead className="text-right">IDC</TableHead><TableHead className="text-right">Precio (USD/IDC)</TableHead><TableHead className="text-right">C. Marginal ref.</TableHead><TableHead className="text-right">C. Marginal real (costo USD {costoIDC.toFixed(4)})</TableHead></TableRow></TableHeader>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Segmento</TableHead>
+								<TableHead className="text-right">IDC</TableHead>
+								<TableHead className="text-right">Precio (USD/IDC)</TableHead>
+								<TableHead className="text-right">CM $</TableHead>
+								<TableHead className="text-right">CM %</TableHead>
+								<TableHead className="text-right">Margen $</TableHead>
+								<TableHead className="text-right">Margen %</TableHead>
+							</TableRow>
+						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
 								const act = s.id === seg.id;
-								const mReal = s.precioIDC > 0 ? (s.precioIDC - costoIDC) / s.precioIDC : 0;
+								const idcMid = s.idcMax == null ? s.idcMin * 1.5 : (s.idcMin + s.idcMax) / 2;
+								const cfPerIDC = idcMid > 0 ? (costs.cfDirecto || 0) / idcMid : 0;
+								const cmVal = s.precioIDC - costoIDC;
+								const cmPct = s.precioIDC > 0 ? cmVal / s.precioIDC : 0;
+								const margenVal = cmVal - cfPerIDC;
+								const margenPct = s.precioIDC > 0 ? margenVal / s.precioIDC : 0;
 								return (
 									<TableRow key={s.id} className={act ? "bg-accent" : ""}>
 										<TableCell className="font-semibold">{s.label}{act && <Badge className="ml-2">actual</Badge>}</TableCell>
-										<TableCell className="text-right tabular-nums">{s.idcMin.toLocaleString("es-AR")}–{s.idcMax == null ? "+" : s.idcMax.toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground">{s.idcMin.toLocaleString("es-AR")}–{s.idcMax == null ? "+" : s.idcMax.toLocaleString("es-AR")}</TableCell>
 										<TableCell className="text-right tabular-nums font-semibold">{"USD " + s.precioIDC.toFixed(2)}</TableCell>
-										<TableCell className="text-right tabular-nums">{(s.margenRef * 100).toFixed(0)}%</TableCell>
-										<TableCell className={"text-right tabular-nums font-semibold " + margClass(mReal)}>{(mReal * 100).toFixed(0)}%</TableCell>
+										<TableCell className={"text-right tabular-nums " + margClass(cmPct)}>{"USD " + cmVal.toFixed(2)}</TableCell>
+										<TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{(cmPct * 100).toFixed(0)}%</TableCell>
+										<TableCell className={"text-right tabular-nums " + margClass(margenPct)}>{"USD " + margenVal.toFixed(2)}</TableCell>
+										<TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{(margenPct * 100).toFixed(0)}%</TableCell>
 									</TableRow>
 								);
 							})}
@@ -395,7 +412,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasTotales.toLocaleString("es-AR")}. El ratio es configurable, no fijo. "C. Marginal real" recalcula con costo cotizadora: cert USD {effCvCert.toFixed(4)} + {incl} firmas × USD {effCvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Referencia doc (USD {costoIdcRef.toFixed(4)}).{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && " ⚠ Precios personalizados activos en esta cotización."}</p>
+			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasTotales.toLocaleString("es-AR")}. CV/IDC = cert USD {effCvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {effCvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. CM = Precio − CV. Margen = CM − CF directo ÷ IDC/mes del punto medio del segmento.{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && " ⚠ Precios personalizados activos en esta cotización."}</p>
 		</div>
 	);
 }
