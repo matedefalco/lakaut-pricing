@@ -43,9 +43,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 	const [showOverrides, setShowOverrides] = useState(false);
+	const [overrideMode, setOverrideMode] = useState(null); // null | "bundle" | "componente" | "margen"
 	const [overridePrecioIDC, setOverridePrecioIDC] = useState("");
-	const [overrideCvCert, setOverrideCvCert] = useState("");
-	const [overrideCvFirma, setOverrideCvFirma] = useState("");
+	const [overridePrecioCert, setOverridePrecioCert] = useState("");
+	const [overridePrecioFirma, setOverridePrecioFirma] = useState("");
+	const [overrideMargenPct, setOverrideMargenPct] = useState("");
 	const [abono, setAbono] = useState(false);
 
 	const DESCUENTO_ABONO = 0.35;
@@ -67,9 +69,22 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 		setPrecioFirmaAdic(i.precioFirmaAdic != null ? i.precioFirmaAdic : 0.5);
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
-		if (i.overridePrecioIDC != null) { setOverridePrecioIDC(String(i.overridePrecioIDC)); setShowOverrides(true); } else { setOverridePrecioIDC(""); }
-		if (i.overrideCvCert != null) { setOverrideCvCert(String(i.overrideCvCert)); setShowOverrides(true); } else { setOverrideCvCert(""); }
-		if (i.overrideCvFirma != null) { setOverrideCvFirma(String(i.overrideCvFirma)); setShowOverrides(true); } else { setOverrideCvFirma(""); }
+		// Load override mode (new format)
+		if (i.overrideMode) {
+			setOverrideMode(i.overrideMode);
+			setShowOverrides(true);
+			if (i.overrideMode === "bundle") { setOverridePrecioIDC(i.overridePrecioIDC != null ? String(i.overridePrecioIDC) : ""); }
+			if (i.overrideMode === "componente") { setOverridePrecioCert(i.overridePrecioCert != null ? String(i.overridePrecioCert) : ""); setOverridePrecioFirma(i.overridePrecioFirma != null ? String(i.overridePrecioFirma) : ""); }
+			if (i.overrideMode === "margen") { setOverrideMargenPct(i.overrideMargenPct != null ? String(i.overrideMargenPct) : ""); }
+		} else if (i.overridePrecioIDC != null) {
+			// Backward compat: old quotes saved with only overridePrecioIDC
+			setOverrideMode("bundle");
+			setOverridePrecioIDC(String(i.overridePrecioIDC));
+			setShowOverrides(true);
+		} else {
+			setOverrideMode(null);
+			setOverridePrecioIDC(""); setOverridePrecioCert(""); setOverridePrecioFirma(""); setOverrideMargenPct("");
+		}
 		setEditingId(pendingEdit.id);
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
@@ -78,11 +93,24 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const adic = Number(firmasAdicPorIDC) || 0;
 	const firmasPorIDC = incl + adic;
 
-	const effCvCert = overrideCvCert !== "" ? (Number(overrideCvCert) || 0) : cvCert;
-	const effCvFirma = overrideCvFirma !== "" ? (Number(overrideCvFirma) || 0) : cvFirma;
-	const effPrecioIDC = overridePrecioIDC !== "" ? (Number(overridePrecioIDC) || 0) : seg.precioIDC;
+	// Costs always from global config — no per-quote overrides
+	const costoIDC = cvCert + incl * cvFirma;
 
-	const costoIDC = effCvCert + incl * effCvFirma;
+	// Effective price per IDC depends on active override mode
+	let effPrecioIDC;
+	if (overrideMode === "bundle" && overridePrecioIDC !== "") {
+		effPrecioIDC = Number(overridePrecioIDC) || 0;
+	} else if (overrideMode === "componente") {
+		const pc = overridePrecioCert !== "" ? (Number(overridePrecioCert) || 0) : cvCert;
+		const pf = overridePrecioFirma !== "" ? (Number(overridePrecioFirma) || 0) : cvFirma;
+		effPrecioIDC = pc + incl * pf;
+	} else if (overrideMode === "margen" && overrideMargenPct !== "") {
+		const m = (Number(overrideMargenPct) || 0) / 100;
+		effPrecioIDC = m < 1 && m > 0 ? costoIDC / (1 - m) : costoIDC;
+	} else {
+		effPrecioIDC = seg.precioIDC;
+	}
+
 	const precioIDC = effPrecioIDC;
 	const margenIDC = precioIDC - costoIDC;
 	const margenPctIDC = precioIDC > 0 ? margenIDC / precioIDC : 0;
@@ -93,8 +121,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 
 	const revIDC = idcMensuales * precioIDC;
 	const revFirmasAdic = firmasAdicTotal * (Number(precioFirmaAdic) || 0);
-	const costoCert = idcMensuales * effCvCert;
-	const costoFirmas = firmasTotales * effCvFirma;
+	const costoCert = idcMensuales * cvCert;
+	const costoFirmas = firmasTotales * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
 	const slaMes = slaBonificado ? 0 : (sla.precioMes || 0);
 	const revSinFee = revIDC + revFirmasAdic + slaMes;
@@ -125,9 +153,15 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			inputs: {
 				idcMensuales, fee, slaId, slaBonificado,
 				firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic, casosDeUso, abono,
-				...(overridePrecioIDC !== "" ? { overridePrecioIDC: Number(overridePrecioIDC) } : {}),
-				...(overrideCvCert !== "" ? { overrideCvCert: Number(overrideCvCert) } : {}),
-				...(overrideCvFirma !== "" ? { overrideCvFirma: Number(overrideCvFirma) } : {}),
+				...(overrideMode ? {
+					overrideMode,
+					...(overrideMode === "bundle" && overridePrecioIDC !== "" ? { overridePrecioIDC: Number(overridePrecioIDC) } : {}),
+					...(overrideMode === "componente" ? {
+						...(overridePrecioCert !== "" ? { overridePrecioCert: Number(overridePrecioCert) } : {}),
+						...(overridePrecioFirma !== "" ? { overridePrecioFirma: Number(overridePrecioFirma) } : {}),
+					} : {}),
+					...(overrideMode === "margen" && overrideMargenPct !== "" ? { overrideMargenPct: Number(overrideMargenPct) } : {}),
+				} : {}),
 			},
 			resumen: {
 				segmento: seg.label, idcMensuales, firmasTotales, precioIDC,
@@ -224,34 +258,88 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					<div className="flex flex-col gap-2">
 						<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-2 text-sm font-medium border border-dashed border-border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors w-full text-left">
 							<span>Ajuste de precios personalizado</span>
-							<span className="text-xs text-muted-foreground">(precio IDC, costo cert, costo firma)</span>
 							<span className="ml-auto text-muted-foreground text-xs">{showOverrides ? "▲ ocultar" : "▼ mostrar"}</span>
-							{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
+							{overrideMode && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
 						</button>
 						{showOverrides && (
-							<div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pl-1 border-l-2 border-muted ml-1">
-								<div className="flex flex-col gap-1.5">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio IDC <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-									<div className="flex items-center gap-1.5">
-										<Input type="number" value={overridePrecioIDC} onChange={function (e) { setOverridePrecioIDC(e.target.value); }} placeholder={"Tabla: " + seg.precioIDC} className="h-8 text-sm" />
-										{overridePrecioIDC !== "" && <button onClick={function () { setOverridePrecioIDC(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-									</div>
+							<div className="pl-1 border-l-2 border-muted ml-1 space-y-3">
+								{/* Selector de modo */}
+								<div className="flex gap-1 flex-wrap">
+									{[
+										{ id: null, label: "Sin ajuste" },
+										{ id: "bundle", label: "Precio bundle" },
+										{ id: "componente", label: "Por componente" },
+										{ id: "margen", label: "Margen objetivo" },
+									].map(function (m) {
+										const active = overrideMode === m.id;
+										return (
+											<button
+												key={m.id ?? "none"}
+												onClick={function () { setOverrideMode(m.id); }}
+												className={"px-2.5 py-1 rounded-md text-xs transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
+											>
+												{m.label}
+											</button>
+										);
+									})}
 								</div>
-								<div className="flex flex-col gap-1.5">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo certificado <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-									<div className="flex items-center gap-1.5">
-										<Input type="number" value={overrideCvCert} onChange={function (e) { setOverrideCvCert(e.target.value); }} placeholder={"Base: " + cvCert.toFixed(4)} className="h-8 text-sm" />
-										{overrideCvCert !== "" && <button onClick={function () { setOverrideCvCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+
+								{/* Modo: Precio bundle */}
+								{overrideMode === "bundle" && (
+									<div className="flex flex-col gap-1.5 max-w-xs">
+										<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio IDC <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+										<div className="flex items-center gap-1.5">
+											<Input type="number" value={overridePrecioIDC} onChange={function (e) { setOverridePrecioIDC(e.target.value); }} placeholder={"Tabla: " + seg.precioIDC} className="h-8 text-sm" />
+											{overridePrecioIDC !== "" && <button onClick={function () { setOverridePrecioIDC(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+										</div>
+										<p className="text-[10px] text-muted-foreground">Reemplaza el precio de tabla para esta cotización.</p>
 									</div>
-								</div>
-								<div className="flex flex-col gap-1.5">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-									<div className="flex items-center gap-1.5">
-										<Input type="number" value={overrideCvFirma} onChange={function (e) { setOverrideCvFirma(e.target.value); }} placeholder={"Base: " + cvFirma.toFixed(4)} className="h-8 text-sm" />
-										{overrideCvFirma !== "" && <button onClick={function () { setOverrideCvFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+								)}
+
+								{/* Modo: Por componente */}
+								{overrideMode === "componente" && (
+									<div className="space-y-2">
+										<div className="grid grid-cols-2 gap-3 max-w-sm">
+											<div className="flex flex-col gap-1.5">
+												<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+												<div className="flex items-center gap-1">
+													<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={cvCert.toFixed(4)} className="h-8 text-sm" />
+													{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+												</div>
+											</div>
+											<div className="flex flex-col gap-1.5">
+												<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma incl. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+												<div className="flex items-center gap-1">
+													<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={cvFirma.toFixed(4)} className="h-8 text-sm" />
+													{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+												</div>
+											</div>
+										</div>
+										<p className="text-[10px] text-muted-foreground">
+											Precio IDC resultante = cert + {incl} firma{incl !== 1 ? "s" : ""} = <span className="font-semibold text-foreground">USD {effPrecioIDC.toFixed(4)}</span>
+										</p>
 									</div>
-								</div>
-								<p className="text-[10px] text-muted-foreground col-span-full">Dejá en blanco para usar los valores globales. Los cambios aplican solo a esta cotización.</p>
+								)}
+
+								{/* Modo: Margen objetivo */}
+								{overrideMode === "margen" && (
+									<div className="flex flex-col gap-1.5 max-w-xs">
+										<Label className="text-xs text-muted-foreground uppercase tracking-wide">Margen objetivo <span className="normal-case tracking-normal font-normal">(%)</span></Label>
+										<div className="flex items-center gap-1.5">
+											<Input type="number" value={overrideMargenPct} onChange={function (e) { setOverrideMargenPct(e.target.value); }} placeholder="Ej: 75" min="0" max="99" className="h-8 text-sm" />
+											{overrideMargenPct !== "" && <button onClick={function () { setOverrideMargenPct(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+										</div>
+										{overrideMargenPct !== "" && (
+											<p className="text-[10px] text-muted-foreground">
+												Precio IDC = costo / (1 − {overrideMargenPct}%) = <span className="font-semibold text-foreground">USD {effPrecioIDC.toFixed(4)}</span>
+											</p>
+										)}
+									</div>
+								)}
+
+								{!overrideMode && (
+									<p className="text-[10px] text-muted-foreground">Seleccioná un modo para aplicar un ajuste de precio a esta cotización.</p>
+								)}
 							</div>
 						)}
 					</div>
@@ -407,7 +495,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 					</Table>
 				</CardContent>
 			</Card>
-			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasTotales.toLocaleString("es-AR")}. CV/IDC = cert USD {effCvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {effCvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. CM = Precio − CV (sin CF). BE = CF directo ÷ CM por IDC — IDC mínimos para cubrir costos fijos al precio de cada segmento.{(overridePrecioIDC !== "" || overrideCvCert !== "" || overrideCvFirma !== "") && " ⚠ Precios personalizados activos en esta cotización."}</p>
+			<p className="text-[11px] text-muted-foreground">Firmas totales = IDC × (incluidas + adicionales) = {idcMensuales.toLocaleString("es-AR")} × {firmasPorIDC} = {firmasTotales.toLocaleString("es-AR")}. CV/IDC = cert USD {cvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. CM = Precio − CV (sin CF). BE = CF directo ÷ CM por IDC — IDC mínimos para cubrir costos fijos al precio de cada segmento.{overrideMode && " ⚠ Precio personalizado activo en esta cotización (" + overrideMode + ")."}</p>
 		</div>
 	);
 }
