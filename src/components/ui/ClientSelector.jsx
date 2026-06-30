@@ -20,7 +20,6 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 	}, []);
 
 	const filtered = clients
-		.filter(function (c) { return c.channel === channel; })
 		.filter(function (c) { return !query || c.name.toLowerCase().includes(query.toLowerCase()); });
 
 	function select(client) {
