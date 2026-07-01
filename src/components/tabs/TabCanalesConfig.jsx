@@ -35,6 +35,56 @@ const thR = Object.assign({}, thStyle, { textAlign: "right" });
 
 const ZEBRA = "#f8f9fa";
 
+function genId(prefix) {
+	return prefix + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+function AddRowButton({ onClick, label }) {
+	return (
+		<button
+			onClick={onClick}
+			style={{
+				marginTop: 10,
+				padding: "6px 14px",
+				background: "transparent",
+				color: BLUE,
+				border: "1px dashed " + BLUE,
+				borderRadius: 6,
+				fontFamily: "'Open Sans',sans-serif",
+				fontSize: 12,
+				fontWeight: 700,
+				cursor: "pointer",
+			}}
+		>
+			+ {label || "Agregar fila"}
+		</button>
+	);
+}
+
+function DeleteRowButton({ onClick }) {
+	return (
+		<button
+			onClick={onClick}
+			title="Eliminar fila"
+			style={{
+				width: 22,
+				height: 22,
+				lineHeight: "20px",
+				textAlign: "center",
+				padding: 0,
+				background: "transparent",
+				color: GRAY,
+				border: "1px solid " + BORD,
+				borderRadius: 4,
+				fontSize: 13,
+				cursor: "pointer",
+			}}
+		>
+			×
+		</button>
+	);
+}
+
 function SectionCard({ title, description, children }) {
 	return (
 		<div style={{ border: "1px solid " + BORD, borderRadius: 10, background: WHITE, overflow: "hidden", marginBottom: 20 }}>
@@ -73,6 +123,16 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 	function handleSave() {
 		updateChannelConfig(draft);
 		setIsDirty(false);
+	}
+
+	function addRow(key, blankRow) {
+		const list = draft[key] || [];
+		updDraft({ [key]: list.concat([blankRow]) });
+	}
+
+	function removeRow(key, idx) {
+		const list = draft[key] || [];
+		updDraft({ [key]: list.filter(function (_, i) { return i !== idx; }) });
 	}
 
 	if (!channelConfig || !updateChannelConfig) return null;
@@ -115,6 +175,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 								{["Nivel", "Label", "Certs mín.", "Certs máx.", "Descuento %", "Compromiso mín. (USD)", "Compromiso máx. (USD)"].map(function (h, i) {
 									return <th key={h} style={i <= 1 ? thL : thR}>{h}</th>;
 								})}
+								<th style={thR}></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -138,12 +199,21 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 										<td style={{ padding: "5px 8px" }}><InlineNum value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></td>
+										<td style={{ padding: "5px 8px", textAlign: "center" }}>
+											<DeleteRowButton onClick={function () { removeRow("distributorTiers", idx); }} />
+										</td>
 									</tr>
 								);
 							})}
 						</tbody>
 					</table>
 				</div>
+				<AddRowButton
+					label="Agregar tier"
+					onClick={function () {
+						addRow("distributorTiers", { id: genId("tier"), label: "Nuevo tier", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null });
+					}}
+				/>
 			</SectionCard>
 
 			{/* ── Segmentos B2B2C ── */}
@@ -155,6 +225,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 								{["IDC mín.", "IDC máx.", "Precio IDC (USD)"].map(function (h) {
 									return <th key={h} style={thR}>{h}</th>;
 								})}
+								<th style={thR}></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -170,12 +241,21 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} /></td>
+										<td style={{ padding: "5px 8px", textAlign: "center" }}>
+											<DeleteRowButton onClick={function () { removeRow("b2b2cSegments", idx); }} />
+										</td>
 									</tr>
 								);
 							})}
 						</tbody>
 					</table>
 				</div>
+				<AddRowButton
+					label="Agregar segmento"
+					onClick={function () {
+						addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, precioIDC: 0 });
+					}}
+				/>
 			</SectionCard>
 
 			{/* ── API Tiers B2B2C ── */}
@@ -188,6 +268,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 								{["Fee mín. (USD)", "Fee máx. (USD)", "Fee default (USD)"].map(function (h) {
 									return <th key={h} style={thR}>{h}</th>;
 								})}
+								<th style={thR}></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -206,12 +287,21 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.feeMin} decimals={0} onChange={function (v) { upd("feeMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.feeMax} decimals={0} onChange={function (v) { upd("feeMax", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.feeDefault} decimals={0} onChange={function (v) { upd("feeDefault", v); }} /></td>
+										<td style={{ padding: "5px 8px", textAlign: "center" }}>
+											<DeleteRowButton onClick={function () { removeRow("b2b2cApiTiers", idx); }} />
+										</td>
 									</tr>
 								);
 							})}
 						</tbody>
 					</table>
 				</div>
+				<AddRowButton
+					label="Agregar API tier"
+					onClick={function () {
+						addRow("b2b2cApiTiers", { id: genId("api"), label: "Nuevo API tier", feeMin: 0, feeMax: 0, feeDefault: 0 });
+					}}
+				/>
 			</SectionCard>
 
 			{/* ── Planes SLA ── */}
@@ -225,6 +315,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 								<th style={thR}>SLA (%)</th>
 								<th style={thR}>TX/mes</th>
 								<th style={thL}>Descripción</th>
+								<th style={thR}></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -246,12 +337,21 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 										<td style={{ padding: "5px 8px" }}>
 											<input value={plan.desc || ""} onChange={function (e) { upd("desc", e.target.value); }} style={inputStyle("100%")} />
 										</td>
+										<td style={{ padding: "5px 8px", textAlign: "center" }}>
+											<DeleteRowButton onClick={function () { removeRow("slaPlans", idx); }} />
+										</td>
 									</tr>
 								);
 							})}
 						</tbody>
 					</table>
 				</div>
+				<AddRowButton
+					label="Agregar plan SLA"
+					onClick={function () {
+						addRow("slaPlans", { id: genId("sla"), label: "Nuevo plan", precioMes: 0, sla: null, txMes: null, desc: "" });
+					}}
+				/>
 			</SectionCard>
 
 			{/* ── Parámetros generales ── */}

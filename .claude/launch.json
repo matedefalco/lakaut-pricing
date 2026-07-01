@@ -5,7 +5,8 @@
       "name": "lakaut-pricing",
       "runtimeExecutable": "/Users/mate/.nvm/versions/node/v22.12.0/bin/node",
       "runtimeArgs": ["./node_modules/.bin/vite"],
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
