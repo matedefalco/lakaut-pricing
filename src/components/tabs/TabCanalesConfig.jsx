@@ -106,11 +106,18 @@ function SectionCard({ title, description, children }) {
 export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 	const [draft, setDraft] = useState(channelConfig);
 	const [isDirty, setIsDirty] = useState(false);
+	const [toast, setToast] = useState(null); // { msg, id }
 
 	useEffect(function () {
 		setDraft(channelConfig);
 		setIsDirty(false);
 	}, [channelConfig]);
+
+	function showToast(msg) {
+		const id = Date.now();
+		setToast({ msg, id });
+		setTimeout(function () { setToast(function (t) { return t && t.id === id ? null : t; }); }, 3000);
+	}
 
 	function updDraft(patch) {
 		setDraft(function (prev) {
@@ -123,6 +130,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 	function handleSave() {
 		updateChannelConfig(draft);
 		setIsDirty(false);
+		showToast("Cambios guardados");
 	}
 
 	function addRow(key, blankRow) {
@@ -139,6 +147,20 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 
 	return (
 		<div style={{ maxWidth: 920 }}>
+
+			{/* Toast */}
+			{toast && (
+				<div style={{
+					position: "fixed", bottom: 28, right: 28, zIndex: 9999,
+					background: "#1a2b4a", color: WHITE, borderRadius: 10,
+					padding: "12px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+					display: "flex", alignItems: "center", gap: 10,
+					fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600,
+				}}>
+					<span style={{ fontSize: 16 }}>✓</span>
+					{toast.msg}
+				</div>
+			)}
 
 			{/* Top bar */}
 			<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
