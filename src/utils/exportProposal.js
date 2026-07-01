@@ -35,19 +35,22 @@ function fmGross(v, currency, tc) {
 	if (currency !== "ARS") return fm(v, currency, tc);
 	return "$ " + (v * tc * (1 + IVA_RATE)).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
-// Bloque de precio grande (usado en el resumen) con desglose s/IVA y c/IVA cuando la cotización es en ARS.
+// Bloque de precio grande (usado en el resumen). En ARS, el monto que se
+// paga es el que incluye IVA: ese es el que se destaca grande como "Total a
+// pagar". El neto queda como referencia chica arriba, nunca como "a pagar".
 function priceBlock(label, v, currency, tc, size) {
 	size = size || "26pt";
 	if (currency !== "ARS") {
 		return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">${label}</div>
         <div style="font-size:${size};font-weight:800;color:${W};line-height:1;">${fm(v, currency, tc)}</div>`;
 	}
-	return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.15cm;">${label} <span style="font-weight:400;opacity:0.7;">(sin IVA)</span></div>
-      <div style="font-size:${size};font-weight:800;color:${W};line-height:1;margin-bottom:0.18cm;">${fm(v, currency, tc)}</div>
-      <div style="display:flex;align-items:baseline;gap:0.18cm;">
-        <span style="font-size:7.5pt;color:${BLT};">Con IVA (21%)</span>
-        <span style="font-size:13pt;font-weight:700;color:${W};">${fmGross(v, currency, tc)}</span>
-      </div>`;
+	return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.15cm;">${label}</div>
+      <div style="display:flex;align-items:baseline;gap:0.18cm;margin-bottom:0.2cm;">
+        <span style="font-size:7.5pt;color:${BLT};opacity:0.8;">Neto (sin IVA)</span>
+        <span style="font-size:13pt;font-weight:700;color:${W};">${fm(v, currency, tc)}</span>
+      </div>
+      <div style="font-size:7.5pt;color:${BLT};font-weight:600;margin-bottom:0.1cm;">Total a pagar <span style="font-weight:400;opacity:0.8;">(IVA 21% incl.)</span></div>
+      <div style="font-size:${size};font-weight:800;color:${W};line-height:1;">${fmGross(v, currency, tc)}</div>`;
 }
 function fd(iso) {
 	try { return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }); }
@@ -322,7 +325,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
         ${priceBlock("Mes 1 · compra inicial", neto, currency, tc, "20pt")}
         <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.25cm 0;"></div>
         ${priceBlock("Mes 2 en adelante · abono mensual", res.abonoMes, currency, tc, "20pt")}
-        ` : priceBlock("Precio neto a pagar", neto, currency, tc, "26pt")}
+        ` : priceBlock("Precio a pagar", neto, currency, tc, "26pt")}
       </div>
 
       ${inp.abono && res.abonoMes ? `
