@@ -363,19 +363,6 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		? `${sla.label} · ${fm(sla.precioMes, currency, tc)}/mes${showIva ? ` (c/IVA ${fmGross(sla.precioMes, currency, tc)})` : ""}`
 		: `${sla.label} · incluido`;
 
-	const rows = [
-		{ l: "Volumen de IDC",           v: (Number(inp.idcMensuales)||0).toLocaleString("es-AR") },
-		// Sin integración API no hay fee de implementación ni SLA: la propuesta
-		// muestra solo el volumen cotizado y las firmas.
-		...(sinApi ? [] : [
-			{ l: "Tipo de integración API",  v: api.label },
-			{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
-			{ l: "Plan de soporte / SLA",    v: slaText },
-		]),
-		{ l: "Firmas incluidas por IDC", v: String(Number(inp.firmasInclPorIDC)||0) },
-		...((Number(inp.firmasAdicPorIDC)||0) > 0 ? [{ l: "Firmas adicionales por IDC", v: `${inp.firmasAdicPorIDC} · ${fm(Number(inp.precioFirmaAdic)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.precioFirmaAdic)||0, currency, tc)})` : ""} c/u` }] : []),
-	];
-
 	// precioIDC es un valor unitario chico (ej. USD 0.65): se formatea aparte de fm/fmGross para no perder los decimales.
 	const precioIDC = res.precioIDC != null ? res.precioIDC : 0;
 	const precioIDCFmt = currency === "ARS"
@@ -384,7 +371,46 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const precioIDCFmtGross = showIva
 		? "$ " + Math.round(precioIDC * tc * (1 + IVA_RATE)).toLocaleString("es-AR")
 		: precioIDCFmt;
-	const revMes = res.revMesTotal || 0;
+
+	// Cantidades: cada IDC incluye 1 certificado; las firmas se informan en totales.
+	const idc = Number(inp.idcMensuales) || 0;
+	const inclPorIDC = Number(inp.firmasInclPorIDC) || 0;
+	const adicPorIDC = Number(inp.firmasAdicPorIDC) || 0;
+	const firmasIncl = idc * inclPorIDC;
+	const firmasAdicTotal = idc * adicPorIDC;
+	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
+
+	const rows = [
+		{ l: "Volumen de IDC",           v: idc.toLocaleString("es-AR") },
+		// Sin integración API no hay fee de implementación ni SLA: la propuesta
+		// muestra solo el volumen cotizado y las firmas.
+		...(sinApi ? [] : [
+			{ l: "Tipo de integración API",  v: api.label },
+			{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
+			{ l: "Plan de soporte / SLA",    v: slaText },
+		]),
+		{ l: "Precio por IDC",           v: `${precioIDCFmt}${showIva ? ` (c/IVA ${precioIDCFmtGross})` : ""}` },
+		{ l: "Certificados",             v: `${idc.toLocaleString("es-AR")} · 1 por IDC` },
+		{ l: "Firmas incluidas",         v: `${firmasIncl.toLocaleString("es-AR")} · ${inclPorIDC} por IDC` },
+		...(firmasAdicTotal > 0 ? [{ l: "Firmas adicionales", v: `${firmasAdicTotal.toLocaleString("es-AR")} · ${adicPorIDC} por IDC · ${fm(precioFirmaAdicN, currency, tc)}${showIva ? ` (c/IVA ${fmGross(precioFirmaAdicN, currency, tc)})` : ""} c/u` }] : []),
+	];
+
+	// Desglose del resumen: subtotales por concepto arriba, IVA después, total al final.
+	const revIDC = idc * precioIDC;
+	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
+	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
+	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
+	const subtotal = revIDC + revFirmasAdic + slaMesVal + feeVal;
+	const items = [
+		{ l: `IDC (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
+		...(revFirmasAdic > 0 ? [{ l: `Firmas adicionales (${firmasAdicTotal.toLocaleString("es-AR")})`, v: revFirmasAdic }] : []),
+		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
+		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
+	];
+	const itemRow = (l, v, strong) => `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:9pt;">
+        <span style="color:rgba(255,255,255,${strong ? "0.85" : "0.65"});${strong ? "font-weight:600;" : ""}">${l}</span>
+        <span style="color:${W};font-weight:${strong ? 700 : 500};">${v}</span>
+      </div>`;
 
 	return `<div class="slide" style="background:${OW};">
   <!-- slide header -->
@@ -414,20 +440,26 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
     <div style="width:41%;background:${B};border-radius:12px;padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
       <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
 
-      <div style="margin-bottom:0.4cm;">
-        ${priceBlock("Precio total", revMes, currency, tc, "28pt")}
+      <!-- subtotales por concepto -->
+      <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.35cm;">
+        ${items.map(it => itemRow(it.l, fm(it.v, currency, tc))).join("")}
       </div>
 
-      <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.35cm;"></div>
+      ${showIva ? `
+      <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.3cm;"></div>
+      <div style="display:flex;flex-direction:column;gap:0.18cm;">
+        ${itemRow("Subtotal (sin IVA)", fm(subtotal, currency, tc), true)}
+        ${itemRow("IVA (21%)", fm(subtotal * IVA_RATE, currency, tc))}
+      </div>
+      ` : ""}
 
-      <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.5cm;">
-        <div style="display:flex;justify-content:space-between;font-size:9pt;">
-          <span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC)</span>
-          <span style="color:${W};font-weight:600;">${precioIDCFmt}${showIva ? ` <span style="color:rgba(255,255,255,0.6);font-weight:400;font-size:8pt;">(c/IVA ${precioIDCFmtGross})</span>` : ""}</span>
-        </div>
+      <!-- total final -->
+      <div style="margin-top:auto;border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;">
+        <div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">Total a pagar${showIva ? ` <span style="font-weight:400;opacity:0.8;">(IVA 21% incl.)</span>` : ""}</div>
+        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${showIva ? fmGross(subtotal, currency, tc) : fm(subtotal, currency, tc)}</div>
       </div>
 
-      ${termsFooter({ marginTop: "auto" })}
+      ${termsFooter({ marginTop: "0.4cm" })}
     </div>
 
   </div>
