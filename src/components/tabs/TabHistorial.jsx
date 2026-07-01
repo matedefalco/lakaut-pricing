@@ -61,7 +61,20 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 	const [idcMin, setIdcMin] = useState("");
 	const [idcMax, setIdcMax] = useState("");
 
-	const quotes = dealsApi?.deals || [];
+	// clientName viene del join hecho al cargar los deals; puede quedar desactualizado
+	// si el cliente se renombró después. Se resuelve contra clientsApi.clients (siempre vivo).
+	const clientsById = useMemo(function () {
+		const map = {};
+		(clientsApi?.clients || []).forEach(function (c) { map[c.id] = c; });
+		return map;
+	}, [clientsApi?.clients]);
+
+	const quotes = useMemo(function () {
+		return (dealsApi?.deals || []).map(function (q) {
+			const live = q.client_id && clientsById[q.client_id];
+			return live ? Object.assign({}, q, { clientName: live.name }) : q;
+		});
+	}, [dealsApi?.deals, clientsById]);
 
 	const months = useMemo(function () {
 		const set = new Set(quotes.map(function (q) { return q.fecha.slice(0, 7); }));
@@ -352,7 +365,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
 														{(q.channel === "b2b2c" || q.channel === "distribuidores") && (
-															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
+															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 														)}
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>

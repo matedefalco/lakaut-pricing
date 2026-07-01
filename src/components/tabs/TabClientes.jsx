@@ -118,6 +118,9 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 		if (!nameInput.trim() || !selected) return;
 		await clientsApi.update(selected.id, { name: nameInput.trim() });
 		setEditingName(false);
+		// Los deals guardan el nombre embebido en el join hecho al cargar la página;
+		// hay que refrescarlos para que reflejen el nuevo nombre sin recargar.
+		dealsApi?.refetch && dealsApi.refetch();
 	}
 
 	async function deleteClient(id) {

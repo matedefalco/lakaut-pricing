@@ -127,5 +127,5 @@ export function useDeals() {
 	// Backwards-compat alias so old refs to quotesApi.quotes still work
 	const quotes = deals;
 
-	return { deals, quotes, loading, migrated, save, remove, updateSlideUrl };
+	return { deals, quotes, loading, migrated, save, remove, updateSlideUrl, refetch: fetchDeals };
 }

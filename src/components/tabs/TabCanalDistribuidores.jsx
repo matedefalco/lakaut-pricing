@@ -67,7 +67,12 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	useEffect(function () {
 		if (!pendingEdit) return;
 		const i = pendingEdit.inputs || {};
-		if (pendingEdit.clients) setSelectedClient(pendingEdit.clients);
+		if (pendingEdit.client_id) {
+			const live = (clientsApi?.clients || []).find(function (c) { return c.id === pendingEdit.client_id; });
+			setSelectedClient(live || pendingEdit.clients || null);
+		} else if (pendingEdit.clients) {
+			setSelectedClient(pendingEdit.clients);
+		}
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
 		setCasosDeUso(i.casosDeUso || "");

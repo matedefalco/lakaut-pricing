@@ -59,7 +59,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	useEffect(function () {
 		if (!pendingEdit) return;
 		const i = pendingEdit.inputs || {};
-		if (pendingEdit.clients) setSelectedClient(pendingEdit.clients);
+		if (pendingEdit.client_id) {
+			const live = (clientsApi?.clients || []).find(function (c) { return c.id === pendingEdit.client_id; });
+			setSelectedClient(live || pendingEdit.clients || null);
+		} else if (pendingEdit.clients) {
+			setSelectedClient(pendingEdit.clients);
+		}
 		setIdcMensuales(i.idcMensuales || 0);
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
