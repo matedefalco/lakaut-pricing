@@ -414,7 +414,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 
       <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.5cm;">
         <div style="display:flex;justify-content:space-between;font-size:9pt;">
-          <span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC/mes)</span>
+          <span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC${esUnica ? "" : "/mes"})</span>
           <span style="color:${W};font-weight:600;">${precioIDCFmt}${showIva ? ` <span style="color:rgba(255,255,255,0.6);font-weight:400;font-size:8pt;">(c/IVA ${precioIDCFmtGross})</span>` : ""}</span>
         </div>
         ${esUnica

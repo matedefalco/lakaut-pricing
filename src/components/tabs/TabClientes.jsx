@@ -243,7 +243,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										<TableHead>Canal</TableHead>
 										<TableHead>Resumen</TableHead>
 										<TableHead>Estado</TableHead>
-										{selected.channel === "b2b2c" && <TableHead className="text-right">IDC/mes</TableHead>}
+										{selected.channel === "b2b2c" && <TableHead className="text-right">IDC</TableHead>}
 										{selected.channel === "distribuidores" && <TableHead className="text-right">Certs</TableHead>}
 										<TableHead className="text-right">Revenue</TableHead>
 										<TableHead></TableHead>

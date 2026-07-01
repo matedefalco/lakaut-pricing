@@ -141,7 +141,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 						<div>
 							<div className="text-sm font-semibold">Pricing por segmento</div>
 							<p className="text-xs text-muted-foreground mt-0.5">
-								El segmento se asigna por volumen mensual de IDC.
+								El segmento se asigna por volumen de IDC de la cotización (mensual o total, según la modalidad).
 								CV/IDC = cert USD {cvCert.toFixed(4)} + 1 firma USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)}.
 								Margen incluye absorción de CF directo al volumen medio de cada segmento.
 							</p>
@@ -153,7 +153,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 						<TableHeader>
 							<TableRow>
 								<TableHead>Segmento</TableHead>
-								<TableHead className="text-right">IDC / mes</TableHead>
+								<TableHead className="text-right">IDC</TableHead>
 								{visible.has("precioIDC")     && <TableHead className="text-right">Precio (USD/IDC)</TableHead>}
 								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text="Costo variable por IDC = cert + 1 firma. Sin costos fijos." /></TableHead>}
 								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV. Ganancia antes de cubrir costos fijos." /></TableHead>}

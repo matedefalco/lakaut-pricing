@@ -25,7 +25,7 @@ const FILTER_DEFS = [
 	{ key: "mes", label: "Mes" },
 	{ key: "cliente", label: "Cliente" },
 	{ key: "certs", label: "Certs activos" },
-	{ key: "idc", label: "IDC / mes" },
+	{ key: "idc", label: "IDC" },
 ];
 
 function summaryCols(channel, fMoney) {
@@ -41,7 +41,7 @@ function summaryCols(channel, fMoney) {
 	}
 	return [
 		{ label: "Segmento", get: function (q) { return q.resumen.segmento; } },
-		{ label: "IDC/mes", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
+		{ label: "IDC", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
 		{ label: "Firmas/mes", get: function (q) { return (q.resumen.firmasMes || 0).toLocaleString("es-AR"); } },
 		{ label: "Rev/mes", get: function (q) { return fMoney(q.resumen.revMesTotal || 0); } },
 		{ label: "Rev año 1", get: function (q) { return fMoney(q.resumen.revAnual || 0); } },
@@ -355,7 +355,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 								)}
 								{openFilter === "idc" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">IDC nuevas por mes (B2B2C)</span>
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Volumen de IDC (B2B2C)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={idcMin} onChange={function (e) { setIdcMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>
