@@ -347,7 +347,8 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
-	const esUnica = inp.frecuencia === "unica";
+	// La Cotizadora B2B2C no tiene (todavía) un selector de modalidad única/recurrente:
+	// el volumen de IDC es un dato neutro. No hay que asumir periodicidad que no se configuró.
 	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
 	const apiTiers = (channelConfig && channelConfig.b2b2cApiTiers) || [];
 	const slaPlans = (channelConfig && channelConfig.slaPlans) || [];
@@ -358,8 +359,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 		: `${sla.label} · incluido`;
 
 	const rows = [
-		{ l: "Modalidad",                v: esUnica ? "Adquisición única" : "Recurrente mensual" },
-		{ l: esUnica ? "Total IDC" : "IDC por mes", v: (Number(inp.idcMensuales)||0).toLocaleString("es-AR") },
+		{ l: "Volumen de IDC",           v: (Number(inp.idcMensuales)||0).toLocaleString("es-AR") },
 		{ l: "Tipo de integración API",  v: api.label },
 		{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
 		{ l: "Plan de soporte / SLA",    v: slaText },
@@ -376,7 +376,6 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 		? "$ " + Math.round(precioIDC * tc * (1 + IVA_RATE)).toLocaleString("es-AR")
 		: precioIDCFmt;
 	const revMes = res.revMesTotal || 0;
-	const revAnual = res.revAnual || 0;
 
 	return `<div class="slide" style="background:${OW};">
   <!-- slide header -->
@@ -407,23 +406,16 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
       <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
 
       <div style="margin-bottom:0.4cm;">
-        ${priceBlock(esUnica ? "Total única vez" : "Precio mensual", revMes, currency, tc, "28pt")}
+        ${priceBlock("Precio total", revMes, currency, tc, "28pt")}
       </div>
 
       <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.35cm;"></div>
 
       <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.5cm;">
         <div style="display:flex;justify-content:space-between;font-size:9pt;">
-          <span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC${esUnica ? "" : "/mes"})</span>
+          <span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC)</span>
           <span style="color:${W};font-weight:600;">${precioIDCFmt}${showIva ? ` <span style="color:rgba(255,255,255,0.6);font-weight:400;font-size:8pt;">(c/IVA ${precioIDCFmtGross})</span>` : ""}</span>
         </div>
-        ${esUnica
-		? ""
-		: `<div style="display:flex;justify-content:space-between;font-size:9pt;">
-          <span style="color:rgba(255,255,255,0.65);">Precio año 1${showIva ? " (s/IVA)" : ""}</span>
-          <span style="color:${W};font-weight:600;">${fm(revAnual, currency, tc)}</span>
-        </div>`
-	}
       </div>
 
       ${termsFooter({ marginTop: "auto" })}
