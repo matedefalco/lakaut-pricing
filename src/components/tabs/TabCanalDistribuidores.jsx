@@ -144,6 +144,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			inputs: { certsActivos, qtys, firmasAdic, casosDeUso, abono },
 			resumen: { tier: tier.label, certsActivos: calc.certsTotal, certsComprados: calc.certsTotal, facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct,
 				...(abono && abonoMes > 0 ? { abonoMes, abonoAnual, facturacionAnio1 } : {}),
+				...(prev?.resumen?.status ? { status: prev.resumen.status } : {}),
 			},
 		}, client?.id || null);
 

@@ -169,9 +169,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 				} : {}),
 			},
 			resumen: {
-				segmento: seg.label, idcMensuales, firmasTotales, precioIDC,
-				revTotal, margen, margenPct,
+				segmento: seg.label, idcMensuales, firmasTotales, firmasMes: firmasTotales, precioIDC,
+				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + (Number(fee) || 0),
+				margen, margenPct,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
+				...(prev?.resumen?.status ? { status: prev.resumen.status } : {}),
 			},
 		}, client?.id || null);
 
