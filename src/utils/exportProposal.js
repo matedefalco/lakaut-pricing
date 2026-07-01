@@ -9,11 +9,45 @@ const OW  = "#F7F8FA";  // off-white background
 const W   = "#FFFFFF";  // white
 const NG  = "#565961";  // numeric gray
 
+// ─── Términos y condiciones (footer del resumen) ───────────────────────────────
+const TERMS_CAUCION = "La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.";
+const TERMS_RETENCIONES = "Lakaut S.A. reviste la condición de Agente de Retención y Percepción, por lo que las percepciones y/o retenciones impositivas que correspondan serán aplicadas en la facturación de acuerdo con la normativa vigente.";
+function termsFooter(extraStyle) {
+	return `<div style="margin-top:${extraStyle && extraStyle.marginTop ? extraStyle.marginTop : "0.4cm"};padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">
+    <div style="margin-bottom:0.12cm;">${TERMS_CAUCION}</div>
+    <div>${TERMS_RETENCIONES}</div>
+  </div>`;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const IVA_RATE = 0.21; // Alineado a TabCanalWeb: precio ARS c/IVA = precio s/IVA × 1.21
+
+// Todos los precios del sistema se guardan sin IVA. `fm` sigue devolviendo el
+// valor neto (sin IVA); `fmGross` agrega el IVA solo para ARS, ya que en
+// USD los montos no se facturan con IVA discriminado en esta propuesta.
 function fm(v, currency, tc) {
 	if (v == null || isNaN(v)) return "—";
 	if (currency === "ARS") return "$ " + (v * tc).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 	return "USD " + Number(v).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function fmGross(v, currency, tc) {
+	if (v == null || isNaN(v)) return "—";
+	if (currency !== "ARS") return fm(v, currency, tc);
+	return "$ " + (v * tc * (1 + IVA_RATE)).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+// Bloque de precio grande (usado en el resumen) con desglose s/IVA y c/IVA cuando la cotización es en ARS.
+function priceBlock(label, v, currency, tc, size) {
+	size = size || "26pt";
+	if (currency !== "ARS") {
+		return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">${label}</div>
+        <div style="font-size:${size};font-weight:800;color:${W};line-height:1;">${fm(v, currency, tc)}</div>`;
+	}
+	return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.15cm;">${label} <span style="font-weight:400;opacity:0.7;">(sin IVA)</span></div>
+      <div style="font-size:${size};font-weight:800;color:${W};line-height:1;margin-bottom:0.18cm;">${fm(v, currency, tc)}</div>
+      <div style="display:flex;align-items:baseline;gap:0.18cm;">
+        <span style="font-size:7.5pt;color:${BLT};">Con IVA (21%)</span>
+        <span style="font-size:13pt;font-weight:700;color:${W};">${fmGross(v, currency, tc)}</span>
+      </div>`;
 }
 function fd(iso) {
 	try { return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }); }
@@ -160,6 +194,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const qtys = inp.qtys || {};
 	const firmasAdic = Number(inp.firmasAdic) || 0;
 	const precioFirmaUSD = Number(inp.precioFirmaUSD) || 0;
+	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
 
 	const webProducts = models || [];
 	const distributorTiers = (channelConfig && channelConfig.distributorTiers) || [];
@@ -207,7 +242,8 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
             <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">INCLUYE</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">P. LISTA</th>
             <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">CANTIDAD</th>
-            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL LISTA</th>
+            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL${showIva ? " (S/IVA)" : ""}</th>
+            ${showIva ? `<th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL (C/IVA)</th>` : ""}
           </tr>
         </thead>
         <tbody>
@@ -222,6 +258,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
             <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(r.unit, currency, tc)}</td>
             <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${r.qty.toLocaleString("es-AR")}</td>
             <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(r.sub, currency, tc)}</td>
+            ${showIva ? `<td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fmGross(r.sub, currency, tc)}</td>` : ""}
           </tr>`;
           }).join("")}
           ${firmasAdic > 0 ? `<tr style="background:${packRows.length%2===0?OW:W};">
@@ -230,13 +267,16 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
             <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(precioFirmaUSD, currency, tc)}</td>
             <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${firmasAdic.toLocaleString("es-AR")}</td>
             <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(firmasAdic*precioFirmaUSD, currency, tc)}</td>
+            ${showIva ? `<td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fmGross(firmasAdic*precioFirmaUSD, currency, tc)}</td>` : ""}
           </tr>` : ""}
           <tr>
             <td colspan="4" style="padding:7px 6px;font-weight:700;color:${DK};font-size:9pt;">Total facturación a lista</td>
             <td style="padding:7px 6px;text-align:right;font-weight:700;color:${DK};font-size:9pt;">${fm(lista, currency, tc)}</td>
+            ${showIva ? `<td style="padding:7px 6px;text-align:right;font-weight:700;color:${DK};font-size:9pt;">${fmGross(lista, currency, tc)}</td>` : ""}
           </tr>
         </tbody>
       </table>
+      ${showIva ? `<div style="font-size:6.5pt;color:${GR};font-style:italic;margin-bottom:0.3cm;">Precios expresados en pesos argentinos. IVA discriminado al 21%.</div>` : ""}
       <!-- desglose de valor -->
       <div style="margin-top:auto;display:flex;gap:0.3cm;">
         ${totalCertsF > 0 ? `<div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
@@ -279,25 +319,20 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
       <!-- big price -->
       <div style="border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;margin-top:auto;">
         ${inp.abono && res.abonoMes ? `
-        <div style="font-size:7.5pt;color:${BLT};font-weight:600;margin-bottom:0.1cm;">Mes 1 · compra inicial</div>
-        <div style="font-size:22pt;font-weight:800;color:${W};line-height:1;margin-bottom:0.3cm;">${fm(neto, currency, tc)}</div>
-        <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.15cm 0;"></div>
-        <div style="font-size:7.5pt;color:${BLT};font-weight:600;margin-bottom:0.1cm;">Mes 2 en adelante · abono mensual</div>
-        <div style="font-size:22pt;font-weight:800;color:${W};line-height:1;">${fm(res.abonoMes, currency, tc)}<span style="font-size:9pt;font-weight:500;">/mes</span></div>
-        ` : `
-        <div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">Precio neto a pagar</div>
-        <div style="font-size:26pt;font-weight:800;color:${W};line-height:1;">${fm(neto, currency, tc)}</div>
-        `}
+        ${priceBlock("Mes 1 · compra inicial", neto, currency, tc, "20pt")}
+        <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.25cm 0;"></div>
+        ${priceBlock("Mes 2 en adelante · abono mensual", res.abonoMes, currency, tc, "20pt")}
+        ` : priceBlock("Precio neto a pagar", neto, currency, tc, "26pt")}
       </div>
 
       ${inp.abono && res.abonoMes ? `
       <div style="margin-top:0.3cm;padding:0.2cm 0.3cm;background:rgba(255,255,255,0.1);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:7pt;color:rgba(255,255,255,0.65);">Facturación año 1</span>
+        <span style="font-size:7pt;color:rgba(255,255,255,0.65);">Facturación año 1${showIva ? " (s/IVA)" : ""}</span>
         <span style="font-size:8.5pt;font-weight:700;color:${W};">${fm(res.facturacionAnio1, currency, tc)}</span>
       </div>
       ` : ""}
 
-      <div style="margin-top:0.4cm;padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
+      ${termsFooter({ marginTop: "0.4cm" })}
     </div>
 
   </div>
@@ -310,26 +345,33 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const esUnica = inp.frecuencia === "unica";
+	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
 	const apiTiers = (channelConfig && channelConfig.b2b2cApiTiers) || [];
 	const slaPlans = (channelConfig && channelConfig.slaPlans) || [];
 	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "API Standard" };
 	const sla = slaPlans.find(s => s.id === inp.slaId) || slaPlans[0] || { label: "Standard", precioMes: 0, desc: "" };
-	const slaText = sla.precioMes ? `${sla.label} · ${fm(sla.precioMes, currency, tc)}/mes` : `${sla.label} · incluido`;
+	const slaText = sla.precioMes
+		? `${sla.label} · ${fm(sla.precioMes, currency, tc)}/mes${showIva ? ` (c/IVA ${fmGross(sla.precioMes, currency, tc)})` : ""}`
+		: `${sla.label} · incluido`;
 
 	const rows = [
 		{ l: "Modalidad",                v: esUnica ? "Adquisición única" : "Recurrente mensual" },
 		{ l: esUnica ? "Total IDC" : "IDC por mes", v: (Number(inp.idcMensuales)||0).toLocaleString("es-AR") },
 		{ l: "Tipo de integración API",  v: api.label },
-		{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)} · una sola vez` },
+		{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
 		{ l: "Plan de soporte / SLA",    v: slaText },
 		{ l: "Firmas incluidas por IDC", v: String(Number(inp.firmasInclPorIDC)||0) },
-		...((Number(inp.firmasAdicPorIDC)||0) > 0 ? [{ l: "Firmas adicionales por IDC", v: `${inp.firmasAdicPorIDC} · ${fm(Number(inp.precioFirmaAdic)||0, currency, tc)} c/u` }] : []),
+		...((Number(inp.firmasAdicPorIDC)||0) > 0 ? [{ l: "Firmas adicionales por IDC", v: `${inp.firmasAdicPorIDC} · ${fm(Number(inp.precioFirmaAdic)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.precioFirmaAdic)||0, currency, tc)})` : ""} c/u` }] : []),
 	];
 
+	// precioIDC es un valor unitario chico (ej. USD 0.65): se formatea aparte de fm/fmGross para no perder los decimales.
 	const precioIDC = res.precioIDC != null ? res.precioIDC : 0;
 	const precioIDCFmt = currency === "ARS"
 		? "$ " + Math.round(precioIDC * tc).toLocaleString("es-AR")
 		: "USD " + precioIDC.toFixed(2);
+	const precioIDCFmtGross = showIva
+		? "$ " + Math.round(precioIDC * tc * (1 + IVA_RATE)).toLocaleString("es-AR")
+		: precioIDCFmt;
 	const revMes = res.revMesTotal || 0;
 	const revAnual = res.revAnual || 0;
 
@@ -354,6 +396,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
           </tr>`).join("")}
         </tbody>
       </table>
+      ${showIva ? `<div style="font-size:6.5pt;color:${GR};font-style:italic;margin-top:0.3cm;">Precios expresados en pesos argentinos. IVA discriminado al 21%.</div>` : ""}
     </div>
 
     <!-- RIGHT: blue box (Resumen) -->
@@ -361,21 +404,26 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
       <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
 
       <div style="margin-bottom:0.4cm;">
-        <div style="font-size:8pt;color:${BLT};margin-bottom:0.15cm;">${esUnica ? "Total única vez" : "Precio mensual"}</div>
-        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${fm(revMes, currency, tc)}</div>
+        ${priceBlock(esUnica ? "Total única vez" : "Precio mensual", revMes, currency, tc, "28pt")}
       </div>
 
       <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.35cm;"></div>
 
       <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.5cm;">
-        <div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC/mes)</span><span style="color:${W};font-weight:600;">${precioIDCFmt}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:9pt;">
+          <span style="color:rgba(255,255,255,0.65);">Precio por IDC (${(Number(inp.idcMensuales)||0).toLocaleString("es-AR")} IDC/mes)</span>
+          <span style="color:${W};font-weight:600;">${precioIDCFmt}${showIva ? ` <span style="color:rgba(255,255,255,0.6);font-weight:400;font-size:8pt;">(c/IVA ${precioIDCFmtGross})</span>` : ""}</span>
+        </div>
         ${esUnica
 		? ""
-		: `<div style="display:flex;justify-content:space-between;font-size:9pt;"><span style="color:rgba(255,255,255,0.65);">Precio año 1</span><span style="color:${W};font-weight:600;">${fm(revAnual, currency, tc)}</span></div>`
+		: `<div style="display:flex;justify-content:space-between;font-size:9pt;">
+          <span style="color:rgba(255,255,255,0.65);">Precio año 1${showIva ? " (s/IVA)" : ""}</span>
+          <span style="color:${W};font-weight:600;">${fm(revAnual, currency, tc)}</span>
+        </div>`
 	}
       </div>
 
-      <div style="margin-top:auto;padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.</div>
+      ${termsFooter({ marginTop: "auto" })}
     </div>
 
   </div>
@@ -480,8 +528,10 @@ ${s5Cierre()}
 </html>`;
 }
 
+// La propuesta exportada siempre se factura en pesos, sin importar en qué
+// moneda esté parada la interfaz al momento de crear o exportar la cotización.
 export function exportProposal(deal, client, currency, tc, channelConfig, models) {
-	const html = buildHTML(deal, client, currency, tc, channelConfig, models);
+	const html = buildHTML(deal, client, "ARS", tc, channelConfig, models);
 	const win = window.open("", "_blank");
 	if (!win) { alert("Habilitá ventanas emergentes para exportar la propuesta."); return; }
 	win.document.open();
