@@ -12,6 +12,7 @@ import { makeMoney } from "@/utils/useMoney";
 import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
+import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 
 const CHANNELS = {
 	distribuidores: { label: "Distribuidores", variant: "secondary" },
@@ -20,6 +21,7 @@ const CHANNELS = {
 
 const FILTER_DEFS = [
 	{ key: "canal", label: "Canal" },
+	{ key: "estado", label: "Estado" },
 	{ key: "mes", label: "Mes" },
 	{ key: "cliente", label: "Cliente" },
 	{ key: "certs", label: "Certs activos" },
@@ -54,6 +56,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 
 	const [openFilter, setOpenFilter] = useState(null);
 	const [selectedChannels, setSelectedChannels] = useState(new Set());
+	const [selectedStatuses, setSelectedStatuses] = useState(new Set());
 	const [month, setMonth] = useState("all");
 	const [search, setSearch] = useState("");
 	const [certsMin, setCertsMin] = useState("");
@@ -89,8 +92,17 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 		});
 	}
 
+	function toggleStatus(key) {
+		setSelectedStatuses(function (prev) {
+			const next = new Set(prev);
+			if (next.has(key)) next.delete(key); else next.add(key);
+			return next;
+		});
+	}
+
 	function isActive(key) {
 		if (key === "canal") return selectedChannels.size > 0;
+		if (key === "estado") return selectedStatuses.size > 0;
 		if (key === "mes") return month !== "all";
 		if (key === "cliente") return search !== "";
 		if (key === "certs") return certsMin !== "" || certsMax !== "";
@@ -101,6 +113,8 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 	function getSummary(key) {
 		if (key === "canal" && selectedChannels.size > 0)
 			return Array.from(selectedChannels).map(function (k) { return CHANNELS[k] ? CHANNELS[k].label : k; }).join(", ");
+		if (key === "estado" && selectedStatuses.size > 0)
+			return Array.from(selectedStatuses).map(function (k) { return DEAL_STATUS_META[k] ? DEAL_STATUS_META[k].label : k; }).join(", ");
 		if (key === "mes" && month !== "all") return month;
 		if (key === "cliente" && search) return '"' + search + '"';
 		if (key === "certs") {
@@ -118,6 +132,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 
 	function clearFilter(key) {
 		if (key === "canal") setSelectedChannels(new Set());
+		if (key === "estado") setSelectedStatuses(new Set());
 		if (key === "mes") setMonth("all");
 		if (key === "cliente") setSearch("");
 		if (key === "certs") { setCertsMin(""); setCertsMax(""); }
@@ -127,6 +142,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 
 	function clearAll() {
 		setSelectedChannels(new Set());
+		setSelectedStatuses(new Set());
 		setMonth("all");
 		setSearch("");
 		setCertsMin(""); setCertsMax("");
@@ -139,6 +155,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 	const filtered = useMemo(function () {
 		return quotes.filter(function (q) {
 			if (selectedChannels.size > 0 && !selectedChannels.has(q.channel)) return false;
+			if (selectedStatuses.size > 0 && !selectedStatuses.has(dealStatus(q))) return false;
 			if (month !== "all" && q.fecha.slice(0, 7) !== month) return false;
 			if (search && !(q.clientName || "").toLowerCase().includes(search.toLowerCase())) return false;
 			if (q.channel === "distribuidores") {
@@ -153,7 +170,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 			}
 			return true;
 		});
-	}, [quotes, selectedChannels, month, search, certsMin, certsMax, idcMin, idcMax]);
+	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax]);
 
 	const groups = useMemo(function () {
 		const byCh = {};
@@ -166,9 +183,9 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 		Object.keys(groups).forEach(function (ch) {
 			const cols = summaryCols(ch, fMoney);
 			lines.push((CHANNELS[ch] ? CHANNELS[ch].label : ch).toUpperCase());
-			lines.push(["fecha", "cliente"].concat(cols.map(function (c) { return c.label; })).join(","));
+			lines.push(["fecha", "cliente", "estado"].concat(cols.map(function (c) { return c.label; })).join(","));
 			groups[ch].forEach(function (q) {
-				lines.push([q.fecha.slice(0, 10), '"' + (q.clientName || "").replace(/"/g, '""') + '"'].concat(cols.map(function (c) { return '"' + String(c.get(q)).replace(/"/g, '""') + '"'; })).join(","));
+				lines.push([q.fecha.slice(0, 10), '"' + (q.clientName || "").replace(/"/g, '""') + '"', DEAL_STATUS_META[dealStatus(q)].label].concat(cols.map(function (c) { return '"' + String(c.get(q)).replace(/"/g, '""') + '"'; })).join(","));
 			});
 			lines.push("");
 		});
@@ -281,6 +298,33 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 										</div>
 									</div>
 								)}
+								{openFilter === "estado" && (
+									<div className="space-y-1.5">
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar estado</span>
+										<div className="flex gap-2">
+											{DEAL_STATUSES.map(function (key) {
+												const meta = DEAL_STATUS_META[key];
+												const checked = selectedStatuses.has(key);
+												return (
+													<button
+														key={key}
+														type="button"
+														onClick={function () { toggleStatus(key); }}
+														className={cn(
+															"inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+															checked
+																? "bg-primary text-primary-foreground border-primary"
+																: "bg-background border-border text-muted-foreground hover:text-foreground"
+														)}
+													>
+														{checked && <svg className="size-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+														{meta.label}
+													</button>
+												);
+											})}
+										</div>
+									</div>
+								)}
 								{openFilter === "mes" && (
 									<div className="space-y-1.5">
 										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar mes</span>
@@ -352,6 +396,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 										<TableRow>
 											<TableHead>Fecha</TableHead>
 											<TableHead>Cliente</TableHead>
+											<TableHead>Estado</TableHead>
 											{cols.map(function (c) { return <TableHead key={c.label} className="text-right">{c.label}</TableHead>; })}
 											<TableHead className="text-right">Acciones</TableHead>
 										</TableRow>
@@ -362,6 +407,16 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 												<TableRow key={q.id}>
 													<TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>
 													<TableCell className="font-medium">{q.clientName || "(sin nombre)"}</TableCell>
+													<TableCell>
+														<Select value={dealStatus(q)} onValueChange={function (v) { dealsApi.updateStatus(q.id, v); }}>
+															<SelectTrigger className={cn("h-7 w-[120px] text-xs border", DEAL_STATUS_META[dealStatus(q)].className)}>
+																<SelectValue />
+															</SelectTrigger>
+															<SelectContent>
+																{DEAL_STATUSES.map(function (s) { return <SelectItem key={s} value={s}>{DEAL_STATUS_META[s].label}</SelectItem>; })}
+															</SelectContent>
+														</Select>
+													</TableCell>
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
 														{(q.channel === "b2b2c" || q.channel === "distribuidores") && (

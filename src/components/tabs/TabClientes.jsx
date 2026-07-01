@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
+import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
+import { cn } from "@/lib/utils";
 
 const CHANNEL_LABEL = { web: "Canal Web", distribuidores: "Distribuidores", b2b2c: "B2B2C (IDC)" };
 const CHANNEL_SHORT = { web: "Web", distribuidores: "Dist.", b2b2c: "B2B2C" };
@@ -78,25 +81,31 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	const stats = useMemo(function () {
 		if (!selectedId) return null;
 		let revenue = 0;
+		let confirmedRevenue = 0;
 		clientDeals.forEach(function (d) {
-			revenue += d.resumen?.revMesTotal || d.resumen?.netoLakaut || 0;
+			const rev = d.resumen?.revMesTotal || d.resumen?.netoLakaut || 0;
+			revenue += rev;
+			if (dealStatus(d) === "confirmada") confirmedRevenue += rev;
 		});
-		return { total: clientDeals.length, revenue };
+		return { total: clientDeals.length, revenue, confirmedRevenue };
 	}, [clientDeals, selectedId]);
 
 	const globalStats = useMemo(function () {
 		const totalClients = clients.length;
 		const totalDeals = deals.length;
 		let totalRevenue = 0;
+		let confirmedRevenue = 0;
 		deals.forEach(function (d) {
-			totalRevenue += d.resumen?.revMesTotal || d.resumen?.revAnual || d.resumen?.netoLakaut || 0;
+			const rev = d.resumen?.revMesTotal || d.resumen?.revAnual || d.resumen?.netoLakaut || 0;
+			totalRevenue += rev;
+			if (dealStatus(d) === "confirmada") confirmedRevenue += rev;
 		});
 		const byChannel = {
 			web: clients.filter(function (c) { return c.channel === "web"; }).length,
 			distribuidores: clients.filter(function (c) { return c.channel === "distribuidores"; }).length,
 			b2b2c: clients.filter(function (c) { return c.channel === "b2b2c"; }).length,
 		};
-		return { totalClients, totalDeals, totalRevenue, byChannel };
+		return { totalClients, totalDeals, totalRevenue, confirmedRevenue, byChannel };
 	}, [clients, deals]);
 
 	function clientRevenue(clientId) {
@@ -213,6 +222,12 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 								<span className="text-xl font-semibold tabular-nums">{fMoney(stats.revenue)}</span>
 							</div>
 						)}
+						{stats.confirmedRevenue > 0 && (
+							<div className="flex flex-col gap-0.5 bg-success/10 rounded-md px-4 py-3 min-w-[140px]">
+								<span className="text-[11px] text-success uppercase tracking-wide">Facturado (confirmado)</span>
+								<span className="text-xl font-semibold tabular-nums text-success">{fMoney(stats.confirmedRevenue)}</span>
+							</div>
+						)}
 					</div>
 				)}
 
@@ -227,6 +242,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										<TableHead>Fecha</TableHead>
 										<TableHead>Canal</TableHead>
 										<TableHead>Resumen</TableHead>
+										<TableHead>Estado</TableHead>
 										{selected.channel === "b2b2c" && <TableHead className="text-right">IDC/mes</TableHead>}
 										{selected.channel === "distribuidores" && <TableHead className="text-right">Certs</TableHead>}
 										<TableHead className="text-right">Revenue</TableHead>
@@ -242,6 +258,16 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 												<TableCell><Badge variant="secondary" className="text-[10px]">{CHANNEL_LABEL[d.channel] || d.channel}</Badge></TableCell>
 												<TableCell className="text-sm text-muted-foreground">
 													{d.channel === "distribuidores" ? (d.resumen?.tier || "—") : (d.resumen?.segmento || "—")}
+												</TableCell>
+												<TableCell>
+													<Select value={dealStatus(d)} onValueChange={function (v) { dealsApi.updateStatus(d.id, v); }}>
+														<SelectTrigger className={cn("h-7 w-[120px] text-xs border", DEAL_STATUS_META[dealStatus(d)].className)}>
+															<SelectValue />
+														</SelectTrigger>
+														<SelectContent>
+															{DEAL_STATUSES.map(function (s) { return <SelectItem key={s} value={s}>{DEAL_STATUS_META[s].label}</SelectItem>; })}
+														</SelectContent>
+													</Select>
 												</TableCell>
 												{selected.channel === "b2b2c" && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.idcMensuales || 0).toLocaleString("es-AR")}</TableCell>}
 												{selected.channel === "distribuidores" && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.certsActivos || 0).toLocaleString("es-AR")}</TableCell>}
@@ -285,6 +311,12 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[160px]">
 						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Revenue acumulado</span>
 						<span className="text-2xl font-semibold tabular-nums">{fMoney(globalStats.totalRevenue)}</span>
+					</div>
+				)}
+				{globalStats.confirmedRevenue > 0 && (
+					<div className="flex flex-col gap-0.5 bg-success/10 rounded-lg px-5 py-4 min-w-[160px]">
+						<span className="text-[11px] text-success uppercase tracking-wide">Facturado (confirmado)</span>
+						<span className="text-2xl font-semibold tabular-nums text-success">{fMoney(globalStats.confirmedRevenue)}</span>
 					</div>
 				)}
 				{globalStats.byChannel.distribuidores > 0 && (

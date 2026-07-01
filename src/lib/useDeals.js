@@ -4,6 +4,7 @@ import { supabase, loadConfig } from "./supabase";
 function normalize(deal) {
 	return Object.assign({}, deal, {
 		clientName: deal.clients ? deal.clients.name : "(sin nombre)",
+		status: (deal.resumen && deal.resumen.status) || "pendiente",
 	});
 }
 
@@ -111,6 +112,34 @@ export function useDeals() {
 		setDeals(function (prev) { return prev.filter(function (d) { return d.id !== id; }); });
 	}, []);
 
+	// El status no tiene columna propia: vive en resumen.status. Se relee resumen
+	// desde la DB antes de mergear para no pisar otros campos con estado stale.
+	const updateStatus = useCallback(async function (id, status) {
+		const { data: current, error: fetchErr } = await supabase
+			.from("deals")
+			.select("resumen")
+			.eq("id", id)
+			.single();
+		if (fetchErr) {
+			console.error("useDeals.updateStatus fetch error:", fetchErr);
+			return null;
+		}
+		const nextResumen = Object.assign({}, current?.resumen, { status });
+		const { data, error } = await supabase
+			.from("deals")
+			.update({ resumen: nextResumen })
+			.eq("id", id)
+			.select("*, clients(id, name, channel, certs_activos)")
+			.single();
+		if (!error && data) {
+			const norm = normalize(data);
+			setDeals(function (prev) { return prev.map(function (d) { return d.id === id ? norm : d; }); });
+			return norm;
+		}
+		console.error("useDeals.updateStatus error:", error);
+		return null;
+	}, []);
+
 	const updateSlideUrl = useCallback(async function (id, slideUrl) {
 		const { data, error } = await supabase
 			.from("deals")
@@ -127,5 +156,5 @@ export function useDeals() {
 	// Backwards-compat alias so old refs to quotesApi.quotes still work
 	const quotes = deals;
 
-	return { deals, quotes, loading, migrated, save, remove, updateSlideUrl, refetch: fetchDeals };
+	return { deals, quotes, loading, migrated, save, remove, updateStatus, updateSlideUrl, refetch: fetchDeals };
 }
