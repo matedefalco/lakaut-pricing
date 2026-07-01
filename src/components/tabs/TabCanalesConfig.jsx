@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, os, mont } from "../../theme/tokens";
+import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, WN, ER, os, mont } from "../../theme/tokens";
+
+const FIRMAS_INCL_REF = 1; // 1 IDC = 1 cert + 1 firma, igual que en Canal B2B2C · Tabla de referencia
+
+function margColor(pct) { return pct >= 0.5 ? OK : pct >= 0.2 ? WN : ER; }
 
 function InlineNum({ value, onChange, decimals }) {
 	return (
@@ -103,10 +107,16 @@ function SectionCard({ title, description, children }) {
 	);
 }
 
-export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
+export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) {
 	const [draft, setDraft] = useState(channelConfig);
 	const [isDirty, setIsDirty] = useState(false);
 	const [toast, setToast] = useState(null); // { msg, id }
+	const [segPriceMode, setSegPriceMode] = useState("manual"); // "manual" | "margen"
+
+	const cvCert = costs?.cvCertBase ?? 0;
+	const cvFirma = costs?.cvFirmaBase ?? 0;
+	const cfDirecto = costs?.cfDirecto ?? 0;
+	const costoRealIDC = cvCert + FIRMAS_INCL_REF * cvFirma;
 
 	useEffect(function () {
 		setDraft(channelConfig);
@@ -239,14 +249,51 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 			</SectionCard>
 
 			{/* ── Segmentos B2B2C ── */}
-			<SectionCard title="2 · Segmentos B2B2C (precio por IDC)">
+			<SectionCard
+				title="2 · Segmentos B2B2C (precio por IDC)"
+				description={"CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + ". CM = Precio − CV. BE = CF directo (USD " + cfDirecto.toFixed(0) + ") ÷ CM por IDC."}
+			>
+				{/* Toggle de modo de carga de precio */}
+				<div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+					{[
+						{ id: "manual", label: "Precio manual" },
+						{ id: "margen", label: "Margen objetivo" },
+					].map(function (m) {
+						const active = segPriceMode === m.id;
+						return (
+							<button
+								key={m.id}
+								onClick={function () { setSegPriceMode(m.id); }}
+								style={{
+									padding: "5px 12px",
+									borderRadius: 6,
+									border: "1px solid " + (active ? BLUE : BORD),
+									background: active ? BLUE : WHITE,
+									color: active ? WHITE : GRAY,
+									fontFamily: "'Open Sans',sans-serif",
+									fontSize: 11,
+									fontWeight: 700,
+									cursor: "pointer",
+								}}
+							>
+								{m.label}
+							</button>
+						);
+					})}
+				</div>
+
 				<div style={{ overflowX: "auto" }}>
 					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
 						<thead>
 							<tr>
-								{["IDC mín.", "IDC máx.", "Precio IDC (USD)"].map(function (h) {
-									return <th key={h} style={thR}>{h}</th>;
-								})}
+								<th style={thR}>IDC mín.</th>
+								<th style={thR}>IDC máx.</th>
+								{segPriceMode === "margen" && <th style={thR}>Margen objetivo (%)</th>}
+								<th style={thR}>Precio IDC (USD){segPriceMode === "margen" ? " (calc.)" : ""}</th>
+								<th style={thR}>Costo CV (USD/IDC)</th>
+								<th style={thR}>CM $</th>
+								<th style={thR}>CM %</th>
+								<th style={thR}>BE (IDC)</th>
 								<th style={thR}></th>
 							</tr>
 						</thead>
@@ -258,11 +305,32 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig }) {
 									});
 									updDraft({ b2b2cSegments: next });
 								}
+								function updMargen(v) {
+									const m = (v || 0) / 100;
+									const newPrecio = m > 0 && m < 1 ? costoRealIDC / (1 - m) : costoRealIDC;
+									upd("precioIDC", Math.round(newPrecio * 10000) / 10000);
+								}
+								const precioIDC = seg.precioIDC || 0;
+								const cmVal = precioIDC - costoRealIDC;
+								const cmPct = precioIDC > 0 ? cmVal / precioIDC : 0;
+								const beVal = cmVal > 0 ? Math.ceil(cfDirecto / cmVal) : null;
+								const margenPct = precioIDC > 0 ? Math.round((cmVal / precioIDC) * 1000) / 10 : 0;
 								return (
 									<tr key={seg.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} /></td>
+										{segPriceMode === "margen" && (
+											<td style={{ padding: "5px 8px" }}><InlineNum value={margenPct} decimals={1} onChange={updMargen} /></td>
+										)}
+										<td style={{ padding: "5px 8px" }}>
+											{segPriceMode === "manual"
+												? <InlineNum value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} />
+												: <div style={Object.assign({}, os(12, 700, BLACK), { textAlign: "right", padding: "2px 6px" })}>{precioIDC.toFixed(4)}</div>}
+										</td>
+										<td style={{ padding: "5px 8px", textAlign: "right", color: GRAY }}>{costoRealIDC.toFixed(4)}</td>
+										<td style={{ padding: "5px 8px", textAlign: "right", color: margColor(cmPct), fontWeight: 700 }}>{cmVal.toFixed(4)}</td>
+										<td style={{ padding: "5px 8px", textAlign: "right", color: margColor(cmPct), fontWeight: 700 }}>{(cmPct * 100).toFixed(0)}%</td>
+										<td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700 }}>{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</td>
 										<td style={{ padding: "5px 8px", textAlign: "center" }}>
 											<DeleteRowButton onClick={function () { removeRow("b2b2cSegments", idx); }} />
 										</td>
