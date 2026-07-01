@@ -14,8 +14,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 const CHANNELS = ["b2b2c", "distribuidores", "web"];
 
 const CHANNEL_META = {
-	b2b2c:         { label: "B2B2C (IDC)",    color: "#6366f1" },
-	distribuidores:{ label: "Distribuidores",  color: "#0ea5e9" },
+	b2b2c:         { label: "Volumen (IDC)",   color: "#6366f1" },
+	distribuidores:{ label: "Precio de lista con descuento", color: "#0ea5e9" },
 	web:           { label: "Web (lista)",     color: "#f59e0b" },
 };
 

@@ -3,7 +3,7 @@ import { UserPlus, ChevronDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
-const CHANNEL_LABEL = { web: "Web", distribuidores: "Distribuidores", b2b2c: "B2B2C" };
+const CHANNEL_LABEL = { web: "Web", distribuidores: "Precio de lista con descuento", b2b2c: "Volumen" };
 
 export function ClientSelector({ channel, clients, onCreate, value, onChange }) {
 	const [open, setOpen] = useState(false);

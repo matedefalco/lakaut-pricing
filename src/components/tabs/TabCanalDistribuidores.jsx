@@ -164,7 +164,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 				<CardHeader className="pb-3">
 					<div className="flex items-start justify-between gap-4">
 						<div>
-							<CardTitle className="font-heading text-base font-semibold">Canal Distribuidores e Integradores</CardTitle>
+							<CardTitle className="font-heading text-base font-semibold">Canal Precio de lista con descuento · Distribuidores e Integradores</CardTitle>
 							<p className="text-sm text-muted-foreground mt-1">El compromiso de facturación se <strong>calcula</strong> a precios de lista y, junto con los certificados activos, define el nivel (gana el mayor). El descuento aplica sobre toda la lista.</p>
 						</div>
 						{editingId && <span className="shrink-0 text-xs font-semibold text-[var(--success)] bg-[var(--success)]/10 px-2 py-1 rounded-md">Editando</span>}

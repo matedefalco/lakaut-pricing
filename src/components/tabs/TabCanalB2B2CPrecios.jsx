@@ -130,7 +130,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 	return (
 		<div className="space-y-6 max-w-4xl">
 			<div>
-				<h2 className="text-base font-semibold font-heading">Canal B2B2C · Tabla de referencia</h2>
+				<h2 className="text-base font-semibold font-heading">Canal Volumen · Tabla de referencia</h2>
 				<p className="text-sm text-muted-foreground mt-1">Precios en USD. La unidad comercial es el IDC (Identidad Digital Certificada). El precio final por cotización puede ajustarse en la Cotizadora.</p>
 			</div>
 

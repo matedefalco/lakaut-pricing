@@ -97,10 +97,12 @@ function iconBox(svg, bg, size) {
 }
 
 // ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
-function s1Cover(clientName, fecha) {
+function s1Cover(clientName, fecha, sinApi) {
 	const badges = [
 		{ text: "100% Remoto",        icon: SVG.check( "rgba(255,255,255,0.85)", 11) },
-		{ text: "Firma embebida",      icon: SVG.code(  "rgba(255,255,255,0.85)", 11) },
+		sinApi
+			? { text: "Emisión a escala",  icon: SVG.zap(   "rgba(255,255,255,0.85)", 11) }
+			: { text: "Firma embebida",    icon: SVG.code(  "rgba(255,255,255,0.85)", 11) },
 		{ text: "Validez legal plena", icon: SVG.shield("rgba(255,255,255,0.85)", 11) },
 	];
 	return `<div class="slide" style="background:${B};">
@@ -120,7 +122,9 @@ function s1Cover(clientName, fecha) {
   <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 1.3cm;">
     <div style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.35cm;">Propuesta Comercial</div>
     <div style="font-size:44pt;font-weight:700;color:${W};line-height:1.05;letter-spacing:-0.5px;margin-bottom:0.45cm;">${clientName}</div>
-    <div style="font-size:10pt;color:rgba(255,255,255,0.72);max-width:15cm;line-height:1.6;margin-bottom:0.9cm;">Integración de firma digital con validez legal,<br>embebida en tu flujo y 100% remota.</div>
+    <div style="font-size:10pt;color:rgba(255,255,255,0.72);max-width:15cm;line-height:1.6;margin-bottom:0.9cm;">${sinApi
+		? "Firma digital con validez legal,<br>emitida por volumen y 100% remota."
+		: "Integración de firma digital con validez legal,<br>embebida en tu flujo y 100% remota."}</div>
     <!-- badges -->
     <div style="display:flex;gap:0.45cm;">
       ${badges.map(b => `<div style="display:flex;align-items:center;gap:0.2cm;border:1.5px solid rgba(255,255,255,0.38);border-radius:20px;padding:0.18cm 0.45cm;">${b.icon}<span style="font-size:8pt;color:${W};font-weight:500;">${b.text}</span></div>`).join("")}
@@ -344,9 +348,10 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 }
 
 // ─── SLIDE 3: MODELO COMERCIAL — B2B2C ───────────────────────────────────────
-function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
+function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
+	const sinApi = inp.integracion === "sin_api";
 	// La Cotizadora B2B2C no tiene (todavía) un selector de modalidad única/recurrente:
 	// el volumen de IDC es un dato neutro. No hay que asumir periodicidad que no se configuró.
 	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
@@ -360,9 +365,13 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
 
 	const rows = [
 		{ l: "Volumen de IDC",           v: (Number(inp.idcMensuales)||0).toLocaleString("es-AR") },
-		{ l: "Tipo de integración API",  v: api.label },
-		{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
-		{ l: "Plan de soporte / SLA",    v: slaText },
+		// Sin integración API no hay fee de implementación ni SLA: la propuesta
+		// muestra solo el volumen cotizado y las firmas.
+		...(sinApi ? [] : [
+			{ l: "Tipo de integración API",  v: api.label },
+			{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
+			{ l: "Plan de soporte / SLA",    v: slaText },
+		]),
 		{ l: "Firmas incluidas por IDC", v: String(Number(inp.firmasInclPorIDC)||0) },
 		...((Number(inp.firmasAdicPorIDC)||0) > 0 ? [{ l: "Firmas adicionales por IDC", v: `${inp.firmasAdicPorIDC} · ${fm(Number(inp.precioFirmaAdic)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.precioFirmaAdic)||0, currency, tc)})` : ""} c/u` }] : []),
 	];
@@ -381,7 +390,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
   <!-- slide header -->
   <div style="flex-shrink:0;padding:0.55cm 1cm 0.35cm;">
     <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Modelo Comercial</div>
-    <div style="font-size:9pt;color:${GR};">B2B2C · IDC <span style="font-weight:400;">(Identidad Digital Certificada)</span> · integración <strong style="color:${DK};">${api.label}</strong></div>
+    <div style="font-size:9pt;color:${GR};">Volumen · IDC <span style="font-weight:400;">(Identidad Digital Certificada)</span>${sinApi ? "" : ` · integración <strong style="color:${DK};">${api.label}</strong>`}</div>
   </div>
 
   <!-- two columns -->
@@ -422,17 +431,23 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig) {
     </div>
 
   </div>
-  ${foot(3)}
+  ${foot(pageN || 3)}
 </div>`;
 }
 
 // ─── SLIDE 4: PRÓXIMOS PASOS ──────────────────────────────────────────────────
-function s4Pasos(clientName) {
-	const steps = [
-		{ n:"01", icon: SVG.file( W, 20), title:"Contrato de integración", desc:"Revisión y firma del Contrato de Integración y sus Anexos.",           dark:false },
-		{ n:"02", icon: SVG.users(W, 20), title:"Kick-off técnico",         desc:"Arranque con el equipo de desarrollo: SLAs, servicio técnico y puesta a punto.", dark:false },
-		{ n:"03", icon: SVG.zap(  W, 20), title:"Go-Live",                  desc:`Pase a producción y puesta en marcha de la firma digital en ${clientName}.`, dark:true  },
-	];
+function s4Pasos(clientName, sinApi, pageN) {
+	const steps = sinApi
+		? [
+			{ n:"01", icon: SVG.file( W, 20), title:"Aceptación de la propuesta", desc:"Revisión y firma de la propuesta comercial y sus condiciones.",                dark:false },
+			{ n:"02", icon: SVG.users(W, 20), title:"Alta y emisión",             desc:"Alta de los usuarios y emisión de las identidades digitales cotizadas.",       dark:false },
+			{ n:"03", icon: SVG.zap(  W, 20), title:"Puesta en marcha",           desc:`Entrega del volumen solicitado y puesta en marcha de la firma digital en ${clientName}.`, dark:true  },
+		]
+		: [
+			{ n:"01", icon: SVG.file( W, 20), title:"Contrato de integración", desc:"Revisión y firma del Contrato de Integración y sus Anexos.",           dark:false },
+			{ n:"02", icon: SVG.users(W, 20), title:"Kick-off técnico",         desc:"Arranque con el equipo de desarrollo: SLAs, servicio técnico y puesta a punto.", dark:false },
+			{ n:"03", icon: SVG.zap(  W, 20), title:"Go-Live",                  desc:`Pase a producción y puesta en marcha de la firma digital en ${clientName}.`, dark:true  },
+		];
 	return `<div class="slide" style="background:${W};">
   <!-- slide header -->
   <div style="flex-shrink:0;padding:0.65cm 1cm 0.4cm;">
@@ -459,12 +474,12 @@ function s4Pasos(clientName) {
         </div>`;
 	}).join("")}
   </div>
-  ${foot(4)}
+  ${foot(pageN || 4)}
 </div>`;
 }
 
 // ─── SLIDE 5: CIERRE ──────────────────────────────────────────────────────────
-function s5Cierre() {
+function s5Cierre(sinApi) {
 	return `<div class="slide" style="background:${B};">
   <!-- decorative circle -->
   <div style="position:absolute;bottom:-3.5cm;left:-2cm;width:12cm;height:12cm;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
@@ -473,7 +488,7 @@ function s5Cierre() {
   <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 1.3cm;">
     <div style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.3cm;">Gracias por su tiempo</div>
     <div style="font-size:36pt;font-weight:700;color:${W};line-height:1.1;margin-bottom:0.4cm;">Muchas gracias</div>
-    <div style="font-size:10pt;color:rgba(255,255,255,0.7);line-height:1.6;max-width:14cm;">Quedamos a disposición para avanzar con la integración.</div>
+    <div style="font-size:10pt;color:rgba(255,255,255,0.7);line-height:1.6;max-width:14cm;">${sinApi ? "Quedamos a disposición para avanzar con la propuesta." : "Quedamos a disposición para avanzar con la integración."}</div>
   </div>
 
   <!-- divider + contact -->
@@ -502,8 +517,11 @@ function s5Cierre() {
 // ─── Builder ──────────────────────────────────────────────────────────────────
 function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
+	// Cotizaciones de volumen sin integración API: la propuesta omite la slide de
+	// integración y el lenguaje técnico (fee, SLA, kick-off) — solo el volumen cotizado.
+	const sinApi = deal.channel === "b2b2c" && deal.inputs?.integracion === "sin_api";
 	const s3 = deal.channel === "b2b2c"
-		? s3B2B2C(deal, clientName, currency, tc, channelConfig)
+		? s3B2B2C(deal, clientName, currency, tc, channelConfig, sinApi ? 2 : 3)
 		: s3Dist(deal, clientName, currency, tc, channelConfig, models);
 
 	return `<!DOCTYPE html>
@@ -514,11 +532,11 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 <style>${SLIDE_CSS}</style>
 </head>
 <body>
-${s1Cover(clientName, deal.fecha)}
-${s2Integracion(clientName)}
+${s1Cover(clientName, deal.fecha, sinApi)}
+${sinApi ? "" : s2Integracion(clientName)}
 ${s3}
-${s4Pasos(clientName)}
-${s5Cierre()}
+${s4Pasos(clientName, sinApi, sinApi ? 3 : 4)}
+${s5Cierre(sinApi)}
 </body>
 </html>`;
 }

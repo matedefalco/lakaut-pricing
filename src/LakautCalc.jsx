@@ -134,14 +134,14 @@ function LakautCalcInner() {
 					],
 				},
 				{
-					key: "distribuidores-group", label: "Distribuidores",
+					key: "distribuidores-group", label: "Precio de lista con descuento",
 					children: [
 						{ key: "distribuidores-precios", label: "Referencia" },
 						{ key: "distribuidores", label: "Cotizadora" },
 					],
 				},
 				{
-					key: "b2b2c-group", label: "B2B2C (IDC)",
+					key: "b2b2c-group", label: "Volumen",
 					children: [
 						{ key: "b2b2c-precios", label: "Referencia" },
 						{ key: "b2b2c", label: "Cotizadora" },

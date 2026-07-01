@@ -10,8 +10,8 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { cn } from "@/lib/utils";
 
-const CHANNEL_LABEL = { web: "Canal Web", distribuidores: "Distribuidores", b2b2c: "B2B2C (IDC)" };
-const CHANNEL_SHORT = { web: "Web", distribuidores: "Dist.", b2b2c: "B2B2C" };
+const CHANNEL_LABEL = { web: "Canal Web", distribuidores: "Precio de lista con descuento", b2b2c: "Volumen" };
+const CHANNEL_SHORT = { web: "Web", distribuidores: "Lista", b2b2c: "Volumen" };
 const CHANNEL_BADGE = { web: "secondary", distribuidores: "default", b2b2c: "default" };
 
 function getDistributorTierLocal(certsActivos, compromisoAnualUSD, tiers) {
@@ -321,13 +321,13 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 				)}
 				{globalStats.byChannel.distribuidores > 0 && (
 					<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[130px]">
-						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Distribuidores</span>
+						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Lista c/desc.</span>
 						<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.distribuidores}</span>
 					</div>
 				)}
 				{globalStats.byChannel.b2b2c > 0 && (
 					<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[110px]">
-						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">B2B2C</span>
+						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Volumen</span>
 						<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.b2b2c}</span>
 					</div>
 				)}
@@ -349,7 +349,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 								onClick={function () { setChannelFilter(ch); }}
 								className={"px-2.5 py-1 rounded-md transition-colors " + (channelFilter === ch ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
 							>
-								{ch === "all" ? "Todos" : ch === "distribuidores" ? "Distribuidores" : "B2B2C"}
+								{ch === "all" ? "Todos" : ch === "distribuidores" ? "Lista c/desc." : "Volumen"}
 							</button>
 						);
 					})}

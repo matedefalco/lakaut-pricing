@@ -15,8 +15,8 @@ import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 
 const CHANNELS = {
-	distribuidores: { label: "Distribuidores", variant: "secondary" },
-	b2b2c: { label: "B2B2C", variant: "default" },
+	distribuidores: { label: "Lista c/desc.", variant: "secondary" },
+	b2b2c: { label: "Volumen", variant: "default" },
 };
 
 const FILTER_DEFS = [
@@ -345,7 +345,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 								)}
 								{openFilter === "certs" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Certs activos administrados (Distribuidores)</span>
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Certs activos administrados (Precio de lista con descuento)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={certsMin} onChange={function (e) { setCertsMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>
@@ -355,7 +355,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 								)}
 								{openFilter === "idc" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Volumen de IDC (B2B2C)</span>
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Volumen de IDC (canal Volumen)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={idcMin} onChange={function (e) { setIdcMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>
@@ -377,7 +377,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 			{dealsApi?.loading ? (
 				<p className="text-sm text-muted-foreground">Cargando historial…</p>
 			) : filtered.length === 0 ? (
-				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Distribuidores o B2B2C y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
+				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Precio de lista con descuento o Volumen y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
 			) : (
 				orderedChannels.map(function (ch) {
 					const cols = summaryCols(ch, fMoney);
@@ -406,7 +406,14 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 											return (
 												<TableRow key={q.id}>
 													<TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>
-													<TableCell className="font-medium">{q.clientName || "(sin nombre)"}</TableCell>
+													<TableCell className="font-medium">
+														{q.clientName || "(sin nombre)"}
+														{q.channel === "b2b2c" && (
+															<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
+																{q.inputs?.integracion === "sin_api" ? "sin API" : "API"}
+															</Badge>
+														)}
+													</TableCell>
 													<TableCell>
 														<Select value={dealStatus(q)} onValueChange={function (v) { dealsApi.updateStatus(q.id, v); }}>
 															<SelectTrigger className={cn("h-7 w-[120px] text-xs border", DEAL_STATUS_META[dealStatus(q)].className)}>

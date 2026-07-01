@@ -32,6 +32,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const cvFirma = costs.cvFirmaBase;
 
 	const [selectedClient, setSelectedClient] = useState(null);
+	const [integracion, setIntegracion] = useState("api"); // "api" | "sin_api"
 	const [idcMensuales, setIdcMensuales] = useState(5500);
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
@@ -52,6 +53,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 
 	const DESCUENTO_ABONO = 0.35;
 
+	const conApi = integracion !== "sin_api";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
 	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
 	const seg = getB2B2CSegmentLocal(idcMensuales, b2b2cSegments);
@@ -65,6 +67,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 		} else if (pendingEdit.clients) {
 			setSelectedClient(pendingEdit.clients);
 		}
+		setIntegracion(i.integracion || "api");
 		setIdcMensuales(i.idcMensuales || 0);
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
@@ -129,9 +132,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 	const costoCert = idcMensuales * cvCert;
 	const costoFirmas = firmasTotales * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
-	const slaMes = slaBonificado ? 0 : (sla.precioMes || 0);
+	// Sin integración API no hay fee de implementación ni plan de soporte/SLA
+	const feeAplicado = conApi ? (Number(fee) || 0) : 0;
+	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
 	const revSinFee = revIDC + revFirmasAdic + slaMes;
-	const revTotal = revSinFee + (Number(fee) || 0);
+	const revTotal = revSinFee + feeAplicado;
 	const margen = revIDC + revFirmasAdic - costoTotal;
 	const margenPct = revIDC + revFirmasAdic > 0 ? margen / (revIDC + revFirmasAdic) : 0;
 
@@ -156,7 +161,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			fecha: prev ? prev.fecha : now,
 			updatedAt: editingId ? now : undefined,
 			inputs: {
-				idcMensuales, fee, slaId, slaBonificado,
+				integracion, idcMensuales,
+				...(conApi ? { fee, slaId, slaBonificado } : {}),
 				firmasInclPorIDC, firmasAdicPorIDC, precioFirmaAdic, casosDeUso, abono,
 				...(overrideMode ? {
 					overrideMode,
@@ -170,7 +176,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			},
 			resumen: {
 				segmento: seg.label, idcMensuales, firmasTotales, firmasMes: firmasTotales, precioIDC,
-				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + (Number(fee) || 0),
+				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
 				margen, margenPct,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
 				...(prev?.resumen?.status ? { status: prev.resumen.status } : {}),
@@ -189,7 +195,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 			<Card className="bg-card border-border">
 				<CardHeader className="pb-3">
 					<div className="flex items-center justify-between gap-4 flex-wrap">
-						<CardTitle className="font-heading text-base font-semibold">Canal B2B2C · Identidades Digitales Certificadas</CardTitle>
+						<CardTitle className="font-heading text-base font-semibold">Canal Volumen · Identidades Digitales Certificadas</CardTitle>
 					</div>
 					<p className="text-sm text-muted-foreground">
 						Empresas que integran los servicios de confianza en sus propios productos. La unidad es el IDC. Las firmas incluidas por IDC son configurables (firma inicial + activación, según lo que requiera la institución).
@@ -213,23 +219,55 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 
 					<Separator />
 
+					{/* Modalidad de integración */}
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
+						<div className="flex gap-1 flex-wrap">
+							{[
+								{ id: "api", label: "Con integración API", sub: "fee de implementación + SLA" },
+								{ id: "sin_api", label: "Sin integración", sub: "solo volumen solicitado" },
+							].map(function (m) {
+								const active = integracion === m.id;
+								return (
+									<button
+										key={m.id}
+										onClick={function () { setIntegracion(m.id); }}
+										className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
+									>
+										<span className="font-medium">{m.label}</span>
+										<span className={"ml-1.5 " + (active ? "opacity-75" : "opacity-60")}>· {m.sub}</span>
+									</button>
+								);
+							})}
+						</div>
+						{!conApi && (
+							<p className="text-[11px] text-muted-foreground">Sin integración API: se cotiza únicamente el volumen de IDC solicitado, sin fee de implementación ni plan de soporte.</p>
+						)}
+					</div>
+
+					<Separator />
+
 					{/* Parámetros */}
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						<NumberField label="Cantidad de IDC" value={idcMensuales} onChange={setIdcMensuales} />
-						<div className="flex flex-col gap-1.5">
-							<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
-						</div>
-						<div className="flex flex-col gap-1.5">
-							<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
-								options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
-							{sla.precioMes > 0 && (
-								<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
-									<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
-									Bonificar SLA para este cliente
-									{slaBonificado && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
-								</label>
-							)}
-						</div>
+						{conApi && (
+							<div className="flex flex-col gap-1.5">
+								<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+							</div>
+						)}
+						{conApi && (
+							<div className="flex flex-col gap-1.5">
+								<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
+									options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
+								{sla.precioMes > 0 && (
+									<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
+										<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
+										Bonificar SLA para este cliente
+										{slaBonificado && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
+									</label>
+								)}
+							</div>
+						)}
 						<NumberField label="Firmas incluidas por IDC" value={firmasInclPorIDC} onChange={setFirmasInclPorIDC} note="Firma inicial + activación (editable)" />
 						<NumberField label="Firmas adicionales por IDC" value={firmasAdicPorIDC} onChange={setFirmasAdicPorIDC} note="Se cobran aparte" />
 						<NumberField label="Precio firma adicional" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" />
@@ -383,7 +421,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 				<StatCard label="Precio por IDC" value={fMoney2(precioIDC)} sub={"Costo " + fMoney2(costoIDC)} accent="primary" />
 				<StatCard label="Cont. marginal por IDC" value={(margenPctIDC * 100).toFixed(0) + "%"} sub={fMoney2(margenIDC) + "/IDC"} accent={margAccent(margenPctIDC)} valueClass={margClass(margenPctIDC)} />
 				<StatCard label="Total firmas" value={firmasTotales.toLocaleString("es-AR")} sub={idcMensuales.toLocaleString("es-AR") + " IDC × " + firmasPorIDC + " firmas"} accent="muted" />
-				<StatCard label="Revenue total" value={fMoney(revTotal)} sub={"IDC + firmas + SLA · fee " + fMoney(Number(fee) || 0) + " incluido"} accent="success" />
+				<StatCard label="Revenue total" value={fMoney(revTotal)} sub={conApi ? "IDC + firmas + SLA · fee " + fMoney(feeAplicado) + " incluido" : "IDC + firmas · sin integración API"} accent="success" />
 				{abono && (
 					<>
 						<StatCard label="Abono mensual (firmas)" value={fMoney(revAbonoMes)} sub={"Renovación " + firmasInclTotal.toLocaleString("es-AR") + " firmas · −" + (DESCUENTO_ABONO * 100).toFixed(0) + "%"} accent="success" />
@@ -424,16 +462,20 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, pendi
 								<TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell>
 								{abono && <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>}
 							</TableRow>
-							<TableRow>
-								<TableCell>Soporte / SLA ({sla.label})</TableCell>
-								<TableCell className="text-right tabular-nums">{slaMes ? fMoney(slaMes) : "incluido"}</TableCell>
-								{abono && <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>}
-							</TableRow>
-							<TableRow>
-								<TableCell>Fee de implementación</TableCell>
-								<TableCell className="text-right tabular-nums">{fMoney(fee)}</TableCell>
-								{abono && <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>}
-							</TableRow>
+							{conApi && (
+								<TableRow>
+									<TableCell>Soporte / SLA ({sla.label})</TableCell>
+									<TableCell className="text-right tabular-nums">{slaMes ? fMoney(slaMes) : "incluido"}</TableCell>
+									{abono && <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>}
+								</TableRow>
+							)}
+							{conApi && (
+								<TableRow>
+									<TableCell>Fee de implementación</TableCell>
+									<TableCell className="text-right tabular-nums">{fMoney(feeAplicado)}</TableCell>
+									{abono && <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>}
+								</TableRow>
+							)}
 							<TableRow className={margen >= 0 ? "bg-success/5" : "bg-destructive/5"}>
 								<TableCell className={"font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal</TableCell>
 								<TableCell className={"text-right tabular-nums font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margen)}</TableCell>
