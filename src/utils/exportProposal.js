@@ -9,18 +9,21 @@ const OW  = "#F7F8FA";  // off-white background
 const W   = "#FFFFFF";  // white
 const NG  = "#565961";  // numeric gray
 
-// ─── Términos y condiciones (footer del resumen) ───────────────────────────────
+// ─── Términos y condiciones (footer de la propuesta) ────────────────────────────
 const TERMS_CAUCION = "La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.";
 const TERMS_RETENCIONES = "Lakaut S.A. reviste la condición de Agente de Retención y Percepción, por lo que las percepciones y/o retenciones impositivas que correspondan serán aplicadas en la facturación de acuerdo con la normativa vigente.";
-function termsFooter(extraStyle) {
-	return `<div style="margin-top:${extraStyle && extraStyle.marginTop ? extraStyle.marginTop : "0.4cm"};padding-top:0.3cm;border-top:1px solid rgba(255,255,255,0.15);font-size:6.5pt;color:rgba(255,255,255,0.45);line-height:1.4;font-style:italic;">
-    <div style="margin-bottom:0.12cm;">${TERMS_CAUCION}</div>
-    <div>${TERMS_RETENCIONES}</div>
-  </div>`;
-}
+const VALIDEZ_DIAS = 15;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const IVA_RATE = 0.21; // Alineado a TabCanalWeb: precio ARS c/IVA = precio s/IVA × 1.21
+
+// Abono mensual (Distribuidores y Volumen): repone la bolsa de firmas con 35% de
+// descuento, arranca en el mes 2 (el mes 1 ya viene con la bolsa incluida en la
+// compra/emisión inicial) y se sostiene mientras dura la vigencia del certificado
+// (2 años = 24 meses, Borrador v5). Ambos canales comparten esta convención.
+const DESCUENTO_ABONO = 0.35;
+const ABONO_DESDE_MES = 2;
+const ABONO_VIGENCIA_MESES = 24;
 
 // Todos los precios del sistema se guardan sin IVA. `fm` sigue devolviendo el
 // valor neto (sin IVA); `fmGross` agrega el IVA solo para ARS, ya que en
@@ -35,26 +38,143 @@ function fmGross(v, currency, tc) {
 	if (currency !== "ARS") return fm(v, currency, tc);
 	return "$ " + (v * tc * (1 + IVA_RATE)).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
-// Bloque de precio grande (usado en el resumen). En ARS, el monto que se
-// paga es el que incluye IVA: ese es el que se destaca grande como "Total a
-// pagar". El neto queda como referencia chica arriba, nunca como "a pagar".
-function priceBlock(label, v, currency, tc, size) {
-	size = size || "26pt";
-	if (currency !== "ARS") {
-		return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">${label}</div>
-        <div style="font-size:${size};font-weight:800;color:${W};line-height:1;">${fm(v, currency, tc)}</div>`;
-	}
-	return `<div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.15cm;">${label}</div>
-      <div style="display:flex;align-items:baseline;gap:0.18cm;margin-bottom:0.2cm;">
-        <span style="font-size:7.5pt;color:${BLT};opacity:0.8;">Neto (sin IVA)</span>
-        <span style="font-size:13pt;font-weight:700;color:${W};">${fm(v, currency, tc)}</span>
-      </div>
-      <div style="font-size:7.5pt;color:${BLT};font-weight:600;margin-bottom:0.1cm;">Total a pagar <span style="font-weight:400;opacity:0.8;">(IVA 21% incl.)</span></div>
-      <div style="font-size:${size};font-weight:800;color:${W};line-height:1;">${fmGross(v, currency, tc)}</div>`;
-}
 function fd(iso) {
 	try { return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }); }
 	catch (e) { return ""; }
+}
+// Fecha de vencimiento de la propuesta: emisión + VALIDEZ_DIAS días corridos.
+function addDays(iso, days) {
+	try {
+		const d = new Date(iso);
+		d.setDate(d.getDate() + days);
+		return d.toISOString();
+	} catch (e) { return null; }
+}
+
+// ─── Slide "Modelo Comercial" — building blocks compartidos por Volumen y
+// Precio de lista con descuento. Narrativa "momentos": Momento 1 = pago/alta
+// inicial, Momento 2 (solo si hay abono) = cargo recurrente que repone firmas.
+function chip(icon, html) {
+	return `<div style="display:flex;align-items:center;gap:0.18cm;">${icon}<span style="font-size:8.5pt;color:${DK};">${html}</span></div>`;
+}
+
+// Une los chips en una sola tarjeta, separados por divisores verticales finos
+// (en vez de una tarjeta por dato) para que "Incluye" se lea de un vistazo.
+function chipsCard(items) {
+	return `<div style="background:${W};border:1px solid ${GRL};border-radius:12px;padding:0.32cm 0.5cm;box-shadow:0 2px 8px rgba(48,65,213,0.06);">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;">
+      ${items.map((it, i) => it + (i < items.length - 1 ? `<div style="width:1px;height:0.4cm;background:${GRL};margin:0 0.4cm;"></div>` : "")).join("")}
+    </div>
+  </div>`;
+}
+
+function momentoCard({ dark, kicker, icon, heading, body, pageBg }) {
+	const bg = dark ? B : W;
+	const border = dark ? "" : `border:1px solid ${GRL};box-shadow:0 2px 10px rgba(48,65,213,0.07);`;
+	const kickerColor = dark ? "rgba(255,255,255,0.75)" : GR;
+	const headingColor = dark ? W : DK;
+	const iconBg = dark ? "rgba(255,255,255,0.18)" : "#EEF0FD";
+	return `<div style="flex:1;background:${bg};${border}border-radius:14px;padding:0.55cm 0.6cm;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:0.3cm;margin-bottom:0.22cm;">
+      <div style="width:0.8cm;height:0.8cm;background:${iconBg};border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${icon}</div>
+      <div style="font-size:7pt;font-weight:700;color:${kickerColor};text-transform:uppercase;letter-spacing:0.8px;">${kicker}</div>
+    </div>
+    <div style="font-size:15pt;font-weight:800;color:${headingColor};line-height:1.2;margin-bottom:0.2cm;">${heading}</div>
+    ${body}
+  </div>`;
+}
+
+// Precio grande dentro de un momentoCard. `note` va debajo, chico.
+function bigPrice({ dark, label, value, perMes, note }) {
+	const labelColor = dark ? "rgba(255,255,255,0.8)" : GR;
+	const valueColor = dark ? W : DK;
+	const noteColor = dark ? "rgba(255,255,255,0.68)" : GR;
+	return `<div style="margin-top:auto;padding-top:0.25cm;">
+    <div style="font-size:8pt;font-weight:600;color:${labelColor};margin-bottom:0.1cm;">${label}</div>
+    <div style="display:flex;align-items:baseline;gap:0.15cm;">
+      <div style="font-size:23pt;font-weight:800;color:${valueColor};line-height:1;">${value}</div>
+      ${perMes ? `<span style="font-size:11pt;font-weight:700;color:${dark ? "rgba(255,255,255,0.85)" : GR};">/mes</span>` : ""}
+    </div>
+    ${note ? `<div style="font-size:7.5pt;color:${noteColor};margin-top:0.15cm;">${note}</div>` : ""}
+  </div>`;
+}
+
+// Par de mini-stats lado a lado (ej. Subtotal | IVA), separadas por un divisor arriba.
+function miniStats(dark, statsList) {
+	const line = dark ? "rgba(255,255,255,0.2)" : GRL;
+	return `<div style="border-top:1px solid ${line};margin-top:0.22cm;padding-top:0.22cm;display:flex;gap:0.4cm;">
+    ${statsList.map(s => `<div style="flex:1;">
+      <div style="font-size:7.5pt;color:${dark ? "rgba(255,255,255,0.68)" : GR};margin-bottom:2px;">${s.label}</div>
+      <div style="font-size:11pt;font-weight:700;color:${dark ? W : DK};">${s.value}</div>
+    </div>`).join("")}
+  </div>`;
+}
+
+function discountBadge(text) {
+	return `<div style="display:inline-flex;align-items:center;gap:0.2cm;background:${W};border-radius:20px;padding:0.16cm 0.42cm;margin-bottom:0.3cm;width:fit-content;">
+    ${SVG.check(B, 11)}<span style="font-size:8.5pt;font-weight:700;color:${DK};">${text}</span>
+  </div>`;
+}
+
+// Barra inferior "cómo se paga": mes 1 → abono mensual, con el total de referencia
+// para toda la vigencia del certificado. Solo se usa cuando el abono está activo.
+function scheduleBar({ mes1Value, abonoValue, totalValue, totalNote }) {
+	return `<div style="display:flex;background:${W};border:1px solid ${GRL};border-radius:14px;overflow:hidden;">
+    <div style="flex:1;padding:0.4cm 0.6cm;">
+      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.25cm;">Cómo se paga · suscripción mensual</div>
+      <div style="display:flex;align-items:center;gap:0.4cm;">
+        <div>
+          <div style="font-size:7.5pt;color:${GR};margin-bottom:2px;">Pago inicial · mes 1</div>
+          <div style="font-size:15pt;font-weight:800;color:${DK};">${mes1Value}</div>
+        </div>
+        ${SVG.arrowRight(GR, 15)}
+        <div>
+          <div style="font-size:7.5pt;color:${GR};margin-bottom:2px;">Suscripción · mes ${ABONO_DESDE_MES} a ${ABONO_VIGENCIA_MESES}</div>
+          <div style="font-size:15pt;font-weight:800;color:${B};">${abonoValue}<span style="font-size:9pt;font-weight:700;"> /mes</span></div>
+        </div>
+      </div>
+    </div>
+    <div style="width:32%;background:${OW};border-left:1px solid ${GRL};padding:0.4cm 0.6cm;display:flex;flex-direction:column;justify-content:center;">
+      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.12cm;">Total acumulado a ${ABONO_VIGENCIA_MESES} meses · referencia</div>
+      <div style="font-size:18pt;font-weight:800;color:${DK};line-height:1;margin-bottom:0.12cm;">${totalValue}</div>
+      <div style="font-size:7.5pt;color:${GR};line-height:1.4;">${totalNote}</div>
+    </div>
+  </div>`;
+}
+
+// `validUntil` es opcional: si viene, agrega la línea de vigencia de 15 días
+// al pie de términos (además de mostrarse arriba, junto a la fecha de emisión).
+function termsFooterLight() {
+	return `<div style="font-size:6.5pt;color:${GR};line-height:1.4;font-style:italic;">
+    <div style="margin-bottom:0.08cm;">${TERMS_CAUCION}</div>
+    <div>${TERMS_RETENCIONES}</div>
+  </div>`;
+}
+
+// Shell de la slide: header (kicker + título + subtítulo), fila "Incluye" con
+// chips, las tarjetas de momento (1 o 2), la barra de pago (si hay abono) y el
+// pie con términos + branding. La fecha de emisión/vencimiento vive únicamente
+// en la portada (slide 1) — acá no se repite.
+function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHtml, pageN }) {
+	return `<div class="slide" style="background:${OW};">
+  <div style="flex-shrink:0;padding:0.5cm 1cm 0;">
+    <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.12cm;">${kicker}</div>
+    <div style="font-size:21pt;font-weight:800;color:${DK};line-height:1.15;">${title}</div>
+    ${subtitle ? `<div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">${subtitle}</div>` : ""}
+  </div>
+
+  <div style="flex-shrink:0;padding:0.3cm 1cm 0;">
+    <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.18cm;">Incluye</div>
+    ${chipsCard(chips)}
+  </div>
+
+  <div style="flex:1;display:flex;gap:0.4cm;padding:0.3cm 1cm 0;overflow:hidden;">${cardsHtml}</div>
+
+  ${scheduleHtml ? `<div style="flex-shrink:0;padding:0.3cm 1cm 0;">${scheduleHtml}</div>` : ""}
+
+  <div style="flex-shrink:0;padding:0.28cm 1cm 0;">${termsFooterLight()}</div>
+  ${foot(pageN)}
+</div>`;
 }
 
 // ─── Inline SVG icons ─────────────────────────────────────────────────────────
@@ -69,6 +189,11 @@ const SVG = {
 	zap:    (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
 	mail:   (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
 	phone:  (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+	idcard: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M6 16c0-1.4 1-2.5 2-2.5s2 1.1 2 2.5"/><line x1="14" y1="9" x2="19" y2="9"/><line x1="14" y1="13" x2="19" y2="13"/></svg>`,
+	checkSquare: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="8 12.5 11 15.5 16 9"/></svg>`,
+	calendar: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+	refresh: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
+	arrowRight: (c,s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`,
 };
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -133,7 +258,7 @@ function s1Cover(clientName, fecha, sinApi) {
 
   <!-- footer -->
   <div style="flex-shrink:0;padding:0.3cm 1.3cm;border-top:1px solid rgba(255,255,255,0.18);display:flex;justify-content:space-between;align-items:center;">
-    <span style="font-size:8pt;color:rgba(255,255,255,0.5);">${fecha ? fd(fecha) : ""}</span>
+    <span style="font-size:8pt;color:rgba(255,255,255,0.5);">${fecha ? `Emitida el ${fd(fecha)} · Válida hasta el ${fd(addDays(fecha, VALIDEZ_DIAS))}` : ""}</span>
     <span style="font-size:7pt;color:rgba(255,255,255,0.32);">Autoridad Certificante Licenciada · Infraestructura de Firma Digital · Ley N° 25.506</span>
   </div>
 </div>`;
@@ -219,7 +344,6 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const lista = res.facturacionLista || 0;
 	const neto = res.netoLakaut || 0;
 	const desc = lista - neto;
-	const mainPack = packRows.reduce((b,r) => (!b || r.sub > b.sub) ? r : b, null);
 
 	// desglose totales
 	const totalPacks = packRows.reduce((s,r) => s + r.qty, 0);
@@ -229,122 +353,90 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const totalFirmasIncl = hayIlimitadas ? null : packRows.reduce((s,r) => s + r.qty * r.firmas, 0);
 	const totalFirmasConAdic = totalFirmasIncl != null ? totalFirmasIncl + firmasAdic : null;
 
-	return `<div class="slide" style="background:${OW};">
-  <!-- slide header -->
-  <div style="flex-shrink:0;padding:0.55cm 1cm 0.35cm;">
-    <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Modelo Comercial</div>
-    <div style="font-size:9pt;color:${GR};">Volumen anual comprometido${res.tier ? ` · <strong style="color:${DK};">${res.tier}</strong> · descuento del ${descPct}% sobre precio de lista.` : ""}</div>
-  </div>
+	// Abono: repone la bolsa de firmas del pack desde el mes 2, durante la vigencia del certificado.
+	const abonoActivo = !!inp.abono && (res.abonoMes || 0) > 0;
+	const abonoVigenciaTotal = abonoActivo ? neto + res.abonoMes * (ABONO_VIGENCIA_MESES - 1) : 0;
 
-  <!-- two columns -->
-  <div style="flex:1;display:flex;gap:0.5cm;padding:0 1cm 0.5cm;overflow:hidden;">
+	const chips = [
+		chip(SVG.idcard(B, 15), `<strong>${totalPacks.toLocaleString("es-AR")}</strong> unidades contratadas`),
+		chip(SVG.shield(B, 15), `<strong>${(totalCertsF + totalCertsJ).toLocaleString("es-AR")}</strong> certificados incluidos`),
+		chip(SVG.checkSquare(B, 15), `<strong>${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</strong> firmas incluidas`),
+		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
+	];
 
-    <!-- LEFT: white card (Detalle de facturación) -->
-    <div style="flex:1;background:${W};border:1px solid ${GRL};border-radius:12px;box-shadow:0 2px 10px rgba(48,65,213,0.07);padding:0.6cm;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.35cm;">Detalle de facturación</div>
-      <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:0.35cm;">
-        <thead>
-          <tr style="border-bottom:1.5px solid ${GRL};">
-            <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">PRODUCTO</th>
-            <th style="padding:5px 6px 6px;text-align:left;font-weight:700;color:${GR};font-size:7.5pt;">INCLUYE</th>
-            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">P. LISTA</th>
-            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">CANTIDAD</th>
-            <th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL${showIva ? " (S/IVA)" : ""}</th>
-            ${showIva ? `<th style="padding:5px 6px 6px;text-align:right;font-weight:700;color:${GR};font-size:7.5pt;">TOTAL (C/IVA)</th>` : ""}
-          </tr>
-        </thead>
-        <tbody>
-          ${packRows.map((r,i) => {
-            const inclParts = [];
-            if (r.certs > 0) inclParts.push(r.certs + " cert" + (r.segment === "empresa" ? " jur." : " fís."));
-            if (r.ilimitadas) inclParts.push("firmas ilimitadas");
-            else if (r.firmas > 0) inclParts.push(r.firmas.toLocaleString("es-AR") + " firmas");
-            return `<tr style="background:${i%2===0?OW:W};">
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};font-weight:600;color:${DK};">${r.label}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};color:${GR};font-size:7.5pt;">${inclParts.join(" · ")}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(r.unit, currency, tc)}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${r.qty.toLocaleString("es-AR")}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(r.sub, currency, tc)}</td>
-            ${showIva ? `<td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fmGross(r.sub, currency, tc)}</td>` : ""}
-          </tr>`;
-          }).join("")}
-          ${firmasAdic > 0 ? `<tr style="background:${packRows.length%2===0?OW:W};">
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};color:${GR};">Firmas adicionales</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};color:${GR};font-size:7.5pt;"></td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${fm(precioFirmaUSD, currency, tc)}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;color:${NG};">${firmasAdic.toLocaleString("es-AR")}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fm(firmasAdic*precioFirmaUSD, currency, tc)}</td>
-            ${showIva ? `<td style="padding:5px 6px;border-bottom:1px solid ${GRL};text-align:right;font-weight:700;color:${DK};">${fmGross(firmasAdic*precioFirmaUSD, currency, tc)}</td>` : ""}
-          </tr>` : ""}
-          <tr>
-            <td colspan="4" style="padding:7px 6px;font-weight:700;color:${DK};font-size:9pt;">Total facturación a lista</td>
-            <td style="padding:7px 6px;text-align:right;font-weight:700;color:${DK};font-size:9pt;">${fm(lista, currency, tc)}</td>
-            ${showIva ? `<td style="padding:7px 6px;text-align:right;font-weight:700;color:${DK};font-size:9pt;">${fmGross(lista, currency, tc)}</td>` : ""}
-          </tr>
-        </tbody>
-      </table>
-      ${showIva ? `<div style="font-size:6.5pt;color:${GR};font-style:italic;margin-bottom:0.3cm;">Precios expresados en pesos argentinos. IVA discriminado al 21%.</div>` : ""}
-      <!-- desglose de valor -->
-      <div style="margin-top:auto;display:flex;gap:0.3cm;">
-        ${totalCertsF > 0 ? `<div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
-          <div style="font-size:6.5pt;color:${GR};margin-bottom:2px;">Certs físicos</div>
-          <div style="font-size:11pt;font-weight:700;color:${DK};">${totalCertsF.toLocaleString("es-AR")}</div>
-        </div>` : ""}
-        ${totalCertsJ > 0 ? `<div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
-          <div style="font-size:6.5pt;color:${GR};margin-bottom:2px;">Certs jurídicos</div>
-          <div style="font-size:11pt;font-weight:700;color:${DK};">${totalCertsJ.toLocaleString("es-AR")}</div>
-        </div>` : ""}
-        <div style="flex:1;background:${OW};border:1px solid ${GRL};border-radius:8px;padding:0.25cm 0.35cm;">
-          <div style="font-size:6.5pt;color:${GR};margin-bottom:2px;">Firmas incluidas</div>
-          <div style="font-size:11pt;font-weight:700;color:${DK};">${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</div>
-        </div>
+	const packItemsHtml = packRows.map(r => {
+		const inclParts = [];
+		if (r.certs > 0) inclParts.push(r.certs + " cert" + (r.segment === "empresa" ? " jur." : " fís."));
+		if (r.ilimitadas) inclParts.push("firmas ilimitadas");
+		else if (r.firmas > 0) inclParts.push(r.firmas.toLocaleString("es-AR") + " firmas");
+		return `<div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:8.5pt;">
+      <span style="color:${GR};">${r.qty}× <strong style="color:${DK};">${r.label}</strong> <span style="font-size:7.5pt;">(${inclParts.join(" · ")})</span></span>
+      <span style="color:${DK};font-weight:600;white-space:nowrap;">${fm(r.sub, currency, tc)}</span>
+    </div>`;
+	}).join("");
+	const firmasAdicItemHtml = firmasAdic > 0 ? `<div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:8.5pt;">
+      <span style="color:${GR};">Firmas adicionales (${firmasAdic.toLocaleString("es-AR")})</span>
+      <span style="color:${DK};font-weight:600;white-space:nowrap;">${fm(firmasAdic * precioFirmaUSD, currency, tc)}</span>
+    </div>` : "";
+
+	const momento1 = momentoCard({
+		dark: false,
+		kicker: "Momento 1 · mes 1",
+		icon: SVG.shield(B, 16),
+		heading: "Activás tu volumen",
+		body: `
+      <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
+        Adquirís el volumen contratado con el nivel <strong style="color:${DK};">${res.tier || "—"}</strong>, con un descuento del ${descPct}% sobre precio de lista.
       </div>
-    </div>
+      <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
+      ${bigPrice({
+				dark: false,
+				label: abonoActivo ? "Pago único de activación" : "Total a pagar",
+				value: showIva ? fmGross(neto, currency, tc) : fm(neto, currency, tc),
+				note: showIva ? "IVA 21% incluido" : null,
+			})}
+      ${miniStats(false, [
+				{ label: "Precio de lista", value: fm(lista, currency, tc) },
+				{ label: `Descuento (${descPct}%)`, value: "−" + fm(desc, currency, tc) },
+			])}
+    `,
+	});
 
-    <!-- RIGHT: blue box (Resumen) -->
-    <div style="width:41%;background:${B};border-radius:12px;padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
-
-      <!-- nivel tag -->
-      ${res.tier ? `<div style="display:inline-flex;align-items:center;border:1.5px solid rgba(255,255,255,0.35);border-radius:20px;padding:0.12cm 0.4cm;width:fit-content;margin-bottom:0.35cm;">
-        <span style="font-size:9pt;font-weight:600;color:${W};">Nivel ${res.tier}</span>
-      </div>` : ""}
-
-      <!-- line items -->
-      <div style="display:flex;flex-direction:column;gap:0.15cm;margin-bottom:0.35cm;">
-        <div style="display:flex;justify-content:space-between;font-size:9pt;">
-          <span style="color:rgba(255,255,255,0.65);">Total a lista</span>
-          <span style="color:${W};font-weight:500;">${fm(lista, currency, tc)}</span>
-        </div>
-        <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.05cm 0;"></div>
-        <div style="display:flex;justify-content:space-between;font-size:9pt;">
-          <span style="color:rgba(255,255,255,0.65);">Descuento (${descPct}%)</span>
-          <span style="color:rgba(255,255,255,0.85);font-weight:500;">−${fm(desc, currency, tc)}</span>
-        </div>
+	const momento2 = abonoActivo ? momentoCard({
+		dark: true,
+		kicker: `Momento 2 · mes ${ABONO_DESDE_MES} a ${ABONO_VIGENCIA_MESES}`,
+		icon: SVG.refresh(W, 16),
+		heading: "Reponés tus firmas",
+		body: `
+      <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
+        Tus packs contratados renuevan su bolsa de firmas cada mes, con un abono fijo y previsible.
       </div>
+      ${discountBadge(`${(DESCUENTO_ABONO * 100).toFixed(0)}% de ahorro sobre precio de lista`)}
+      ${bigPrice({
+				dark: true, perMes: true,
+				label: "Abono mensual",
+				value: showIva ? fmGross(res.abonoMes, currency, tc) : fm(res.abonoMes, currency, tc),
+				note: `Precio de lista (${fm(lista, currency, tc)}) × ${((1 - DESCUENTO_ABONO) * 100).toFixed(0)}%${showIva ? ` · IVA 21% incluido (neto ${fm(res.abonoMes, currency, tc)})` : ""}`,
+			})}
+    `,
+	}) : "";
 
-      <!-- big price -->
-      <div style="border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;margin-top:auto;">
-        ${inp.abono && res.abonoMes ? `
-        ${priceBlock("Mes 1 · compra inicial", neto, currency, tc, "20pt")}
-        <div style="height:1px;background:rgba(255,255,255,0.2);margin:0.25cm 0;"></div>
-        ${priceBlock("Mes 2 en adelante · abono mensual", res.abonoMes, currency, tc, "20pt")}
-        ` : priceBlock("Precio a pagar", neto, currency, tc, "26pt")}
-      </div>
+	const schedule = abonoActivo ? scheduleBar({
+		mes1Value: showIva ? fmGross(neto, currency, tc) : fm(neto, currency, tc),
+		abonoValue: showIva ? fmGross(res.abonoMes, currency, tc) : fm(res.abonoMes, currency, tc),
+		totalValue: showIva ? fmGross(abonoVigenciaTotal, currency, tc) : fm(abonoVigenciaTotal, currency, tc),
+		totalNote: "No se abona por adelantado: se paga mes a mes durante la vigencia.",
+	}) : "";
 
-      ${inp.abono && res.abonoMes ? `
-      <div style="margin-top:0.3cm;padding:0.2cm 0.3cm;background:rgba(255,255,255,0.1);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:7pt;color:rgba(255,255,255,0.65);">Facturación año 1${showIva ? " (s/IVA)" : ""}</span>
-        <span style="font-size:8.5pt;font-weight:700;color:${W};">${fm(res.facturacionAnio1, currency, tc)}</span>
-      </div>
-      ` : ""}
-
-      ${termsFooter({ marginTop: "0.4cm" })}
-    </div>
-
-  </div>
-  ${foot(3)}
-</div>`;
+	return commercialSlide({
+		kicker: "Modelo comercial · precio de lista con descuento",
+		title: "Tu propuesta a medida",
+		subtitle: showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : null,
+		chips,
+		cardsHtml: momento1 + momento2,
+		scheduleHtml: schedule,
+		pageN: 3,
+	});
 }
 
 // ─── SLIDE 3: MODELO COMERCIAL — B2B2C ───────────────────────────────────────
@@ -359,18 +451,12 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const slaPlans = (channelConfig && channelConfig.slaPlans) || [];
 	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "API Standard" };
 	const sla = slaPlans.find(s => s.id === inp.slaId) || slaPlans[0] || { label: "Standard", precioMes: 0, desc: "" };
-	const slaText = sla.precioMes
-		? `${sla.label} · ${fm(sla.precioMes, currency, tc)}/mes${showIva ? ` (c/IVA ${fmGross(sla.precioMes, currency, tc)})` : ""}`
-		: `${sla.label} · incluido`;
 
 	// precioIDC es un valor unitario chico (ej. USD 0.65): se formatea aparte de fm/fmGross para no perder los decimales.
 	const precioIDC = res.precioIDC != null ? res.precioIDC : 0;
 	const precioIDCFmt = currency === "ARS"
 		? "$ " + Math.round(precioIDC * tc).toLocaleString("es-AR")
 		: "USD " + precioIDC.toFixed(2);
-	const precioIDCFmtGross = showIva
-		? "$ " + Math.round(precioIDC * tc * (1 + IVA_RATE)).toLocaleString("es-AR")
-		: precioIDCFmt;
 
 	// Cantidades: cada IDC incluye 1 certificado; las firmas se informan en totales.
 	const idc = Number(inp.idcMensuales) || 0;
@@ -379,21 +465,6 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const firmasIncl = idc * inclPorIDC;
 	const firmasAdicTotal = idc * adicPorIDC;
 	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
-
-	const rows = [
-		{ l: "Volumen de IDC",           v: idc.toLocaleString("es-AR") },
-		// Sin integración API no hay fee de implementación ni SLA: la propuesta
-		// muestra solo el volumen cotizado y las firmas.
-		...(sinApi ? [] : [
-			{ l: "Tipo de integración API",  v: api.label },
-			{ l: "Fee de implementación",    v: `${fm(Number(inp.fee)||0, currency, tc)}${showIva ? ` (c/IVA ${fmGross(Number(inp.fee)||0, currency, tc)})` : ""} · una sola vez` },
-			{ l: "Plan de soporte / SLA",    v: slaText },
-		]),
-		{ l: "Precio por IDC",           v: `${precioIDCFmt}${showIva ? ` (c/IVA ${precioIDCFmtGross})` : ""}` },
-		{ l: "Certificados",             v: `${idc.toLocaleString("es-AR")} · 1 por IDC` },
-		{ l: "Firmas incluidas",         v: `${firmasIncl.toLocaleString("es-AR")} · ${inclPorIDC} por IDC` },
-		...(firmasAdicTotal > 0 ? [{ l: "Firmas adicionales", v: `${firmasAdicTotal.toLocaleString("es-AR")} · ${adicPorIDC} por IDC · ${fm(precioFirmaAdicN, currency, tc)}${showIva ? ` (c/IVA ${fmGross(precioFirmaAdicN, currency, tc)})` : ""} c/u` }] : []),
-	];
 
 	// Desglose del resumen: subtotales por concepto arriba, IVA después, total al final.
 	const revIDC = idc * precioIDC;
@@ -407,64 +478,91 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
-	const itemRow = (l, v, strong) => `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:9pt;">
-        <span style="color:rgba(255,255,255,${strong ? "0.85" : "0.65"});${strong ? "font-weight:600;" : ""}">${l}</span>
-        <span style="color:${W};font-weight:${strong ? 700 : 500};">${v}</span>
-      </div>`;
+	// Abono: repone la bolsa de firmas incluidas desde el mes 2, durante la vigencia del certificado.
+	// El volumen de IDC no se asume recurrente por sí solo — recurre a partir de que se activa el abono.
+	// Precio del abono = precio de firma adicional con el descuento; se muestra la cuenta completa
+	// (cantidad × precio) para que el monto nunca aparezca como un número sin origen visible.
+	const abonoActivo = !!inp.abono && (res.revAbonoMes || 0) > 0;
+	const abonoMensual = abonoActivo ? res.revAbonoMes : 0;
+	const precioAbonoUnit = precioFirmaAdicN * (1 - DESCUENTO_ABONO);
+	const abonoVigenciaTotal = abonoActivo ? subtotal + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
 
-	return `<div class="slide" style="background:${OW};">
-  <!-- slide header -->
-  <div style="flex-shrink:0;padding:0.55cm 1cm 0.35cm;">
-    <div style="font-size:17pt;font-weight:700;color:${DK};line-height:1.2;margin-bottom:0.1cm;">Modelo Comercial</div>
-    <div style="font-size:9pt;color:${GR};">Volumen · IDC <span style="font-weight:400;">(Identidad Digital Certificada)</span>${sinApi ? "" : ` · integración <strong style="color:${DK};">${api.label}</strong>`}</div>
-  </div>
+	const chips = [
+		chip(SVG.idcard(B, 15), `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)`),
+		chip(SVG.shield(B, 15), `<strong>1</strong> certificado c/u`),
+		chip(SVG.checkSquare(B, 15), `<strong>${inclPorIDC}</strong> firma${inclPorIDC === 1 ? "" : "s"} incl. c/u`),
+		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
+	];
 
-  <!-- two columns -->
-  <div style="flex:1;display:flex;gap:0.5cm;padding:0 1cm 0.5cm;overflow:hidden;">
+	// Cuando hay un único concepto (solo IDC, sin fee/SLA/firmas adicionales), el
+	// desglose se reduce a una sola cuenta "cantidad × precio" — sin listar items.
+	const singleItem = items.length === 1;
+	const subtotalLabel = singleItem ? `Subtotal (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})` : "Subtotal (sin IVA)";
+	const itemsListHtml = !singleItem ? items.map(it => `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+      <span style="color:${GR};">${it.l}</span>
+      <span style="color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
+    </div>`).join("") : "";
+	const stats = [{ label: subtotalLabel, value: fm(subtotal, currency, tc) }];
+	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
 
-    <!-- LEFT: white card (Detalle) -->
-    <div style="flex:1;background:${W};border:1px solid ${GRL};border-radius:12px;box-shadow:0 2px 10px rgba(48,65,213,0.07);padding:0.6cm;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.35cm;">Detalle de la propuesta</div>
-      <table style="width:100%;border-collapse:collapse;font-size:9pt;">
-        <tbody>
-          ${rows.map((r,i) => `<tr style="background:${i%2===0?OW:W};">
-            <td style="padding:7px 8px;border-bottom:1px solid ${GRL};color:${GR};width:46%;">${r.l}</td>
-            <td style="padding:7px 8px;border-bottom:1px solid ${GRL};color:${DK};font-weight:500;">${r.v}</td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-      ${showIva ? `<div style="font-size:6.5pt;color:${GR};font-style:italic;margin-top:0.3cm;">Precios expresados en pesos argentinos. IVA discriminado al 21%.</div>` : ""}
-    </div>
-
-    <!-- RIGHT: blue box (Resumen) -->
-    <div style="width:41%;background:${B};border-radius:12px;padding:0.65cm;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.45cm;">Resumen</div>
-
-      <!-- subtotales por concepto -->
-      <div style="display:flex;flex-direction:column;gap:0.18cm;margin-bottom:0.35cm;">
-        ${items.map(it => itemRow(it.l, fm(it.v, currency, tc))).join("")}
+	const momento1 = momentoCard({
+		dark: false,
+		kicker: "Momento 1 · mes 1",
+		icon: SVG.shield(B, 16),
+		heading: "Activás tus identidades",
+		body: `
+      <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
+        Comprás las ${idc.toLocaleString("es-AR")} identidades, cada una con su certificado y su primera firma incluida.
       </div>
+      ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:0.14cm;margin-bottom:0.05cm;">${itemsListHtml}</div>` : ""}
+      ${bigPrice({
+				dark: false,
+				label: abonoActivo ? "Pago único de activación" : "Total a pagar",
+				value: showIva ? fmGross(subtotal, currency, tc) : fm(subtotal, currency, tc),
+				note: showIva ? "IVA 21% incluido" : null,
+			})}
+      ${miniStats(false, stats)}
+    `,
+	});
 
-      ${showIva ? `
-      <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:0.3cm;"></div>
-      <div style="display:flex;flex-direction:column;gap:0.18cm;">
-        ${itemRow("Subtotal (sin IVA)", fm(subtotal, currency, tc), true)}
-        ${itemRow("IVA (21%)", fm(subtotal * IVA_RATE, currency, tc))}
+	const momento2 = abonoActivo ? momentoCard({
+		dark: true,
+		kicker: `Momento 2 · mes ${ABONO_DESDE_MES} a ${ABONO_VIGENCIA_MESES}`,
+		icon: SVG.refresh(W, 16),
+		heading: "Reponés tus firmas",
+		body: `
+      <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
+        Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} firmas se renueva cada mes, con un abono fijo y previsible.
       </div>
-      ` : ""}
+      ${discountBadge(`${(DESCUENTO_ABONO * 100).toFixed(0)}% de ahorro · ${fm(precioAbonoUnit, currency, tc)} en vez de ${fm(precioFirmaAdicN, currency, tc)} por firma`)}
+      ${bigPrice({
+				dark: true, perMes: true,
+				label: "Abono mensual",
+				value: showIva ? fmGross(abonoMensual, currency, tc) : fm(abonoMensual, currency, tc),
+				note: `${firmasIncl.toLocaleString("es-AR")} firmas × ${fm(precioAbonoUnit, currency, tc)}${showIva ? ` · IVA 21% incluido (neto ${fm(abonoMensual, currency, tc)})` : ""}`,
+			})}
+    `,
+	}) : "";
 
-      <!-- total final -->
-      <div style="margin-top:auto;border-top:1.5px solid rgba(255,255,255,0.25);padding-top:0.4cm;">
-        <div style="font-size:8pt;color:${BLT};font-weight:600;margin-bottom:0.2cm;">Total a pagar${showIva ? ` <span style="font-weight:400;opacity:0.8;">(IVA 21% incl.)</span>` : ""}</div>
-        <div style="font-size:28pt;font-weight:800;color:${W};line-height:1;">${showIva ? fmGross(subtotal, currency, tc) : fm(subtotal, currency, tc)}</div>
-      </div>
+	const schedule = abonoActivo ? scheduleBar({
+		mes1Value: showIva ? fmGross(subtotal, currency, tc) : fm(subtotal, currency, tc),
+		abonoValue: showIva ? fmGross(abonoMensual, currency, tc) : fm(abonoMensual, currency, tc),
+		totalValue: showIva ? fmGross(abonoVigenciaTotal, currency, tc) : fm(abonoVigenciaTotal, currency, tc),
+		totalNote: "No se abona por adelantado: se paga mes a mes durante la vigencia.",
+	}) : "";
 
-      ${termsFooter({ marginTop: "0.4cm" })}
-    </div>
+	const subtitleParts = [sinApi ? "Cotización de volumen directo, sin integración API" : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
+	if (showIva) subtitleParts.push("precios en pesos argentinos, IVA discriminado al 21%");
 
-  </div>
-  ${foot(pageN || 3)}
-</div>`;
+	return commercialSlide({
+		kicker: "Modelo comercial · volumen IDC",
+		title: "Tu propuesta a medida",
+		subtitle: subtitleParts.join(" · "),
+		chips,
+		cardsHtml: momento1 + momento2,
+		scheduleHtml: schedule,
+		pageN: pageN || 3,
+	});
 }
 
 // ─── SLIDE 4: PRÓXIMOS PASOS ──────────────────────────────────────────────────
