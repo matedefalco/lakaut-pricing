@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { NumberField, StatCard } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
 import { QuoteSavedBanner } from "@/components/ui/QuoteSavedBanner";
 
@@ -158,10 +159,10 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="font-heading text-xl font-semibold text-foreground">{CHANNELS.distribuidores.full}</h1>
-				<p className="text-sm text-muted-foreground mt-1">El compromiso de facturación se calcula a precios de lista y, junto con los certificados activos, define el nivel (gana el mayor). El descuento aplica sobre toda la lista.</p>
-			</div>
+			<PageHeader
+				title={CHANNELS.distribuidores.full}
+				description="El compromiso de facturación se calcula a precios de lista y, junto con los certificados activos, define el nivel (gana el mayor). El descuento aplica sobre toda la lista."
+			/>
 
 			{saved && (
 				<QuoteSavedBanner

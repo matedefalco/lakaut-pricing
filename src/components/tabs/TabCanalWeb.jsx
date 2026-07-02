@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { BLUE, BLUEL, BORD, GRAY, BLACK, WHITE, OK, WN, ER, os } from "@/theme/tokens";
 
 const ALL_COLS = [
@@ -330,13 +331,11 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 		<div className="space-y-6">
 			{showPrecios && (
 				<>
-					<div>
-						<h2 className="font-heading text-lg font-semibold text-foreground">Tabla de precios · Canal Web</h2>
-						<p className="text-sm text-muted-foreground">Personas, profesionales y PyMEs que contratan sin intermediación, abonando con tarjeta. Precios de lista en ARS, USD derivado por TC.</p>
-					</div>
-					<div className="flex justify-end mb-2">
-						<ColFilterDropdown visible={visibleCols} onToggle={toggleCol} />
-					</div>
+					<PageHeader
+						title="Precios web"
+						description="Personas, profesionales y PyMEs que contratan sin intermediación, abonando con tarjeta. Precios de lista en ARS, USD derivado por TC."
+						actions={<ColFilterDropdown visible={visibleCols} onToggle={toggleCol} />}
+					/>
 					<Card>
 						<CardContent>
 							<Table>
@@ -401,9 +400,11 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 				<>
 					{!view && <div style={{ borderTop: "1px solid var(--border)", paddingTop: 24 }} />}
 					{view === "simulador" && (
-						<div>
-							<h2 className="font-heading text-lg font-semibold text-foreground">Simulador de portfolio · Canal Web</h2>
-							<p className="text-sm text-muted-foreground mb-4">Break-even con mezcla de ventas. Estimá el volumen por pack y verás si el mix cubre costos fijos.</p>
+						<div className="mb-4">
+							<PageHeader
+								title="Simulador de portfolio"
+								description="Break-even con mezcla de ventas del canal web. Estimá el volumen por pack y verás si el mix cubre costos fijos."
+							/>
 						</div>
 					)}
 					<PortfolioSimulator models={models} costs={costs} currency={currency} tc={tc} />

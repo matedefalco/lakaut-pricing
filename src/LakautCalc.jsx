@@ -21,6 +21,7 @@ import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
 import { TabHistorial } from "./components/tabs/TabHistorial";
 import { TabClientes } from "./components/tabs/TabClientes";
 import { TabInicio } from "./components/tabs/TabInicio";
+import { TabReportes } from "./components/tabs/TabReportes";
 
 
 // ── Estructura de navegación · agrupada por tarea del usuario ──────────────────
@@ -44,6 +45,7 @@ const NAV_GROUPS = [
 	{
 		groupKey: "analisis", groupLabel: "ANÁLISIS",
 		items: [
+			{ key: "reportes", label: "Reportes" },
 			{ key: "comparación", label: "Comparación de canales" },
 			{ key: "web-simulador", label: "Simulador de portfolio" },
 		],
@@ -278,6 +280,7 @@ function LakautCalcInner() {
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
 
 					{/* ── ANÁLISIS ── */}
+					{activeNavItem === "reportes" && <TabReportes dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} />}
 					{activeNavItem === "comparación" && <TabComparacion costs={costs} currency={currency} tc={tc} />}
 					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
 

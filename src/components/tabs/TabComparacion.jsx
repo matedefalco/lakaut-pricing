@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { NumberField } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from "recharts";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -318,6 +319,11 @@ export function TabComparacion({ costs, currency, tc }) {
 
 	return (
 		<div className="space-y-5">
+
+			<PageHeader
+				title="Comparación de canales"
+				description="Mismo volumen de certificados y firmas, comparado en los tres canales. Guardá escenarios para contrastar hipótesis."
+			/>
 
 			{/* Scenario tabs */}
 			<div className="flex items-center gap-1 flex-wrap">

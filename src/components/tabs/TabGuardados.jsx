@@ -2,6 +2,9 @@ import { useState } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, ER, ERBG, os, mont } from "../../theme/tokens";
 import { useModels } from "../../context/ModelsContext";
 import { NumInput } from "../ui/NumInput";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Toast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/button";
 
 const ARCH_OPTIONS = [
 	{ k: "bolsa", label: "Bolsa prepaga" },
@@ -540,58 +543,19 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 	}
 
 	return (
-		<div>
-			{/* Toast */}
-			{toast && (
-				<div style={{
-					position: "fixed", bottom: 28, right: 28, zIndex: 9999,
-					background: "#1a2b4a", color: WHITE, borderRadius: 10,
-					padding: "12px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-					display: "flex", alignItems: "center", gap: 10,
-					fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600,
-					animation: "fadeInUp 0.2s ease",
-				}}>
-					<span style={{ fontSize: 16 }}>✓</span>
-					{toast.msg}
-				</div>
-			)}
-			{/* Toolbar */}
-			<div style={{
-				display: "flex",
-				justifyContent: "space-between",
-				alignItems: "center",
-				marginBottom: 16,
-				flexWrap: "wrap",
-				gap: 8,
-			}}>
-				<div style={Object.assign({}, os(12, 400, GRAY))}>
-					{models.length} {models.length === 1 ? "modelo guardado" : "modelos guardados"}
-				</div>
-				<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-					<button
-						onClick={function () { setEditingId("new"); }}
-						style={{
-							padding: "6px 14px",
-							background: BLUE,
-							color: WHITE,
-							border: "none",
-							borderRadius: 7,
-							fontFamily: "'Open Sans',sans-serif",
-							fontSize: 12,
-							fontWeight: 700,
-							cursor: "pointer",
-						}}
-					>
-						+ Nuevo modelo
-					</button>
-					<button
-						onClick={function () { if (window.confirm("¿Restaurar modelos por defecto? Se perderán los cambios.")) resetToDefaults(); }}
-						style={{ padding: "6px 14px", background: WHITE, color: GRAY, border: "1.5px solid " + BORD, borderRadius: 7, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-					>
-						Restaurar defaults
-					</button>
-				</div>
-			</div>
+		<div className="space-y-5">
+			<Toast toast={toast} />
+
+			<PageHeader
+				title="Modelos y packs"
+				description={models.length + " " + (models.length === 1 ? "modelo guardado" : "modelos guardados") + ". Definen los packs que se cotizan en todos los canales."}
+				actions={
+					<>
+						<Button size="sm" onClick={function () { setEditingId("new"); }}>+ Nuevo modelo</Button>
+						<Button size="sm" variant="outline" onClick={function () { if (window.confirm("¿Restaurar modelos por defecto? Se perderán los cambios.")) resetToDefaults(); }}>Restaurar defaults</Button>
+					</>
+				}
+			/>
 
 			{/* Model list */}
 			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>

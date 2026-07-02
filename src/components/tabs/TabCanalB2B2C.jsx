@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { NumberField, SelectField, StatCard } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
 import { QuoteSavedBanner } from "@/components/ui/QuoteSavedBanner";
 import { TabCanalB2B2CPrecios } from "@/components/tabs/TabCanalB2B2CPrecios";
@@ -199,10 +200,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="font-heading text-xl font-semibold text-foreground">{CHANNELS.b2b2c.full}</h1>
-				<p className="text-sm text-muted-foreground mt-1">{CHANNELS.b2b2c.desc} Las firmas incluidas por IDC son configurables (firma inicial + activación, según la institución).</p>
-			</div>
+			<PageHeader
+				title={CHANNELS.b2b2c.full}
+				description={CHANNELS.b2b2c.desc + " Las firmas incluidas por IDC son configurables (firma inicial + activación, según la institución)."}
+			/>
 
 			{saved && (
 				<QuoteSavedBanner

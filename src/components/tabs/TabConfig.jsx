@@ -4,6 +4,8 @@ import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, CAT_COLO
 import { fD } from "../../utils/formatters";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "../../data/costs";
 import { markSaved, readSaved, formatSaved } from "../../lib/savedAt";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/button";
 
 function InlineNum({ value, onChange, decimals }) {
 	return (
@@ -29,18 +31,13 @@ function InlineNum({ value, onChange, decimals }) {
 	);
 }
 
-function SectionHeader({ title }) {
+// Header de sección alineado al lenguaje de SectionCard/CardTitle (ShadCN):
+// título chico en mayúsculas sobre fondo claro, en lugar del bloque negro.
+function SectionHeader({ title, description }) {
 	return (
-		<div
-			style={Object.assign({}, mont(14), {
-				color: WHITE,
-				background: BLACK,
-				padding: "10px 16px",
-				borderRadius: "8px 8px 0 0",
-				marginTop: 20,
-			})}
-		>
-			{title}
+		<div style={{ background: WHITE, border: "1px solid " + BORD, borderBottom: "none", borderRadius: "10px 10px 0 0", padding: "14px 16px 2px", marginTop: 20 }}>
+			<div style={Object.assign({}, mont(12), { color: GRAY, textTransform: "uppercase", letterSpacing: "0.5px" })}>{title}</div>
+			{description && <div style={Object.assign({}, os(12, 400, GRAY), { marginTop: 4 })}>{description}</div>}
 		</div>
 	);
 }
@@ -117,7 +114,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 	const cvCertTotal = costConfig.cvCertItems.reduce(function (s, r) { return s + r.v; }, 0);
 	const cvFirmaTotal = (costConfig.cvFirmaItems || []).reduce(function (s, r) { return s + r.v; }, 0);
 
-	const thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "6px 10px", textAlign: "left", background: GRAY });
+	const thStyle = Object.assign({}, os(10, 700, GRAY), { padding: "8px 10px", textAlign: "left", borderBottom: "1px solid " + BORD, textTransform: "uppercase", letterSpacing: "0.4px" });
 	const thR = Object.assign({}, thStyle, { textAlign: "right" });
 	const tipoStyle = function (t) {
 		return { padding: "2px 5px", border: "1px solid " + BORD, borderRadius: 4, fontSize: 10, fontWeight: 700, fontFamily: "'Open Sans',sans-serif", cursor: "pointer", background: t === "directo" ? OKBG : WNBG, color: t === "directo" ? OK : WN };
@@ -185,9 +182,13 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 
 	return (
 		<div style={{ maxWidth: 900 }}>
+			<PageHeader
+				title="Costos"
+				description="Matriz de costos fijos y variables del negocio. Alimenta los cálculos de margen y break-even de toda la app."
+			/>
 			{/* ── COSTOS FIJOS ─────────────────────────────────────── */}
 			<SectionHeader title="1 · Costos Fijos" />
-			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 16, background: WHITE, marginBottom: 4 }}>
+			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 10px 10px", padding: 16, background: WHITE, marginBottom: 4 }}>
 
 				{/* Activos adquiridos */}
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
@@ -370,7 +371,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 
 			{/* ── COSTOS VARIABLES ─────────────────────────────────── */}
 			<SectionHeader title="2 · Costos Variables" />
-			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 16, background: WHITE }}>
+			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 10px 10px", padding: 16, background: WHITE }}>
 				<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
 
 					{/* CV × Certificado */}
@@ -470,18 +471,10 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 					)}
 				</div>
 				<div style={{ display: "flex", gap: 10 }}>
-					<button
-						onClick={handleReset}
-						style={{ padding: "10px 20px", background: WHITE, color: GRAY, border: "1.5px solid " + BORD, borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 400, cursor: "pointer" }}
-					>
-						Restaurar valores originales
-					</button>
-					<button
-						onClick={handleSave}
-						style={{ padding: "10px 28px", background: saveOk ? OK : isDirty ? WN : BLUE, color: WHITE, border: "none", borderRadius: 8, fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "background 0.3s" }}
-					>
+					<Button variant="outline" onClick={handleReset}>Restaurar valores originales</Button>
+					<Button onClick={handleSave} className={saveOk ? "bg-[var(--success)] hover:bg-[var(--success)]" : ""}>
 						{saveOk ? "✓ Guardado" : "Guardar configuración"}
-					</button>
+					</Button>
 				</div>
 			</div>
 		</div>

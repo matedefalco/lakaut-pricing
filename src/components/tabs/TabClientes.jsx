@@ -10,6 +10,8 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { getDistributorTier } from "@/lib/tiers";
 import { CHANNELS, channelLabel, channelShort } from "@/data/channelMeta";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
 const CHANNEL_LABEL = { web: channelLabel("web"), distribuidores: channelLabel("distribuidores"), b2b2c: channelLabel("b2b2c") };
@@ -260,8 +262,17 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 													<div className="flex gap-1 justify-end">
 														{d.slide_url && <a href={d.slide_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground"><ExternalLink className="size-3.5" /></a>}
 														{onEditDeal && (
-															<button onClick={function () { onEditDeal(d); }} className="text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+															<button onClick={function () { onEditDeal(d); }} className="text-muted-foreground hover:text-foreground" title="Editar"><Pencil className="size-3.5" /></button>
 														)}
+														<button
+															onClick={function () {
+																if (window.confirm("¿Borrar esta cotización de " + (selected.name || "(sin nombre)") + "?")) dealsApi.remove(d.id);
+															}}
+															className="text-muted-foreground hover:text-destructive"
+															title="Borrar cotización"
+														>
+															<Trash2 className="size-3.5" />
+														</button>
 													</div>
 												</TableCell>
 											</TableRow>
@@ -281,39 +292,26 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	// ── List view ─────────────────────────────────────────────────────────────
 	return (
 		<div className="space-y-5">
+			<PageHeader
+				title="Clientes"
+				description="Master de clientes con su historial de cotizaciones y revenue acumulado."
+			/>
+
 			{/* KPI summary */}
 			<div className="flex gap-3 flex-wrap">
-				<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[120px]">
-					<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Clientes</span>
-					<span className="text-2xl font-semibold tabular-nums">{globalStats.totalClients}</span>
-				</div>
-				<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[120px]">
-					<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Cotizaciones</span>
-					<span className="text-2xl font-semibold tabular-nums">{globalStats.totalDeals}</span>
-				</div>
+				<StatCard label="Clientes" value={globalStats.totalClients} accent="muted" />
+				<StatCard label="Cotizaciones" value={globalStats.totalDeals} accent="muted" />
 				{globalStats.totalRevenue > 0 && (
-					<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[160px]">
-						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Revenue acumulado</span>
-						<span className="text-2xl font-semibold tabular-nums">{fMoney(globalStats.totalRevenue)}</span>
-					</div>
+					<StatCard label="Revenue acumulado" value={fMoney(globalStats.totalRevenue)} accent="primary" />
 				)}
 				{globalStats.confirmedRevenue > 0 && (
-					<div className="flex flex-col gap-0.5 bg-success/10 rounded-lg px-5 py-4 min-w-[160px]">
-						<span className="text-[11px] text-success uppercase tracking-wide">Facturado (confirmado)</span>
-						<span className="text-2xl font-semibold tabular-nums text-success">{fMoney(globalStats.confirmedRevenue)}</span>
-					</div>
+					<StatCard label="Facturado (confirmado)" value={fMoney(globalStats.confirmedRevenue)} accent="success" valueClass="text-[var(--success)]" />
 				)}
 				{globalStats.byChannel.distribuidores > 0 && (
-					<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[130px]">
-						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Lista c/desc.</span>
-						<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.distribuidores}</span>
-					</div>
+					<StatCard label={channelShort("distribuidores")} value={globalStats.byChannel.distribuidores} accent="muted" />
 				)}
 				{globalStats.byChannel.b2b2c > 0 && (
-					<div className="flex flex-col gap-0.5 bg-muted/40 rounded-lg px-5 py-4 min-w-[110px]">
-						<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Volumen</span>
-						<span className="text-2xl font-semibold tabular-nums">{globalStats.byChannel.b2b2c}</span>
-					</div>
+					<StatCard label={channelShort("b2b2c")} value={globalStats.byChannel.b2b2c} accent="muted" />
 				)}
 			</div>
 

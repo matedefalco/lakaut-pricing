@@ -14,6 +14,7 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { channelShort, CHANNELS as CHANNEL_META } from "@/data/channelMeta";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const CHANNELS = {
 	distribuidores: { label: channelShort("distribuidores"), variant: CHANNEL_META.distribuidores.badgeVariant },
@@ -206,15 +207,15 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-wrap items-end justify-between gap-3">
-				<div>
-					<h2 className="font-heading text-lg font-semibold text-foreground">Cotizaciones</h2>
-					<p className="text-sm text-muted-foreground">Todas las cotizaciones guardadas, sincronizadas vía Supabase para el equipo.</p>
-				</div>
-				<Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
-					<Download /> Exportar CSV
-				</Button>
-			</div>
+			<PageHeader
+				title="Cotizaciones"
+				description="Todas las cotizaciones guardadas, sincronizadas para el equipo."
+				actions={
+					<Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+						<Download /> Exportar CSV
+					</Button>
+				}
+			/>
 
 			{/* Panel de filtros estilo Notion */}
 			<Card className="bg-card border-border">

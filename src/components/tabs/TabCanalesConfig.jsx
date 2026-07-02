@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, WN, ER, os, mont } from "../../theme/tokens";
 import { markSaved, readSaved, formatSaved } from "../../lib/savedAt";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionCard as SharedSectionCard } from "@/components/ui/SectionCard";
+import { Toast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/button";
 
 const FIRMAS_INCL_REF = 1; // 1 IDC = 1 cert + 1 firma, igual que en Canal B2B2C · Tabla de referencia
 
@@ -34,7 +38,7 @@ function inputStyle(width) {
 	return { width: width || "100%", border: "1px solid " + BORD, borderRadius: 4, padding: "2px 6px", fontSize: 11, fontFamily: "'Open Sans',sans-serif", color: BLACK, background: WHITE, outline: "none" };
 }
 
-const thStyle = Object.assign({}, os(10, 700, WHITE), { padding: "6px 10px", background: GRAY });
+const thStyle = Object.assign({}, os(10, 700, GRAY), { padding: "8px 10px", borderBottom: "1px solid " + BORD, textTransform: "uppercase", letterSpacing: "0.4px" });
 const thL = Object.assign({}, thStyle, { textAlign: "left" });
 const thR = Object.assign({}, thStyle, { textAlign: "right" });
 
@@ -92,19 +96,9 @@ function DeleteRowButton({ onClick }) {
 
 function SectionCard({ title, description, children }) {
 	return (
-		<div style={{ border: "1px solid " + BORD, borderRadius: 10, background: WHITE, overflow: "hidden", marginBottom: 20 }}>
-			<div style={Object.assign({}, mont(13), { color: WHITE, background: "#1a2b4a", padding: "10px 16px" })}>
-				{title}
-			</div>
-			{description && (
-				<div style={Object.assign({}, os(11, 400, GRAY), { padding: "10px 16px 0", borderBottom: "none" })}>
-					{description}
-				</div>
-			)}
-			<div style={{ padding: 16 }}>
-				{children}
-			</div>
-		</div>
+		<SharedSectionCard title={title} description={description} className="mb-5">
+			{children}
+		</SharedSectionCard>
 	);
 }
 
@@ -159,49 +153,15 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 	if (!channelConfig || !updateChannelConfig) return null;
 
 	return (
-		<div style={{ maxWidth: 920 }}>
+		<div className="space-y-6" style={{ maxWidth: 920 }}>
 
-			{/* Toast */}
-			{toast && (
-				<div style={{
-					position: "fixed", bottom: 28, right: 28, zIndex: 9999,
-					background: "#1a2b4a", color: WHITE, borderRadius: 10,
-					padding: "12px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-					display: "flex", alignItems: "center", gap: 10,
-					fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600,
-				}}>
-					<span style={{ fontSize: 16 }}>✓</span>
-					{toast.msg}
-				</div>
-			)}
+			<Toast toast={toast} />
 
-			{/* Top bar */}
-			<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-				<div>
-					<div style={mont(20)}>Configuración de canales</div>
-					<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 3 })}>
-						{isDirty ? "Cambios sin guardar" : (savedAt ? "Última edición: " + formatSaved(savedAt) : "Sin cambios registrados")}
-					</div>
-				</div>
-				<button
-					onClick={handleSave}
-					disabled={!isDirty}
-					style={{
-						padding: "8px 20px",
-						background: isDirty ? BLUE : BORD,
-						color: WHITE,
-						border: "none",
-						borderRadius: 8,
-						fontFamily: "'Open Sans',sans-serif",
-						fontSize: 13,
-						fontWeight: 700,
-						cursor: isDirty ? "pointer" : "default",
-						transition: "background 0.15s",
-					}}
-				>
-					Guardar cambios
-				</button>
-			</div>
+			<PageHeader
+				title="Precios por canal"
+				description={isDirty ? "Cambios sin guardar" : (savedAt ? "Última edición: " + formatSaved(savedAt) : "Sin cambios registrados")}
+				actions={<Button onClick={handleSave} disabled={!isDirty}>Guardar cambios</Button>}
+			/>
 
 			{/* ── Tiers de distribuidores ── */}
 			<SectionCard

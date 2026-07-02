@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { ArrowRight, Plus, Clock } from "lucide-react";
+import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/field";
 import { DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { CHANNELS, channelShort } from "@/data/channelMeta";
 
@@ -67,20 +68,10 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 			</div>
 
 			{/* Resumen rápido */}
-			<div className="grid grid-cols-3 gap-3">
-				<Card className="py-4"><CardContent className="px-4">
-					<div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Cotizaciones</div>
-					<div className="font-heading text-2xl font-semibold mt-1 tabular-nums">{totalCotizaciones}</div>
-				</CardContent></Card>
-				<Card className="py-4"><CardContent className="px-4">
-					<div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Pendientes</div>
-					<div className="font-heading text-2xl font-semibold mt-1 tabular-nums">{pendientes}</div>
-				</CardContent></Card>
-				<Card className="py-4"><CardContent className="px-4">
-					<div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1"><Clock className="size-3" /> Tipo de cambio</div>
-					<div className="font-heading text-2xl font-semibold mt-1 tabular-nums">$ {tc}</div>
-					{tcLastUpdated && <div className="text-[11px] text-muted-foreground mt-0.5">Actualizado {fDate(tcLastUpdated)}</div>}
-				</CardContent></Card>
+			<div className="flex flex-wrap gap-3">
+				<StatCard label="Cotizaciones" value={totalCotizaciones} accent="muted" />
+				<StatCard label="Pendientes" value={pendientes} accent={pendientes > 0 ? "warning" : "muted"} />
+				<StatCard label="Tipo de cambio" value={"$ " + tc} sub={tcLastUpdated ? "Actualizado " + fDate(tcLastUpdated) : null} accent="primary" />
 			</div>
 
 			{/* Últimas cotizaciones */}
@@ -108,7 +99,7 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 									const st = dealStatus(d);
 									const meta = DEAL_STATUS_META[st] || DEAL_STATUS_META.pendiente;
 									return (
-										<button key={d.id} onClick={function () { onEditQuote(d); }} className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
+										<div key={d.id} role="button" tabIndex={0} onClick={function () { onEditQuote(d); }} onKeyDown={function (e) { if (e.key === "Enter") onEditQuote(d); }} className="group flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
 											<div className="min-w-0 flex-1">
 												<div className="flex items-center gap-2">
 													<span className="font-semibold text-sm truncate">{name}</span>
@@ -118,7 +109,17 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 											</div>
 											<span className={"shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium " + meta.className}>{meta.label}</span>
 											<span className="shrink-0 tabular-nums text-sm font-semibold w-24 text-right">{dealValue(d, fMoney)}</span>
-										</button>
+											<button
+												onClick={function (e) {
+													e.stopPropagation();
+													if (window.confirm("¿Borrar la cotización de " + name + "?")) dealsApi.remove(d.id);
+												}}
+												className="shrink-0 text-muted-foreground/40 transition-colors hover:text-destructive group-hover:text-muted-foreground"
+												title="Borrar cotización"
+											>
+												<Trash2 className="size-3.5" />
+											</button>
+										</div>
 									);
 								})}
 							</div>

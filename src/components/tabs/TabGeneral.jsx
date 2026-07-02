@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, os, mont } from "../../theme/tokens";
+import { Check, RefreshCw } from "lucide-react";
 import { DOLAR_SOURCES } from "../../lib/useDolarTC";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionCard } from "@/components/ui/SectionCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcError, tcLastUpdated, tcRefresh }) {
 	const [draft, setDraft] = useState(tc);
@@ -16,142 +22,84 @@ export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcErro
 		setTimeout(function () { setSaved(false); }, 2500);
 	}
 
+	const isManual = tcSource === "manual";
+
 	return (
-		<div style={{ maxWidth: 600 }}>
-			<div style={Object.assign({}, mont(14), { color: WHITE, background: BLACK, padding: "10px 16px", borderRadius: "8px 8px 0 0" })}>
-				Tipo de cambio USD → ARS
-			</div>
-			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 24, background: WHITE }}>
+		<div className="space-y-6 max-w-2xl">
+			<PageHeader
+				title="General · tipo de cambio"
+				description="El toggle USD/ARS de la barra superior usa este tipo de cambio para convertir todos los precios de la app."
+			/>
 
-				{/* Selector de variante */}
-				<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 })}>
-					Variante del dólar
-				</div>
-				<div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-					{DOLAR_SOURCES.map(function (s) {
-						const active = tcSource === s.k;
-						return (
-							<button
-								key={s.k}
-								onClick={function () { setTcSource(s.k); }}
-								style={{
-									padding: "8px 18px",
-									borderRadius: 8,
-									border: "1.5px solid " + (active ? BLUE : BORD),
-									background: active ? BLUEL : WHITE,
-									color: active ? BLUE : GRAY,
-									fontFamily: "'Open Sans',sans-serif",
-									fontSize: 13,
-									fontWeight: active ? 700 : 400,
-									cursor: "pointer",
-									transition: "all 0.15s",
-								}}
-							>
-								{s.label}
-							</button>
-						);
-					})}
-				</div>
-
-				{/* Valor actual */}
-				<div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
-					<div>
-						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>
-							{tcSource === "manual" ? "Ingresá el valor" : "Valor actual (venta)"}
-						</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<span style={os(12, 400, GRAY)}>1 USD =</span>
-							<input
-								type="number"
-								value={tcSource === "manual" ? draft : tc}
-								onChange={function (e) {
-									if (tcSource === "manual") setDraft(e.target.value);
-									else setTc(Number(e.target.value) || 1);
-								}}
-								onKeyDown={function (e) { if (tcSource === "manual" && e.key === "Enter") applyManual(); }}
-								style={{
-									width: 110,
-									padding: "8px 12px",
-									border: "1.5px solid " + (tcSource === "manual" && draft != tc ? BLUE : BORD),
-									borderRadius: 8,
-									fontFamily: "Courier New,monospace",
-									fontSize: 16,
-									fontWeight: 700,
-									color: BLACK,
-									outline: "none",
-								}}
-							/>
-							<span style={os(12, 400, GRAY)}>ARS</span>
+			<SectionCard
+				title="Tipo de cambio USD → ARS"
+				description={isManual
+					? "Modo manual: ingresá el valor directamente. No se consulta ninguna API."
+					: "Fuente: dolarapi.com. El valor se carga automáticamente al entrar y se puede forzar con Actualizar."}
+			>
+				<div className="space-y-5">
+					{/* Variante del dólar */}
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Variante del dólar</Label>
+						<div className="flex gap-1 flex-wrap">
+							{DOLAR_SOURCES.map(function (s) {
+								const active = tcSource === s.k;
+								return (
+									<button
+										key={s.k}
+										onClick={function () { setTcSource(s.k); }}
+										className={"px-3 py-1.5 rounded-md text-xs font-medium transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
+									>
+										{s.label}
+									</button>
+								);
+							})}
 						</div>
 					</div>
-					{tcSource === "manual" ? (
-						<div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 18 }}>
-							<button
-								onClick={applyManual}
-								style={{
-									padding: "8px 18px",
-									background: saved ? OK : BLUE,
-									color: WHITE,
-									border: "none",
-									borderRadius: 8,
-									fontFamily: "'Open Sans',sans-serif",
-									fontSize: 12,
-									fontWeight: 700,
-									cursor: "pointer",
-									transition: "background 0.2s",
-								}}
-							>
-								{saved ? "✓ Guardado" : "Aplicar"}
-							</button>
-							{saved && (
-								<div style={Object.assign({}, os(10, 400, OK), { textAlign: "center" })}>
-									TC activo: {tc.toLocaleString("es-AR")}
-								</div>
-							)}
+
+					{/* Valor + acción */}
+					<div className="flex flex-wrap items-end gap-3">
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">{isManual ? "Ingresá el valor" : "Valor actual (venta)"}</Label>
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground">1 USD =</span>
+								<Input
+									type="number"
+									className="w-28 tabular-nums font-semibold"
+									value={isManual ? draft : tc}
+									onChange={function (e) {
+										if (isManual) setDraft(e.target.value);
+										else setTc(Number(e.target.value) || 1);
+									}}
+									onKeyDown={function (e) { if (isManual && e.key === "Enter") applyManual(); }}
+								/>
+								<span className="text-sm text-muted-foreground">ARS</span>
+							</div>
 						</div>
-					) : (
-						<button
-							onClick={tcRefresh}
-							disabled={tcLoading}
-							style={{
-								marginTop: 18,
-								padding: "8px 18px",
-								background: tcLoading ? "#f1f5f9" : BLUE,
-								color: tcLoading ? GRAY : WHITE,
-								border: "none",
-								borderRadius: 8,
-								fontFamily: "'Open Sans',sans-serif",
-								fontSize: 12,
-								fontWeight: 700,
-								cursor: tcLoading ? "default" : "pointer",
-							}}
-						>
-							{tcLoading ? "Actualizando..." : "↺ Actualizar"}
-						</button>
+						{isManual ? (
+							<Button onClick={applyManual} className={saved ? "bg-[var(--success)] hover:bg-[var(--success)]" : ""}>
+								{saved ? <><Check className="size-4 mr-1.5" /> Guardado</> : "Aplicar"}
+							</Button>
+						) : (
+							<Button variant="outline" onClick={tcRefresh} disabled={tcLoading}>
+								<RefreshCw className={"size-4 mr-1.5 " + (tcLoading ? "animate-spin" : "")} />
+								{tcLoading ? "Actualizando..." : "Actualizar"}
+							</Button>
+						)}
+					</div>
+
+					{/* Estado */}
+					{tcError && (
+						<p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{tcError}</p>
+					)}
+					{!tcError && (tcLastUpdated || saved) && (
+						<p className="text-xs text-muted-foreground">
+							{saved && <Badge variant="secondary" className="mr-2 text-[10px] text-[var(--success)] border-[var(--success)]">TC activo: {Number(tc).toLocaleString("es-AR")}</Badge>}
+							{tcLastUpdated && <>Última actualización: {new Date(tcLastUpdated).toLocaleString("es-AR")}</>}
+						</p>
 					)}
 				</div>
-
-				{/* Estado */}
-				{tcError && (
-					<div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
-						<span style={os(11, 700, ER)}>{tcError}</span>
-					</div>
-				)}
-				{tcLastUpdated && !tcError && (
-					<div style={{ background: OKBG, border: "1px solid #86efac", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
-						<span style={os(11, 400, OK)}>
-							Última actualización: {new Date(tcLastUpdated).toLocaleString("es-AR")}
-						</span>
-					</div>
-				)}
-
-				<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 8 })}>
-					{tcSource === "manual"
-						? <>Modo <strong>Manual</strong>: ingresá el valor directamente en el campo. No se consulta ninguna API.</>
-						: <>Fuente: <strong>dolarapi.com</strong>. El valor se carga automáticamente al entrar y se puede forzar con "Actualizar". El toggle USD/ARS usa este tipo de cambio para convertir todos los precios.</>
-					}
-				</div>
-			</div>
+			</SectionCard>
 		</div>
 	);
 }
