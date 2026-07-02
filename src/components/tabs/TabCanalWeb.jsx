@@ -198,7 +198,7 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 												style={{ width: 80, textAlign: "right", fontSize: 13, border: "1px solid " + BORD, borderRadius: 6, padding: "4px 8px", background: WHITE, fontFamily: "'Open Sans',sans-serif" }}
 											/>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{r.u > 0 ? (isARS ? fARS(r.precioARS * r.u) : fUSD(Math.round(r.rev))) : <span style={{ color: GRAY }}>—</span>}</TableCell>
+										<TableCell className="text-right tabular-nums">{r.u > 0 ? (isARS ? fARSraw(r.precioARS * r.u) : fUSD(Math.round(r.rev))) : <span style={{ color: GRAY }}>—</span>}</TableCell>
 										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: r.u > 0 ? cmColor : GRAY }}>{r.u > 0 ? fMoney2(Math.round(r.cmTot)) : "—"}</TableCell>
 										<TableCell className="text-right tabular-nums" style={{ color: GRAY, fontSize: 12 }}>{r.u > 0 ? mix + "%" : "—"}</TableCell>
 									</TableRow>

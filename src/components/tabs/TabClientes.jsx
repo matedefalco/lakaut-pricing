@@ -8,29 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
+import { getDistributorTier } from "@/lib/tiers";
+import { CHANNELS, channelLabel, channelShort } from "@/data/channelMeta";
 import { cn } from "@/lib/utils";
 
-const CHANNEL_LABEL = { web: "Canal Web", distribuidores: "Precio de lista con descuento", b2b2c: "Volumen" };
-const CHANNEL_SHORT = { web: "Web", distribuidores: "Lista", b2b2c: "Volumen" };
-const CHANNEL_BADGE = { web: "secondary", distribuidores: "default", b2b2c: "default" };
-
-function getDistributorTierLocal(certsActivos, compromisoAnualUSD, tiers) {
-	function tierByCerts(certs) {
-		return tiers.find(function (t) {
-			return certs >= t.certsMin && (t.certsMax === null || certs <= t.certsMax);
-		}) || tiers[0];
-	}
-	function tierByCompromiso(usd) {
-		return tiers.find(function (t) {
-			return usd >= t.compromisoMin && (t.compromisoMax === null || usd <= t.compromisoMax);
-		}) || tiers[0];
-	}
-	const a = tierByCerts(certsActivos || 0);
-	const b = tierByCompromiso(compromisoAnualUSD || 0);
-	const ia = tiers.indexOf(a);
-	const ib = tiers.indexOf(b);
-	return ia >= ib ? a : b;
-}
+const CHANNEL_LABEL = { web: channelLabel("web"), distribuidores: channelLabel("distribuidores"), b2b2c: channelLabel("b2b2c") };
+const CHANNEL_SHORT = { web: channelShort("web"), distribuidores: channelShort("distribuidores"), b2b2c: channelShort("b2b2c") };
+const CHANNEL_BADGE = { web: CHANNELS.web.badgeVariant, distribuidores: CHANNELS.distribuidores.badgeVariant, b2b2c: CHANNELS.b2b2c.badgeVariant };
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -200,7 +184,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 									{certsTotal > 0 && (
 										<div className="text-right">
 											<p className="text-xs text-muted-foreground">Nivel actual</p>
-											<p className="text-sm font-semibold">{getDistributorTierLocal(certsTotal, 0, distributorTiers).label}</p>
+											<p className="text-sm font-semibold">{getDistributorTier(certsTotal, 0, distributorTiers).label}</p>
 										</div>
 									)}
 								</div>

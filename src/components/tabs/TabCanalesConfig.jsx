@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, WN, ER, os, mont } from "../../theme/tokens";
+import { markSaved, readSaved, formatSaved } from "../../lib/savedAt";
 
 const FIRMAS_INCL_REF = 1; // 1 IDC = 1 cert + 1 firma, igual que en Canal B2B2C · Tabla de referencia
 
@@ -112,6 +113,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 	const [isDirty, setIsDirty] = useState(false);
 	const [toast, setToast] = useState(null); // { msg, id }
 	const [segPriceMode, setSegPriceMode] = useState("manual"); // "manual" | "margen"
+	const [savedAt, setSavedAt] = useState(function () { return readSaved("channelConfig"); });
 
 	const cvCert = costs?.cvCertBase ?? 0;
 	const cvFirma = costs?.cvFirmaBase ?? 0;
@@ -140,6 +142,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 	function handleSave() {
 		updateChannelConfig(draft);
 		setIsDirty(false);
+		setSavedAt(markSaved("channelConfig"));
 		showToast("Cambios guardados");
 	}
 
@@ -174,7 +177,12 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 
 			{/* Top bar */}
 			<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-				<div style={mont(20)}>Configuración de canales</div>
+				<div>
+					<div style={mont(20)}>Configuración de canales</div>
+					<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 3 })}>
+						{isDirty ? "Cambios sin guardar" : (savedAt ? "Última edición: " + formatSaved(savedAt) : "Sin cambios registrados")}
+					</div>
+				</div>
 				<button
 					onClick={handleSave}
 					disabled={!isDirty}

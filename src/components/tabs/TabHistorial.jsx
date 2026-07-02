@@ -13,10 +13,11 @@ import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
+import { channelShort, CHANNELS as CHANNEL_META } from "@/data/channelMeta";
 
 const CHANNELS = {
-	distribuidores: { label: "Lista c/desc.", variant: "secondary" },
-	b2b2c: { label: "Volumen", variant: "default" },
+	distribuidores: { label: channelShort("distribuidores"), variant: CHANNEL_META.distribuidores.badgeVariant },
+	b2b2c: { label: channelShort("b2b2c"), variant: CHANNEL_META.b2b2c.badgeVariant },
 };
 
 const FILTER_DEFS = [

@@ -3,6 +3,7 @@ import { saveConfig } from "../../lib/supabase";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, OKBG, WN, WNBG, ER, CAT_COLOR, os, mont } from "../../theme/tokens";
 import { fD } from "../../utils/formatters";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "../../data/costs";
+import { markSaved, readSaved, formatSaved } from "../../lib/savedAt";
 
 function InlineNum({ value, onChange, decimals }) {
 	return (
@@ -82,11 +83,13 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 	}
 
 	const [saveOk, setSaveOk] = useState(false);
+	const [savedAt, setSavedAt] = useState(function () { return readSaved("costConfig"); });
 	function handleSave() {
 		try { localStorage.setItem("lakaut_costConfig", JSON.stringify(costConfig)); } catch (e) {}
 		saveConfig("costConfig", costConfig);
 		setSaveOk(true);
 		setIsDirty(false);
+		setSavedAt(markSaved("costConfig"));
 		setTimeout(function () { setSaveOk(false); }, 2000);
 	}
 	function handleReset() {
@@ -458,10 +461,12 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 			{/* Save / reset buttons */}
 			<div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
 				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-					{isDirty && !saveOk && (
+					{isDirty && !saveOk ? (
 						<span style={Object.assign({}, os(11, 700, ER), { background: "#fee2e2", padding: "4px 10px", borderRadius: 6 })}>
 							Cambios sin guardar
 						</span>
+					) : (
+						savedAt && <span style={os(11, 400, GRAY)}>Última edición: {formatSaved(savedAt)}</span>
 					)}
 				</div>
 				<div style={{ display: "flex", gap: 10 }}>

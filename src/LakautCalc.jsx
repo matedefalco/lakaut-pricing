@@ -1,8 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useDolarTC } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, BG, os, mont } from "./theme/tokens";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "./data/costs";
+import { CHANNELS } from "./data/channelMeta";
+import { exportProposal } from "./utils/exportProposal";
 import { ModelsProvider, useModels } from "./context/ModelsContext";
 import { useDeals } from "./lib/useDeals";
 import { useClients } from "./lib/useClients";
@@ -15,11 +17,88 @@ import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabComparacion } from "./components/tabs/TabComparacion";
 import { TabCanalWeb } from "./components/tabs/TabCanalWeb";
 import { TabCanalDistribuidores } from "./components/tabs/TabCanalDistribuidores";
-import { TabCanalDistribuidoresPrecios } from "./components/tabs/TabCanalDistribuidoresPrecios";
 import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
-import { TabCanalB2B2CPrecios } from "./components/tabs/TabCanalB2B2CPrecios";
 import { TabHistorial } from "./components/tabs/TabHistorial";
 import { TabClientes } from "./components/tabs/TabClientes";
+import { TabInicio } from "./components/tabs/TabInicio";
+
+
+// ── Estructura de navegación · agrupada por tarea del usuario ──────────────────
+// Cotizar (lo que más se hace) primero, después seguimiento, análisis y config.
+const NAV_GROUPS = [
+	{
+		groupKey: "cotizar", groupLabel: "COTIZAR",
+		items: [
+			{ key: "distribuidores", label: CHANNELS.distribuidores.label },
+			{ key: "b2b2c", label: CHANNELS.b2b2c.label },
+			{ key: "web-precios", label: "Precios web" },
+		],
+	},
+	{
+		groupKey: "seguimiento", groupLabel: "SEGUIMIENTO",
+		items: [
+			{ key: "historial", label: "Cotizaciones" },
+			{ key: "clientes", label: "Clientes" },
+		],
+	},
+	{
+		groupKey: "analisis", groupLabel: "ANÁLISIS",
+		items: [
+			{ key: "comparación", label: "Comparación de canales" },
+			{ key: "web-simulador", label: "Simulador de portfolio" },
+		],
+	},
+	{
+		groupKey: "configuracion", groupLabel: "CONFIGURACIÓN",
+		items: [
+			{ key: "cfg-costos", label: "Costos" },
+			{ key: "cfg-modelos", label: "Modelos y packs" },
+			{ key: "cfg-precios", label: "Precios por canal" },
+			{ key: "cfg-general", label: "General · tipo de cambio" },
+		],
+	},
+];
+
+// Canales que se pueden cotizar desde "Nueva cotización".
+const QUOTABLE = [
+	{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
+	{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
+];
+
+
+function NuevaCotizacionButton({ onPick }) {
+	const [open, setOpen] = useState(false);
+	const ref = useRef(null);
+	useEffect(function () {
+		function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+		document.addEventListener("mousedown", handler);
+		return function () { document.removeEventListener("mousedown", handler); };
+	}, []);
+	return (
+		<div ref={ref} style={{ position: "relative", padding: "12px 12px 4px" }}>
+			<button
+				onClick={function () { setOpen(function (o) { return !o; }); }}
+				style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 12px", background: BLUE, color: WHITE, border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, boxShadow: "0 1px 3px rgba(48,65,213,0.25)" }}
+			>
+				<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" /></svg>
+				Nueva cotización
+			</button>
+			{open && (
+				<div style={{ position: "absolute", top: "calc(100% - 0px)", left: 12, right: 12, zIndex: 60, background: WHITE, border: "1px solid " + BORD, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.14)", overflow: "hidden", marginTop: 4 }}>
+					<div style={Object.assign({}, os(10, 700, GRAY), { padding: "10px 12px 4px", textTransform: "uppercase", letterSpacing: "0.5px" })}>¿Qué querés cotizar?</div>
+					{QUOTABLE.map(function (q) {
+						return (
+							<button key={q.key} onClick={function () { setOpen(false); onPick(q.key); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", background: "none", border: "none", cursor: "pointer", borderTop: "1px solid " + BORD }}>
+								<div style={os(13, 700, BLACK)}>{q.label}</div>
+								<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2, lineHeight: 1.4 })}>{q.desc}</div>
+							</button>
+						);
+					})}
+				</div>
+			)}
+		</div>
+	);
+}
 
 
 function LakautCalcInner() {
@@ -44,8 +123,6 @@ function LakautCalcInner() {
 		});
 	}, []);
 
-
-
 	const [selectedModelId, setSelectedModelId] = useState(function () {
 		return models.length > 0 ? models[0].id : null;
 	});
@@ -66,31 +143,26 @@ function LakautCalcInner() {
 		};
 	});
 
-	const [activeNavItem, setActiveNavItem] = useState("web-precios");
+	const [activeNavItem, setActiveNavItem] = useState("inicio");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
-	const [expandedGroups, setExpandedGroups] = useState(function () { return new Set(["web"]); });
 	const [pendingEdit, setPendingEdit] = useState(null);
-
-	function toggleGroup(key) {
-		setExpandedGroups(function (prev) {
-			const next = new Set(prev);
-			if (next.has(key)) { next.delete(key); } else { next.add(key); }
-			return next;
-		});
-	}
+	// Nonce por canal: al pedir "nueva cotización" se incrementa y fuerza el
+	// remonte del componente (key) para arrancar con un lienzo en blanco.
+	const [quoteNonce, setQuoteNonce] = useState({ distribuidores: 0, b2b2c: 0 });
 
 	function navTo(key) {
 		setActiveNavItem(key);
-		// Auto-expand parent group if item is a child
-		ALL_NAV.forEach(function (group) {
-			group.items.forEach(function (item) {
-				if (item.children && item.children.some(function (c) { return c.key === key; })) {
-					setExpandedGroups(function (prev) { const next = new Set(prev); next.add(item.key); return next; });
-				}
-			});
-		});
 	}
 
+	function newQuote(channel) {
+		setPendingEdit(null);
+		setQuoteNonce(function (prev) { return Object.assign({}, prev, { [channel]: (prev[channel] || 0) + 1 }); });
+		navTo(channel);
+	}
+
+	function exportDeal(deal, client) {
+		exportProposal(deal, client, currency, tc, channelConfig, models);
+	}
 
 	// Load costConfig from Supabase on mount; subscribe to remote changes
 	useEffect(function () {
@@ -122,53 +194,6 @@ function LakautCalcInner() {
 	}, [costConfig]);
 
 
-	const ALL_NAV = [
-		{
-			groupKey: "canales", groupLabel: "🌐 CANALES",
-			items: [
-				{
-					key: "web", label: "Canal Web",
-					children: [
-						{ key: "web-precios", label: "Tabla de precios" },
-						{ key: "web-simulador", label: "Simulador" },
-					],
-				},
-				{
-					key: "distribuidores-group", label: "Precio de lista con descuento",
-					children: [
-						{ key: "distribuidores-precios", label: "Referencia" },
-						{ key: "distribuidores", label: "Cotizadora" },
-					],
-				},
-				{
-					key: "b2b2c-group", label: "Volumen",
-					children: [
-						{ key: "b2b2c-precios", label: "Referencia" },
-						{ key: "b2b2c", label: "Cotizadora" },
-					],
-				},
-				{ key: "comparación", label: "Comparación" },
-			],
-		},
-		{
-			groupKey: "bases", groupLabel: "🗄️ REGISTROS",
-			items: [
-				{ key: "historial", label: "Cotizaciones" },
-				{ key: "clientes", label: "Clientes" },
-				{ key: "cfg-costos", label: "Costos" },
-				{ key: "cfg-modelos", label: "Modelos" },
-			],
-		},
-		{
-			groupKey: "configuracion", groupLabel: "⚙️ CONFIGURACIÓN",
-			items: [
-				{ key: "cfg-general", label: "General" },
-				{ key: "cfg-precios", label: "Precios" },
-			],
-		},
-	];
-
-
 	return (
 		<div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Open Sans',sans-serif" }}>
 
@@ -176,49 +201,33 @@ function LakautCalcInner() {
 			{sidebarOpen && (
 				<div className="no-print" style={{ width: 220, flexShrink: 0, borderRight: "1px solid " + BORD, background: WHITE, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
 					{/* Brand header */}
-					<div style={{ background: BLUE, padding: "16px 16px 14px", flexShrink: 0 }}>
+					<button onClick={function () { navTo("inicio"); }} style={{ background: BLUE, padding: "16px 16px 14px", flexShrink: 0, border: "none", textAlign: "left", cursor: "pointer", display: "block" }}>
 						<div style={Object.assign({}, mont(18), { color: WHITE })}>LAKAUT</div>
 						<div style={Object.assign({}, os(11, 400, WHITE), { opacity: 0.7, marginTop: 2 })}>Pricing Calculator</div>
+					</button>
+
+					{/* Nueva cotización — acción primaria */}
+					<NuevaCotizacionButton onPick={newQuote} />
+
+					{/* Inicio */}
+					<div style={{ padding: "4px 0 0" }}>
+						<button onClick={function () { navTo("inicio"); }} style={{ width: "100%", display: "block", padding: "8px 14px", background: activeNavItem === "inicio" ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (activeNavItem === "inicio" ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: activeNavItem === "inicio" ? 700 : 600, color: activeNavItem === "inicio" ? BLUE : BLACK, textAlign: "left" }}>
+							Inicio
+						</button>
 					</div>
+
 					{/* Nav groups */}
-					<nav style={{ flex: 1, overflowY: "auto", paddingTop: 8, paddingBottom: 16 }}>
-						{ALL_NAV.map(function (group) {
+					<nav style={{ flex: 1, overflowY: "auto", paddingTop: 4, paddingBottom: 16 }}>
+						{NAV_GROUPS.map(function (group) {
 							return (
-								<div key={group.groupKey} style={{ marginBottom: 8 }}>
-									<div style={Object.assign({}, os(9, 700, GRAY), { padding: "16px 14px 6px", textTransform: "uppercase", letterSpacing: "0.6px" })}>
+								<div key={group.groupKey} style={{ marginBottom: 6 }}>
+									<div style={Object.assign({}, os(9, 700, GRAY), { padding: "14px 14px 5px", textTransform: "uppercase", letterSpacing: "0.6px" })}>
 										{group.groupLabel}
 									</div>
 									{group.items.map(function (item) {
-										if (item.key === "sep-coti") {
-											return <div key="sep-coti" style={{ height: 1, background: BORD, margin: "4px 10px" }} />;
-										}
 										const isActive = activeNavItem === item.key;
-										const isGroup = item.children && item.children.length > 0;
-										const expanded = expandedGroups.has(item.key);
-										if (isGroup) {
-											return (
-												<div key={item.key}>
-													<button onClick={function () { toggleGroup(item.key); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 600, color: expanded ? BLUE : BLACK, textAlign: "left" }}>
-														<span>{item.label}</span>
-														<span style={{ fontSize: 9, color: GRAY, display: "inline-block", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>▶</span>
-													</button>
-													{expanded && (
-														<div style={{ paddingLeft: 8 }}>
-															{item.children.map(function (child) {
-																const childActive = activeNavItem === child.key;
-																return (
-																	<button key={child.key} onClick={function () { navTo(child.key); }} style={{ width: "100%", display: "block", padding: "6px 12px 6px 18px", background: childActive ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (childActive ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: childActive ? 700 : 400, color: childActive ? BLUE : GRAY, textAlign: "left" }}>
-																		{child.label}
-																	</button>
-																);
-															})}
-														</div>
-													)}
-												</div>
-											);
-										}
 										return (
-											<button key={item.key} onClick={function () { navTo(item.key); }} style={{ width: "100%", display: "block", padding: "7px 14px", background: isActive ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (isActive ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: isActive ? 700 : 400, color: isActive ? BLUE : BLACK, textAlign: "left" }}>
+											<button key={item.key} onClick={function () { navTo(item.key); }} style={{ width: "100%", display: "block", padding: "7px 14px", background: isActive ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (isActive ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: isActive ? 700 : 400, color: isActive ? BLUE : BLACK, textAlign: "left", lineHeight: 1.35 }}>
 												{item.label}
 											</button>
 										);
@@ -256,18 +265,21 @@ function LakautCalcInner() {
 				{/* Content area */}
 				<div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
 
-					{/* ── CANALES ── */}
+					{/* ── INICIO ── */}
+					{activeNavItem === "inicio" && <TabInicio dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcLastUpdated={tcLastUpdated} onNewQuote={newQuote} onOpenHistorial={function () { navTo("historial"); }} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
+
+					{/* ── COTIZAR ── */}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
-					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
-					{activeNavItem === "distribuidores-precios" && <TabCanalDistribuidoresPrecios currency={currency} tc={tc} />}
-					{activeNavItem === "distribuidores" && <TabCanalDistribuidores costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-					{activeNavItem === "b2b2c-precios" && <TabCanalB2B2CPrecios costs={costs} />}
-					{activeNavItem === "b2b2c" && <TabCanalB2B2C costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "distribuidores" && <TabCanalDistribuidores key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={function () { navTo("historial"); }} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "b2b2c" && <TabCanalB2B2C key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={function () { navTo("historial"); }} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+
+					{/* ── SEGUIMIENTO ── */}
 					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
 
 					{/* ── ANÁLISIS ── */}
 					{activeNavItem === "comparación" && <TabComparacion costs={costs} currency={currency} tc={tc} />}
+					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
 
 					{/* ── CONFIGURACIÓN ── */}
 					{activeNavItem === "cfg-general" && <TabGeneral tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} />}
