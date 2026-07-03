@@ -77,20 +77,21 @@ function NuevaCotizacionButton({ onPick }) {
 		return function () { document.removeEventListener("mousedown", handler); };
 	}, []);
 	return (
-		<div ref={ref} style={{ position: "relative", padding: "12px 12px 4px" }}>
+		<div ref={ref} style={{ position: "relative", padding: "14px 14px 6px" }}>
 			<button
 				onClick={function () { setOpen(function (o) { return !o; }); }}
-				style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 12px", background: BLUE, color: WHITE, border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700, boxShadow: "0 1px 3px rgba(48,65,213,0.25)" }}
+				className="shadow-float transition-all duration-150 hover:-translate-y-px hover:brightness-110 active:translate-y-0"
+				style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "11px 12px", background: BLUE, color: WHITE, border: "none", borderRadius: 999, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: 700 }}
 			>
 				<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" /></svg>
 				Nueva cotización
 			</button>
 			{open && (
-				<div style={{ position: "absolute", top: "calc(100% - 0px)", left: 12, right: 12, zIndex: 60, background: WHITE, border: "1px solid " + BORD, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.14)", overflow: "hidden", marginTop: 4 }}>
-					<div style={Object.assign({}, os(10, 700, GRAY), { padding: "10px 12px 4px", textTransform: "uppercase", letterSpacing: "0.5px" })}>¿Qué querés cotizar?</div>
+				<div className="glass-strong shadow-float" style={{ position: "absolute", top: "calc(100% - 0px)", left: 14, right: 14, zIndex: 60, border: "1px solid var(--glass-border)", borderRadius: 18, overflow: "hidden", marginTop: 6 }}>
+					<div style={Object.assign({}, os(10, 700, GRAY), { padding: "12px 14px 6px", textTransform: "uppercase", letterSpacing: "0.5px" })}>¿Qué querés cotizar?</div>
 					{QUOTABLE.map(function (q) {
 						return (
-							<button key={q.key} onClick={function () { setOpen(false); onPick(q.key); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", background: "none", border: "none", cursor: "pointer", borderTop: "1px solid " + BORD }}>
+							<button key={q.key} onClick={function () { setOpen(false); onPick(q.key); }} className="transition-colors hover:bg-white/60" style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", cursor: "pointer" }}>
 								<div style={os(13, 700, BLACK)}>{q.label}</div>
 								<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 2, lineHeight: 1.4 })}>{q.desc}</div>
 							</button>
@@ -196,26 +197,38 @@ function LakautCalcInner() {
 	}, [costConfig]);
 
 
-	return (
-		<div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Open Sans',sans-serif" }}>
+	// Item de navegación estilo pill: activo = pill blanca con sombra suave.
+	function NavPill({ label, itemKey, bold }) {
+		const isActive = activeNavItem === itemKey;
+		return (
+			<button
+				onClick={function () { navTo(itemKey); }}
+				className={"transition-all duration-150 " + (isActive ? "shadow-card" : "hover:bg-white/50")}
+				style={{ width: "calc(100% - 16px)", display: "block", margin: "1px 8px", padding: "7px 12px", background: isActive ? "rgba(255,255,255,0.9)" : "none", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: isActive ? 700 : (bold ? 600 : 400), color: isActive ? BLUE : BLACK, textAlign: "left", lineHeight: 1.35 }}
+			>
+				{label}
+			</button>
+		);
+	}
 
-			{/* ── Sidebar ── */}
+	return (
+		<div className="app-bg" style={{ display: "flex", minHeight: "100vh", fontFamily: "'Open Sans',sans-serif" }}>
+
+			{/* ── Sidebar · vidrio ── */}
 			{sidebarOpen && (
-				<div className="no-print" style={{ width: 220, flexShrink: 0, borderRight: "1px solid " + BORD, background: WHITE, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+				<div className="no-print glass" style={{ width: 224, flexShrink: 0, borderRight: "1px solid var(--glass-border)", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", zIndex: 40 }}>
 					{/* Brand header */}
-					<button onClick={function () { navTo("inicio"); }} style={{ background: BLUE, padding: "16px 16px 14px", flexShrink: 0, border: "none", textAlign: "left", cursor: "pointer", display: "block" }}>
-						<div style={Object.assign({}, mont(18), { color: WHITE })}>LAKAUT</div>
-						<div style={Object.assign({}, os(11, 400, WHITE), { opacity: 0.7, marginTop: 2 })}>Pricing Calculator</div>
+					<button onClick={function () { navTo("inicio"); }} style={{ background: "none", padding: "18px 18px 6px", flexShrink: 0, border: "none", textAlign: "left", cursor: "pointer", display: "block" }}>
+						<div style={Object.assign({}, mont(18), { color: BLUE, letterSpacing: "-0.5px" })}>LAKAUT</div>
+						<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 1 })}>Pricing Calculator</div>
 					</button>
 
 					{/* Nueva cotización — acción primaria */}
 					<NuevaCotizacionButton onPick={newQuote} />
 
 					{/* Inicio */}
-					<div style={{ padding: "4px 0 0" }}>
-						<button onClick={function () { navTo("inicio"); }} style={{ width: "100%", display: "block", padding: "8px 14px", background: activeNavItem === "inicio" ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (activeNavItem === "inicio" ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: activeNavItem === "inicio" ? 700 : 600, color: activeNavItem === "inicio" ? BLUE : BLACK, textAlign: "left" }}>
-							Inicio
-						</button>
+					<div style={{ padding: "6px 0 0" }}>
+						<NavPill label="Inicio" itemKey="inicio" bold />
 					</div>
 
 					{/* Nav groups */}
@@ -223,16 +236,11 @@ function LakautCalcInner() {
 						{NAV_GROUPS.map(function (group) {
 							return (
 								<div key={group.groupKey} style={{ marginBottom: 6 }}>
-									<div style={Object.assign({}, os(9, 700, GRAY), { padding: "14px 14px 5px", textTransform: "uppercase", letterSpacing: "0.6px" })}>
+									<div style={Object.assign({}, os(9, 700, GRAY), { padding: "14px 18px 5px", textTransform: "uppercase", letterSpacing: "0.6px" })}>
 										{group.groupLabel}
 									</div>
 									{group.items.map(function (item) {
-										const isActive = activeNavItem === item.key;
-										return (
-											<button key={item.key} onClick={function () { navTo(item.key); }} style={{ width: "100%", display: "block", padding: "7px 14px", background: isActive ? BLUEL : "none", border: "none", borderLeft: "2px solid " + (isActive ? BLUE : "transparent"), cursor: "pointer", fontFamily: "'Open Sans',sans-serif", fontSize: 13, fontWeight: isActive ? 700 : 400, color: isActive ? BLUE : BLACK, textAlign: "left", lineHeight: 1.35 }}>
-												{item.label}
-											</button>
-										);
+										return <NavPill key={item.key} label={item.label} itemKey={item.key} />;
 									})}
 								</div>
 							);
@@ -242,9 +250,9 @@ function LakautCalcInner() {
 			)}
 
 			{/* ── Content ── */}
-			<div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: BG }}>
-				{/* Top bar */}
-				<div className="no-print" style={{ background: WHITE, borderBottom: "1px solid " + BORD, padding: "8px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+			<div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+				{/* Top bar · vidrio */}
+				<div className="no-print glass" style={{ borderBottom: "1px solid var(--glass-border)", padding: "8px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0, position: "sticky", top: 0, zIndex: 30 }}>
 					<button onClick={function () { setSidebarOpen(function (o) { return !o; }); }} style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, padding: "4px 6px", borderRadius: 6, display: "flex", alignItems: "center" }} title={sidebarOpen ? "Cerrar menú" : "Abrir menú"}>
 						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
 							<line x1="2" y1="4" x2="14" y2="4" /><line x1="2" y1="8" x2="14" y2="8" /><line x1="2" y1="12" x2="14" y2="12" />
@@ -254,7 +262,7 @@ function LakautCalcInner() {
 					<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
 						{["USD", "ARS"].map(function (c) {
 							return (
-								<button key={c} onClick={function () { setCurrency(c); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid " + (currency === c ? BLUE : BORD), background: currency === c ? BLUE : WHITE, color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
+								<button key={c} onClick={function () { setCurrency(c); }} className="transition-colors" style={{ padding: "4px 12px", borderRadius: 999, border: "1.5px solid " + (currency === c ? BLUE : "transparent"), background: currency === c ? BLUE : "rgba(255,255,255,0.6)", color: currency === c ? WHITE : GRAY, fontFamily: "'Open Sans',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{c}</button>
 							);
 						})}
 						{currency === "ARS" && <span style={os(11, 400, GRAY)}>TC: {tcLoading ? "..." : tc}</span>}

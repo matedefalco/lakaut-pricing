@@ -6,7 +6,7 @@ import { Check } from "lucide-react";
 export function Toast({ toast }) {
 	if (!toast) return null;
 	return (
-		<div className="fixed bottom-7 right-7 z-[9999] flex items-center gap-2.5 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background shadow-lg">
+		<div className="shadow-float fixed bottom-7 right-7 z-[9999] flex items-center gap-2.5 rounded-full bg-foreground/90 px-5 py-3 text-sm font-semibold text-background backdrop-blur-md">
 			<Check className="size-4 text-[var(--success)]" />
 			{toast.msg}
 		</div>

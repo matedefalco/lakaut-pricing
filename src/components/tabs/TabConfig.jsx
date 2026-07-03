@@ -35,7 +35,7 @@ function InlineNum({ value, onChange, decimals }) {
 // título chico en mayúsculas sobre fondo claro, en lugar del bloque negro.
 function SectionHeader({ title, description }) {
 	return (
-		<div style={{ background: WHITE, border: "1px solid " + BORD, borderBottom: "none", borderRadius: "10px 10px 0 0", padding: "14px 16px 2px", marginTop: 20 }}>
+		<div style={{ background: WHITE, border: "1px solid rgba(255,255,255,0.7)", borderBottom: "none", borderRadius: "16px 16px 0 0", padding: "16px 18px 2px", marginTop: 20 }}>
 			<div style={Object.assign({}, mont(12), { color: GRAY, textTransform: "uppercase", letterSpacing: "0.5px" })}>{title}</div>
 			{description && <div style={Object.assign({}, os(12, 400, GRAY), { marginTop: 4 })}>{description}</div>}
 		</div>
@@ -188,7 +188,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 			/>
 			{/* ── COSTOS FIJOS ─────────────────────────────────────── */}
 			<SectionHeader title="1 · Costos Fijos" />
-			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 10px 10px", padding: 16, background: WHITE, marginBottom: 4 }}>
+			<div style={{ border: "1px solid rgba(255,255,255,0.7)", borderTop: "none", borderRadius: "0 0 16px 16px", padding: 18, background: WHITE, marginBottom: 4, boxShadow: "var(--shadow-card)" }}>
 
 				{/* Activos adquiridos */}
 				<div style={Object.assign({}, os(11, 700, BLACK), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 })}>
@@ -371,7 +371,7 @@ export function TabConfig({ costConfig, setCostConfig, channelConfig, updateChan
 
 			{/* ── COSTOS VARIABLES ─────────────────────────────────── */}
 			<SectionHeader title="2 · Costos Variables" />
-			<div style={{ border: "1px solid " + BORD, borderTop: "none", borderRadius: "0 0 10px 10px", padding: 16, background: WHITE }}>
+			<div style={{ border: "1px solid rgba(255,255,255,0.7)", borderTop: "none", borderRadius: "0 0 16px 16px", padding: 18, background: WHITE, boxShadow: "var(--shadow-card)" }}>
 				<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
 
 					{/* CV × Certificado */}

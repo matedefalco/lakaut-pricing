@@ -54,7 +54,7 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{channelCards.map(function (c) {
 					return (
-						<button key={c.key} onClick={function () { onNewQuote(c.key); }} className="group text-left rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary hover:bg-primary/5">
+						<button key={c.key} onClick={function () { onNewQuote(c.key); }} className="group shadow-card text-left rounded-2xl border border-white/70 bg-card p-5 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-float">
 							<div className="flex items-center justify-between gap-3">
 								<span className="font-heading text-base font-semibold text-foreground">{c.label}</span>
 								<span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">

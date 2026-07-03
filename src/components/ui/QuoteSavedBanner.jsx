@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 // logro, no como un formulario que se envió al vacío.
 export function QuoteSavedBanner({ clientName, onExport, onGoHistorial, onNew, onDismiss }) {
 	return (
-		<div className="rounded-xl border border-[var(--success)]/40 bg-[var(--success)]/8 p-4">
+		<div className="shadow-card rounded-2xl border border-[var(--success)]/40 bg-[var(--success)]/8 p-4 backdrop-blur-sm">
 			<div className="flex items-start gap-3">
 				<span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--success)] text-white">
 					<Check className="size-4" />

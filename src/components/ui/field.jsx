@@ -43,21 +43,25 @@ export function SelectField({ label, value, onValueChange, options, note }) {
 	);
 }
 
-const ACCENT = {
-	primary: "border-t-primary",
-	success: "border-t-[var(--success)]",
-	warning: "border-t-[var(--warning)]",
-	destructive: "border-t-destructive",
-	muted: "border-t-muted-foreground",
+const ACCENT_DOT = {
+	primary: "bg-primary",
+	success: "bg-[var(--success)]",
+	warning: "bg-[var(--warning)]",
+	destructive: "bg-destructive",
+	muted: "bg-muted-foreground/50",
 };
 
-// Tarjeta KPI con borde superior de color.
+// Tarjeta KPI: el acento semántico es un punto de color junto al label
+// (lenguaje Crystal Glass: sombra difusa en lugar de bordes duros).
 export function StatCard({ label, value, sub, accent = "primary", valueClass }) {
 	return (
-		<Card className={cn("flex-1 min-w-[150px] gap-2 border-t-4 py-4", ACCENT[accent] || ACCENT.primary)}>
+		<Card className="flex-1 min-w-[150px] gap-2 py-4">
 			<div className="px-4">
-				<div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div>
-				<div className={cn("font-heading text-2xl font-semibold mt-1", valueClass)}>{value}</div>
+				<div className="flex items-center gap-1.5">
+					<span className={cn("size-1.5 rounded-full shrink-0", ACCENT_DOT[accent] || ACCENT_DOT.primary)} />
+					<span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+				</div>
+				<div className={cn("font-heading text-2xl font-semibold mt-1 tabular-nums", valueClass)}>{value}</div>
 				{sub && <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>}
 			</div>
 		</Card>
