@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { DISTRIBUTOR_TIERS, B2B2C_SEGMENTS, B2B2C_API_TIERS, SLA_PLANS, COSTO_IDC_REF } from "../data/channels";
-import { PRECIO_CERT_JURIDICA } from "../data/volumeTiers";
+import { DISTRIBUTOR_TIERS, B2B2C_SEGMENTS, B2B2C_API_TIERS, SLA_PLANS } from "../data/channels";
 import { loadConfig, saveConfig, subscribeConfig } from "../lib/supabase";
 
 const ChannelConfigContext = createContext(null);
@@ -11,8 +10,6 @@ const DEFAULT_CHANNEL_CONFIG = {
 	b2b2cSegments: B2B2C_SEGMENTS,
 	b2b2cApiTiers: B2B2C_API_TIERS,
 	slaPlans: SLA_PLANS,
-	costoIdcRef: COSTO_IDC_REF,
-	precioCertJuridica: PRECIO_CERT_JURIDICA,
 };
 
 export function ChannelConfigProvider({ children }) {

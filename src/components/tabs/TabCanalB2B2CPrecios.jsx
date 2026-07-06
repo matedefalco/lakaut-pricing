@@ -108,7 +108,7 @@ function ColFilterDropdown({ visible, onToggle }) {
 
 export function TabCanalB2B2CPrecios({ costs }) {
 	const { channelConfig } = useChannelConfig();
-	const { b2b2cSegments, b2b2cApiTiers, slaPlans, costoIdcRef } = channelConfig;
+	const { b2b2cSegments, b2b2cApiTiers, slaPlans } = channelConfig;
 
 	const cvCert = costs?.cvCertBase ?? 0;
 	const cvFirma = costs?.cvFirmaBase ?? 0;
@@ -152,8 +152,8 @@ export function TabCanalB2B2CPrecios({ costs }) {
 								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV (sin CF). Ganancia por IDC antes de cubrir costos fijos." /></TableHead>}
 								{visible.has("cmRealPct")     && <TableHead className="text-right">CM %<InfoTooltip text="CM como porcentaje del precio = CM / Precio × 100." /></TableHead>}
 								{visible.has("beReal")        && <TableHead className="text-right">BE (IDC)<InfoTooltip text="Break-even: IDC mínimos para cubrir el CF directo al precio de este segmento. BE = CF directo ÷ CM por IDC." /></TableHead>}
-								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.<InfoTooltip text="Costo de referencia por IDC provisto por el Borrador v5." /></TableHead>}
-								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.<InfoTooltip text="Contribución marginal calculada con el costo de referencia del Borrador v5 (Precio − Costo ref.)." /></TableHead>}
+								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.<InfoTooltip text="Costo de referencia por IDC calculado desde el esquema de costos (Configuración → Costos). Coincide con el Costo CV." /></TableHead>}
+								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.<InfoTooltip text="Contribución marginal calculada con el costo de referencia (Precio − Costo ref.)." /></TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -161,7 +161,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 								const cmVal     = s.precioIDC - costoRealIDC;
 								const cmPct     = s.precioIDC > 0 ? cmVal / s.precioIDC : 0;
 								const beVal     = cmVal > 0 ? Math.ceil((costs?.cfDirecto ?? 0) / cmVal) : null;
-								const cmRefVal  = s.precioIDC - costoIdcRef;
+								const cmRefVal  = s.precioIDC - costoRealIDC;
 								const mRefPct   = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
 								return (
 									<TableRow key={s.id}>
@@ -175,7 +175,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fUSD(cmVal)}</TableCell>}
 										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fPct(cmPct)}</TableCell>}
 										{visible.has("beReal")        && <TableCell className="text-right tabular-nums font-semibold">{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</TableCell>}
-										{visible.has("costoRef")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoIdcRef)}</TableCell>}
+										{visible.has("costoRef")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
 										{visible.has("cmRef")         && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
 									</TableRow>
 								);

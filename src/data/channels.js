@@ -144,10 +144,6 @@ export const B2B2C_API_TIERS = [
 	{ id: "enterprise", label: "API Enterprise", feeMin: 25000, feeMax: 50000, feeDefault: 37500 },
 ];
 
-// Costo de referencia por IDC según el documento (cert + 1 firma).
-// El CV real se recalcula desde costs.js; este es el piso del Borrador v5.
-export const COSTO_IDC_REF = 0.3741;
-
 // ── Servicios premium / SLA ─────────────────────────────────────────────────────
 // Precio mensual en USD. Standard incluido en todos los productos.
 export const SLA_PLANS = [

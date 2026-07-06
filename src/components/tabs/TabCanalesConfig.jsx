@@ -165,7 +165,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 
 			{/* ── Tiers de distribuidores ── */}
 			<SectionCard
-				title="1 · Tiers de Distribuidores e Integradores"
+				title="1 · Precio de lista con descuento · Niveles y descuentos"
 				description="El nivel se asigna por el mayor entre certificados activos y compromiso anual de facturación (USD)."
 			>
 				<div style={{ overflowX: "auto" }}>
@@ -218,7 +218,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 
 			{/* ── Segmentos B2B2C ── */}
 			<SectionCard
-				title="2 · Segmentos B2B2C (precio por IDC)"
+				title="2 · Volumen · Segmentos por IDC"
 				description={"CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + ". CM = Precio − CV. BE = CF directo (USD " + cfDirecto.toFixed(0) + ") ÷ CM por IDC."}
 			>
 				{/* Toggle de modo de carga de precio */}
@@ -321,7 +321,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			</SectionCard>
 
 			{/* ── API Tiers B2B2C ── */}
-			<SectionCard title="3 · API Tiers B2B2C (fee de implementación)">
+			<SectionCard title="3 · Volumen · API · Fee de implementación">
 				<div style={{ overflowX: "auto" }}>
 					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
 						<thead>
@@ -367,7 +367,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			</SectionCard>
 
 			{/* ── Planes SLA ── */}
-			<SectionCard title="4 · Planes SLA">
+			<SectionCard title="4 · Volumen · Planes SLA">
 				<div style={{ overflowX: "auto" }}>
 					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
 						<thead>
@@ -416,16 +416,18 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				/>
 			</SectionCard>
 
-			{/* ── Parámetros generales ── */}
-			<SectionCard title="5 · Parámetros generales">
-				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-					<div>
-						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Costo IDC referencia (USD)</div>
-						<InlineNum value={draft.costoIdcRef} decimals={4} onChange={function (v) { updDraft({ costoIdcRef: v }); }} />
+			{/* ── Parámetros derivados ── */}
+			<SectionCard
+				title="5 · Parámetros derivados del esquema de costos"
+				description="Estos valores se calculan automáticamente desde Configuración → Costos. No se editan a mano."
+			>
+				<div style={{ maxWidth: 320 }}>
+					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Costo IDC referencia (USD)</div>
+					<div style={{ border: "1px solid " + BORD, borderRadius: 4, padding: "6px 10px", fontFamily: "Courier New,monospace", fontSize: 13, textAlign: "right", color: BLACK, background: ZEBRA }}>
+						{costoRealIDC.toFixed(4)}
 					</div>
-					<div>
-						<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Precio cert jurídica (USD/empresa/año)</div>
-						<InlineNum value={draft.precioCertJuridica} decimals={2} onChange={function (v) { updDraft({ precioCertJuridica: v }); }} />
+					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 6 })}>
+						= cert USD {cvCert.toFixed(4)} + {FIRMAS_INCL_REF} firma USD {cvFirma.toFixed(4)}
 					</div>
 				</div>
 			</SectionCard>
