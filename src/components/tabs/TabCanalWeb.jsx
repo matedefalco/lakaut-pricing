@@ -392,7 +392,6 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 							</Table>
 						</CardContent>
 					</Card>
-					<p className="text-[11px] text-muted-foreground">Contribución marginal = precio USD − CV certificados − CV firmas incluidas. BE = CF total ÷ CM unitario (packs necesarios para cubrir todos los costos fijos). CV cert {fMoney2(cvCert)} · CV firma {fMoney2(cvFirma)}.</p>
 				</>
 			)}
 

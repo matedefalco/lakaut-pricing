@@ -137,30 +137,23 @@ export function TabCanalB2B2CPrecios({ costs }) {
 			{/* ── Pricing por segmento ────────────────────────────────── */}
 			<Card>
 				<CardContent>
-					<div className="flex items-start justify-between gap-4 mb-3">
-						<div>
-							<div className="text-sm font-semibold">Pricing por segmento</div>
-							<p className="text-xs text-muted-foreground mt-0.5">
-								El segmento se asigna por volumen de IDC de la cotización (mensual o total, según la modalidad).
-								CV/IDC = cert USD {cvCert.toFixed(4)} + 1 firma USD {cvFirma.toFixed(4)} = USD {costoRealIDC.toFixed(4)}.
-								Margen incluye absorción de CF directo al volumen medio de cada segmento.
-							</p>
-						</div>
+					<div className="flex items-center justify-between gap-4 mb-3">
+						<div className="text-sm font-semibold">Pricing por segmento</div>
 						<ColFilterDropdown visible={visible} onToggle={toggleCol} />
 					</div>
 					<div className="overflow-x-auto">
 					<Table>
 						<TableHeader>
 							<TableRow>
-								<TableHead>Segmento</TableHead>
-								<TableHead className="text-right">IDC</TableHead>
-								{visible.has("precioIDC")     && <TableHead className="text-right">Precio (USD/IDC)</TableHead>}
-								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text="Costo variable por IDC = cert + 1 firma. Sin costos fijos." /></TableHead>}
-								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV. Ganancia antes de cubrir costos fijos." /></TableHead>}
+								<TableHead>Segmento<InfoTooltip text="El segmento se asigna por volumen de IDC de la cotización (mensual o total, según la modalidad)." /></TableHead>
+								<TableHead className="text-right">IDC<InfoTooltip text="Rango de IDC (Identidad Digital Certificada) que define el segmento." /></TableHead>
+								{visible.has("precioIDC")     && <TableHead className="text-right">Precio (USD/IDC)<InfoTooltip text="Precio de lista por IDC del segmento, en USD." /></TableHead>}
+								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text={"Costo variable por IDC = cert USD " + cvCert.toFixed(4) + " + 1 firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
+								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV (sin CF). Ganancia por IDC antes de cubrir costos fijos." /></TableHead>}
 								{visible.has("cmRealPct")     && <TableHead className="text-right">CM %<InfoTooltip text="CM como porcentaje del precio = CM / Precio × 100." /></TableHead>}
-								{visible.has("beReal")        && <TableHead className="text-right">BE (IDC)<InfoTooltip text="Break-even: IDC necesarios para cubrir el CF directo mensual al precio de este segmento. BE = CF / CM por IDC." /></TableHead>}
-								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.</TableHead>}
-								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.</TableHead>}
+								{visible.has("beReal")        && <TableHead className="text-right">BE (IDC)<InfoTooltip text="Break-even: IDC mínimos para cubrir el CF directo al precio de este segmento. BE = CF directo ÷ CM por IDC." /></TableHead>}
+								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.<InfoTooltip text="Costo de referencia por IDC provisto por el Borrador v5." /></TableHead>}
+								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.<InfoTooltip text="Contribución marginal calculada con el costo de referencia del Borrador v5 (Precio − Costo ref.)." /></TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -190,9 +183,6 @@ export function TabCanalB2B2CPrecios({ costs }) {
 						</TableBody>
 					</Table>
 					</div>
-					<p className="text-[11px] text-muted-foreground mt-2">
-						CM = Precio − CV (sin CF). BE = CF directo ÷ CM por IDC — IDC mínimos para cubrir costos fijos al precio de cada segmento. Columnas "ref." provienen del Borrador v5.
-					</p>
 				</CardContent>
 			</Card>
 

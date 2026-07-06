@@ -254,6 +254,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
 						<thead>
 							<tr>
+								<th style={thL}>Segmento</th>
 								<th style={thR}>IDC mín.</th>
 								<th style={thR}>IDC máx.</th>
 								{segPriceMode === "margen" && <th style={thR}>Margen objetivo (%)</th>}
@@ -285,6 +286,9 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 								const margenPct = precioIDC > 0 ? Math.round((cmVal / precioIDC) * 1000) / 10 : 0;
 								return (
 									<tr key={seg.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
+										<td style={{ padding: "5px 8px" }}>
+											<input value={seg.label || ""} onChange={function (e) { upd("label", e.target.value); }} style={inputStyle(140)} />
+										</td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></td>
 										{segPriceMode === "margen" && (
