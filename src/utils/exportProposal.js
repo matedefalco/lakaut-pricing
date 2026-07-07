@@ -512,7 +512,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		heading: "Activás tus identidades",
 		body: `
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
-        Comprás las ${idc.toLocaleString("es-AR")} identidades, cada una con su certificado y su primera firma incluida.
+        Comprás las ${idc.toLocaleString("es-AR")} identidades, cada una con su certificado y ${inclPorIDC === 1 ? "su primera firma incluida" : `sus ${inclPorIDC} firmas incluidas`}${inclPorIDC > 1 ? ` (${firmasIncl.toLocaleString("es-AR")} firmas en total)` : ""}.
       </div>
       ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:0.14cm;margin-bottom:0.05cm;">${itemsListHtml}</div>` : ""}
       ${bigPrice({
