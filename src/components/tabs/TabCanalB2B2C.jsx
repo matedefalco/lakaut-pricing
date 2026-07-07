@@ -117,25 +117,35 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		effPrecioIDC = seg.precioIDC;
 	}
 
+	const precioFirmaLista = Math.max(0, Number(precioFirmaAdic) || 0);
+
+	// precioIDC (segmento/override) = solo el certificado. El precio del IDC en el
+	// mes 1 se compone de certificado + firmas incluidas a precio de lista, alineado
+	// con el costo (cvCert + incl × cvFirma) y con la propuesta comercial.
 	const precioIDC = effPrecioIDC;
-	const margenIDC = precioIDC - costoIDC;
-	const margenPctIDC = precioIDC > 0 ? margenIDC / precioIDC : 0;
+	const precioIDCmes1 = precioIDC + incl * precioFirmaLista;
+	const margenIDC = precioIDCmes1 - costoIDC;
+	const margenPctIDC = precioIDCmes1 > 0 ? margenIDC / precioIDCmes1 : 0;
 
 	const firmasTotales = idc * firmasPorIDC;
 	const firmasAdicTotal = idc * adic;
 	const firmasInclTotal = idc * incl;
 
+	// Mes 1 (activación): certificados + bolsa inicial de firmas incluidas + firmas
+	// adicionales, todo a precio de lista. El 35% de descuento aplica recién al abono.
 	const revIDC = idc * precioIDC;
-	const revFirmasAdic = firmasAdicTotal * Math.max(0, Number(precioFirmaAdic) || 0);
+	const revFirmasIncl = firmasInclTotal * precioFirmaLista;
+	const revFirmasAdic = firmasAdicTotal * precioFirmaLista;
 	const costoCert = idc * cvCert;
 	const costoFirmas = firmasTotales * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
 	const feeAplicado = conApi ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
-	const revSinFee = revIDC + revFirmasAdic + slaMes;
+	const revSinFee = revIDC + revFirmasIncl + revFirmasAdic + slaMes;
 	const revTotal = revSinFee + feeAplicado;
-	const margen = revIDC + revFirmasAdic - costoTotal;
-	const margenPct = revIDC + revFirmasAdic > 0 ? margen / (revIDC + revFirmasAdic) : 0;
+	const revServicio = revIDC + revFirmasIncl + revFirmasAdic;
+	const margen = revServicio - costoTotal;
+	const margenPct = revServicio > 0 ? margen / revServicio : 0;
 
 	const precioFirmaAbono = Math.max(0, Number(precioFirmaAdic) || 0) * (1 - DESCUENTO_ABONO);
 	const revAbonoMes = firmasInclTotal * precioFirmaAbono;
@@ -375,7 +385,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			{hasVolume ? (
 				<div className="flex flex-wrap gap-3">
 					<StatCard label="Segmento" value={seg.label} sub={seg.idcMin.toLocaleString("es-AR") + "–" + (seg.idcMax == null ? "+" : seg.idcMax.toLocaleString("es-AR")) + " IDC"} accent="primary" />
-					<StatCard label="Precio por IDC" value={fMoney2(precioIDC)} sub={overrideMode ? "Precio personalizado" : "Precio de tabla"} accent="primary" />
+					<StatCard label="Precio por IDC (mes 1)" value={fMoney2(precioIDCmes1)} sub={"cert " + fMoney2(precioIDC) + " + " + incl + " firma" + (incl !== 1 ? "s" : "") + (overrideMode ? " · personalizado" : "")} accent="primary" />
 					<StatCard label="Total firmas" value={firmasTotales.toLocaleString("es-AR")} sub={idc.toLocaleString("es-AR") + " IDC × " + firmasPorIDC + " firmas"} accent="muted" />
 					<StatCard label="Revenue total" value={fMoney(revTotal)} sub={conApi ? "IDC + firmas + SLA · fee " + fMoney(feeAplicado) + " incluido" : "IDC + firmas · sin integración API"} accent="success" />
 					{abono && (
@@ -401,7 +411,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					<Table>
 						<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
 						<TableBody>
-							<TableRow><TableCell>Ingreso por IDC ({idc.toLocaleString("es-AR")} × {fMoney2(precioIDC)})</TableCell><TableCell className="text-right tabular-nums">{fMoney(revIDC)}</TableCell></TableRow>
+							<TableRow><TableCell>Ingreso certificados ({idc.toLocaleString("es-AR")} × {fMoney2(precioIDC)})</TableCell><TableCell className="text-right tabular-nums">{fMoney(revIDC)}</TableCell></TableRow>
+							<TableRow><TableCell>Ingreso firmas incluidas ({firmasInclTotal.toLocaleString("es-AR")} × {fMoney2(precioFirmaLista)} · mes 1)</TableCell><TableCell className="text-right tabular-nums">{revFirmasIncl ? fMoney(revFirmasIncl) : "—"}</TableCell></TableRow>
 							<TableRow><TableCell>Ingreso firmas adicionales ({firmasAdicTotal.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums">{revFirmasAdic ? fMoney(revFirmasAdic) : "—"}</TableCell></TableRow>
 							<TableRow><TableCell>Costo certificados</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoCert)}</TableCell></TableRow>
 							<TableRow><TableCell>Costo firmas ({firmasTotales.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
@@ -413,7 +424,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 							</TableRow>
 						</TableBody>
 					</Table>
-					<p className="text-[11px] text-muted-foreground mt-3">CV/IDC = cert USD {cvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. CM = Precio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
+					<p className="text-[11px] text-muted-foreground mt-3">CV/IDC = cert USD {cvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Precio IDC mes 1 = cert + {incl} firma{incl !== 1 ? "s" : ""} a precio de lista = USD {precioIDCmes1.toFixed(4)}. CM = Precio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
 				</CollapsibleSection>
 			)}
 

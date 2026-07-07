@@ -465,16 +465,25 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const firmasIncl = idc * inclPorIDC;
 	const firmasAdicTotal = idc * adicPorIDC;
 	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
+	// Precio de firma a precio de lista (mes 1, sin el 35% del abono). Se formatea
+	// aparte como precioIDC: es un decimal chico y fm/USD lo redondearía a entero.
+	const precioFirmaFmt = currency === "ARS"
+		? "$ " + Math.round(precioFirmaAdicN * tc).toLocaleString("es-AR")
+		: "USD " + precioFirmaAdicN.toFixed(2);
 
-	// Desglose del resumen: subtotales por concepto arriba, IVA después, total al final.
+	// Desglose del mes 1 (activación): certificados + bolsa inicial de firmas a precio
+	// de lista + firmas adicionales. El 35% de descuento aplica recién al abono (mes 2
+	// en adelante); por eso las firmas del mes 1 van a precio de lista.
 	const revIDC = idc * precioIDC;
+	const revFirmasIncl = firmasIncl * precioFirmaAdicN;
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
 	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
-	const subtotal = revIDC + revFirmasAdic + slaMesVal + feeVal;
+	const subtotal = revIDC + revFirmasIncl + revFirmasAdic + slaMesVal + feeVal;
 	const items = [
-		{ l: `IDC (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
-		...(revFirmasAdic > 0 ? [{ l: `Firmas adicionales (${firmasAdicTotal.toLocaleString("es-AR")})`, v: revFirmasAdic }] : []),
+		{ l: `Certificados (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
+		...(revFirmasIncl > 0 ? [{ l: `Firmas incluidas (${firmasIncl.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
+		...(revFirmasAdic > 0 ? [{ l: `Firmas adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
@@ -512,7 +521,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		heading: "Activás tus identidades",
 		body: `
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
-        Comprás las ${idc.toLocaleString("es-AR")} identidades, cada una con su certificado y ${inclPorIDC === 1 ? "su primera firma incluida" : `sus ${inclPorIDC} firmas incluidas`}${inclPorIDC > 1 ? ` (${firmasIncl.toLocaleString("es-AR")} firmas en total)` : ""}.
+        Comprás las ${idc.toLocaleString("es-AR")} identidades: cada una con su certificado y ${inclPorIDC === 1 ? "su primera firma" : `sus ${inclPorIDC} firmas`} de activación${inclPorIDC > 0 ? ` (${firmasIncl.toLocaleString("es-AR")} firmas en total)` : ""}.
       </div>
       ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:0.14cm;margin-bottom:0.05cm;">${itemsListHtml}</div>` : ""}
       ${bigPrice({
