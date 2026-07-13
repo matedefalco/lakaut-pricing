@@ -10,12 +10,14 @@ import { useDeals } from "./lib/useDeals";
 import { useClients } from "./lib/useClients";
 import { DiscountProvider } from "./context/DiscountContext";
 import { ChannelConfigProvider, useChannelConfig } from "./context/ChannelConfigContext";
+import { ToastProvider } from "./components/ui/Toaster";
 import { TabConfig } from "./components/tabs/TabConfig";
 import { TabCanalesConfig } from "./components/tabs/TabCanalesConfig";
 import { TabGeneral } from "./components/tabs/TabGeneral";
 import { TabGuardados } from "./components/tabs/TabGuardados";
 import { TabComparacion } from "./components/tabs/TabComparacion";
 import { TabCanalWeb } from "./components/tabs/TabCanalWeb";
+import { TabCanalWebCotizar } from "./components/tabs/TabCanalWebCotizar";
 import { TabCanalDistribuidores } from "./components/tabs/TabCanalDistribuidores";
 import { TabCanalB2B2C } from "./components/tabs/TabCanalB2B2C";
 import { TabHistorial } from "./components/tabs/TabHistorial";
@@ -30,9 +32,9 @@ const NAV_GROUPS = [
 	{
 		groupKey: "cotizar", groupLabel: "COTIZAR",
 		items: [
+			{ key: "web", label: CHANNELS.web.label },
 			{ key: "distribuidores", label: CHANNELS.distribuidores.label },
 			{ key: "b2b2c", label: CHANNELS.b2b2c.label },
-			{ key: "web-precios", label: "Precios web" },
 		],
 	},
 	{
@@ -47,6 +49,7 @@ const NAV_GROUPS = [
 		items: [
 			{ key: "reportes", label: "Reportes" },
 			{ key: "comparación", label: "Comparación de canales" },
+			{ key: "web-precios", label: "Precios web" },
 			{ key: "web-simulador", label: "Simulador de portfolio" },
 		],
 	},
@@ -63,6 +66,7 @@ const NAV_GROUPS = [
 
 // Canales que se pueden cotizar desde "Nueva cotización".
 const QUOTABLE = [
+	{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
 	{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
 	{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
 ];
@@ -149,9 +153,12 @@ function LakautCalcInner() {
 	const [activeNavItem, setActiveNavItem] = useState("inicio");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [pendingEdit, setPendingEdit] = useState(null);
+	// Al ir a Cotizaciones desde el toast de guardado, resaltamos y hacemos scroll
+	// a esa fila. Se limpia sola tras el flash (ver TabHistorial).
+	const [historialHighlight, setHistorialHighlight] = useState(null);
 	// Nonce por canal: al pedir "nueva cotización" se incrementa y fuerza el
 	// remonte del componente (key) para arrancar con un lienzo en blanco.
-	const [quoteNonce, setQuoteNonce] = useState({ distribuidores: 0, b2b2c: 0 });
+	const [quoteNonce, setQuoteNonce] = useState({ web: 0, distribuidores: 0, b2b2c: 0 });
 
 	function navTo(key) {
 		setActiveNavItem(key);
@@ -161,6 +168,11 @@ function LakautCalcInner() {
 		setPendingEdit(null);
 		setQuoteNonce(function (prev) { return Object.assign({}, prev, { [channel]: (prev[channel] || 0) + 1 }); });
 		navTo(channel);
+	}
+
+	function goHistorial(dealId) {
+		setHistorialHighlight(dealId || null);
+		navTo("historial");
 	}
 
 	function exportDeal(deal, client) {
@@ -279,12 +291,13 @@ function LakautCalcInner() {
 					{activeNavItem === "inicio" && <TabInicio dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcLastUpdated={tcLastUpdated} onNewQuote={newQuote} onOpenHistorial={function () { navTo("historial"); }} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
 
 					{/* ── COTIZAR ── */}
+					{activeNavItem === "web" && <TabCanalWebCotizar key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && pendingEdit.channel === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
-					{activeNavItem === "distribuidores" && <TabCanalDistribuidores key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={function () { navTo("historial"); }} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-					{activeNavItem === "b2b2c" && <TabCanalB2B2C key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={function () { navTo("historial"); }} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "distribuidores" && <TabCanalDistribuidores key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && pendingEdit.channel === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "b2b2c" && <TabCanalB2B2C key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 
 					{/* ── SEGUIMIENTO ── */}
-					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
+					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} highlightId={historialHighlight} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={function (d) { setPendingEdit(d); navTo(d.channel); }} />}
 
 					{/* ── ANÁLISIS ── */}
@@ -308,7 +321,9 @@ export default function LakautCalc() {
 		<ModelsProvider>
 			<DiscountProvider>
 				<ChannelConfigProvider>
-					<LakautCalcInner />
+					<ToastProvider>
+						<LakautCalcInner />
+					</ToastProvider>
 				</ChannelConfigProvider>
 			</DiscountProvider>
 		</ModelsProvider>

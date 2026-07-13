@@ -29,6 +29,7 @@ const STATUS_COLORS = { confirmada: "#059669", pendiente: "#c87a00", rechazada: 
 // revenue anual en volumen. Es la misma cifra que muestra cada cotizadora.
 function dealRevenue(d) {
 	const r = d.resumen || {};
+	if (d.channel === "web") return r.facturacionLista || r.netoLakaut || 0;
 	if (d.channel === "distribuidores") return r.facturacionAnio1 || r.netoLakaut || 0;
 	if (d.channel === "b2b2c") return r.revAnual || (r.revMesTotal || 0) * 12 || 0;
 	return 0;
@@ -37,7 +38,7 @@ function dealRevenue(d) {
 function dealItems(d) {
 	const r = d.resumen || {};
 	return {
-		certs: d.channel === "distribuidores" ? (r.certsComprados || r.certsActivos || 0) : 0,
+		certs: (d.channel === "distribuidores" || d.channel === "web") ? (r.certsComprados || r.certsActivos || 0) : 0,
 		idc: d.channel === "b2b2c" ? (r.idcMensuales || 0) : 0,
 		firmas: r.firmasTotal || r.firmasTotales || 0,
 	};

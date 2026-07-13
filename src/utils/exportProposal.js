@@ -222,14 +222,24 @@ function iconBox(svg, bg, size) {
 }
 
 // ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
-function s1Cover(clientName, fecha, sinApi) {
+// `sinApi` engloba las propuestas sin integración (volumen sin API y canal web);
+// `isWeb` afina el copy para la venta directa por tarjeta.
+function s1Cover(clientName, fecha, sinApi, isWeb) {
+	const middleBadge = isWeb
+		? { text: "Contratación directa", icon: SVG.check("rgba(255,255,255,0.85)", 11) }
+		: sinApi
+			? { text: "Emisión a escala",  icon: SVG.zap(   "rgba(255,255,255,0.85)", 11) }
+			: { text: "Firma embebida",    icon: SVG.code(  "rgba(255,255,255,0.85)", 11) };
 	const badges = [
 		{ text: "100% Remoto",        icon: SVG.check( "rgba(255,255,255,0.85)", 11) },
-		sinApi
-			? { text: "Emisión a escala",  icon: SVG.zap(   "rgba(255,255,255,0.85)", 11) }
-			: { text: "Firma embebida",    icon: SVG.code(  "rgba(255,255,255,0.85)", 11) },
+		middleBadge,
 		{ text: "Validez legal plena", icon: SVG.shield("rgba(255,255,255,0.85)", 11) },
 	];
+	const subtitle = isWeb
+		? "Firma digital con validez legal,<br>contratada de forma directa y 100% remota."
+		: sinApi
+			? "Firma digital con validez legal,<br>emitida por volumen y 100% remota."
+			: "Integración de firma digital con validez legal,<br>embebida en tu flujo y 100% remota.";
 	return `<div class="slide" style="background:${B};">
   <!-- decorative circles -->
   <div style="position:absolute;top:-5cm;right:-2.5cm;width:16cm;height:16cm;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
@@ -247,9 +257,7 @@ function s1Cover(clientName, fecha, sinApi) {
   <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 1.3cm;">
     <div style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.35cm;">Propuesta Comercial</div>
     <div style="font-size:44pt;font-weight:700;color:${W};line-height:1.05;letter-spacing:-0.5px;margin-bottom:0.45cm;">${clientName}</div>
-    <div style="font-size:10pt;color:rgba(255,255,255,0.72);max-width:15cm;line-height:1.6;margin-bottom:0.9cm;">${sinApi
-		? "Firma digital con validez legal,<br>emitida por volumen y 100% remota."
-		: "Integración de firma digital con validez legal,<br>embebida en tu flujo y 100% remota."}</div>
+    <div style="font-size:10pt;color:rgba(255,255,255,0.72);max-width:15cm;line-height:1.6;margin-bottom:0.9cm;">${subtitle}</div>
     <!-- badges -->
     <div style="display:flex;gap:0.45cm;">
       ${badges.map(b => `<div style="display:flex;align-items:center;gap:0.2cm;border:1.5px solid rgba(255,255,255,0.38);border-radius:20px;padding:0.18cm 0.45cm;">${b.icon}<span style="font-size:8pt;color:${W};font-weight:500;">${b.text}</span></div>`).join("")}
@@ -574,6 +582,93 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	});
 }
 
+// ─── SLIDE 3: MODELO COMERCIAL — WEB (precio de lista, sin descuento) ─────────
+// Venta directa por tarjeta: se cotiza a precio de lista puro. No hay tier ni
+// abono, así que la slide no muestra ninguna sección de descuento — solo el
+// desglose de packs y el precio de lista como total a pagar.
+function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
+	const inp = deal.inputs || {};
+	const res = deal.resumen || {};
+	const qtys = inp.qtys || {};
+	const firmasAdic = Number(inp.firmasAdic) || 0;
+	const precioFirmaUSD = Number(res.precioFirmaAdic) || 0;
+	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
+
+	const webProducts = models || [];
+	const packRows = webProducts
+		.filter(p => p.priceUSD > 0 && (Number(qtys[p.id]) || 0) > 0)
+		.map(p => ({
+			label: p.label, qty: Number(qtys[p.id]),
+			unit: p.priceUSD, sub: Number(qtys[p.id]) * p.priceUSD,
+			certs: p.certs || 0, firmas: p.firmas || 0, ilimitadas: p.ilimitadas,
+			segment: p.segment || "persona",
+		}));
+
+	const total = res.facturacionLista || 0;
+
+	// desglose totales
+	const totalPacks = packRows.reduce((s, r) => s + r.qty, 0);
+	const totalCerts = packRows.reduce((s, r) => s + r.qty * r.certs, 0);
+	const hayIlimitadas = packRows.some(r => r.ilimitadas);
+	const totalFirmasIncl = hayIlimitadas ? null : packRows.reduce((s, r) => s + r.qty * r.firmas, 0);
+	const totalFirmasConAdic = totalFirmasIncl != null ? totalFirmasIncl + firmasAdic : null;
+
+	const chips = [
+		chip(SVG.idcard(B, 15), `<strong>${totalPacks.toLocaleString("es-AR")}</strong> unidades contratadas`),
+		chip(SVG.shield(B, 15), `<strong>${totalCerts.toLocaleString("es-AR")}</strong> certificados incluidos`),
+		chip(SVG.checkSquare(B, 15), `<strong>${totalFirmasConAdic != null ? totalFirmasConAdic.toLocaleString("es-AR") : "Ilimitadas"}</strong> firmas incluidas`),
+		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
+	];
+
+	const packItemsHtml = packRows.map(r => {
+		const inclParts = [];
+		if (r.certs > 0) inclParts.push(r.certs + " cert" + (r.segment === "empresa" ? " jur." : " fís."));
+		if (r.ilimitadas) inclParts.push("firmas ilimitadas");
+		else if (r.firmas > 0) inclParts.push(r.firmas.toLocaleString("es-AR") + " firmas");
+		return `<div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:8.5pt;">
+      <span style="color:${GR};">${r.qty}× <strong style="color:${DK};">${r.label}</strong> <span style="font-size:7.5pt;">(${inclParts.join(" · ")})</span></span>
+      <span style="color:${DK};font-weight:600;white-space:nowrap;">${fm(r.sub, currency, tc)}</span>
+    </div>`;
+	}).join("");
+	const firmasAdicItemHtml = firmasAdic > 0 ? `<div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:8.5pt;">
+      <span style="color:${GR};">Firmas adicionales (${firmasAdic.toLocaleString("es-AR")})</span>
+      <span style="color:${DK};font-weight:600;white-space:nowrap;">${fm(firmasAdic * precioFirmaUSD, currency, tc)}</span>
+    </div>` : "";
+
+	const stats = [{ label: "Subtotal (sin IVA)", value: fm(total, currency, tc) }];
+	if (showIva) stats.push({ label: "IVA (21%)", value: fm(total * IVA_RATE, currency, tc) });
+
+	const momento1 = momentoCard({
+		dark: false,
+		kicker: "Tu compra",
+		icon: SVG.shield(B, 16),
+		heading: "Contratás tu volumen",
+		body: `
+      <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
+        Contratás los packs seleccionados a <strong style="color:${DK};">precio de lista web</strong>, sin intermediación. Se abona una única vez.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
+      ${bigPrice({
+				dark: false,
+				label: "Total a pagar",
+				value: showIva ? fmGross(total, currency, tc) : fm(total, currency, tc),
+				note: showIva ? "IVA 21% incluido" : null,
+			})}
+      ${showIva ? miniStats(false, stats) : ""}
+    `,
+	});
+
+	return commercialSlide({
+		kicker: "Modelo comercial · precio web",
+		title: "Tu propuesta a medida",
+		subtitle: showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : "Precios de lista web, sin descuento.",
+		chips,
+		cardsHtml: momento1,
+		scheduleHtml: "",
+		pageN: pageN || 2,
+	});
+}
+
 // ─── SLIDE 4: PRÓXIMOS PASOS ──────────────────────────────────────────────────
 function s4Pasos(clientName, sinApi, pageN) {
 	const steps = sinApi
@@ -656,12 +751,16 @@ function s5Cierre(sinApi) {
 // ─── Builder ──────────────────────────────────────────────────────────────────
 function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
-	// Cotizaciones de volumen sin integración API: la propuesta omite la slide de
-	// integración y el lenguaje técnico (fee, SLA, kick-off) — solo el volumen cotizado.
-	const sinApi = deal.channel === "b2b2c" && deal.inputs?.integracion === "sin_api";
-	const s3 = deal.channel === "b2b2c"
-		? s3B2B2C(deal, clientName, currency, tc, channelConfig, sinApi ? 2 : 3)
-		: s3Dist(deal, clientName, currency, tc, channelConfig, models);
+	// Cotizaciones sin integración API (volumen sin API o canal web): la propuesta
+	// omite la slide de integración y el lenguaje técnico (fee, SLA, kick-off).
+	const isWeb = deal.channel === "web";
+	const sinApiB2B2C = deal.channel === "b2b2c" && deal.inputs?.integracion === "sin_api";
+	const noApi = sinApiB2B2C || isWeb;
+	const s3 = isWeb
+		? s3Web(deal, clientName, currency, tc, channelConfig, models, 2)
+		: deal.channel === "b2b2c"
+			? s3B2B2C(deal, clientName, currency, tc, channelConfig, sinApiB2B2C ? 2 : 3)
+			: s3Dist(deal, clientName, currency, tc, channelConfig, models);
 
 	return `<!DOCTYPE html>
 <html lang="es">
@@ -671,11 +770,11 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 <style>${SLIDE_CSS}</style>
 </head>
 <body>
-${s1Cover(clientName, deal.fecha, sinApi)}
-${sinApi ? "" : s2Integracion(clientName)}
+${s1Cover(clientName, deal.fecha, noApi, isWeb)}
+${noApi ? "" : s2Integracion(clientName)}
 ${s3}
-${s4Pasos(clientName, sinApi, sinApi ? 3 : 4)}
-${s5Cierre(sinApi)}
+${s4Pasos(clientName, noApi, noApi ? 3 : 4)}
+${s5Cierre(noApi)}
 </body>
 </html>`;
 }

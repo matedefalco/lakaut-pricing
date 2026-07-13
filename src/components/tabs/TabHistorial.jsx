@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Pencil, Trash2, Download, FileText, ChevronDown, X } from "lucide-react";
 import { exportProposal } from "@/utils/exportProposal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { channelShort, CHANNELS as CHANNEL_META } from "@/data/channelMeta";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const CHANNELS = {
+	web: { label: channelShort("web"), variant: CHANNEL_META.web.badgeVariant },
 	distribuidores: { label: channelShort("distribuidores"), variant: CHANNEL_META.distribuidores.badgeVariant },
 	b2b2c: { label: channelShort("b2b2c"), variant: CHANNEL_META.b2b2c.badgeVariant },
 };
@@ -31,6 +32,14 @@ const FILTER_DEFS = [
 ];
 
 function summaryCols(channel, fMoney) {
+	if (channel === "web") {
+		return [
+			{ label: "Certs", get: function (q) { return (q.resumen.certsComprados || q.resumen.certsActivos || 0).toLocaleString("es-AR"); } },
+			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
+			{ label: "Precio de lista", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
+			{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
+		];
+	}
 	if (channel === "distribuidores") {
 		return [
 			{ label: "Nivel", get: function (q) { return q.resumen.tier; } },
@@ -51,10 +60,24 @@ function summaryCols(channel, fMoney) {
 	];
 }
 
-export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }) {
+export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, highlightId }) {
 	const { channelConfig } = useChannelConfig();
 	const { models } = useModels();
 	const { fMoney } = makeMoney(currency, tc);
+
+	// Al llegar desde el toast de "cotización guardada": scroll a esa fila y flash
+	// de resaltado por unos segundos.
+	const [flashId, setFlashId] = useState(null);
+	useEffect(function () {
+		if (!highlightId) return;
+		setFlashId(highlightId);
+		const raf = requestAnimationFrame(function () {
+			const el = document.querySelector('[data-deal-id="' + highlightId + '"]');
+			if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+		});
+		const timer = setTimeout(function () { setFlashId(null); }, 2800);
+		return function () { cancelAnimationFrame(raf); clearTimeout(timer); };
+	}, [highlightId]);
 
 	const [openFilter, setOpenFilter] = useState(null);
 	const [selectedChannels, setSelectedChannels] = useState(new Set());
@@ -379,7 +402,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 			{dealsApi?.loading ? (
 				<p className="text-sm text-muted-foreground">Cargando historial…</p>
 			) : filtered.length === 0 ? (
-				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Precio de lista con descuento o Volumen y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
+				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Web, Precio de lista con descuento o Volumen y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
 			) : (
 				orderedChannels.map(function (ch) {
 					const cols = summaryCols(ch, fMoney);
@@ -406,7 +429,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 									<TableBody>
 										{groups[ch].map(function (q) {
 											return (
-												<TableRow key={q.id}>
+												<TableRow key={q.id} data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
 													<TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>
 													<TableCell className="font-medium">
 														{q.clientName || "(sin nombre)"}
@@ -428,7 +451,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi }
 													</TableCell>
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
-														{(q.channel === "b2b2c" || q.channel === "distribuidores") && (
+														{(q.channel === "b2b2c" || q.channel === "distribuidores" || q.channel === "web") && (
 															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 														)}
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>

@@ -14,18 +14,19 @@ import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
-import { QuoteSavedBanner } from "@/components/ui/QuoteSavedBanner";
+import { useToast, notifyQuoteSaved } from "@/components/ui/Toaster";
 import { TabCanalB2B2CPrecios } from "@/components/tabs/TabCanalB2B2CPrecios";
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
 
-export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, onNewQuote, pendingEdit, onConsumeEdit }) {
+export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
 	const { channelConfig } = useChannelConfig();
 	const b2b2cSegments = channelConfig.b2b2cSegments;
 	const b2b2cApiTiers = channelConfig.b2b2cApiTiers;
 	const slaPlans = channelConfig.slaPlans;
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
+	const { toast } = useToast();
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
@@ -200,6 +201,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setFlash(true);
 		setSaved({ deal, client });
 		setTimeout(function () { setFlash(false); }, 1500);
+
+		notifyQuoteSaved(toast, {
+			clientName: client?.name,
+			onExport: function () { onExport && onExport(deal, client); },
+			onGoHistorial: function () { onGoHistorial && onGoHistorial(deal.id); },
+		});
 	}
 
 	function exportNow() {
@@ -214,16 +221,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				title={CHANNELS.b2b2c.full}
 				description={CHANNELS.b2b2c.desc + " Las firmas incluidas por IDC son configurables (firma inicial + activación, según la institución)."}
 			/>
-
-			{saved && (
-				<QuoteSavedBanner
-					clientName={(saved.client && saved.client.name) || (selectedClient && selectedClient.name) || ""}
-					onExport={exportNow}
-					onGoHistorial={onGoHistorial}
-					onNew={function () { onNewQuote && onNewQuote(); }}
-					onDismiss={function () { setSaved(null); }}
-				/>
-			)}
 
 			{/* ── Inputs ── */}
 			<Card className="bg-card border-border">
