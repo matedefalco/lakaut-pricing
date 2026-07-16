@@ -36,8 +36,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
-	const [firmasInclJuridicaPorIDC, setFirmasInclJuridicaPorIDC] = useState(0);
-	const [firmasInclFisicaPorIDC, setFirmasInclFisicaPorIDC] = useState(4);
+	const [pctJuridicos, setPctJuridicos] = useState(0); // % de certificados jurídicos (resto = físicos)
+	const [firmasPorCertJuridico, setFirmasPorCertJuridico] = useState(1);
+	const [firmasPorCertFisico, setFirmasPorCertFisico] = useState(1);
 	const [firmasAdicPorIDC, setFirmasAdicPorIDC] = useState(0);
 	const [precioFirmaAdic, setPrecioFirmaAdic] = useState(0.5);
 	const [casosDeUso, setCasosDeUso] = useState("");
@@ -75,8 +76,21 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
-		setFirmasInclJuridicaPorIDC(i.firmasInclJuridicaPorIDC != null ? i.firmasInclJuridicaPorIDC : 0);
-		setFirmasInclFisicaPorIDC(i.firmasInclFisicaPorIDC != null ? i.firmasInclFisicaPorIDC : (i.firmasInclPorIDC != null ? i.firmasInclPorIDC : 4));
+		if (i.pctJuridicos != null || i.firmasPorCertFisico != null || i.firmasPorCertJuridico != null) {
+			// Formato nuevo: split de certificados por tipo.
+			setPctJuridicos(i.pctJuridicos != null ? i.pctJuridicos : 0);
+			setFirmasPorCertJuridico(i.firmasPorCertJuridico != null ? i.firmasPorCertJuridico : 1);
+			setFirmasPorCertFisico(i.firmasPorCertFisico != null ? i.firmasPorCertFisico : 1);
+		} else {
+			// Legacy: firmas por IDC uniformes (jur + fís aplicaban a todos los IDC).
+			// Se preserva el total volcándolo a "físicos" con 0% jurídicos.
+			const legacyIncl = i.firmasInclPorIDC != null
+				? i.firmasInclPorIDC
+				: ((Number(i.firmasInclJuridicaPorIDC) || 0) + (Number(i.firmasInclFisicaPorIDC) || 0)) || 1;
+			setPctJuridicos(0);
+			setFirmasPorCertJuridico(1);
+			setFirmasPorCertFisico(legacyIncl);
+		}
 		setFirmasAdicPorIDC(i.firmasAdicPorIDC || 0);
 		setPrecioFirmaAdic(i.precioFirmaAdic != null ? i.precioFirmaAdic : 0.5);
 		setCasosDeUso(i.casosDeUso || "");
@@ -100,12 +114,23 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
 
-	// Firmas incluidas por IDC: jurídicas y físicas cuestan y cotizan igual (mismo
-	// precio de firma, mismo costo variable). La distinción es solo para listar el
-	// desglose en la propuesta comercial al cliente.
-	const inclJuridica = Math.max(0, Number(firmasInclJuridicaPorIDC) || 0);
-	const inclFisica = Math.max(0, Number(firmasInclFisicaPorIDC) || 0);
-	const incl = inclJuridica + inclFisica;
+	// Un certificado (IDC) es jurídico o físico; la firma es solo la manifestación de
+	// voluntad y cuesta/cotiza igual sea de un tipo u otro. Dividimos el volumen de
+	// certificados por tipo (según % jurídicos) y cada tipo tiene sus firmas por
+	// certificado. El split es para el desglose comercial; el cálculo usa los totales.
+	const pctJur = Math.min(100, Math.max(0, Number(pctJuridicos) || 0));
+	const fPorCertJur = Math.max(0, Number(firmasPorCertJuridico) || 0);
+	const fPorCertFis = Math.max(0, Number(firmasPorCertFisico) || 0);
+	const idcJuridicos = Math.round(idc * pctJur / 100);
+	const idcFisicos = idc - idcJuridicos;
+	const firmasInclJuridicaTotal = idcJuridicos * fPorCertJur;
+	const firmasInclFisicaTotal = idcFisicos * fPorCertFis;
+	const firmasInclTotal = firmasInclJuridicaTotal + firmasInclFisicaTotal;
+	// Firmas incluidas promedio por IDC (ponderado por el mix): alimenta los cálculos
+	// por unidad (costo/precio/margen por IDC). Puede ser fraccionario en mezclas.
+	const incl = idc > 0 ? firmasInclTotal / idc : fPorCertFis;
+	// incl puede ser fraccionario en mezclas; se formatea para las etiquetas.
+	const inclFmt = Number.isInteger(incl) ? incl : incl.toFixed(2);
 	const adic = Math.max(0, Number(firmasAdicPorIDC) || 0);
 	const firmasPorIDC = incl + adic;
 
@@ -144,9 +169,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const firmasTotales = idc * firmasPorIDC;
 	const firmasAdicTotal = idc * adic;
-	const firmasInclTotal = idc * incl;
-	const firmasInclJuridicaTotal = idc * inclJuridica;
-	const firmasInclFisicaTotal = idc * inclFisica;
 
 	// Mes 1 (activación): certificados + bolsa inicial de firmas incluidas + firmas
 	// adicionales, todo a precio de lista. El 35% de descuento aplica recién al abono.
@@ -181,7 +203,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			inputs: {
 				integracion, idcMensuales: idc,
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
-				firmasInclJuridicaPorIDC: inclJuridica, firmasInclFisicaPorIDC: inclFisica, firmasInclPorIDC: incl,
+				pctJuridicos: pctJur, firmasPorCertJuridico: fPorCertJur, firmasPorCertFisico: fPorCertFis,
 				firmasAdicPorIDC: adic, precioFirmaAdic, casosDeUso, abono,
 				...(overrideMode ? {
 					overrideMode,
@@ -297,8 +319,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 								)}
 							</div>
 						)}
-						<NumberField label="Firmas jurídicas incl. por IDC" value={firmasInclJuridicaPorIDC} onChange={setFirmasInclJuridicaPorIDC} min={0} note="Firma de representante/apoderado" />
-						<NumberField label="Firmas físicas incl. por IDC" value={firmasInclFisicaPorIDC} onChange={setFirmasInclFisicaPorIDC} min={0} note={"Firma inicial + activación · total " + incl + "/IDC"} />
+						<NumberField label="% de certificados jurídicos" value={pctJuridicos} onChange={setPctJuridicos} suffix="%" min={0} note={hasVolume ? idcJuridicos.toLocaleString("es-AR") + " jurídicos · " + idcFisicos.toLocaleString("es-AR") + " físicos" : "El resto son certificados físicos"} />
+						{pctJur > 0 && (
+							<NumberField label="Firmas por certificado jurídico" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note="1 = una firma por cada certificado" />
+						)}
+						<NumberField label="Firmas por certificado físico" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note="1 = una firma por cada certificado" />
 						<NumberField label="Firmas adicionales por IDC" value={firmasAdicPorIDC} onChange={setFirmasAdicPorIDC} min={0} note="Se cobran aparte" />
 						<NumberField label="Precio firma adicional" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" min={0} />
 					</div>
@@ -315,7 +340,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						{abono && hasVolume && (
 							<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1">
 								<p>Repone la bolsa de firmas incluidas por IDC con un descuento del {(DESCUENTO_ABONO * 100).toFixed(0)}% sobre el precio de firma adicional.</p>
-								<p className="text-xs">{firmasInclTotal.toLocaleString("es-AR")} firmas ({idc.toLocaleString("es-AR")} IDC × {incl} firmas incl.) × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
+								<p className="text-xs">{firmasInclTotal.toLocaleString("es-AR")} firmas incluidas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
 							</div>
 						)}
 					</div>
@@ -372,7 +397,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 												</div>
 											</div>
 										</div>
-										<p className="text-[10px] text-muted-foreground">Precio IDC resultante = cert + {incl} firma{incl !== 1 ? "s" : ""} = <span className="font-semibold text-foreground">USD {effPrecioIDC.toFixed(4)}</span></p>
+										<p className="text-[10px] text-muted-foreground">Precio IDC resultante = cert + {inclFmt} firma{incl !== 1 ? "s" : ""} = <span className="font-semibold text-foreground">USD {effPrecioIDC.toFixed(4)}</span></p>
 									</div>
 								)}
 								{overrideMode === "margen" && (
@@ -403,8 +428,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			{hasVolume ? (
 				<div className="flex flex-wrap gap-3">
 					<StatCard label="Segmento" value={seg.label} sub={seg.idcMin.toLocaleString("es-AR") + "–" + (seg.idcMax == null ? "+" : seg.idcMax.toLocaleString("es-AR")) + " IDC"} accent="primary" />
-					<StatCard label="Precio por IDC (mes 1)" value={fMoney2(precioIDCmes1)} sub={"cert " + fMoney2(precioIDC) + " + " + incl + " firma" + (incl !== 1 ? "s" : "") + (overrideMode ? " · personalizado" : "")} accent="primary" />
-					<StatCard label="Total firmas" value={firmasTotales.toLocaleString("es-AR")} sub={idc.toLocaleString("es-AR") + " IDC × " + firmasPorIDC + " firmas" + (inclJuridica > 0 && inclFisica > 0 ? " (" + inclJuridica + " jur. + " + inclFisica + " fís. incl.)" : "")} accent="muted" />
+					<StatCard label="Precio por IDC (mes 1)" value={fMoney2(precioIDCmes1)} sub={"cert " + fMoney2(precioIDC) + " + " + inclFmt + " firma" + (incl !== 1 ? "s" : "") + (pctJur > 0 ? " prom." : "") + (overrideMode ? " · personalizado" : "")} accent="primary" />
+					<StatCard label="Total firmas" value={firmasTotales.toLocaleString("es-AR")} sub={pctJur > 0 ? firmasInclJuridicaTotal.toLocaleString("es-AR") + " jur. + " + firmasInclFisicaTotal.toLocaleString("es-AR") + " fís." + (firmasAdicTotal > 0 ? " + " + firmasAdicTotal.toLocaleString("es-AR") + " adic." : "") : idc.toLocaleString("es-AR") + " IDC × " + firmasPorIDC + " firmas"} accent="muted" />
 					<StatCard label="Revenue total" value={fMoney(revTotal)} sub={conApi ? "IDC + firmas + SLA · fee " + fMoney(feeAplicado) + " incluido" : "IDC + firmas · sin integración API"} accent="success" />
 					{abono && (
 						<>
@@ -454,7 +479,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 							)}
 						</TableBody>
 					</Table>
-					<p className="text-[11px] text-muted-foreground mt-3">CV/IDC = cert USD {cvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Precio IDC mes 1 = cert + {incl} firma{incl !== 1 ? "s" : ""} a precio de lista = USD {precioIDCmes1.toFixed(4)}. CM = Precio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
+					<p className="text-[11px] text-muted-foreground mt-3">CV/IDC = cert USD {cvCert.toFixed(4)} + {inclFmt} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Precio IDC mes 1 = cert + {inclFmt} firma{incl !== 1 ? "s" : ""} a precio de lista = USD {precioIDCmes1.toFixed(4)}. CM = Precio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
 				</CollapsibleSection>
 			)}
 
