@@ -421,8 +421,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 							<TableRow><TableCell>Ingreso certificados ({idc.toLocaleString("es-AR")} × {fMoney2(precioIDC)})</TableCell><TableCell className="text-right tabular-nums">{fMoney(revIDC)}</TableCell></TableRow>
 							<TableRow><TableCell>Ingreso firmas incluidas ({firmasInclTotal.toLocaleString("es-AR")} × {fMoney2(precioFirmaLista)} · mes 1)</TableCell><TableCell className="text-right tabular-nums">{revFirmasIncl ? fMoney(revFirmasIncl) : "—"}</TableCell></TableRow>
 							<TableRow><TableCell>Ingreso firmas adicionales ({firmasAdicTotal.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums">{revFirmasAdic ? fMoney(revFirmasAdic) : "—"}</TableCell></TableRow>
-							<TableRow><TableCell>Costo certificados</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoCert)}</TableCell></TableRow>
-							<TableRow><TableCell>Costo firmas ({firmasTotales.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
+							<TableRow><TableCell>Costo certificados ({idc.toLocaleString("es-AR")} × {fMoney2(cvCert)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoCert)}</TableCell></TableRow>
+							<TableRow><TableCell>Costo firmas ({firmasTotales.toLocaleString("es-AR")} × {fMoney2(cvFirma)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
 							<TableRow className={margen >= 0 ? "bg-success/5" : "bg-destructive/5"}>
 								<TableCell className={"font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal <span className="font-normal text-muted-foreground">· volumen (cert + firmas)</span></TableCell>
 								<TableCell className={"text-right tabular-nums font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margen)} ({(margenPct * 100).toFixed(0)}%)</TableCell>
