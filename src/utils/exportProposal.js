@@ -467,19 +467,30 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		: "USD " + precioIDC.toFixed(2);
 
 	// Un certificado (IDC) es jurídico o físico; la firma es solo la manifestación de
-	// voluntad y cuesta/cotiza igual. El volumen se divide en certificados jurídicos y
-	// físicos (según % jurídicos), cada tipo con sus firmas por certificado. Legacy
-	// (sin pctJuridicos): firmas por IDC uniformes → todo física, preservando el total.
-	const idc = Number(inp.idcMensuales) || 0;
+	// voluntad y cuesta/cotiza igual. El volumen se carga por cantidad de certificados
+	// de cada tipo, cada uno con sus firmas por certificado. Fallbacks: formato % (deriva
+	// las cantidades) y legacy (firmas por IDC uniformes → todo física), preservando el total.
+	const idcTotalGuardado = Number(inp.idcMensuales) || 0;
 	const adicPorIDC = Number(inp.firmasAdicPorIDC) || 0;
-	const nuevoFormato = inp.pctJuridicos != null || inp.firmasPorCertFisico != null || inp.firmasPorCertJuridico != null;
-	const pctJur = nuevoFormato ? Math.min(100, Math.max(0, Number(inp.pctJuridicos) || 0)) : 0;
-	const fPorCertJur = nuevoFormato ? Math.max(0, Number(inp.firmasPorCertJuridico) || 0) : 1;
-	const fPorCertFis = nuevoFormato
+	const formatoCantidades = inp.certFisicos != null || inp.certJuridicos != null;
+	const formatoPct = !formatoCantidades && inp.pctJuridicos != null;
+	const fPorCertJur = (formatoCantidades || formatoPct) ? Math.max(0, Number(inp.firmasPorCertJuridico) || 0) : 1;
+	const fPorCertFis = (formatoCantidades || formatoPct)
 		? Math.max(0, Number(inp.firmasPorCertFisico) || 0)
 		: (inp.firmasInclPorIDC != null ? Number(inp.firmasInclPorIDC) || 0 : ((Number(inp.firmasInclJuridicaPorIDC) || 0) + (Number(inp.firmasInclFisicaPorIDC) || 0)));
-	const idcJuridicos = Math.round(idc * pctJur / 100);
-	const idcFisicos = idc - idcJuridicos;
+	let idcJuridicos, idcFisicos;
+	if (formatoCantidades) {
+		idcJuridicos = Math.max(0, Number(inp.certJuridicos) || 0);
+		idcFisicos = Math.max(0, Number(inp.certFisicos) || 0);
+	} else if (formatoPct) {
+		const pctJur = Math.min(100, Math.max(0, Number(inp.pctJuridicos) || 0));
+		idcJuridicos = Math.round(idcTotalGuardado * pctJur / 100);
+		idcFisicos = idcTotalGuardado - idcJuridicos;
+	} else {
+		idcJuridicos = 0;
+		idcFisicos = idcTotalGuardado;
+	}
+	const idc = idcJuridicos + idcFisicos;
 	const hayJuridicos = idcJuridicos > 0;
 	const firmasInclJuridica = idcJuridicos * fPorCertJur;
 	const firmasInclFisica = idcFisicos * fPorCertFis;
