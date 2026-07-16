@@ -104,27 +104,34 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const costoIDC = cvCert + incl * cvFirma;
 
-	let effPrecioIDC;
+	// precioIDC = solo el certificado. precioFirmaLista = precio unitario de cada
+	// firma (incluidas y adicionales). El precio del IDC en el mes 1 se compone de
+	// certificado + firmas incluidas a precio de lista. Cada modo de ajuste mantiene
+	// esa separación: el certificado y la firma nunca se mezclan en un mismo valor.
+	const precioFirmaBase = Math.max(0, Number(precioFirmaAdic) || 0);
+
+	let precioIDC;        // certificado, sin firmas
+	let precioFirmaLista; // precio unitario de firma (incl. + adic.)
+
 	if (overrideMode === "bundle" && overridePrecioIDC !== "") {
-		effPrecioIDC = Math.max(0, Number(overridePrecioIDC) || 0);
+		precioIDC = Math.max(0, Number(overridePrecioIDC) || 0);
+		precioFirmaLista = precioFirmaBase;
 	} else if (overrideMode === "componente") {
-		const pc = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : cvCert;
-		const pf = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : cvFirma;
-		effPrecioIDC = pc + incl * pf;
+		precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : cvCert;
+		precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : cvFirma;
 	} else if (overrideMode === "margen" && overrideMargenPct !== "") {
 		const m = (Number(overrideMargenPct) || 0) / 100;
-		effPrecioIDC = m < 1 && m > 0 ? costoIDC / (1 - m) : costoIDC;
+		const mes1Objetivo = m < 1 && m > 0 ? costoIDC / (1 - m) : costoIDC;
+		precioFirmaLista = precioFirmaBase;
+		precioIDC = Math.max(0, mes1Objetivo - incl * precioFirmaLista);
 	} else {
-		effPrecioIDC = seg.precioIDC;
+		precioIDC = seg.precioIDC;
+		precioFirmaLista = precioFirmaBase;
 	}
 
-	const precioFirmaLista = Math.max(0, Number(precioFirmaAdic) || 0);
-
-	// precioIDC (segmento/override) = solo el certificado. El precio del IDC en el
-	// mes 1 se compone de certificado + firmas incluidas a precio de lista, alineado
-	// con el costo (cvCert + incl × cvFirma) y con la propuesta comercial.
-	const precioIDC = effPrecioIDC;
 	const precioIDCmes1 = precioIDC + incl * precioFirmaLista;
+	// Alias para las etiquetas del panel de ajuste ("Precio IDC resultante").
+	const effPrecioIDC = precioIDCmes1;
 	const margenIDC = precioIDCmes1 - costoIDC;
 	const margenPctIDC = precioIDCmes1 > 0 ? margenIDC / precioIDCmes1 : 0;
 
