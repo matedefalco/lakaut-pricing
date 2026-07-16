@@ -154,6 +154,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const revServicio = revIDC + revFirmasIncl + revFirmasAdic;
 	const margen = revServicio - costoTotal;
 	const margenPct = revServicio > 0 ? margen / revServicio : 0;
+	// Resultado del mes 1 sumando lo que queda fuera de la CM de volumen: SLA
+	// (mensual) y fee de implementación (pago único). No es contribución marginal.
+	const resultadoTotal = margen + slaMes + feeAplicado;
 
 	const precioFirmaAbono = Math.max(0, Number(precioFirmaAdic) || 0) * (1 - DESCUENTO_ABONO);
 	const revAbonoMes = firmasInclTotal * precioFirmaAbono;
@@ -420,12 +423,24 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 							<TableRow><TableCell>Ingreso firmas adicionales ({firmasAdicTotal.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums">{revFirmasAdic ? fMoney(revFirmasAdic) : "—"}</TableCell></TableRow>
 							<TableRow><TableCell>Costo certificados</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoCert)}</TableCell></TableRow>
 							<TableRow><TableCell>Costo firmas ({firmasTotales.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
-							{conApi && <TableRow><TableCell>Soporte / SLA ({sla.label})</TableCell><TableCell className="text-right tabular-nums">{slaMes ? fMoney(slaMes) : "incluido"}</TableCell></TableRow>}
-							{conApi && <TableRow><TableCell>Fee de implementación</TableCell><TableCell className="text-right tabular-nums">{fMoney(feeAplicado)}</TableCell></TableRow>}
 							<TableRow className={margen >= 0 ? "bg-success/5" : "bg-destructive/5"}>
-								<TableCell className={"font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal</TableCell>
+								<TableCell className={"font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal <span className="font-normal text-muted-foreground">· volumen (cert + firmas)</span></TableCell>
 								<TableCell className={"text-right tabular-nums font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margen)} ({(margenPct * 100).toFixed(0)}%)</TableCell>
 							</TableRow>
+							{conApi && (
+								<>
+									<TableRow className="border-t-2 border-border hover:bg-transparent">
+										<TableCell className="text-[11px] uppercase tracking-wide text-muted-foreground pt-4">Fuera de la contribución marginal</TableCell>
+										<TableCell />
+									</TableRow>
+									<TableRow><TableCell>Soporte / SLA ({sla.label}){slaMes ? " · mensual" : ""}</TableCell><TableCell className="text-right tabular-nums">{slaBonificado ? "bonificado" : slaMes ? fMoney(slaMes) : "incluido"}</TableCell></TableRow>
+									<TableRow><TableCell>Fee de implementación · pago único</TableCell><TableCell className="text-right tabular-nums">{fMoney(feeAplicado)}</TableCell></TableRow>
+									<TableRow className="bg-muted/40">
+										<TableCell className="font-semibold">Resultado mes 1 <span className="font-normal text-muted-foreground">· con SLA y fee</span></TableCell>
+										<TableCell className="text-right tabular-nums font-semibold">{fMoney(resultadoTotal)}</TableCell>
+									</TableRow>
+								</>
+							)}
 						</TableBody>
 					</Table>
 					<p className="text-[11px] text-muted-foreground mt-3">CV/IDC = cert USD {cvCert.toFixed(4)} + {incl} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Precio IDC mes 1 = cert + {incl} firma{incl !== 1 ? "s" : ""} a precio de lista = USD {precioIDCmes1.toFixed(4)}. CM = Precio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
