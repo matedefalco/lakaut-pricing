@@ -10,6 +10,7 @@ const FIRMAS_INCL_REF = 1;
 
 const ALL_COLS = [
 	{ key: "precioIDC",     label: "Precio (USD/IDC)" },
+	{ key: "precioFirma",   label: "Precio firma (USD)" },
 	{ key: "costoReal",     label: "Costo CV (USD/IDC)" },
 	{ key: "cmReal",        label: "CM $" },
 	{ key: "cmRealPct",     label: "CM %" },
@@ -18,7 +19,7 @@ const ALL_COLS = [
 	{ key: "cmRef",         label: "CM ref. (USD/IDC)" },
 ];
 
-const DEFAULT_VISIBLE = new Set(["precioIDC", "costoReal", "cmReal", "cmRealPct", "beReal"]);
+const DEFAULT_VISIBLE = new Set(["precioIDC", "precioFirma", "costoReal", "cmReal", "cmRealPct", "beReal"]);
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -145,9 +146,10 @@ export function TabCanalB2B2CPrecios({ costs }) {
 					<Table>
 						<TableHeader>
 							<TableRow>
-								<TableHead>Segmento<InfoTooltip text="El segmento se asigna por volumen de IDC de la cotización (mensual o total, según la modalidad)." /></TableHead>
+								<TableHead>Segmento<InfoTooltip text="El segmento se alcanza por el mayor entre las unidades (certificados + firmas) y la facturación a precio de lista." /></TableHead>
 								<TableHead className="text-right">IDC<InfoTooltip text="Rango de IDC (Identidad Digital Certificada) que define el segmento." /></TableHead>
 								{visible.has("precioIDC")     && <TableHead className="text-right">Precio (USD/IDC)<InfoTooltip text="Precio de lista por IDC del segmento, en USD." /></TableHead>}
+								{visible.has("precioFirma")   && <TableHead className="text-right">Precio firma (USD)<InfoTooltip text="Precio de la firma del segmento, en USD. Baja con el volumen." /></TableHead>}
 								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text={"Costo variable por IDC = cert USD " + cvCert.toFixed(4) + " + 1 firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
 								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV (sin CF). Ganancia por IDC antes de cubrir costos fijos." /></TableHead>}
 								{visible.has("cmRealPct")     && <TableHead className="text-right">CM %<InfoTooltip text="CM como porcentaje del precio = CM / Precio × 100." /></TableHead>}
@@ -171,6 +173,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 											{s.idcMax == null ? "+" : " – " + s.idcMax.toLocaleString("es-AR")}
 										</TableCell>
 										{visible.has("precioIDC")     && <TableCell className="text-right tabular-nums font-semibold">{fUSD(s.precioIDC)}</TableCell>}
+										{visible.has("precioFirma")   && <TableCell className="text-right tabular-nums">{s.precioFirma != null ? fUSD(s.precioFirma) : "—"}</TableCell>}
 										{visible.has("costoReal")     && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
 										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fUSD(cmVal)}</TableCell>}
 										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fPct(cmPct)}</TableCell>}

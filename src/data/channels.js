@@ -120,15 +120,21 @@ export function getDistributorTier(certsActivos, compromisoAnualUSD) {
 }
 
 // ── Canal C · B2B2C (Identidades Digitales Certificadas) ────────────────────────
-// Unidad = IDC. Precio mensual por IDC según segmento (volumen mensual de IDCs).
-// Cada IDC incluye: validación biométrica + emisión + sello de tiempo + custodia
-// + firma inicial + 3 firmas de activación + guarda documental.
+// Unidad = certificado (IDC). El segmento se alcanza por el MAYOR entre la
+// cantidad de unidades (certificados + firmas) y la facturación a precio de lista
+// (el precio del segmento base). Cada segmento define su precio de certificado y
+// su precio de firma; ambos bajan con el volumen (premia el gran caso de negocio).
+//   - idcMin/idcMax: rango de UNIDADES (certificados + firmas).
+//   - facturacionMin/facturacionMax: rango de facturación a lista (USD) que alcanza
+//     el segmento; null = sin tope. Si un segmento no tiene rango, esa vía se ignora.
+//   - precioIDC: precio del certificado. precioFirma: precio de la firma.
+// Los valores son escala de referencia (Borrador v5): ajustar en Config → Precios.
 export const B2B2C_SEGMENTS = [
-	{ id: "startup", label: "Start Up", idcMin: 1000, idcMax: 10000, precioIDC: 0.65, margenRef: 0.74 },
-	{ id: "growth", label: "Growth", idcMin: 10001, idcMax: 50000, precioIDC: 0.60, margenRef: 0.60 },
-	{ id: "pyme", label: "PyME", idcMin: 50001, idcMax: 200000, precioIDC: 0.55, margenRef: 0.47 },
-	{ id: "empresa", label: "Empresa", idcMin: 200001, idcMax: 600000, precioIDC: 0.50, margenRef: 0.34 },
-	{ id: "plataforma", label: "Plataforma", idcMin: 600001, idcMax: 1200000, precioIDC: 0.45, margenRef: 0.20 },
+	{ id: "startup", label: "Start Up", idcMin: 1000, idcMax: 50000, facturacionMin: 0, facturacionMax: 25000, precioIDC: 0.65, precioFirma: 0.50, margenRef: 0.74 },
+	{ id: "growth", label: "Growth", idcMin: 50001, idcMax: 250000, facturacionMin: 25001, facturacionMax: 125000, precioIDC: 0.60, precioFirma: 0.45, margenRef: 0.60 },
+	{ id: "pyme", label: "PyME", idcMin: 250001, idcMax: 1000000, facturacionMin: 125001, facturacionMax: 500000, precioIDC: 0.55, precioFirma: 0.40, margenRef: 0.47 },
+	{ id: "empresa", label: "Empresa", idcMin: 1000001, idcMax: 3000000, facturacionMin: 500001, facturacionMax: 1500000, precioIDC: 0.50, precioFirma: 0.35, margenRef: 0.34 },
+	{ id: "plataforma", label: "Plataforma", idcMin: 3000001, idcMax: null, facturacionMin: 1500001, facturacionMax: null, precioIDC: 0.45, precioFirma: 0.30, margenRef: 0.20 },
 ];
 
 export function getB2B2CSegment(idcMensuales) {

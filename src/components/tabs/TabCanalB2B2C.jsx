@@ -26,6 +26,9 @@ function margWord(pct) { return pct >= 0.5 ? "saludable" : pct >= 0.2 ? "ajustad
 
 const OVERRIDE_LABEL = { bundle: "precio bundle", componente: "por componente", margen: "margen objetivo" };
 const DESCUENTO_ABONO = 0.35;
+// Fallback del precio de firma si un segmento de la config no tiene `precioFirma`
+// cargado todavía (config vieja). Con la columna cargada, el precio es dinámico.
+const DEFAULT_FIRMA_PRICE = 0.5;
 
 export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
 	const { channelConfig } = useChannelConfig();
@@ -50,9 +53,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
-	// Precio de la firma a precio de lista. Cotiza las firmas del mes 1 y es, además,
-	// el precio de la firma adicional si el cliente supera el presupuesto armado.
-	const [precioFirmaAdic, setPrecioFirmaAdic] = useState(0.5);
+	// Precio de la firma extra (excedente sobre lo cotizado). Por defecto usa el
+	// precio de firma del segmento alcanzado (dinámico); "" = dinámico. Se puede
+	// sobrescribir a mano para ese excedente.
+	const [precioFirmaExtra, setPrecioFirmaExtra] = useState("");
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
@@ -74,12 +78,22 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const nj = Math.max(0, Number(certJuridicos) || 0);
 	const ff = Math.max(0, Number(firmasPorCertFisico) || 0);
 	const fj = Math.max(0, Number(firmasPorCertJuridico) || 0);
-	const idc = nf + nj; // total de certificados (IDC) · define el segmento
+	const idc = nf + nj; // total de certificados (IDC)
 	const firmasFisica = nf * ff;
 	const firmasJuridica = nj * fj;
 	const firmasIncl = firmasFisica + firmasJuridica;
 
-	const seg = getB2B2CSegment(idc || b2b2cSegments[0].idcMin, b2b2cSegments);
+	// El segmento se alcanza por el MAYOR entre las unidades (certs + firmas) y la
+	// facturación a precio de lista (rompe la circularidad precio↔segmento: la
+	// facturación de referencia se calcula con el precio del segmento base, el más
+	// caro; el segmento alcanzado recién define el precio final, como Distribuidores).
+	const unidades = idc + firmasIncl;
+	const segBase = b2b2cSegments[0] || {};
+	const precioIDCbase = segBase.precioIDC || 0;
+	const precioFirmaBaseSeg = segBase.precioFirma != null ? segBase.precioFirma : DEFAULT_FIRMA_PRICE;
+	const facturacionAtList = idc * precioIDCbase + firmasIncl * precioFirmaBaseSeg;
+	const seg = getB2B2CSegment(unidades, facturacionAtList, b2b2cSegments);
+	const segFirma = seg && seg.precioFirma != null ? seg.precioFirma : DEFAULT_FIRMA_PRICE;
 	const hasVolume = idc > 0;
 
 	useEffect(function () {
@@ -109,7 +123,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
-		setPrecioFirmaAdic(i.precioFirmaAdic != null ? i.precioFirmaAdic : 0.5);
+		// Precio de firma extra: si el deal guardó un override lo tomamos; si no,
+		// queda dinámico ("" = precio de firma del segmento).
+		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
 		if (i.overrideMode) {
@@ -127,11 +143,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
 
-	// ── Precios efectivos (con ajuste personalizado si está activo) ──
+	// ── Precios efectivos ──
 	// precioIDC = precio del certificado (sin firmas). precioFirmaLista = precio
-	// unitario de cada firma. Ambos se cotizan por separado; el ajuste mantiene esa
-	// separación. El certificado y la firma nunca se mezclan en un mismo valor.
-	const precioFirmaBase = Math.max(0, Number(precioFirmaAdic) || 0);
+	// unitario de cada firma, dinámico según el segmento alcanzado (ya no se ingresa
+	// a mano). El ajuste personalizado puede sobrescribir ambos; el certificado y la
+	// firma nunca se mezclan en un mismo valor.
 	const costoCert = idc * cvCert;
 	const costoFirmas = firmasIncl * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
@@ -139,19 +155,23 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	let precioIDC, precioFirmaLista;
 	if (overrideMode === "bundle" && overridePrecioIDC !== "") {
 		precioIDC = Math.max(0, Number(overridePrecioIDC) || 0);
-		precioFirmaLista = precioFirmaBase;
+		precioFirmaLista = segFirma;
 	} else if (overrideMode === "componente") {
 		precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : cvCert;
-		precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : cvFirma;
+		precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : segFirma;
 	} else if (overrideMode === "margen" && overrideMargenPct !== "" && idc > 0) {
 		const m = (Number(overrideMargenPct) || 0) / 100;
-		precioFirmaLista = precioFirmaBase;
+		precioFirmaLista = segFirma;
 		const revServicioObjetivo = m < 1 && m > 0 ? costoTotal / (1 - m) : costoTotal;
 		precioIDC = Math.max(0, (revServicioObjetivo - firmasIncl * precioFirmaLista) / idc);
 	} else {
 		precioIDC = seg.precioIDC;
-		precioFirmaLista = precioFirmaBase;
+		precioFirmaLista = segFirma;
 	}
+
+	// Precio de firma extra (excedente): dinámico = precio de firma del segmento,
+	// salvo que se haya cargado un override manual.
+	const precioFirmaExtraEff = precioFirmaExtra !== "" ? Math.max(0, Number(precioFirmaExtra) || 0) : precioFirmaLista;
 
 	// ── Ingresos (mes 1 · activación) ──
 	const revCertFisicos = nf * precioIDC;
@@ -172,7 +192,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const resultadoTotal = margen + slaMes + feeAplicado;
 
 	// Abono (opcional): repone la bolsa de firmas cada mes con el 35% de descuento.
-	const precioFirmaAbono = precioFirmaBase * (1 - DESCUENTO_ABONO);
+	const precioFirmaAbono = precioFirmaLista * (1 - DESCUENTO_ABONO);
 	const revAbonoMes = firmasIncl * precioFirmaAbono;
 	const revAbonoAnual = revAbonoMes * 12;
 
@@ -193,6 +213,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				s.label,
 				s.idcMin.toLocaleString("es-AR") + (s.idcMax == null ? "+" : "–" + s.idcMax.toLocaleString("es-AR")),
 				"USD " + s.precioIDC,
+				"USD " + (s.precioFirma != null ? s.precioFirma : DEFAULT_FIRMA_PRICE),
 			],
 		};
 	});
@@ -217,9 +238,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				certJuridicos: nj, firmasPorCertJuridico: fj,
 				idcMensuales: idc, // compat: consumido por historial/reportes/clientes
 				firmasAdicPorIDC: 0,
-				// Guardamos el precio de firma efectivo (con ajuste si lo hubo) para que la
-				// propuesta exportada cotice exactamente lo mismo que la cotizadora.
+				// precioFirmaAdic = precio de firma con que se cotizan las firmas del mes 1
+				// (dinámico del segmento o ajuste). La propuesta exportada usa este valor.
 				precioFirmaAdic: precioFirmaLista,
+				// Precio de firma extra (excedente): guardamos el override solo si difiere
+				// del dinámico, para reabrir la cotización con el mismo valor.
+				...(precioFirmaExtra !== "" ? { precioFirmaExtra: precioFirmaExtraEff } : {}),
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
 				casosDeUso, abono,
 				...(overrideMode ? {
@@ -235,7 +259,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			resumen: {
 				segmento: seg.label, idcMensuales: idc,
 				certFisicos: nf, certJuridicos: nj,
-				firmasTotales: firmasIncl, firmasMes: firmasIncl, precioIDC,
+				firmasTotales: firmasIncl, firmasMes: firmasIncl,
+				precioIDC, precioFirma: precioFirmaLista, precioFirmaExtra: precioFirmaExtraEff,
 				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
 				margen, margenPct,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
@@ -304,13 +329,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			{/* Segmento + acceso contextual a la tabla de precios */}
 			<div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
 				<div className="min-w-0">
-					<div className="text-[11px] text-muted-foreground">Segmento · {hasVolume ? idc.toLocaleString("es-AR") + " certs" : "por volumen total"}</div>
+					<div className="text-[11px] text-muted-foreground">Segmento · {hasVolume ? unidades.toLocaleString("es-AR") + " unidades" : "por volumen total"}</div>
 					<div className="text-sm font-semibold">
-						{hasVolume ? <>{seg.label} <span className="font-normal text-[11px] text-muted-foreground">· {fMoney2(precioIDC)}/cert</span></> : <span className="text-muted-foreground/40">—</span>}
+						{hasVolume ? <>{seg.label} <span className="font-normal text-[11px] text-muted-foreground">· {fMoney2(precioIDC)}/cert · {fMoney2(precioFirmaLista)}/firma</span></> : <span className="text-muted-foreground/40">—</span>}
 					</div>
 				</div>
 				{hasVolume && (
-					<TierHint label="ver segmentos" columns={["Segmento", "Certs", "Precio"]} rows={segRows} activeId={seg.id} nextHint={segHint} />
+					<TierHint label="ver segmentos" columns={["Segmento", "Unidades", "Cert", "Firma"]} rows={segRows} activeId={seg.id} nextHint={segHint} />
 				)}
 			</div>
 
@@ -351,7 +376,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney} /></span>
 					</div>
 
-					<p className="text-[10px] text-muted-foreground">Firma adicional (si superan el presupuesto): {fMoney2(precioFirmaBase)} c/u.</p>
+					<p className="text-[10px] text-muted-foreground">Firma extra (si superan el presupuesto): {fMoney2(precioFirmaExtraEff)} c/u{precioFirmaExtra !== "" ? " · manual" : " · dinámico"}.</p>
 				</div>
 			) : (
 				<p className="text-[11px] text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
@@ -423,8 +448,26 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					</div>
 				</div>
 
+				{/* Precio de firma: dinámico según el segmento (no se ingresa a mano). El
+				    input es solo el precio de la firma extra (excedente), con override. */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<NumberField label="Precio por firma" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" min={0} note="Cotiza las firmas del mes 1 y es el precio de la firma adicional si superan el presupuesto." />
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio por firma <span className="normal-case tracking-normal font-normal">(dinámico)</span></Label>
+						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioFirmaLista) : "—"}</span>
+							<span className="ml-2 text-[11px] text-muted-foreground">{hasVolume ? "según segmento " + seg.label : "según el segmento alcanzado"}</span>
+						</div>
+						<span className="text-[11px] text-muted-foreground">Se calcula por el segmento (volumen facturado o cantidad de certs + firmas).</span>
+					</div>
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio de firma extra <span className="normal-case tracking-normal font-normal">(excedente)</span></Label>
+						<div className="relative flex items-center">
+							<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
+							<Input type="number" min={0} value={precioFirmaExtra} onChange={function (e) { setPrecioFirmaExtra(e.target.value); }} placeholder={hasVolume ? precioFirmaLista.toFixed(3) : "dinámico"} className="tabular-nums pl-11" />
+							{precioFirmaExtra !== "" && <button onClick={function () { setPrecioFirmaExtra(""); }} className="absolute right-3 text-muted-foreground hover:text-foreground text-xs">✕</button>}
+						</div>
+						<span className="text-[11px] text-muted-foreground">Precio si superan lo cotizado y siguen consumiendo. Vacío = usa el precio del segmento.</span>
+					</div>
 				</div>
 			</FieldGroup>
 
@@ -511,7 +554,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 										<div className="flex flex-col gap-1.5">
 											<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
 											<div className="flex items-center gap-1">
-												<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={cvFirma.toFixed(4)} className="h-8 text-sm" />
+												<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segFirma.toFixed(4)} className="h-8 text-sm" />
 												{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
 											</div>
 										</div>

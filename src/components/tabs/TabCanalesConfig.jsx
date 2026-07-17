@@ -218,8 +218,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 
 			{/* ── Segmentos B2B2C ── */}
 			<SectionCard
-				title="2 · Volumen · Segmentos por IDC"
-				description={"CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + ". CM = Precio − CV. BE = CF directo (USD " + cfDirecto.toFixed(0) + ") ÷ CM por IDC."}
+				title="2 · Volumen · Segmentos por unidades y facturación"
+				description={"El segmento se alcanza por el mayor entre unidades (certs + firmas) y facturación a lista. Precio de cert y de firma bajan con el volumen. CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + "."}
 			>
 				{/* Toggle de modo de carga de precio */}
 				<div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
@@ -255,10 +255,13 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						<thead>
 							<tr>
 								<th style={thL}>Segmento</th>
-								<th style={thR}>IDC mín.</th>
-								<th style={thR}>IDC máx.</th>
+								<th style={thR}>Unid. mín.</th>
+								<th style={thR}>Unid. máx.</th>
+								<th style={thR}>Fact. mín (USD)</th>
+								<th style={thR}>Fact. máx (USD)</th>
 								{segPriceMode === "margen" && <th style={thR}>Margen objetivo (%)</th>}
 								<th style={thR}>Precio IDC (USD){segPriceMode === "margen" ? " (calc.)" : ""}</th>
+								<th style={thR}>Precio firma (USD)</th>
 								<th style={thR}>Costo CV (USD/IDC)</th>
 								<th style={thR}>CM $</th>
 								<th style={thR}>CM %</th>
@@ -291,6 +294,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 										</td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></td>
 										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></td>
+										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></td>
+										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></td>
 										{segPriceMode === "margen" && (
 											<td style={{ padding: "5px 8px" }}><InlineNum value={margenPct} decimals={1} onChange={updMargen} /></td>
 										)}
@@ -299,6 +304,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 												? <InlineNum value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} />
 												: <div style={Object.assign({}, os(12, 700, BLACK), { textAlign: "right", padding: "2px 6px" })}>{precioIDC.toFixed(4)}</div>}
 										</td>
+										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.precioFirma} decimals={4} onChange={function (v) { upd("precioFirma", v); }} /></td>
 										<td style={{ padding: "5px 8px", textAlign: "right", color: GRAY }}>{costoRealIDC.toFixed(4)}</td>
 										<td style={{ padding: "5px 8px", textAlign: "right", color: margColor(cmPct), fontWeight: 700 }}>{cmVal.toFixed(4)}</td>
 										<td style={{ padding: "5px 8px", textAlign: "right", color: margColor(cmPct), fontWeight: 700 }}>{(cmPct * 100).toFixed(0)}%</td>
@@ -315,7 +321,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				<AddRowButton
 					label="Agregar segmento"
 					onClick={function () {
-						addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, precioIDC: 0 });
+						addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, precioFirma: 0 });
 					}}
 				/>
 			</SectionCard>
