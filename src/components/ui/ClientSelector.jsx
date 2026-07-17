@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { UserPlus, ChevronDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
-const CHANNEL_LABEL = { web: "Web", distribuidores: "Precio de lista con descuento", b2b2c: "Volumen" };
+import { channelShort } from "@/data/channelMeta";
 
 export function ClientSelector({ channel, clients, onCreate, value, onChange }) {
 	const [open, setOpen] = useState(false);
@@ -50,7 +49,7 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 				{value ? (
 					<>
 						<span className="flex-1 text-sm font-medium">{value.name}</span>
-						<Badge variant="secondary" className="text-[10px] shrink-0">{CHANNEL_LABEL[value.channel] || value.channel}</Badge>
+						<Badge variant="secondary" className="text-[10px] shrink-0">{channelShort(value.channel)}</Badge>
 						<button onClick={clear} className="text-muted-foreground hover:text-foreground ml-1 shrink-0"><X className="size-3.5" /></button>
 					</>
 				) : (

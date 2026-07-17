@@ -284,8 +284,11 @@ function LakautCalcInner() {
 					</div>
 				</div>
 
-				{/* Content area */}
-				<div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+				{/* Content area · el scroll lo maneja el documento (no este div): así el
+				    panel de resultado sticky de la cotizadora se ancla al viewport. Un
+				    overflow:auto acá rompería el sticky (se ligaría a un contenedor que no
+				    scrollea). */}
+				<div style={{ flex: 1, padding: 24 }}>
 
 					{/* ── INICIO ── */}
 					{activeNavItem === "inicio" && <TabInicio dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcLastUpdated={tcLastUpdated} onNewQuote={newQuote} onOpenHistorial={function () { navTo("historial"); }} onEditQuote={function (q) { setPendingEdit(q); navTo(q.channel); }} />}

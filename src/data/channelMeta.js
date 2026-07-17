@@ -15,14 +15,20 @@ export const CHANNELS = {
 	},
 	distribuidores: {
 		id: "distribuidores",
-		label: "Precio de lista con descuento",
-		shortLabel: "Lista c/desc.",
+		// La navegación y el seguimiento nombran los canales por su audiencia
+		// (a quién le vendo); el nombre formal del modelo comercial vive en `full`,
+		// que es lo que aparece en el encabezado y en la propuesta exportada.
+		label: "Distribuidores",
+		shortLabel: "Distrib.",
 		full: "Precio de lista con descuento",
 		desc: "Distribuidores e integradores que compran volumen a precio de lista con un descuento por nivel.",
 		badgeVariant: "default",
 	},
 	b2b2c: {
 		id: "b2b2c",
+		// Este canal se nombra por el modelo (Volumen), no por audiencia: es el
+		// término que usa el equipo comercial. Web y Distribuidores sí van por
+		// audiencia (a quién le vendo).
 		label: "Volumen",
 		shortLabel: "Volumen",
 		full: "Volumen · Identidades Digitales Certificadas",

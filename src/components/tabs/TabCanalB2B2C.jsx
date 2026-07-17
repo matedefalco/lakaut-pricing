@@ -3,7 +3,6 @@ import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { getB2B2CSegment } from "@/lib/tiers";
 import { CHANNELS } from "@/data/channelMeta";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +13,19 @@ import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
+import { QuoteLayout, FieldGroup } from "@/components/ui/QuoteLayout";
+import { ResultPanel, ResultHero, ResultRow, StatusPill, AnimatedNumber } from "@/components/ui/ResultPanel";
+import { TierHint } from "@/components/ui/TierHint";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useToast, notifyQuoteSaved } from "@/components/ui/Toaster";
 import { TabCanalB2B2CPrecios } from "@/components/tabs/TabCanalB2B2CPrecios";
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
+function margWord(pct) { return pct >= 0.5 ? "saludable" : pct >= 0.2 ? "ajustado" : "a revisar"; }
+
+const OVERRIDE_LABEL = { bundle: "precio bundle", componente: "por componente", margen: "margen objetivo" };
+const DESCUENTO_ABONO = 0.35;
 
 export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
 	const { channelConfig } = useChannelConfig();
@@ -32,15 +39,19 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const [selectedClient, setSelectedClient] = useState(null);
 	const [integracion, setIntegracion] = useState("api"); // "api" | "sin_api"
-	// El volumen se carga como cantidad de certificados por tipo; el total de IDC es la suma.
-	const [certFisicos, setCertFisicos] = useState(""); // arranca vacío: sin alarmas por defecto
+	// Modelo por tipo de certificado. Un certificado (IDC) es físico (persona) o
+	// jurídico (empresa/representante). Mismo precio y costo; se separan solo para
+	// el desglose de la propuesta. Cada tipo lleva su cantidad de certificados y las
+	// firmas que entran en cada certificado de ese tipo (sin firma inicial extra).
+	const [certFisicos, setCertFisicos] = useState("");
+	const [firmasPorCertFisico, setFirmasPorCertFisico] = useState(0);
 	const [certJuridicos, setCertJuridicos] = useState("");
+	const [firmasPorCertJuridico, setFirmasPorCertJuridico] = useState(0);
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
-	const [firmasPorCertJuridico, setFirmasPorCertJuridico] = useState(1);
-	const [firmasPorCertFisico, setFirmasPorCertFisico] = useState(1);
-	const [firmasAdicPorIDC, setFirmasAdicPorIDC] = useState(0);
+	// Precio de la firma a precio de lista. Cotiza las firmas del mes 1 y es, además,
+	// el precio de la firma adicional si el cliente supera el presupuesto armado.
 	const [precioFirmaAdic, setPrecioFirmaAdic] = useState(0.5);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
@@ -54,17 +65,22 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [overrideMargenPct, setOverrideMargenPct] = useState("");
 	const [abono, setAbono] = useState(false);
 
-	const DESCUENTO_ABONO = 0.35;
-
 	const conApi = integracion !== "sin_api";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
 	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
-	const idcFisicos = Math.max(0, Number(certFisicos) || 0);
-	const idcJuridicos = Math.max(0, Number(certJuridicos) || 0);
-	const idc = idcFisicos + idcJuridicos;
+
+	// ── Cantidades ──
+	const nf = Math.max(0, Number(certFisicos) || 0);
+	const nj = Math.max(0, Number(certJuridicos) || 0);
+	const ff = Math.max(0, Number(firmasPorCertFisico) || 0);
+	const fj = Math.max(0, Number(firmasPorCertJuridico) || 0);
+	const idc = nf + nj; // total de certificados (IDC) · define el segmento
+	const firmasFisica = nf * ff;
+	const firmasJuridica = nj * fj;
+	const firmasIncl = firmasFisica + firmasJuridica;
+
 	const seg = getB2B2CSegment(idc || b2b2cSegments[0].idcMin, b2b2cSegments);
 	const hasVolume = idc > 0;
-	const hayJuridicos = idcJuridicos > 0;
 
 	useEffect(function () {
 		if (!pendingEdit) return;
@@ -76,36 +92,23 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			setSelectedClient(pendingEdit.clients);
 		}
 		setIntegracion(i.integracion || "api");
+		// Cantidades nuevas (por tipo). Fallback a formato legacy (IDC único + firmas
+		// por IDC → todo se toma como certificados físicos, preservando el total).
+		if (i.certFisicos != null || i.certJuridicos != null) {
+			setCertFisicos(i.certFisicos != null ? i.certFisicos : "");
+			setCertJuridicos(i.certJuridicos != null ? i.certJuridicos : "");
+			setFirmasPorCertFisico(i.firmasPorCertFisico != null ? i.firmasPorCertFisico : 0);
+			setFirmasPorCertJuridico(i.firmasPorCertJuridico != null ? i.firmasPorCertJuridico : 0);
+		} else {
+			setCertFisicos(i.idcMensuales != null ? i.idcMensuales : "");
+			setCertJuridicos("");
+			const legacyFis = i.firmasInclFisicaPorIDC != null ? i.firmasInclFisicaPorIDC : (i.firmasInclPorIDC != null ? i.firmasInclPorIDC : 0);
+			setFirmasPorCertFisico(legacyFis || 0);
+			setFirmasPorCertJuridico(i.firmasInclJuridicaPorIDC || 0);
+		}
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
-		const savedIdc = Number(i.idcMensuales) || 0;
-		if (i.certFisicos != null || i.certJuridicos != null) {
-			// Formato nuevo: cantidades de certificados por tipo.
-			setCertFisicos(i.certFisicos != null ? i.certFisicos : "");
-			setCertJuridicos(i.certJuridicos != null ? i.certJuridicos : "");
-			setFirmasPorCertJuridico(i.firmasPorCertJuridico != null ? i.firmasPorCertJuridico : 1);
-			setFirmasPorCertFisico(i.firmasPorCertFisico != null ? i.firmasPorCertFisico : 1);
-		} else if (i.pctJuridicos != null) {
-			// Formato intermedio (%): se derivan las cantidades desde el % guardado.
-			const pct = Math.min(100, Math.max(0, Number(i.pctJuridicos) || 0));
-			const jur = Math.round(savedIdc * pct / 100);
-			setCertJuridicos(jur);
-			setCertFisicos(savedIdc - jur);
-			setFirmasPorCertJuridico(i.firmasPorCertJuridico != null ? i.firmasPorCertJuridico : 1);
-			setFirmasPorCertFisico(i.firmasPorCertFisico != null ? i.firmasPorCertFisico : 1);
-		} else {
-			// Legacy: firmas por IDC uniformes. Se preserva el total volcándolo a
-			// físicos (jurídicos = 0) con las firmas por IDC como firmas por certificado.
-			const legacyIncl = i.firmasInclPorIDC != null
-				? i.firmasInclPorIDC
-				: ((Number(i.firmasInclJuridicaPorIDC) || 0) + (Number(i.firmasInclFisicaPorIDC) || 0)) || 1;
-			setCertFisicos(savedIdc || "");
-			setCertJuridicos("");
-			setFirmasPorCertJuridico(1);
-			setFirmasPorCertFisico(legacyIncl);
-		}
-		setFirmasAdicPorIDC(i.firmasAdicPorIDC || 0);
 		setPrecioFirmaAdic(i.precioFirmaAdic != null ? i.precioFirmaAdic : 0.5);
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
@@ -115,10 +118,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			if (i.overrideMode === "bundle") { setOverridePrecioIDC(i.overridePrecioIDC != null ? String(i.overridePrecioIDC) : ""); }
 			if (i.overrideMode === "componente") { setOverridePrecioCert(i.overridePrecioCert != null ? String(i.overridePrecioCert) : ""); setOverridePrecioFirma(i.overridePrecioFirma != null ? String(i.overridePrecioFirma) : ""); }
 			if (i.overrideMode === "margen") { setOverrideMargenPct(i.overrideMargenPct != null ? String(i.overrideMargenPct) : ""); }
-		} else if (i.overridePrecioIDC != null) {
-			setOverrideMode("bundle");
-			setOverridePrecioIDC(String(i.overridePrecioIDC));
-			setShowOverrides(true);
 		} else {
 			setOverrideMode(null);
 			setOverridePrecioIDC(""); setOverridePrecioCert(""); setOverridePrecioFirma(""); setOverrideMargenPct("");
@@ -128,83 +127,84 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
 
-	// Un certificado (IDC) es jurídico o físico; la firma es solo la manifestación de
-	// voluntad y cuesta/cotiza igual sea de un tipo u otro. El volumen se carga por
-	// cantidad de certificados de cada tipo, cada uno con sus firmas por certificado.
-	// El split es para el desglose comercial; el cálculo usa los totales.
-	const fPorCertJur = Math.max(0, Number(firmasPorCertJuridico) || 0);
-	const fPorCertFis = Math.max(0, Number(firmasPorCertFisico) || 0);
-	const firmasInclJuridicaTotal = idcJuridicos * fPorCertJur;
-	const firmasInclFisicaTotal = idcFisicos * fPorCertFis;
-	const firmasInclTotal = firmasInclJuridicaTotal + firmasInclFisicaTotal;
-	// Firmas incluidas promedio por IDC (ponderado por el mix): alimenta los cálculos
-	// por unidad (costo/precio/margen por IDC). Puede ser fraccionario en mezclas.
-	const incl = idc > 0 ? firmasInclTotal / idc : fPorCertFis;
-	// incl puede ser fraccionario en mezclas; se formatea para las etiquetas.
-	const inclFmt = Number.isInteger(incl) ? incl : incl.toFixed(2);
-	const adic = Math.max(0, Number(firmasAdicPorIDC) || 0);
-	const firmasPorIDC = incl + adic;
-
-	const costoIDC = cvCert + incl * cvFirma;
-
-	// precioIDC = solo el certificado. precioFirmaLista = precio unitario de cada
-	// firma (incluidas y adicionales). El precio del IDC en el mes 1 se compone de
-	// certificado + firmas incluidas a precio de lista. Cada modo de ajuste mantiene
-	// esa separación: el certificado y la firma nunca se mezclan en un mismo valor.
+	// ── Precios efectivos (con ajuste personalizado si está activo) ──
+	// precioIDC = precio del certificado (sin firmas). precioFirmaLista = precio
+	// unitario de cada firma. Ambos se cotizan por separado; el ajuste mantiene esa
+	// separación. El certificado y la firma nunca se mezclan en un mismo valor.
 	const precioFirmaBase = Math.max(0, Number(precioFirmaAdic) || 0);
+	const costoCert = idc * cvCert;
+	const costoFirmas = firmasIncl * cvFirma;
+	const costoTotal = costoCert + costoFirmas;
 
-	let precioIDC;        // certificado, sin firmas
-	let precioFirmaLista; // precio unitario de firma (incl. + adic.)
-
+	let precioIDC, precioFirmaLista;
 	if (overrideMode === "bundle" && overridePrecioIDC !== "") {
 		precioIDC = Math.max(0, Number(overridePrecioIDC) || 0);
 		precioFirmaLista = precioFirmaBase;
 	} else if (overrideMode === "componente") {
 		precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : cvCert;
 		precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : cvFirma;
-	} else if (overrideMode === "margen" && overrideMargenPct !== "") {
+	} else if (overrideMode === "margen" && overrideMargenPct !== "" && idc > 0) {
 		const m = (Number(overrideMargenPct) || 0) / 100;
-		const mes1Objetivo = m < 1 && m > 0 ? costoIDC / (1 - m) : costoIDC;
 		precioFirmaLista = precioFirmaBase;
-		precioIDC = Math.max(0, mes1Objetivo - incl * precioFirmaLista);
+		const revServicioObjetivo = m < 1 && m > 0 ? costoTotal / (1 - m) : costoTotal;
+		precioIDC = Math.max(0, (revServicioObjetivo - firmasIncl * precioFirmaLista) / idc);
 	} else {
 		precioIDC = seg.precioIDC;
 		precioFirmaLista = precioFirmaBase;
 	}
 
-	const precioIDCmes1 = precioIDC + incl * precioFirmaLista;
-	// Alias para las etiquetas del panel de ajuste ("Precio IDC resultante").
-	const effPrecioIDC = precioIDCmes1;
-	const margenIDC = precioIDCmes1 - costoIDC;
-	const margenPctIDC = precioIDCmes1 > 0 ? margenIDC / precioIDCmes1 : 0;
-
-	const firmasTotales = idc * firmasPorIDC;
-	const firmasAdicTotal = idc * adic;
-
-	// Mes 1 (activación): certificados + bolsa inicial de firmas incluidas + firmas
-	// adicionales, todo a precio de lista. El 35% de descuento aplica recién al abono.
+	// ── Ingresos (mes 1 · activación) ──
+	const revCertFisicos = nf * precioIDC;
+	const revCertJuridicos = nj * precioIDC;
 	const revIDC = idc * precioIDC;
-	const revFirmasIncl = firmasInclTotal * precioFirmaLista;
-	const revFirmasAdic = firmasAdicTotal * precioFirmaLista;
-	const costoCert = idc * cvCert;
-	const costoFirmas = firmasTotales * cvFirma;
-	const costoTotal = costoCert + costoFirmas;
+	const revFirmasFisica = firmasFisica * precioFirmaLista;
+	const revFirmasJuridica = firmasJuridica * precioFirmaLista;
+	const revFirmas = firmasIncl * precioFirmaLista;
+	const revServicio = revIDC + revFirmas;
+
 	const feeAplicado = conApi ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
-	const revSinFee = revIDC + revFirmasIncl + revFirmasAdic + slaMes;
+	const revSinFee = revServicio + slaMes;
 	const revTotal = revSinFee + feeAplicado;
-	const revServicio = revIDC + revFirmasIncl + revFirmasAdic;
+
 	const margen = revServicio - costoTotal;
 	const margenPct = revServicio > 0 ? margen / revServicio : 0;
-	// Resultado del mes 1 sumando lo que queda fuera de la CM de volumen: SLA
-	// (mensual) y fee de implementación (pago único). No es contribución marginal.
 	const resultadoTotal = margen + slaMes + feeAplicado;
 
-	const precioFirmaAbono = Math.max(0, Number(precioFirmaAdic) || 0) * (1 - DESCUENTO_ABONO);
-	const revAbonoMes = firmasInclTotal * precioFirmaAbono;
+	// Abono (opcional): repone la bolsa de firmas cada mes con el 35% de descuento.
+	const precioFirmaAbono = precioFirmaBase * (1 - DESCUENTO_ABONO);
+	const revAbonoMes = firmasIncl * precioFirmaAbono;
 	const revAbonoAnual = revAbonoMes * 12;
 
-	// Objeto deal compartido por guardar y exportar (así "Exportar" funciona con o sin guardar).
+	// Distancia al siguiente segmento: contexto de volumen para el vendedor.
+	const segIdx = b2b2cSegments.findIndex(function (s) { return s.id === seg.id; });
+	const nextSeg = segIdx >= 0 && segIdx < b2b2cSegments.length - 1 ? b2b2cSegments[segIdx + 1] : null;
+	let segHint = null;
+	if (hasVolume && nextSeg) {
+		const idcFaltan = Math.max(0, nextSeg.idcMin - idc);
+		segHint = "Con " + idcFaltan.toLocaleString("es-AR") + " certificados más entrás en " + nextSeg.label + " · precio de tabla USD " + nextSeg.precioIDC + " por certificado.";
+	} else if (hasVolume) {
+		segHint = "Es el segmento de mayor volumen.";
+	}
+	const segRows = b2b2cSegments.map(function (s) {
+		return {
+			id: s.id,
+			cells: [
+				s.label,
+				s.idcMin.toLocaleString("es-AR") + (s.idcMax == null ? "+" : "–" + s.idcMax.toLocaleString("es-AR")),
+				"USD " + s.precioIDC,
+			],
+		};
+	});
+
+	// Resumen de estado de las condiciones comerciales (subtítulo del grupo).
+	const condResumen = [
+		conApi ? api.label : "sin integración API",
+		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
+		overrideMode ? "precio " + (OVERRIDE_LABEL[overrideMode] || overrideMode) : "precio de tabla",
+		abono ? "con abono mensual" : "sin abono",
+	].filter(Boolean).join(" · ");
+
 	function buildDeal(id, fecha) {
 		return {
 			id: id,
@@ -212,10 +212,16 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			fecha: fecha,
 			updatedAt: editingId ? new Date().toISOString() : undefined,
 			inputs: {
-				integracion, idcMensuales: idc,
+				integracion,
+				certFisicos: nf, firmasPorCertFisico: ff,
+				certJuridicos: nj, firmasPorCertJuridico: fj,
+				idcMensuales: idc, // compat: consumido por historial/reportes/clientes
+				firmasAdicPorIDC: 0,
+				// Guardamos el precio de firma efectivo (con ajuste si lo hubo) para que la
+				// propuesta exportada cotice exactamente lo mismo que la cotizadora.
+				precioFirmaAdic: precioFirmaLista,
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
-				certFisicos: idcFisicos, certJuridicos: idcJuridicos, firmasPorCertJuridico: fPorCertJur, firmasPorCertFisico: fPorCertFis,
-				firmasAdicPorIDC: adic, precioFirmaAdic, casosDeUso, abono,
+				casosDeUso, abono,
 				...(overrideMode ? {
 					overrideMode,
 					...(overrideMode === "bundle" && overridePrecioIDC !== "" ? { overridePrecioIDC: Number(overridePrecioIDC) } : {}),
@@ -227,7 +233,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				} : {}),
 			},
 			resumen: {
-				segmento: seg.label, idcMensuales: idc, firmasTotales, firmasMes: firmasTotales, precioIDC,
+				segmento: seg.label, idcMensuales: idc,
+				certFisicos: nf, certJuridicos: nj,
+				firmasTotales: firmasIncl, firmasMes: firmasIncl, precioIDC,
 				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
 				margen, margenPct,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
@@ -268,227 +276,295 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		onExport && onExport(src, saved ? saved.client : selectedClient);
 	}
 
-	return (
-		<div className="space-y-6">
-			<PageHeader
-				title={CHANNELS.b2b2c.full}
-				description={CHANNELS.b2b2c.desc + " Las firmas incluidas por IDC son configurables (firma inicial + activación, según la institución)."}
+	const header = (
+		<PageHeader
+			title={CHANNELS.b2b2c.full + (selectedClient ? " · " + selectedClient.name : "")}
+			description={
+				<>
+					{CHANNELS.b2b2c.desc}
+					<InfoTooltip text="Un certificado (IDC) es físico o jurídico; cuestan y cotizan igual. Cada uno lleva las firmas que se le carguen, sin firma inicial extra." />
+				</>
+			}
+		/>
+	);
+
+	// Panel de resultado = resumen de la cotización: segmento, cantidades y precios
+	// por tipo, condiciones comerciales y total. Es lo que el vendedor lee para
+	// entender qué está cotizando de un vistazo.
+	const result = (
+		<ResultPanel eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
+			<ResultHero
+				label={conApi ? "Total · mes 1" : "Total"}
+				value={hasVolume ? <AnimatedNumber value={revTotal} format={fMoney} /> : "—"}
+				sub={hasVolume ? (conApi ? "Certificados + firmas + SLA · fee incluido" : "Certificados + firmas · sin integración API") : "Cargá certificados para ver el total"}
+				empty={!hasVolume}
+				pill={hasVolume ? <StatusPill tone={margAccent(margenPct)}>Margen {(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</StatusPill> : null}
 			/>
 
-			{/* ── Inputs ── */}
-			<Card className="bg-card border-border">
-				<CardHeader className="pb-3">
-					<CardTitle className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">Datos de la cotización</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-5">
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">
-							Cliente
-							{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
-						</Label>
-						<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} value={selectedClient} onChange={setSelectedClient} />
+			{/* Segmento + acceso contextual a la tabla de precios */}
+			<div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+				<div className="min-w-0">
+					<div className="text-[11px] text-muted-foreground">Segmento · {hasVolume ? idc.toLocaleString("es-AR") + " certs" : "por volumen total"}</div>
+					<div className="text-sm font-semibold">
+						{hasVolume ? <>{seg.label} <span className="font-normal text-[11px] text-muted-foreground">· {fMoney2(precioIDC)}/cert</span></> : <span className="text-muted-foreground/40">—</span>}
 					</div>
+				</div>
+				{hasVolume && (
+					<TierHint label="ver segmentos" columns={["Segmento", "Certs", "Precio"]} rows={segRows} activeId={seg.id} nextHint={segHint} />
+				)}
+			</div>
 
-					<Separator />
-
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
-						<div className="flex gap-1 flex-wrap">
-							{[
-								{ id: "api", label: "Con integración API", sub: "fee de implementación + SLA" },
-								{ id: "sin_api", label: "Sin integración", sub: "solo volumen solicitado" },
-							].map(function (m) {
-								const active = integracion === m.id;
-								return (
-									<button key={m.id} onClick={function () { setIntegracion(m.id); }} className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>
-										<span className="font-medium">{m.label}</span>
-										<span className={"ml-1.5 " + (active ? "opacity-75" : "opacity-60")}>· {m.sub}</span>
-									</button>
-								);
-							})}
-						</div>
-						{!conApi && <p className="text-[11px] text-muted-foreground">Sin integración API: se cotiza únicamente el volumen de IDC, sin fee de implementación ni plan de soporte.</p>}
-					</div>
-
-					<Separator />
-
-					{/* Volumen por tipo de certificado: cada tipo con su cantidad y sus firmas. */}
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<div className="rounded-lg border border-border/60 bg-muted/20 p-3 flex flex-col gap-3">
-							<div className="flex items-baseline justify-between">
-								<span className="text-xs font-semibold uppercase tracking-wide">Certificados físicos</span>
-								<span className="text-[11px] text-muted-foreground">persona física</span>
-							</div>
-							<div className="grid grid-cols-2 gap-3">
-								<NumberField label="Cantidad" value={certFisicos} onChange={setCertFisicos} min={0} placeholder="Ej: 5.000" />
-								<NumberField label="Firmas por cert." value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note="1 = una c/u" />
-							</div>
-						</div>
-						<div className="rounded-lg border border-border/60 bg-muted/20 p-3 flex flex-col gap-3">
-							<div className="flex items-baseline justify-between">
-								<span className="text-xs font-semibold uppercase tracking-wide">Certificados jurídicos</span>
-								<span className="text-[11px] text-muted-foreground">representante / apoderado</span>
-							</div>
-							<div className="grid grid-cols-2 gap-3">
-								<NumberField label="Cantidad" value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
-								<NumberField label="Firmas por cert." value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note="1 = una c/u" />
-							</div>
-						</div>
-					</div>
-					<p className="text-[11px] text-muted-foreground -mt-1">Total: <span className="font-medium text-foreground">{idc.toLocaleString("es-AR")}</span> IDC (certificados) · define el segmento</p>
-
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{conApi && (
-							<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
-						)}
-						{conApi && (
-							<div className="flex flex-col gap-1.5">
-								<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
-									options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
-								{sla.precioMes > 0 && (
-									<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
-										<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
-										Bonificar SLA para este cliente
-										{slaBonificado && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
-									</label>
-								)}
-							</div>
-						)}
-						<NumberField label="Firmas adicionales por IDC" value={firmasAdicPorIDC} onChange={setFirmasAdicPorIDC} min={0} note="Se cobran aparte" />
-						<NumberField label="Precio firma adicional" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" min={0} />
-					</div>
-
-					<Separator />
-
-					{/* Abono mensual */}
-					<div className="flex flex-col gap-3">
-						<label className="flex items-center gap-2.5 cursor-pointer select-none">
-							<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
-							<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
-							{abono && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
-						</label>
-						{abono && hasVolume && (
-							<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1">
-								<p>Repone la bolsa de firmas incluidas por IDC con un descuento del {(DESCUENTO_ABONO * 100).toFixed(0)}% sobre el precio de firma adicional.</p>
-								<p className="text-xs">{firmasInclTotal.toLocaleString("es-AR")} firmas incluidas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
-							</div>
-						)}
-					</div>
-
-					<Separator />
-
-					{/* Ajuste de precios personalizado */}
-					<div className="flex flex-col gap-2">
-						<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-2 text-sm font-medium border border-dashed border-border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors w-full text-left">
-							<span>Ajuste de precios personalizado</span>
-							<span className="ml-auto text-muted-foreground text-xs">{showOverrides ? "▲ ocultar" : "▼ mostrar"}</span>
-							{overrideMode && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
-						</button>
-						{showOverrides && (
-							<div className="pl-1 border-l-2 border-muted ml-1 space-y-3">
-								<div className="flex gap-1 flex-wrap">
-									{[
-										{ id: null, label: "Sin ajuste" },
-										{ id: "bundle", label: "Precio bundle" },
-										{ id: "componente", label: "Por componente" },
-										{ id: "margen", label: "Margen objetivo" },
-									].map(function (m) {
-										const active = overrideMode === m.id;
-										return (
-											<button key={m.id ?? "none"} onClick={function () { setOverrideMode(m.id); }} className={"px-2.5 py-1 rounded-md text-xs transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{m.label}</button>
-										);
-									})}
-								</div>
-								{overrideMode === "bundle" && (
-									<div className="flex flex-col gap-1.5 max-w-xs">
-										<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio IDC <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-										<div className="flex items-center gap-1.5">
-											<Input type="number" value={overridePrecioIDC} onChange={function (e) { setOverridePrecioIDC(e.target.value); }} placeholder={"Tabla: " + seg.precioIDC} className="h-8 text-sm" />
-											{overridePrecioIDC !== "" && <button onClick={function () { setOverridePrecioIDC(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-										</div>
-										<p className="text-[10px] text-muted-foreground">Reemplaza el precio de tabla para esta cotización.</p>
-									</div>
-								)}
-								{overrideMode === "componente" && (
-									<div className="space-y-2">
-										<div className="grid grid-cols-2 gap-3 max-w-sm">
-											<div className="flex flex-col gap-1.5">
-												<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-												<div className="flex items-center gap-1">
-													<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={cvCert.toFixed(4)} className="h-8 text-sm" />
-													{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-												</div>
-											</div>
-											<div className="flex flex-col gap-1.5">
-												<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma incl. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-												<div className="flex items-center gap-1">
-													<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={cvFirma.toFixed(4)} className="h-8 text-sm" />
-													{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-												</div>
-											</div>
-										</div>
-										<p className="text-[10px] text-muted-foreground">Precio IDC resultante = cert + {inclFmt} firma{incl !== 1 ? "s" : ""} = <span className="font-semibold text-foreground">USD {effPrecioIDC.toFixed(4)}</span></p>
-									</div>
-								)}
-								{overrideMode === "margen" && (
-									<div className="flex flex-col gap-1.5 max-w-xs">
-										<Label className="text-xs text-muted-foreground uppercase tracking-wide">Margen objetivo <span className="normal-case tracking-normal font-normal">(%)</span></Label>
-										<div className="flex items-center gap-1.5">
-											<Input type="number" value={overrideMargenPct} onChange={function (e) { setOverrideMargenPct(e.target.value); }} placeholder="Ej: 75" min="0" max="99" className="h-8 text-sm" />
-											{overrideMargenPct !== "" && <button onClick={function () { setOverrideMargenPct(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-										</div>
-										{overrideMargenPct !== "" && <p className="text-[10px] text-muted-foreground">Precio IDC = costo / (1 − {overrideMargenPct}%) = <span className="font-semibold text-foreground">USD {effPrecioIDC.toFixed(4)}</span></p>}
-									</div>
-								)}
-								{!overrideMode && <p className="text-[10px] text-muted-foreground">Seleccioná un modo para aplicar un ajuste de precio a esta cotización.</p>}
-							</div>
-						)}
-					</div>
-
-					<Separator />
-
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
-						<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* ── Resultado (comercial) ── */}
+			{/* Desglose por tipo de certificado */}
 			{hasVolume ? (
-				<div className="flex flex-wrap gap-3">
-					<StatCard label="Segmento" value={seg.label} sub={seg.idcMin.toLocaleString("es-AR") + "–" + (seg.idcMax == null ? "+" : seg.idcMax.toLocaleString("es-AR")) + " IDC"} accent="primary" />
-					<StatCard label="Precio por IDC (mes 1)" value={fMoney2(precioIDCmes1)} sub={"cert " + fMoney2(precioIDC) + " + " + inclFmt + " firma" + (incl !== 1 ? "s" : "") + (hayJuridicos ? " prom." : "") + (overrideMode ? " · personalizado" : "")} accent="primary" />
-					<StatCard label="Total firmas" value={firmasTotales.toLocaleString("es-AR")} sub={hayJuridicos ? firmasInclJuridicaTotal.toLocaleString("es-AR") + " jur. + " + firmasInclFisicaTotal.toLocaleString("es-AR") + " fís." + (firmasAdicTotal > 0 ? " + " + firmasAdicTotal.toLocaleString("es-AR") + " adic." : "") : idc.toLocaleString("es-AR") + " IDC × " + firmasPorIDC + " firmas"} accent="muted" />
-					<StatCard label="Revenue total" value={fMoney(revTotal)} sub={conApi ? "IDC + firmas + SLA · fee " + fMoney(feeAplicado) + " incluido" : "IDC + firmas · sin integración API"} accent="success" />
-					{abono && (
-						<>
-							<StatCard label="Abono mensual (firmas)" value={fMoney(revAbonoMes)} sub={"Renovación " + firmasInclTotal.toLocaleString("es-AR") + " firmas · −" + (DESCUENTO_ABONO * 100).toFixed(0) + "%"} accent="success" />
-							<StatCard label="Facturación abono anual" value={fMoney(revAbonoAnual)} sub="Abono × 12 meses" accent="success" />
-						</>
+				<div className="space-y-3">
+					{nf > 0 && (
+						<div className="rounded-lg bg-sky-50 px-3 py-2">
+							<div className="flex items-center justify-between">
+								<span className="text-[11px] font-semibold text-sky-700">Certificados físicos</span>
+								<span className="text-[11px] text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>
+							</div>
+							<ResultRow label={"Certificados (" + nf.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertFisicos} format={fMoney} />} accent="primary" />
+							{firmasFisica > 0 && <ResultRow label={"Firmas (" + firmasFisica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasFisica} format={fMoney} />} />}
+						</div>
 					)}
+					{nj > 0 && (
+						<div className="rounded-lg bg-violet-50 px-3 py-2">
+							<div className="flex items-center justify-between">
+								<span className="text-[11px] font-semibold text-violet-700">Certificados jurídicos</span>
+								<span className="text-[11px] text-muted-foreground">{nj.toLocaleString("es-AR")} × {fj} firma{fj !== 1 ? "s" : ""}</span>
+							</div>
+							<ResultRow label={"Certificados (" + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney} />} accent="primary" />
+							{firmasJuridica > 0 && <ResultRow label={"Firmas (" + firmasJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney} />} />}
+						</div>
+					)}
+
+					{/* Condiciones comerciales */}
+					<div>
+						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney} /> : "incluido"} />}
+						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney} />} />}
+						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney} />/mes</>} accent="success" />}
+					</div>
+
+					{/* Total */}
+					<div className="flex items-center justify-between border-t-2 border-border pt-2">
+						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conApi ? "Total mes 1" : "Total"}</span>
+						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney} /></span>
+					</div>
+
+					<p className="text-[10px] text-muted-foreground">Firma adicional (si superan el presupuesto): {fMoney2(precioFirmaBase)} c/u.</p>
 				</div>
 			) : (
-				<Card><CardContent className="py-8 text-center">
-					<p className="text-sm text-muted-foreground">Ingresá la cantidad de certificados (físicos y/o jurídicos) para ver el precio y el revenue de la cotización.</p>
-				</CardContent></Card>
+				<p className="text-[11px] text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
 			)}
+		</ResultPanel>
+	);
+
+	const footer = (
+		<SaveExportBar
+			hint={hasVolume ? "" : "Cargá al menos un certificado para guardar o exportar."}
+			canSave={hasVolume}
+			canExport={hasVolume}
+			onSave={saveQuote}
+			onExport={exportNow}
+			onCancelEdit={function () { setEditingId(null); }}
+			editingId={editingId}
+			flash={flash}
+		/>
+	);
+
+	return (
+		<QuoteLayout header={header} result={result} footer={footer}>
+			{/* ── 1 · Qué cotizás ── */}
+			<FieldGroup step={1} title="Qué cotizás" subtitle="Modalidad y volumen de certificados por tipo. El resumen se arma a la derecha.">
+				<div className="flex flex-col gap-1.5">
+					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
+					<div className="flex gap-1 flex-wrap">
+						{[
+							{ id: "api", label: "Con integración API", sub: "fee de implementación + SLA" },
+							{ id: "sin_api", label: "Sin integración", sub: "solo volumen solicitado" },
+						].map(function (m) {
+							const active = integracion === m.id;
+							return (
+								<button key={m.id} onClick={function () { setIntegracion(m.id); }} className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>
+									<span className="font-medium">{m.label}</span>
+									<span className={"ml-1.5 " + (active ? "opacity-75" : "opacity-60")}>· {m.sub}</span>
+								</button>
+							);
+						})}
+					</div>
+					{!conApi && <p className="text-[11px] text-muted-foreground">Sin integración API: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
+				</div>
+
+				<Separator />
+
+				{/* Volumen agrupado por tipo de certificado */}
+				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+					<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+						<div className="mb-2.5 flex items-center gap-1.5">
+							<span className="inline-block size-2 rounded-full bg-sky-500" />
+							<span className="text-xs font-semibold text-sky-700">Certificados físicos</span>
+							<span className="text-[10px] text-muted-foreground">· personas</span>
+						</div>
+						<div className="grid grid-cols-2 gap-2.5">
+							<NumberField label="Cantidad" value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" />
+							<NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} />
+						</div>
+					</div>
+					<div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
+						<div className="mb-2.5 flex items-center gap-1.5">
+							<span className="inline-block size-2 rounded-full bg-violet-500" />
+							<span className="text-xs font-semibold text-violet-700">Certificados jurídicos</span>
+							<span className="text-[10px] text-muted-foreground">· empresas</span>
+						</div>
+						<div className="grid grid-cols-2 gap-2.5">
+							<NumberField label="Cantidad" value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
+							<NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} />
+						</div>
+					</div>
+				</div>
+
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<NumberField label="Precio por firma" value={precioFirmaAdic} onChange={setPrecioFirmaAdic} prefix="USD" min={0} note="Cotiza las firmas del mes 1 y es el precio de la firma adicional si superan el presupuesto." />
+				</div>
+			</FieldGroup>
+
+			{/* ── 2 · Condiciones comerciales ── */}
+			<FieldGroup step={2} title="Condiciones comerciales" subtitle={condResumen}>
+				{conApi && (
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+						<div className="flex flex-col gap-1.5">
+							<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
+								options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
+							{sla.precioMes > 0 && (
+								<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
+									<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
+									Bonificar SLA para este cliente
+									{slaBonificado && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
+								</label>
+							)}
+						</div>
+					</div>
+				)}
+
+				{conApi && <Separator />}
+
+				{/* Abono mensual */}
+				<div className="flex flex-col gap-3">
+					<label className="flex items-center gap-2.5 cursor-pointer select-none">
+						<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
+						<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
+						{abono && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
+					</label>
+					{abono && hasVolume && (
+						<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1">
+							<p>Repone la bolsa de firmas cada mes con un descuento del {(DESCUENTO_ABONO * 100).toFixed(0)}% sobre el precio de firma.</p>
+							<p className="text-xs">{firmasIncl.toLocaleString("es-AR")} firmas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
+						</div>
+					)}
+				</div>
+
+				<Separator />
+
+				{/* Ajuste de precios personalizado */}
+				<div className="flex flex-col gap-2">
+					<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-2 text-sm font-medium border border-dashed border-border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors w-full text-left">
+						<span>Ajuste de precios personalizado</span>
+						<span className="ml-auto text-muted-foreground text-xs">{showOverrides ? "▲ ocultar" : "▼ mostrar"}</span>
+						{overrideMode && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
+					</button>
+					{showOverrides && (
+						<div className="pl-1 border-l-2 border-muted ml-1 space-y-3">
+							<div className="flex gap-1 flex-wrap">
+								{[
+									{ id: null, label: "Sin ajuste" },
+									{ id: "bundle", label: "Precio por cert." },
+									{ id: "componente", label: "Por componente" },
+									{ id: "margen", label: "Margen objetivo" },
+								].map(function (m) {
+									const active = overrideMode === m.id;
+									return (
+										<button key={m.id ?? "none"} onClick={function () { setOverrideMode(m.id); }} className={"px-2.5 py-1 rounded-md text-xs transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{m.label}</button>
+									);
+								})}
+							</div>
+							{overrideMode === "bundle" && (
+								<div className="flex flex-col gap-1.5 max-w-xs">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio por certificado <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+									<div className="flex items-center gap-1.5">
+										<Input type="number" value={overridePrecioIDC} onChange={function (e) { setOverridePrecioIDC(e.target.value); }} placeholder={"Tabla: " + seg.precioIDC} className="h-8 text-sm" />
+										{overridePrecioIDC !== "" && <button onClick={function () { setOverridePrecioIDC(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+									<p className="text-[10px] text-muted-foreground">Reemplaza el precio de tabla para esta cotización.</p>
+								</div>
+							)}
+							{overrideMode === "componente" && (
+								<div className="space-y-2">
+									<div className="grid grid-cols-2 gap-3 max-w-sm">
+										<div className="flex flex-col gap-1.5">
+											<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+											<div className="flex items-center gap-1">
+												<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={cvCert.toFixed(4)} className="h-8 text-sm" />
+												{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+											</div>
+										</div>
+										<div className="flex flex-col gap-1.5">
+											<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+											<div className="flex items-center gap-1">
+												<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={cvFirma.toFixed(4)} className="h-8 text-sm" />
+												{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+											</div>
+										</div>
+									</div>
+									<p className="text-[10px] text-muted-foreground">Precio efectivo: cert {fMoney2(precioIDC)} · firma {fMoney2(precioFirmaLista)}.</p>
+								</div>
+							)}
+							{overrideMode === "margen" && (
+								<div className="flex flex-col gap-1.5 max-w-xs">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Margen objetivo <span className="normal-case tracking-normal font-normal">(%)</span></Label>
+									<div className="flex items-center gap-1.5">
+										<Input type="number" value={overrideMargenPct} onChange={function (e) { setOverrideMargenPct(e.target.value); }} placeholder="Ej: 75" min="0" max="99" className="h-8 text-sm" />
+										{overrideMargenPct !== "" && <button onClick={function () { setOverrideMargenPct(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+									{overrideMargenPct !== "" && hasVolume && <p className="text-[10px] text-muted-foreground">Precio por certificado resultante = <span className="font-semibold text-foreground">{fMoney2(precioIDC)}</span>.</p>}
+								</div>
+							)}
+							{!overrideMode && <p className="text-[10px] text-muted-foreground">Seleccioná un modo para aplicar un ajuste de precio a esta cotización.</p>}
+						</div>
+					)}
+				</div>
+			</FieldGroup>
+
+			{/* ── 3 · Para la propuesta ── */}
+			<FieldGroup step={3} title="Para la propuesta" subtitle="Datos del documento final. No cambian el cálculo.">
+				<div className="flex flex-col gap-1.5">
+					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
+						Cliente
+						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
+					</Label>
+					<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} value={selectedClient} onChange={setSelectedClient} />
+				</div>
+
+				<div className="flex flex-col gap-1.5">
+					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
+					<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
+				</div>
+			</FieldGroup>
 
 			{/* ── Rentabilidad (interno) ── */}
 			{hasVolume && (
 				<CollapsibleSection tone="internal" title="Rentabilidad · uso interno" subtitle="Costo variable, contribución marginal y break-even. No aparece en la propuesta del cliente.">
 					<div className="flex flex-wrap gap-3 mb-4">
-						<StatCard label="Cont. marginal por IDC" value={(margenPctIDC * 100).toFixed(0) + "%"} sub={fMoney2(margenIDC) + "/IDC · costo " + fMoney2(costoIDC)} accent={margAccent(margenPctIDC)} valueClass={margClass(margenPctIDC)} />
-						<StatCard label="Contribución marginal total" value={fMoney(margen)} sub={"sobre revenue de servicio"} accent={margen >= 0 ? "success" : "destructive"} valueClass={margen >= 0 ? "text-[var(--success)]" : "text-destructive"} />
+						<StatCard label="Contribución marginal" value={fMoney(margen)} sub={(margenPct * 100).toFixed(0) + "% sobre revenue de servicio"} accent={margAccent(margenPct)} valueClass={margClass(margenPct)} />
+						<StatCard label="Costo variable total" value={fMoney(costoTotal)} sub={idc.toLocaleString("es-AR") + " certs + " + firmasIncl.toLocaleString("es-AR") + " firmas"} accent="muted" />
 					</div>
 					<Table>
 						<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
 						<TableBody>
 							<TableRow><TableCell>Ingreso certificados ({idc.toLocaleString("es-AR")} × {fMoney2(precioIDC)})</TableCell><TableCell className="text-right tabular-nums">{fMoney(revIDC)}</TableCell></TableRow>
-							<TableRow><TableCell>Ingreso firmas incluidas ({firmasInclTotal.toLocaleString("es-AR")} × {fMoney2(precioFirmaLista)} · mes 1)</TableCell><TableCell className="text-right tabular-nums">{revFirmasIncl ? fMoney(revFirmasIncl) : "—"}</TableCell></TableRow>
-							<TableRow><TableCell>Ingreso firmas adicionales ({firmasAdicTotal.toLocaleString("es-AR")})</TableCell><TableCell className="text-right tabular-nums">{revFirmasAdic ? fMoney(revFirmasAdic) : "—"}</TableCell></TableRow>
+							<TableRow><TableCell>Ingreso firmas ({firmasIncl.toLocaleString("es-AR")} × {fMoney2(precioFirmaLista)})</TableCell><TableCell className="text-right tabular-nums">{revFirmas ? fMoney(revFirmas) : "—"}</TableCell></TableRow>
 							<TableRow><TableCell>Costo certificados ({idc.toLocaleString("es-AR")} × {fMoney2(cvCert)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoCert)}</TableCell></TableRow>
-							<TableRow><TableCell>Costo firmas ({firmasTotales.toLocaleString("es-AR")} × {fMoney2(cvFirma)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
+							<TableRow><TableCell>Costo firmas ({firmasIncl.toLocaleString("es-AR")} × {fMoney2(cvFirma)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
 							<TableRow className={margen >= 0 ? "bg-success/5" : "bg-destructive/5"}>
 								<TableCell className={"font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal <span className="font-normal text-muted-foreground">· volumen (cert + firmas)</span></TableCell>
 								<TableCell className={"text-right tabular-nums font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margen)} ({(margenPct * 100).toFixed(0)}%)</TableCell>
@@ -509,7 +585,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 							)}
 						</TableBody>
 					</Table>
-					<p className="text-[11px] text-muted-foreground mt-3">CV/IDC = cert USD {cvCert.toFixed(4)} + {inclFmt} firma{incl !== 1 ? "s" : ""} × USD {cvFirma.toFixed(4)} = USD {costoIDC.toFixed(4)}. Precio IDC mes 1 = cert + {inclFmt} firma{incl !== 1 ? "s" : ""} a precio de lista = USD {precioIDCmes1.toFixed(4)}. CM = Precio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
+					<p className="text-[11px] text-muted-foreground mt-3">CV = {idc.toLocaleString("es-AR")} certs × USD {cvCert.toFixed(4)} + {firmasIncl.toLocaleString("es-AR")} firmas × USD {cvFirma.toFixed(4)} = USD {costoTotal.toFixed(2)}. CM = Ingreso servicio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
 				</CollapsibleSection>
 			)}
 
@@ -517,17 +593,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			<CollapsibleSection title="Referencia · precios por segmento, API y SLA" subtitle="Tabla completa del modelo de volumen (Borrador v5).">
 				<TabCanalB2B2CPrecios costs={costs} />
 			</CollapsibleSection>
-
-			<SaveExportBar
-				hint={hasVolume ? "" : "Ingresá la cantidad de certificados para guardar o exportar."}
-				canSave={hasVolume}
-				canExport={hasVolume}
-				onSave={saveQuote}
-				onExport={exportNow}
-				onCancelEdit={function () { setEditingId(null); }}
-				editingId={editingId}
-				flash={flash}
-			/>
-		</div>
+		</QuoteLayout>
 	);
 }
