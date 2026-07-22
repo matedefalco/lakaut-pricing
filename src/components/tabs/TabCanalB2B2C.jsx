@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { getB2B2CSegment } from "@/lib/tiers";
+import { buildProyeccion, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
 import { CHANNELS } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [overridePrecioFirma, setOverridePrecioFirma] = useState("");
 	const [overrideMargenPct, setOverrideMargenPct] = useState("");
 	const [abono, setAbono] = useState(false);
+	// Proyección de crecimiento (opcional, override por propuesta): escalones de
+	// volumen con descuento progresivo para que el cliente proyecte su costo.
+	const [proyEnabled, setProyEnabled] = useState(false);
+	const [proyDriver, setProyDriver] = useState("packs");
+	const [proySteps, setProySteps] = useState(function () { return DEFAULT_PROYECCION_STEPS.map(function (s) { return { ...s }; }); });
 
 	const conApi = integracion !== "sin_api";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
@@ -128,6 +134,25 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
+		// Proyección de crecimiento: se reabre con el driver y los escalones guardados.
+		const p = i.proyeccion;
+		if (p && p.enabled) {
+			setProyEnabled(true);
+			setProyDriver(p.driver || "packs");
+			const steps = Array.isArray(p.steps) && p.steps.length ? p.steps : DEFAULT_PROYECCION_STEPS;
+			setProySteps(steps.map(function (s) {
+				return {
+					pct: s.pct != null ? s.pct : 0,
+					descuento: s.descuento != null ? s.descuento : 0,
+					...(s.idc != null ? { idc: s.idc } : {}),
+					...(s.firmas != null ? { firmas: s.firmas } : {}),
+				};
+			}));
+		} else {
+			setProyEnabled(false);
+			setProyDriver("packs");
+			setProySteps(DEFAULT_PROYECCION_STEPS.map(function (s) { return { ...s }; }));
+		}
 		if (i.overrideMode) {
 			setOverrideMode(i.overrideMode);
 			setShowOverrides(true);
@@ -226,6 +251,44 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		abono ? "con abono mensual" : "sin abono",
 	].filter(Boolean).join(" · ");
 
+	// ── Proyección de crecimiento (preview) ──
+	// Base = volumen y precio ya cotizados. El motor es el mismo que usa el export.
+	const proyBase = { idc: idc, firmas: firmasIncl, precioCert: precioIDC, precioFirma: precioFirmaLista };
+	const proyRows = proyEnabled && hasVolume ? buildProyeccion(proyBase, proyDriver, proySteps) : [];
+
+	function updateStep(i, patch) {
+		setProySteps(function (prev) { return prev.map(function (s, idx) { return idx === i ? { ...s, ...patch } : s; }); });
+	}
+	function addStep() {
+		setProySteps(function (prev) {
+			const last = prev.length ? prev[prev.length - 1] : { pct: 0, descuento: 0 };
+			return prev.concat([{ pct: (Number(last.pct) || 0) + 10, descuento: (Number(last.descuento) || 0) + 3 }]);
+		});
+	}
+	function removeStep(i) {
+		setProySteps(function (prev) { return prev.filter(function (_, idx) { return idx !== i; }); });
+	}
+	function resetSteps() {
+		setProySteps(DEFAULT_PROYECCION_STEPS.map(function (s) { return { ...s }; }));
+	}
+	// Al pasar a modo manual, pre-cargamos el volumen de cada escalón con el
+	// crecimiento proporcional para que arranquen con un número editable.
+	function changeDriver(d) {
+		if (d === "manual") {
+			setProySteps(function (prev) {
+				return prev.map(function (s) {
+					const k = 1 + (Number(s.pct) || 0) / 100;
+					return {
+						...s,
+						idc: s.idc != null && s.idc !== "" ? s.idc : Math.round(idc * k),
+						firmas: s.firmas != null && s.firmas !== "" ? s.firmas : Math.round(firmasIncl * k),
+					};
+				});
+			});
+		}
+		setProyDriver(d);
+	}
+
 	function buildDeal(id, fecha) {
 		return {
 			id: id,
@@ -246,6 +309,22 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				...(precioFirmaExtra !== "" ? { precioFirmaExtra: precioFirmaExtraEff } : {}),
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
 				casosDeUso, abono,
+				...(proyEnabled && proySteps.length ? {
+					proyeccion: {
+						enabled: true,
+						driver: proyDriver,
+						steps: proySteps.map(function (s) {
+							return {
+								pct: Number(s.pct) || 0,
+								descuento: Number(s.descuento) || 0,
+								...(proyDriver === "manual" ? {
+									...(s.idc != null && s.idc !== "" ? { idc: Number(s.idc) } : {}),
+									...(s.firmas != null && s.firmas !== "" ? { firmas: Number(s.firmas) } : {}),
+								} : {}),
+							};
+						}),
+					},
+				} : {}),
 				...(overrideMode ? {
 					overrideMode,
 					...(overrideMode === "bundle" && overridePrecioIDC !== "" ? { overridePrecioIDC: Number(overridePrecioIDC) } : {}),
@@ -578,8 +657,123 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				</div>
 			</FieldGroup>
 
-			{/* ── 3 · Para la propuesta ── */}
-			<FieldGroup step={3} title="Para la propuesta" subtitle="Datos del documento final. No cambian el cálculo.">
+			{/* ── 3 · Proyección de crecimiento (opcional) ── */}
+			<FieldGroup step={3} title="Proyección de crecimiento" subtitle={proyEnabled ? "Escalones de volumen con descuento progresivo · " + (PROYECCION_DRIVERS.find(function (d) { return d.id === proyDriver; }) || {}).label : "Opcional · agrega al PDF una tabla de precios por volumen alcanzado."}>
+				<label className="flex items-center gap-2.5 cursor-pointer select-none">
+					<input type="checkbox" checked={proyEnabled} onChange={function (e) { setProyEnabled(e.target.checked); }} className="rounded" />
+					<span className="text-sm font-medium">Incluir tabla de proyección en la propuesta</span>
+					{proyEnabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
+				</label>
+
+				{proyEnabled && (
+					<div className="space-y-4">
+						<p className="text-[11px] text-muted-foreground">
+							Parte del volumen y el precio de esta cotización y muestra escalones crecientes con mejor precio. Es un override solo para esta propuesta: no cambia tu segmentación.
+						</p>
+
+						{/* Driver: qué escala en cada escalón */}
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Qué crece en cada escalón</Label>
+							<div className="flex gap-1 flex-wrap">
+								{PROYECCION_DRIVERS.map(function (d) {
+									const active = proyDriver === d.id;
+									return (
+										<button key={d.id} onClick={function () { changeDriver(d.id); }} className={"px-2.5 py-1 rounded-md text-xs transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{d.label}</button>
+									);
+								})}
+							</div>
+							<span className="text-[11px] text-muted-foreground">{(PROYECCION_DRIVERS.find(function (d) { return d.id === proyDriver; }) || {}).desc}</span>
+						</div>
+
+						{/* Escalones editables */}
+						<div className="space-y-2">
+							<div className="flex items-center justify-between">
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Escalones</Label>
+								<button onClick={resetSteps} className="text-[11px] text-muted-foreground hover:text-foreground">restaurar (5/10/25/50%)</button>
+							</div>
+							<div className="space-y-1.5">
+								{proySteps.map(function (s, i) {
+									return (
+										<div key={i} className="flex items-end gap-2 flex-wrap">
+											{proyDriver === "manual" ? (
+												<>
+													<div className="flex flex-col gap-1">
+														<span className="text-[10px] text-muted-foreground">Certificados</span>
+														<Input type="number" min={0} value={s.idc != null ? s.idc : ""} onChange={function (e) { updateStep(i, { idc: e.target.value }); }} className="h-8 w-28 text-sm tabular-nums" />
+													</div>
+													<div className="flex flex-col gap-1">
+														<span className="text-[10px] text-muted-foreground">Firmas</span>
+														<Input type="number" min={0} value={s.firmas != null ? s.firmas : ""} onChange={function (e) { updateStep(i, { firmas: e.target.value }); }} className="h-8 w-28 text-sm tabular-nums" />
+													</div>
+												</>
+											) : (
+												<div className="flex flex-col gap-1">
+													<span className="text-[10px] text-muted-foreground">Crecimiento</span>
+													<div className="flex items-center">
+														<span className="text-xs text-muted-foreground mr-1">+</span>
+														<Input type="number" min={0} value={s.pct} onChange={function (e) { updateStep(i, { pct: e.target.value }); }} className="h-8 w-20 text-sm tabular-nums" />
+														<span className="text-xs text-muted-foreground ml-1">%</span>
+													</div>
+												</div>
+											)}
+											<div className="flex flex-col gap-1">
+												<span className="text-[10px] text-muted-foreground">Descuento</span>
+												<div className="flex items-center">
+													<span className="text-xs text-muted-foreground mr-1">−</span>
+													<Input type="number" min={0} max={100} value={s.descuento} onChange={function (e) { updateStep(i, { descuento: e.target.value }); }} className="h-8 w-20 text-sm tabular-nums" />
+													<span className="text-xs text-muted-foreground ml-1">%</span>
+												</div>
+											</div>
+											<button onClick={function () { removeStep(i); }} className="h-8 px-2 text-muted-foreground hover:text-destructive text-xs shrink-0" title="Quitar escalón">✕</button>
+										</div>
+									);
+								})}
+							</div>
+							<button onClick={addStep} className="text-xs font-medium text-primary hover:underline">+ agregar escalón</button>
+						</div>
+
+						{/* Preview de la tabla que va al PDF */}
+						{hasVolume ? (
+							<div className="rounded-lg border border-border overflow-hidden">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Escenario</TableHead>
+											<TableHead>Volumen</TableHead>
+											<TableHead className="text-right">/ cert</TableHead>
+											<TableHead className="text-right">/ firma</TableHead>
+											<TableHead className="text-right">Costo est.</TableHead>
+											<TableHead className="text-right">Ahorro</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{proyRows.map(function (r, i) {
+											const isBase = i === 0;
+											const isTarget = proyRows.length > 1 && i === proyRows.length - 1;
+											return (
+												<TableRow key={i} className={isTarget ? "bg-primary/5" : ""}>
+													<TableCell className="font-medium">{isBase ? "Actual" : "+" + r.pct + "%"}{isTarget ? <span className="ml-1 text-[10px] text-primary font-semibold">objetivo</span> : null}</TableCell>
+													<TableCell className="text-muted-foreground text-xs tabular-nums">{r.idc.toLocaleString("es-AR")} cert{r.firmas > 0 ? " · " + r.firmas.toLocaleString("es-AR") + " firmas" : ""}</TableCell>
+													<TableCell className="text-right tabular-nums">{fMoney2(r.precioCert)}</TableCell>
+													<TableCell className="text-right tabular-nums">{fMoney2(r.precioFirma)}</TableCell>
+													<TableCell className="text-right tabular-nums font-semibold">{fMoney(r.costo)}</TableCell>
+													<TableCell className="text-right tabular-nums text-[var(--success)]">{isBase ? "—" : fMoney(r.ahorroMonto) + " (" + (r.ahorroPct * 100).toFixed(0) + "%)"}</TableCell>
+												</TableRow>
+											);
+										})}
+									</TableBody>
+								</Table>
+							</div>
+						) : (
+							<p className="text-[11px] text-muted-foreground">Cargá certificados para ver la proyección.</p>
+						)}
+						<p className="text-[10px] text-muted-foreground">Costo estimado = volumen de certificados y firmas a ese escalón (sin fee ni SLA). El descuento se aplica al precio de cert y de firma por igual.</p>
+					</div>
+				)}
+			</FieldGroup>
+
+			{/* ── 4 · Para la propuesta ── */}
+			<FieldGroup step={4} title="Para la propuesta" subtitle="Datos del documento final. No cambian el cálculo.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente

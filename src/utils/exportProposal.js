@@ -1,3 +1,4 @@
+import { buildProyeccion } from "@/lib/proyeccion";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -631,6 +632,87 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	});
 }
 
+// ─── SLIDE: PROYECCIÓN DE CRECIMIENTO — B2B2C ─────────────────────────────────
+// Tabla override por propuesta: parte del volumen y precio cotizados y muestra
+// escalones crecientes con mejor precio, para que el cliente proyecte su costo
+// a distintas escalas. Se calcula con el mismo motor que el preview en pantalla.
+function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
+	const inp = deal.inputs || {};
+	const res = deal.resumen || {};
+	const proy = inp.proyeccion || {};
+	// Base recuperada del resumen del deal (evita re-derivar los inputs por tipo).
+	const idc = Number(res.idcMensuales) || 0;
+	const firmas = Number(res.firmasTotales != null ? res.firmasTotales : res.firmasMes) || 0;
+	const precioCert = Number(res.precioIDC) || 0;
+	const precioFirma = Number(res.precioFirma != null ? res.precioFirma : inp.precioFirmaAdic) || 0;
+	const rows = buildProyeccion({ idc, firmas, precioCert, precioFirma }, proy.driver || "packs", proy.steps || []);
+	const showIva = currency === "ARS";
+
+	// Precios unitarios chicos (ej. USD 0.65): se formatean aparte para no perder
+	// decimales que fm/USD redondearía a entero.
+	const fmU = (v) => currency === "ARS" ? "$ " + Math.round(v * tc).toLocaleString("es-AR") : "USD " + Number(v).toFixed(2);
+
+	const driverNote = {
+		packs: "Crecimiento proporcional de certificados y firmas.",
+		firmas: "Los certificados quedan fijos; crece el volumen de firmas.",
+		certificados: "Las firmas quedan fijas; crece el volumen de certificados.",
+		manual: "Volúmenes proyectados a medida.",
+	}[proy.driver || "packs"];
+
+	const th = (txt, align) => `<th style="text-align:${align || "left"};font-size:7.5pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.6px;padding:0.3cm 0.5cm;border-bottom:1.5px solid ${GRL};white-space:nowrap;">${txt}</th>`;
+
+	const nRows = rows.length;
+	const bodyRows = rows.map((r, i) => {
+		const isBase = i === 0;
+		const isTarget = nRows > 1 && i === nRows - 1;
+		const rowBg = isTarget ? "#EEF0FD" : (i % 2 === 1 ? OW : W);
+		const td = (html, align, extra) => `<td style="text-align:${align || "left"};font-size:9.5pt;color:${DK};padding:0.34cm 0.5cm;border-bottom:1px solid ${GRL};${extra || ""}">${html}</td>`;
+		const esc = isBase
+			? `<span style="font-weight:700;color:${DK};">Volumen actual</span>`
+			: `<span style="font-weight:700;color:${isTarget ? B : DK};">+${r.pct}%</span>${isTarget ? ` <span style="font-size:7pt;color:${B};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">objetivo</span>` : ""}`;
+		const vol = `${r.idc.toLocaleString("es-AR")} certificados${r.firmas > 0 ? ` · ${r.firmas.toLocaleString("es-AR")} firmas` : ""}`;
+		const ahorro = isBase
+			? `<span style="color:${GR};">—</span>`
+			: `<span style="font-weight:700;color:${B};">${fm(r.ahorroMonto, currency, tc)}</span> <span style="font-size:7.5pt;color:${GR};">(${(r.ahorroPct * 100).toFixed(0)}%)</span>`;
+		return `<tr style="background:${rowBg};">
+      ${td(esc)}
+      ${td(`<span style="color:${GR};">${vol}</span>`)}
+      ${td(fmU(r.precioCert), "right", "font-weight:600;")}
+      ${td(fmU(r.precioFirma), "right", "font-weight:600;")}
+      ${td(fm(r.costo, currency, tc), "right", `font-weight:700;color:${isTarget ? B : DK};`)}
+      ${td(ahorro, "right")}
+    </tr>`;
+	}).join("");
+
+	return `<div class="slide" style="background:${OW};">
+  <div style="flex-shrink:0;padding:0.6cm 1cm 0.3cm;">
+    <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.1cm;">Proyección de crecimiento</div>
+    <div style="font-size:21pt;font-weight:800;color:${DK};line-height:1.15;">Cuanto más escalás, mejor tu precio</div>
+    <div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">A medida que crece tu volumen, mejora el precio por certificado y por firma. ${driverNote}</div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;padding:0.2cm 1cm 0;overflow:hidden;">
+    <div style="background:${W};border:1px solid ${GRL};border-radius:14px;box-shadow:0 2px 10px rgba(48,65,213,0.06);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          ${th("Escenario")}
+          ${th("Volumen proyectado")}
+          ${th("Precio / certificado", "right")}
+          ${th("Precio / firma", "right")}
+          ${th("Costo estimado", "right")}
+          ${th("Ahorro vs. actual", "right")}
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:auto;padding:0.3cm 0;font-size:7.5pt;color:${GR};line-height:1.5;">
+      Costo estimado sobre el volumen de certificados y firmas de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez ni el abono de soporte / SLA). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
+    </div>
+  </div>
+  ${foot(pageN || 4)}
+</div>`;
+}
+
 // ─── SLIDE 3: MODELO COMERCIAL — WEB (precio de lista, sin descuento) ─────────
 // Venta directa por tarjeta: se cotiza a precio de lista puro. No hay tier ni
 // abono, así que la slide no muestra ninguna sección de descuento — solo el
@@ -805,11 +887,25 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	const isWeb = deal.channel === "web";
 	const sinApiB2B2C = deal.channel === "b2b2c" && deal.inputs?.integracion === "sin_api";
 	const noApi = sinApiB2B2C || isWeb;
+
+	// Slide de proyección de crecimiento: solo B2B2C, con la proyección activa y
+	// con volumen cargado. Corre la numeración de páginas de las slides siguientes.
+	const proy = deal.channel === "b2b2c" ? deal.inputs?.proyeccion : null;
+	const hasProy = !!(proy && proy.enabled)
+		&& (Number(deal.resumen?.idcMensuales) || 0) > 0
+		&& Array.isArray(proy.steps) && proy.steps.length > 0;
+
+	// Página del modelo comercial: 2 sin slide de integración, 3 con ella.
+	const s3Page = noApi ? 2 : 3;
+	const proyPage = s3Page + 1;
+	const pasosPage = hasProy ? proyPage + 1 : s3Page + 1;
+
 	const s3 = isWeb
-		? s3Web(deal, clientName, currency, tc, channelConfig, models, 2)
+		? s3Web(deal, clientName, currency, tc, channelConfig, models, s3Page)
 		: deal.channel === "b2b2c"
-			? s3B2B2C(deal, clientName, currency, tc, channelConfig, sinApiB2B2C ? 2 : 3)
+			? s3B2B2C(deal, clientName, currency, tc, channelConfig, s3Page)
 			: s3Dist(deal, clientName, currency, tc, channelConfig, models);
+	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage) : "";
 
 	return `<!DOCTYPE html>
 <html lang="es">
@@ -822,7 +918,8 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 ${s1Cover(clientName, deal.fecha, noApi, isWeb)}
 ${noApi ? "" : s2Integracion(clientName)}
 ${s3}
-${s4Pasos(clientName, noApi, noApi ? 3 : 4)}
+${proySlide}
+${s4Pasos(clientName, noApi, pasosPage)}
 ${s5Cierre(noApi)}
 </body>
 </html>`;
