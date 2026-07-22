@@ -482,10 +482,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					</div>
 				</div>
 				<div className="space-y-1 border-t border-border/60 pt-2">
-					<ResultRow label="Ingreso certificados" value={<AnimatedNumber value={revIDC} format={fMoney} />} accent="primary" />
-					<ResultRow label="Ingreso firmas" value={revFirmas ? <AnimatedNumber value={revFirmas} format={fMoney} /> : "—"} />
-					<ResultRow label="Costo certificados" value={<span className="tabular-nums text-destructive">−{fMoney(costoCert)}</span>} />
-					<ResultRow label="Costo firmas" value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
+					<ResultRow label={<>Ingreso certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(precioIDC) + " por certificado = " + fMoney(revIDC)} /></>} value={<AnimatedNumber value={revIDC} format={fMoney} />} accent="primary" />
+					<ResultRow label={<>Ingreso firmas<InfoTooltip text={firmasIncl.toLocaleString("es-AR") + " firmas × " + fMoney2(precioFirmaLista) + " por firma = " + fMoney(revFirmas)} /></>} value={revFirmas ? <AnimatedNumber value={revFirmas} format={fMoney} /> : "—"} />
+					<ResultRow label={<>Costo certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(cvCert) + " de costo variable c/u = " + fMoney(costoCert)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoCert)}</span>} />
+					<ResultRow label={<>Costo firmas<InfoTooltip text={firmasIncl.toLocaleString("es-AR") + " firmas × " + fMoney2(cvFirma) + " de costo variable c/u = " + fMoney(costoFirmas)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
 				</div>
 			</div>
 		)}
