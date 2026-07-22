@@ -667,16 +667,14 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
 		const isTarget = nRows > 1 && i === nRows - 1;
 		const rowBg = isTarget ? "#EEF0FD" : (i % 2 === 1 ? OW : W);
 		const td = (html, align, extra) => `<td style="text-align:${align || "left"};font-size:9.5pt;color:${DK};padding:0.34cm 0.5cm;border-bottom:1px solid ${GRL};${extra || ""}">${html}</td>`;
-		const esc = isBase
-			? `<span style="font-weight:700;color:${DK};">Volumen actual</span>`
-			: `<span style="font-weight:700;color:${isTarget ? B : DK};">+${r.pct}%</span>${isTarget ? ` <span style="font-size:7pt;color:${B};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">objetivo</span>` : ""}`;
+		// Sin columna de escenario/% en el export: el cliente ve solo el volumen
+		// proyectado. La fila objetivo (última) se resalta por color de fondo.
 		const vol = `${r.idc.toLocaleString("es-AR")} certificados${r.firmas > 0 ? ` · ${r.firmas.toLocaleString("es-AR")} firmas` : ""}`;
 		const ahorro = isBase
 			? `<span style="color:${GR};">—</span>`
 			: `<span style="font-weight:700;color:${B};">${fm(r.ahorroMonto, currency, tc)}</span> <span style="font-size:7.5pt;color:${GR};">(${(r.ahorroPct * 100).toFixed(0)}%)</span>`;
 		return `<tr style="background:${rowBg};">
-      ${td(esc)}
-      ${td(`<span style="color:${GR};">${vol}</span>`)}
+      ${td(`<span style="font-weight:${isBase || isTarget ? 700 : 400};color:${isTarget ? B : DK};">${vol}</span>`)}
       ${td(fmU(r.precioCert), "right", "font-weight:600;")}
       ${td(fmU(r.precioFirma), "right", "font-weight:600;")}
       ${td(fm(r.costo, currency, tc), "right", `font-weight:700;color:${isTarget ? B : DK};`)}
@@ -695,7 +693,6 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
     <div style="background:${W};border:1px solid ${GRL};border-radius:14px;box-shadow:0 2px 10px rgba(48,65,213,0.06);overflow:hidden;">
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr>
-          ${th("Escenario")}
           ${th("Volumen proyectado")}
           ${th("Precio / certificado", "right")}
           ${th("Precio / firma", "right")}

@@ -25,7 +25,6 @@ function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0
 function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
 function margWord(pct) { return pct >= 0.5 ? "saludable" : pct >= 0.2 ? "ajustado" : "a revisar"; }
 
-const OVERRIDE_LABEL = { bundle: "precio bundle", componente: "por componente", margen: "margen objetivo" };
 const DESCUENTO_ABONO = 0.35;
 // Fallback del precio de firma si un segmento de la config no tiene `precioFirma`
 // cargado todavía (config vieja). Con la columna cargada, el precio es dinámico.
@@ -62,12 +61,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 	const [saved, setSaved] = useState(null); // { deal, client } tras guardar
+	// Ajuste de precios personalizado (por componente): cada campo que se complete
+	// sobrescribe ese elemento; vacío = usa el precio normal (segmento/dinámico).
 	const [showOverrides, setShowOverrides] = useState(false);
-	const [overrideMode, setOverrideMode] = useState(null); // null | "bundle" | "componente" | "margen"
-	const [overridePrecioIDC, setOverridePrecioIDC] = useState("");
 	const [overridePrecioCert, setOverridePrecioCert] = useState("");
 	const [overridePrecioFirma, setOverridePrecioFirma] = useState("");
-	const [overrideMargenPct, setOverrideMargenPct] = useState("");
 	const [abono, setAbono] = useState(false);
 	// Proyección de crecimiento (opcional, override por propuesta): escalones de
 	// volumen con descuento progresivo para que el cliente proyecte su costo.
@@ -153,16 +151,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			setProyDriver("packs");
 			setProySteps(DEFAULT_PROYECCION_STEPS.map(function (s) { return { ...s }; }));
 		}
-		if (i.overrideMode) {
-			setOverrideMode(i.overrideMode);
-			setShowOverrides(true);
-			if (i.overrideMode === "bundle") { setOverridePrecioIDC(i.overridePrecioIDC != null ? String(i.overridePrecioIDC) : ""); }
-			if (i.overrideMode === "componente") { setOverridePrecioCert(i.overridePrecioCert != null ? String(i.overridePrecioCert) : ""); setOverridePrecioFirma(i.overridePrecioFirma != null ? String(i.overridePrecioFirma) : ""); }
-			if (i.overrideMode === "margen") { setOverrideMargenPct(i.overrideMargenPct != null ? String(i.overrideMargenPct) : ""); }
-		} else {
-			setOverrideMode(null);
-			setOverridePrecioIDC(""); setOverridePrecioCert(""); setOverridePrecioFirma(""); setOverrideMargenPct("");
-		}
+		// Solo ajuste por componente. Deals viejos con "bundle" mapean su precio de
+		// certificado al override de cert; "margen" ya no se reconstruye.
+		const legacyCert = i.overridePrecioCert != null ? i.overridePrecioCert : (i.overrideMode === "bundle" ? i.overridePrecioIDC : null);
+		setOverridePrecioCert(legacyCert != null ? String(legacyCert) : "");
+		setOverridePrecioFirma(i.overridePrecioFirma != null ? String(i.overridePrecioFirma) : "");
+		setShowOverrides(legacyCert != null || i.overridePrecioFirma != null);
 		setEditingId(pendingEdit.id);
 		setSaved(null);
 		onConsumeEdit && onConsumeEdit();
@@ -177,22 +171,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const costoFirmas = firmasIncl * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
 
-	let precioIDC, precioFirmaLista;
-	if (overrideMode === "bundle" && overridePrecioIDC !== "") {
-		precioIDC = Math.max(0, Number(overridePrecioIDC) || 0);
-		precioFirmaLista = segFirma;
-	} else if (overrideMode === "componente") {
-		precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : cvCert;
-		precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : segFirma;
-	} else if (overrideMode === "margen" && overrideMargenPct !== "" && idc > 0) {
-		const m = (Number(overrideMargenPct) || 0) / 100;
-		precioFirmaLista = segFirma;
-		const revServicioObjetivo = m < 1 && m > 0 ? costoTotal / (1 - m) : costoTotal;
-		precioIDC = Math.max(0, (revServicioObjetivo - firmasIncl * precioFirmaLista) / idc);
-	} else {
-		precioIDC = seg.precioIDC;
-		precioFirmaLista = segFirma;
-	}
+	// Ajuste por componente: cada campo cargado sobrescribe ese elemento; vacío usa
+	// el precio normal (precio del segmento para el certificado, dinámico para la firma).
+	const overrideActive = overridePrecioCert !== "" || overridePrecioFirma !== "";
+	const precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : seg.precioIDC;
+	const precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : segFirma;
 
 	// Precio de firma extra (excedente): dinámico = precio de firma del segmento,
 	// salvo que se haya cargado un override manual.
@@ -246,7 +229,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const condResumen = [
 		conApi ? api.label : "sin integración API",
 		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
-		overrideMode ? "precio " + (OVERRIDE_LABEL[overrideMode] || overrideMode) : "precio de tabla",
+		overrideActive ? "precio ajustado" : "precio de tabla",
 		abono ? "con abono mensual" : "sin abono",
 	].filter(Boolean).join(" · ");
 
@@ -324,14 +307,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						}),
 					},
 				} : {}),
-				...(overrideMode ? {
-					overrideMode,
-					...(overrideMode === "bundle" && overridePrecioIDC !== "" ? { overridePrecioIDC: Number(overridePrecioIDC) } : {}),
-					...(overrideMode === "componente" ? {
-						...(overridePrecioCert !== "" ? { overridePrecioCert: Number(overridePrecioCert) } : {}),
-						...(overridePrecioFirma !== "" ? { overridePrecioFirma: Number(overridePrecioFirma) } : {}),
-					} : {}),
-					...(overrideMode === "margen" && overrideMargenPct !== "" ? { overrideMargenPct: Number(overrideMargenPct) } : {}),
+				...(overrideActive ? {
+					overrideMode: "componente",
+					...(overridePrecioCert !== "" ? { overridePrecioCert: Number(overridePrecioCert) } : {}),
+					...(overridePrecioFirma !== "" ? { overridePrecioFirma: Number(overridePrecioFirma) } : {}),
 				} : {}),
 			},
 			resumen: {
@@ -634,70 +613,33 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 				<Separator />
 
-				{/* Ajuste de precios personalizado */}
+				{/* Ajuste de precios personalizado (por componente) */}
 				<div className="flex flex-col gap-2">
 					<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-2 text-sm font-medium border border-dashed border-border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors w-full text-left">
 						<span>Ajuste de precios personalizado</span>
 						<span className="ml-auto text-muted-foreground text-xs">{showOverrides ? "▲ ocultar" : "▼ mostrar"}</span>
-						{overrideMode && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
+						{overrideActive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
 					</button>
 					{showOverrides && (
-						<div className="pl-1 border-l-2 border-muted ml-1 space-y-3">
-							<div className="flex gap-1 flex-wrap">
-								{[
-									{ id: null, label: "Sin ajuste" },
-									{ id: "bundle", label: "Precio por cert." },
-									{ id: "componente", label: "Por componente" },
-									{ id: "margen", label: "Margen objetivo" },
-								].map(function (m) {
-									const active = overrideMode === m.id;
-									return (
-										<button key={m.id ?? "none"} onClick={function () { setOverrideMode(m.id); }} className={"px-2.5 py-1 rounded-md text-xs transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{m.label}</button>
-									);
-								})}
+						<div className="pl-1 border-l-2 border-muted ml-1 space-y-2">
+							<p className="text-[11px] text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
+							<div className="grid grid-cols-2 gap-3 max-w-sm">
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+									<div className="flex items-center gap-1">
+										<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={seg.precioIDC != null ? String(seg.precioIDC) : ""} className="h-8 text-sm" />
+										{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+								</div>
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+									<div className="flex items-center gap-1">
+										<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segFirma.toFixed(3)} className="h-8 text-sm" />
+										{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+									</div>
+								</div>
 							</div>
-							{overrideMode === "bundle" && (
-								<div className="flex flex-col gap-1.5 max-w-xs">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio por certificado <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-									<div className="flex items-center gap-1.5">
-										<Input type="number" value={overridePrecioIDC} onChange={function (e) { setOverridePrecioIDC(e.target.value); }} placeholder={"Tabla: " + seg.precioIDC} className="h-8 text-sm" />
-										{overridePrecioIDC !== "" && <button onClick={function () { setOverridePrecioIDC(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-									</div>
-									<p className="text-[10px] text-muted-foreground">Reemplaza el precio de tabla para esta cotización.</p>
-								</div>
-							)}
-							{overrideMode === "componente" && (
-								<div className="space-y-2">
-									<div className="grid grid-cols-2 gap-3 max-w-sm">
-										<div className="flex flex-col gap-1.5">
-											<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-											<div className="flex items-center gap-1">
-												<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={cvCert.toFixed(4)} className="h-8 text-sm" />
-												{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-											</div>
-										</div>
-										<div className="flex flex-col gap-1.5">
-											<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-											<div className="flex items-center gap-1">
-												<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segFirma.toFixed(4)} className="h-8 text-sm" />
-												{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-											</div>
-										</div>
-									</div>
-									<p className="text-[10px] text-muted-foreground">Precio efectivo: cert {fMoney2(precioIDC)} · firma {fMoney2(precioFirmaLista)}.</p>
-								</div>
-							)}
-							{overrideMode === "margen" && (
-								<div className="flex flex-col gap-1.5 max-w-xs">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Margen objetivo <span className="normal-case tracking-normal font-normal">(%)</span></Label>
-									<div className="flex items-center gap-1.5">
-										<Input type="number" value={overrideMargenPct} onChange={function (e) { setOverrideMargenPct(e.target.value); }} placeholder="Ej: 75" min="0" max="99" className="h-8 text-sm" />
-										{overrideMargenPct !== "" && <button onClick={function () { setOverrideMargenPct(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-									</div>
-									{overrideMargenPct !== "" && hasVolume && <p className="text-[10px] text-muted-foreground">Precio por certificado resultante = <span className="font-semibold text-foreground">{fMoney2(precioIDC)}</span>.</p>}
-								</div>
-							)}
-							{!overrideMode && <p className="text-[10px] text-muted-foreground">Seleccioná un modo para aplicar un ajuste de precio a esta cotización.</p>}
+							<p className="text-[10px] text-muted-foreground">Precio efectivo: cert {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma {fMoney2(precioFirmaLista)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
 						</div>
 					)}
 				</div>
