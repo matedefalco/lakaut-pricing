@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { NumberField, SelectField, StatCard } from "@/components/ui/field";
+import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -214,7 +214,6 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const margen = revServicio - costoTotal;
 	const margenPct = revServicio > 0 ? margen / revServicio : 0;
-	const resultadoTotal = margen + slaMes + feeAplicado;
 
 	// Abono (opcional): repone la bolsa de firmas cada mes con el 35% de descuento.
 	const precioFirmaAbono = precioFirmaLista * (1 - DESCUENTO_ABONO);
@@ -396,6 +395,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	// por tipo, condiciones comerciales y total. Es lo que el vendedor lee para
 	// entender qué está cotizando de un vistazo.
 	const result = (
+		<>
 		<ResultPanel eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
 			<ResultHero
 				label={conApi ? "Total · mes 1" : "Total"}
@@ -461,6 +461,35 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				<p className="text-[11px] text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
 			)}
 		</ResultPanel>
+
+		{/* Rentabilidad · uso interno: vive debajo del resumen para ver el impacto en
+		    vivo mientras se cotiza. No se exporta a la propuesta del cliente. */}
+		{hasVolume && (
+			<div className="rounded-xl border border-border bg-card p-4 shadow-float">
+				<div className="mb-3">
+					<span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rentabilidad · uso interno</span>
+				</div>
+				<div className="mb-3 grid grid-cols-2 gap-3">
+					<div>
+						<div className="text-[10px] text-muted-foreground">Contribución marginal</div>
+						<div className={"font-heading text-base font-semibold tabular-nums " + margClass(margenPct)}><AnimatedNumber value={margen} format={fMoney} /></div>
+						<div className="text-[10px] text-muted-foreground">{(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</div>
+					</div>
+					<div>
+						<div className="text-[10px] text-muted-foreground">Costo variable total</div>
+						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={costoTotal} format={fMoney} /></div>
+						<div className="text-[10px] text-muted-foreground">{idc.toLocaleString("es-AR")} certs + {firmasIncl.toLocaleString("es-AR")} firmas</div>
+					</div>
+				</div>
+				<div className="space-y-1 border-t border-border/60 pt-2">
+					<ResultRow label="Ingreso certificados" value={<AnimatedNumber value={revIDC} format={fMoney} />} accent="primary" />
+					<ResultRow label="Ingreso firmas" value={revFirmas ? <AnimatedNumber value={revFirmas} format={fMoney} /> : "—"} />
+					<ResultRow label="Costo certificados" value={<span className="tabular-nums text-destructive">−{fMoney(costoCert)}</span>} />
+					<ResultRow label="Costo firmas" value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
+				</div>
+			</div>
+		)}
+		</>
 	);
 
 	const footer = (
@@ -478,8 +507,25 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
-			{/* ── 1 · Qué cotizás ── */}
-			<FieldGroup step={1} title="Qué cotizás" subtitle="Modalidad y volumen de certificados por tipo. El resumen se arma a la derecha.">
+			{/* ── 1 · Para la propuesta ── */}
+			<FieldGroup step={1} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+				<div className="flex flex-col gap-1.5">
+					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
+						Cliente
+						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
+					</Label>
+					<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} value={selectedClient} onChange={setSelectedClient} />
+					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
+				</div>
+
+				<div className="flex flex-col gap-1.5">
+					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
+					<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
+				</div>
+			</FieldGroup>
+
+			{/* ── 2 · Qué cotizás ── */}
+			<FieldGroup step={2} title="Qué cotizás" subtitle="Modalidad y volumen de certificados por tipo. El resumen se arma a la derecha.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
 					<div className="flex gap-1 flex-wrap">
@@ -550,8 +596,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				</div>
 			</FieldGroup>
 
-			{/* ── 2 · Condiciones comerciales ── */}
-			<FieldGroup step={2} title="Condiciones comerciales" subtitle={condResumen}>
+			{/* ── 3 · Condiciones comerciales ── */}
+			<FieldGroup step={3} title="Condiciones comerciales" subtitle={condResumen}>
 				{conApi && (
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
@@ -655,15 +701,17 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						</div>
 					)}
 				</div>
-			</FieldGroup>
+				<Separator />
 
-			{/* ── 3 · Proyección de crecimiento (opcional) ── */}
-			<FieldGroup step={3} title="Proyección de crecimiento" subtitle={proyEnabled ? "Escalones de volumen con descuento progresivo · " + (PROYECCION_DRIVERS.find(function (d) { return d.id === proyDriver; }) || {}).label : "Opcional · agrega al PDF una tabla de precios por volumen alcanzado."}>
-				<label className="flex items-center gap-2.5 cursor-pointer select-none">
-					<input type="checkbox" checked={proyEnabled} onChange={function (e) { setProyEnabled(e.target.checked); }} className="rounded" />
-					<span className="text-sm font-medium">Incluir tabla de proyección en la propuesta</span>
-					{proyEnabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
-				</label>
+				{/* Proyección de crecimiento (opcional): override por propuesta que suma
+				    al PDF una tabla de precios por volumen alcanzado. */}
+				<div className="flex flex-col gap-3">
+					<label className="flex items-center gap-2.5 cursor-pointer select-none">
+						<input type="checkbox" checked={proyEnabled} onChange={function (e) { setProyEnabled(e.target.checked); }} className="rounded" />
+						<span className="text-sm font-medium">Proyección de crecimiento en la propuesta</span>
+						{proyEnabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
+					</label>
+					{!proyEnabled && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo.</p>}
 
 				{proyEnabled && (
 					<div className="space-y-4">
@@ -768,63 +816,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 							<p className="text-[11px] text-muted-foreground">Cargá certificados para ver la proyección.</p>
 						)}
 						<p className="text-[10px] text-muted-foreground">Costo estimado = volumen de certificados y firmas a ese escalón (sin fee ni SLA). El descuento se aplica al precio de cert y de firma por igual.</p>
-					</div>
-				)}
-			</FieldGroup>
-
-			{/* ── 4 · Para la propuesta ── */}
-			<FieldGroup step={4} title="Para la propuesta" subtitle="Datos del documento final. No cambian el cálculo.">
-				<div className="flex flex-col gap-1.5">
-					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
-						Cliente
-						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
-					</Label>
-					<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} value={selectedClient} onChange={setSelectedClient} />
-				</div>
-
-				<div className="flex flex-col gap-1.5">
-					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
-					<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
+						</div>
+					)}
 				</div>
 			</FieldGroup>
-
-			{/* ── Rentabilidad (interno) ── */}
-			{hasVolume && (
-				<CollapsibleSection tone="internal" title="Rentabilidad · uso interno" subtitle="Costo variable, contribución marginal y break-even. No aparece en la propuesta del cliente.">
-					<div className="flex flex-wrap gap-3 mb-4">
-						<StatCard label="Contribución marginal" value={fMoney(margen)} sub={(margenPct * 100).toFixed(0) + "% sobre revenue de servicio"} accent={margAccent(margenPct)} valueClass={margClass(margenPct)} />
-						<StatCard label="Costo variable total" value={fMoney(costoTotal)} sub={idc.toLocaleString("es-AR") + " certs + " + firmasIncl.toLocaleString("es-AR") + " firmas"} accent="muted" />
-					</div>
-					<Table>
-						<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
-						<TableBody>
-							<TableRow><TableCell>Ingreso certificados ({idc.toLocaleString("es-AR")} × {fMoney2(precioIDC)})</TableCell><TableCell className="text-right tabular-nums">{fMoney(revIDC)}</TableCell></TableRow>
-							<TableRow><TableCell>Ingreso firmas ({firmasIncl.toLocaleString("es-AR")} × {fMoney2(precioFirmaLista)})</TableCell><TableCell className="text-right tabular-nums">{revFirmas ? fMoney(revFirmas) : "—"}</TableCell></TableRow>
-							<TableRow><TableCell>Costo certificados ({idc.toLocaleString("es-AR")} × {fMoney2(cvCert)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoCert)}</TableCell></TableRow>
-							<TableRow><TableCell>Costo firmas ({firmasIncl.toLocaleString("es-AR")} × {fMoney2(cvFirma)})</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(costoFirmas)}</TableCell></TableRow>
-							<TableRow className={margen >= 0 ? "bg-success/5" : "bg-destructive/5"}>
-								<TableCell className={"font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>Contribución marginal <span className="font-normal text-muted-foreground">· volumen (cert + firmas)</span></TableCell>
-								<TableCell className={"text-right tabular-nums font-semibold " + (margen >= 0 ? "text-[var(--success)]" : "text-destructive")}>{fMoney(margen)} ({(margenPct * 100).toFixed(0)}%)</TableCell>
-							</TableRow>
-							{conApi && (
-								<>
-									<TableRow className="border-t-2 border-border hover:bg-transparent">
-										<TableCell className="text-[11px] uppercase tracking-wide text-muted-foreground pt-4">Fuera de la contribución marginal</TableCell>
-										<TableCell />
-									</TableRow>
-									<TableRow><TableCell>Soporte / SLA ({sla.label}){slaMes ? " · mensual" : ""}</TableCell><TableCell className="text-right tabular-nums">{slaBonificado ? "bonificado" : slaMes ? fMoney(slaMes) : "incluido"}</TableCell></TableRow>
-									<TableRow><TableCell>Fee de implementación · pago único</TableCell><TableCell className="text-right tabular-nums">{fMoney(feeAplicado)}</TableCell></TableRow>
-									<TableRow className="bg-muted/40">
-										<TableCell className="font-semibold">Resultado mes 1 <span className="font-normal text-muted-foreground">· con SLA y fee</span></TableCell>
-										<TableCell className="text-right tabular-nums font-semibold">{fMoney(resultadoTotal)}</TableCell>
-									</TableRow>
-								</>
-							)}
-						</TableBody>
-					</Table>
-					<p className="text-[11px] text-muted-foreground mt-3">CV = {idc.toLocaleString("es-AR")} certs × USD {cvCert.toFixed(4)} + {firmasIncl.toLocaleString("es-AR")} firmas × USD {cvFirma.toFixed(4)} = USD {costoTotal.toFixed(2)}. CM = Ingreso servicio − CV (sin CF).{overrideMode ? " ⚠ Precio personalizado activo (" + overrideMode + ")." : ""}</p>
-				</CollapsibleSection>
-			)}
 
 			{/* ── Referencia ── */}
 			<CollapsibleSection title="Referencia · precios por segmento, API y SLA" subtitle="Tabla completa del modelo de volumen (Borrador v5).">
