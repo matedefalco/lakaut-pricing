@@ -156,7 +156,7 @@ function termsFooterLight() {
 // chips, las tarjetas de momento (1 o 2), la barra de pago (si hay abono) y el
 // pie con términos + branding. La fecha de emisión/vencimiento vive únicamente
 // en la portada (slide 1) — acá no se repite.
-function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHtml, pageN }) {
+function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHtml, footnote, pageN }) {
 	return `<div class="slide" style="background:${OW};">
   <div style="flex-shrink:0;padding:0.5cm 1cm 0;">
     <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.12cm;">${kicker}</div>
@@ -172,6 +172,8 @@ function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHt
   <div style="flex:1;display:flex;gap:0.4cm;padding:0.3cm 1cm 0;overflow:hidden;">${cardsHtml}</div>
 
   ${scheduleHtml ? `<div style="flex-shrink:0;padding:0.3cm 1cm 0;">${scheduleHtml}</div>` : ""}
+
+  ${footnote ? `<div style="flex-shrink:0;padding:0.25cm 1cm 0;font-size:7pt;color:${GR};line-height:1.4;">${footnote}</div>` : ""}
 
   <div style="flex-shrink:0;padding:0.28cm 1cm 0;">${termsFooterLight()}</div>
   ${foot(pageN)}
@@ -453,6 +455,15 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const sinApi = inp.integracion === "sin_api";
+	const conApi = !sinApi;
+	// Terminología de facturación según modalidad (cambio de presentación, no de
+	// cálculo). Con integración API el certificado se factura como consumo del
+	// servicio de validación de identidad (se cobra aunque la validación resulte
+	// inválida) y la firma como documento firmado (se cobra cada documento, no la
+	// operación). Sin API se mantiene la nomenclatura de certificado + firma.
+	const firmaSing = conApi ? "documento firmado" : "firma";
+	const firmaPlur = conApi ? "documentos firmados" : "firmas";
+	const firmaCap = conApi ? "Documentos firmados" : "Firmas";
 	// La Cotizadora B2B2C no tiene (todavía) un selector de modalidad única/recurrente:
 	// el volumen de IDC es un dato neutro. No hay que asumir periodicidad que no se configuró.
 	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
@@ -515,22 +526,29 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
 	const subtotal = revIDC + revFirmasIncl + revFirmasAdic + slaMesVal + feeVal;
+	// Con API: el certificado se factura como consumo del servicio de validación
+	// de identidad y la firma como documento firmado (ver comentario arriba).
+	const certLbl = conApi ? "Consumos de validación · persona jurídica" : "Certificados jurídicos";
+	const certLblFis = conApi ? "Consumos de validación · persona física" : "Certificados físicos";
+	const certLblGen = conApi ? "Consumos de validación de identidad" : "Certificados";
+	const firmaLblJur = conApi ? "Documentos firmados · persona jurídica" : "Firmas de certificados jurídicos";
+	const firmaLblFis = conApi ? "Documentos firmados · persona física" : "Firmas de certificados físicos";
 	const items = [
 		// Certificados: se desglosan por tipo solo cuando hay jurídicos en el mix.
 		...(hayJuridicos ? [
-			{ l: `Certificados jurídicos (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcJuridicos * precioIDC },
-			...(idcFisicos > 0 ? [{ l: `Certificados físicos (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcFisicos * precioIDC }] : []),
+			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcJuridicos * precioIDC },
+			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcFisicos * precioIDC }] : []),
 		] : [
-			{ l: `Certificados (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
+			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
 		]),
 		// Firmas incluidas: se atribuyen al tipo de certificado que las genera.
 		...(hayJuridicos ? [
-			...(revFirmasInclJuridica > 0 ? [{ l: `Firmas de certificados jurídicos (${firmasInclJuridica.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclJuridica }] : []),
-			...(revFirmasInclFisica > 0 ? [{ l: `Firmas de certificados físicos (${firmasInclFisica.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclFisica }] : []),
+			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasInclJuridica.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclJuridica }] : []),
+			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasInclFisica.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclFisica }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `Firmas incluidas (${firmasIncl.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} inclu${conApi ? "idos" : "idas"} (${firmasIncl.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
 		]),
-		...(revFirmasAdic > 0 ? [{ l: `Firmas adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
+		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
@@ -544,12 +562,12 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const abonoVigenciaTotal = abonoActivo ? subtotal + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
 
 	const chips = [
-		chip(SVG.idcard(B, 15), `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)`),
-		chip(SVG.shield(B, 15), `<strong>1</strong> certificado c/u`),
+		chip(SVG.idcard(B, 15), conApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)`),
+		chip(SVG.shield(B, 15), conApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`),
 		...(hayJuridicos ? [
 			chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 		] : [
-			chip(SVG.checkSquare(B, 15), `<strong>${fPorCertFis}</strong> firma${fPorCertFis === 1 ? "" : "s"} incl. c/u`),
+			chip(SVG.checkSquare(B, 15), `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`),
 		]),
 		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
 	];
@@ -565,18 +583,22 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const stats = [{ label: subtotalLabel, value: fm(subtotal, currency, tc) }];
 	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
 
-	const firmaWord = (n) => `${n} firma${n === 1 ? "" : "s"}`;
+	const firmaWord = (n) => `${n} ${n === 1 ? firmaSing : firmaPlur}`;
+	const unidadPl = conApi ? "validaciones de identidad" : "identidades";
+	const certJurWord = conApi ? "consumos de validación · persona jurídica" : "certificados jurídicos";
+	const certFisWord = conApi ? "consumos de validación · persona física" : "certificados físicos";
+	const verboAct = conApi ? "Contratás" : "Comprás";
 	const activacionTxt = hayJuridicos
-		? `Comprás las ${idc.toLocaleString("es-AR")} identidades: ${[
-				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} certificados jurídicos (${firmaWord(fPorCertJur)} c/u)` : null,
-				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} certificados físicos (${firmaWord(fPorCertFis)} c/u)` : null,
-			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `, ${firmasIncl.toLocaleString("es-AR")} firmas en total` : ""}.`
-		: `Comprás las ${idc.toLocaleString("es-AR")} identidades: cada una con su certificado${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su firma" : `sus ${firmaWord(fPorCertFis)}`} de activación (${firmasIncl.toLocaleString("es-AR")} firmas en total)` : ""}.`;
+		? `${verboAct} las ${idc.toLocaleString("es-AR")} ${unidadPl}: ${[
+				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} ${certJurWord} (${firmaWord(fPorCertJur)} c/u)` : null,
+				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${certFisWord} (${firmaWord(fPorCertFis)} c/u)` : null,
+			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `, ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total` : ""}.`
+		: `${verboAct} las ${idc.toLocaleString("es-AR")} ${unidadPl}: cada una con su ${conApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`} de activación (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total)` : ""}.`;
 	const momento1 = momentoCard({
 		dark: false,
 		kicker: "Momento 1 · mes 1",
 		icon: SVG.shield(B, 16),
-		heading: "Activás tus identidades",
+		heading: conApi ? "Activás tu servicio" : "Activás tus identidades",
 		body: `
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
         ${activacionTxt}
@@ -596,17 +618,17 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		dark: true,
 		kicker: `Momento 2 · mes ${ABONO_DESDE_MES} a ${ABONO_VIGENCIA_MESES}`,
 		icon: SVG.refresh(W, 16),
-		heading: "Reponés tus firmas",
+		heading: conApi ? "Reponés tus documentos" : "Reponés tus firmas",
 		body: `
       <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
-        Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} firmas se renueva cada mes, con un abono fijo y previsible.
+        Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} se renueva cada mes, con un abono fijo y previsible.
       </div>
-      ${discountBadge(`${(DESCUENTO_ABONO * 100).toFixed(0)}% de ahorro · ${fm(precioAbonoUnit, currency, tc)} en vez de ${fm(precioFirmaAdicN, currency, tc)} por firma`)}
+      ${discountBadge(`${(DESCUENTO_ABONO * 100).toFixed(0)}% de ahorro · ${fm(precioAbonoUnit, currency, tc)} en vez de ${fm(precioFirmaAdicN, currency, tc)} por ${firmaSing}`)}
       ${bigPrice({
 				dark: true, perMes: true,
 				label: "Abono mensual",
 				value: showIva ? fmGross(abonoMensual, currency, tc) : fm(abonoMensual, currency, tc),
-				note: `${firmasIncl.toLocaleString("es-AR")} firmas × ${fm(precioAbonoUnit, currency, tc)}${showIva ? ` · IVA 21% incluido (neto ${fm(abonoMensual, currency, tc)})` : ""}`,
+				note: `${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} × ${fm(precioAbonoUnit, currency, tc)}${showIva ? ` · IVA 21% incluido (neto ${fm(abonoMensual, currency, tc)})` : ""}`,
 			})}
     `,
 	}) : "";
@@ -621,13 +643,20 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const subtitleParts = [sinApi ? "Cotización de volumen directo, sin integración API" : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
 	if (showIva) subtitleParts.push("precios en pesos argentinos, IVA discriminado al 21%");
 
+	// Con API, aclaración de facturación al pie: el consumo se cobra aunque la
+	// validación resulte inválida, y la firma se cobra por cada documento firmado.
+	const footnote = conApi
+		? `<strong style="color:${DK};">Consumo del servicio de validación de identidad:</strong> se factura cada llamada a la API, aunque la validación resulte inválida — el servicio se ejecuta igual. &nbsp;·&nbsp; <strong style="color:${DK};">Documento firmado:</strong> se factura por cada documento firmado; si en una misma operación se firman varios documentos, se cobra cada uno.`
+		: "";
+
 	return commercialSlide({
-		kicker: "Modelo comercial · volumen IDC",
+		kicker: conApi ? "Modelo comercial · consumo por API" : "Modelo comercial · volumen IDC",
 		title: "Tu propuesta a medida",
 		subtitle: subtitleParts.join(" · "),
 		chips,
 		cardsHtml: momento1 + momento2,
 		scheduleHtml: schedule,
+		footnote,
 		pageN: pageN || 3,
 	});
 }
@@ -636,10 +665,16 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 // Tabla override por propuesta: parte del volumen y precio cotizados y muestra
 // escalones crecientes con mejor precio, para que el cliente proyecte su costo
 // a distintas escalas. Se calcula con el mismo motor que el preview en pantalla.
-function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
+function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const proy = inp.proyeccion || {};
+	// Wording de facturación alineado a la slide comercial: con API, certificado →
+	// validación de identidad y firma → documento firmado (solo presentación).
+	const certN = conApi ? "validación de identidad" : "certificado";
+	const certNpl = conApi ? "validaciones de identidad" : "certificados";
+	const firmaN = conApi ? "documento firmado" : "firma";
+	const firmaNpl = conApi ? "documentos firmados" : "firmas";
 	// Base recuperada del resumen del deal (evita re-derivar los inputs por tipo).
 	const idc = Number(res.idcMensuales) || 0;
 	const firmas = Number(res.firmasTotales != null ? res.firmasTotales : res.firmasMes) || 0;
@@ -653,9 +688,9 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
 	const fmU = (v) => currency === "ARS" ? "$ " + Math.round(v * tc).toLocaleString("es-AR") : "USD " + Number(v).toFixed(2);
 
 	const driverNote = {
-		packs: "Crecimiento proporcional de certificados y firmas.",
-		firmas: "Los certificados quedan fijos; crece el volumen de firmas.",
-		certificados: "Las firmas quedan fijas; crece el volumen de certificados.",
+		packs: `Crecimiento proporcional de ${certNpl} y ${firmaNpl}.`,
+		firmas: `${conApi ? "Los consumos de validación" : "Los certificados"} quedan fijos; crece el volumen de ${firmaNpl}.`,
+		certificados: `${conApi ? "Los documentos firmados quedan fijos" : "Las firmas quedan fijas"}; crece el volumen de ${certNpl}.`,
 		manual: "Volúmenes proyectados a medida.",
 	}[proy.driver || "packs"];
 
@@ -669,7 +704,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
 		const td = (html, align, extra) => `<td style="text-align:${align || "left"};font-size:9.5pt;color:${DK};padding:0.34cm 0.5cm;border-bottom:1px solid ${GRL};${extra || ""}">${html}</td>`;
 		// Sin columna de escenario/% en el export: el cliente ve solo el volumen
 		// proyectado. La fila objetivo (última) se resalta por color de fondo.
-		const vol = `${r.idc.toLocaleString("es-AR")} certificados${r.firmas > 0 ? ` · ${r.firmas.toLocaleString("es-AR")} firmas` : ""}`;
+		const vol = `${r.idc.toLocaleString("es-AR")} ${certNpl}${r.firmas > 0 ? ` · ${r.firmas.toLocaleString("es-AR")} ${firmaNpl}` : ""}`;
 		const ahorro = isBase
 			? `<span style="color:${GR};">—</span>`
 			: `<span style="font-weight:700;color:${B};">${fm(r.ahorroMonto, currency, tc)}</span> <span style="font-size:7.5pt;color:${GR};">(${(r.ahorroPct * 100).toFixed(0)}%)</span>`;
@@ -686,7 +721,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
   <div style="flex-shrink:0;padding:0.6cm 1cm 0.3cm;">
     <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.1cm;">Proyección de crecimiento</div>
     <div style="font-size:21pt;font-weight:800;color:${DK};line-height:1.15;">Cuanto más escalás, mejor tu precio</div>
-    <div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">A medida que crece tu volumen, mejora el precio por certificado y por firma. ${driverNote}</div>
+    <div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">A medida que crece tu volumen, mejora el precio por ${certN} y por ${firmaN}. ${driverNote}</div>
   </div>
 
   <div style="flex:1;display:flex;flex-direction:column;padding:0.2cm 1cm 0;overflow:hidden;">
@@ -694,8 +729,8 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr>
           ${th("Volumen proyectado")}
-          ${th("Precio / certificado", "right")}
-          ${th("Precio / firma", "right")}
+          ${th(conApi ? "Precio / validación" : "Precio / certificado", "right")}
+          ${th(conApi ? "Precio / documento" : "Precio / firma", "right")}
           ${th("Costo estimado", "right")}
           ${th("Ahorro vs. actual", "right")}
         </tr></thead>
@@ -703,7 +738,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN) {
       </table>
     </div>
     <div style="margin-top:auto;padding:0.3cm 0;font-size:7.5pt;color:${GR};line-height:1.5;">
-      Costo estimado sobre el volumen de certificados y firmas de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez ni el abono de soporte / SLA). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
+      Costo estimado sobre el volumen de ${certNpl} y ${firmaNpl} de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez ni el abono de soporte / SLA). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
     </div>
   </div>
   ${foot(pageN || 4)}
@@ -902,7 +937,8 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 		: deal.channel === "b2b2c"
 			? s3B2B2C(deal, clientName, currency, tc, channelConfig, s3Page)
 			: s3Dist(deal, clientName, currency, tc, channelConfig, models);
-	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage) : "";
+	const proyConApi = deal.channel === "b2b2c" && deal.inputs?.integracion !== "sin_api";
+	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage, proyConApi) : "";
 
 	return `<!DOCTYPE html>
 <html lang="es">
