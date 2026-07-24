@@ -150,6 +150,39 @@ export const B2B2C_API_TIERS = [
 	{ id: "enterprise", label: "API Enterprise", feeMin: 25000, feeMax: 50000, feeDefault: 37500 },
 ];
 
+// ── Palancas de descuento comercial ──────────────────────────────────────────
+// Descuentos por condiciones favorables, aplicables en Volumen y Distribuidores.
+// El volumen ya está en el precio (segmento/tabla o nivel); estas 3 palancas suman
+// un % adicional (aditivo) sobre el subtotal de servicio, con un tope máximo.
+// Cada palanca es una lista de opciones {id, label, discount} (discount en puntos %).
+// Escala de referencia (Borrador v5): ajustar en Config → Precios por canal.
+//   - timeToCash: cuánto tarda el cliente en pagarnos (más rápido → más descuento).
+//   - duracion: duración de la vinculación / contrato (más largo → más descuento).
+//   - velocidad: cuánto tarda en confirmar el acuerdo (más rápido → más descuento).
+// `cap` = tope máximo de la SUMA de las 3 palancas (puntos %). El default de cada
+// palanca es la opción con 0% (precio base; el vendedor sube desde ahí).
+export const COMMERCIAL_LEVERS = {
+	cap: 15,
+	timeToCash: [
+		{ id: "anticipado", label: "Pago anticipado / contado", discount: 8 },
+		{ id: "d30", label: "30 días", discount: 4 },
+		{ id: "d60", label: "60 días", discount: 2 },
+		{ id: "d90", label: "90 días o más", discount: 0 },
+	],
+	duracion: [
+		{ id: "m12", label: "12 meses", discount: 0 },
+		{ id: "m24", label: "24 meses", discount: 3 },
+		{ id: "m36", label: "36 meses", discount: 6 },
+		{ id: "m48", label: "48 meses o más", discount: 9 },
+	],
+	velocidad: [
+		{ id: "d15", label: "Confirma en 15 días", discount: 4 },
+		{ id: "d30", label: "Confirma en 30 días", discount: 2 },
+		{ id: "d60", label: "Confirma en 60 días", discount: 1 },
+		{ id: "mas", label: "Más de 60 días", discount: 0 },
+	],
+};
+
 // ── Servicios premium / SLA ─────────────────────────────────────────────────────
 // Precio mensual en USD. Standard incluido en todos los productos.
 export const SLA_PLANS = [

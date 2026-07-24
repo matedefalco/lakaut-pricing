@@ -150,6 +150,22 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 		updDraft({ [key]: list.filter(function (_, i) { return i !== idx; }) });
 	}
 
+	// ── Palancas de descuento comercial (objeto anidado commercialLevers) ──
+	const levers = draft.commercialLevers || {};
+	function updLevers(patch) {
+		updDraft({ commercialLevers: Object.assign({}, draft.commercialLevers, patch) });
+	}
+	function updLeverRow(key, idx, field, val) {
+		const list = (levers[key] || []).map(function (r, i) { return i === idx ? Object.assign({}, r, { [field]: val }) : r; });
+		updLevers({ [key]: list });
+	}
+	function addLeverRow(key) {
+		updLevers({ [key]: (levers[key] || []).concat([{ id: genId(key), label: "Nueva opción", discount: 0 }]) });
+	}
+	function removeLeverRow(key, idx) {
+		updLevers({ [key]: (levers[key] || []).filter(function (_, i) { return i !== idx; }) });
+	}
+
 	if (!channelConfig || !updateChannelConfig) return null;
 
 	return (
@@ -422,9 +438,59 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				/>
 			</SectionCard>
 
+			{/* ── Palancas de descuento comercial ── */}
+			<SectionCard
+				title="5 · Palancas de descuento comercial (Volumen y Distribuidores)"
+				description="Descuentos por condiciones favorables, además del volumen. Se suman con tope y aplican sobre el subtotal de servicio. El % de cada opción está en puntos (ej. 8 = −8%)."
+			>
+				<div style={{ maxWidth: 260, marginBottom: 16 }}>
+					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Tope máximo de la suma (%)</div>
+					<InlineNum value={levers.cap} decimals={0} onChange={function (v) { updLevers({ cap: v }); }} />
+				</div>
+
+				{[
+					{ key: "timeToCash", title: "Time to cash · cuánto tardan en pagarnos" },
+					{ key: "duracion", title: "Duración de la vinculación" },
+					{ key: "velocidad", title: "Velocidad de cierre del acuerdo" },
+				].map(function (lv) {
+					return (
+						<div key={lv.key} style={{ marginBottom: 16 }}>
+							<div style={Object.assign({}, os(11, 700, BLACK), { marginBottom: 6 })}>{lv.title}</div>
+							<div style={{ overflowX: "auto" }}>
+								<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 360, maxWidth: 520 }}>
+									<thead>
+										<tr>
+											<th style={thL}>Opción</th>
+											<th style={thR}>Descuento %</th>
+											<th style={thR}></th>
+										</tr>
+									</thead>
+									<tbody>
+										{(levers[lv.key] || []).map(function (opt, idx) {
+											return (
+												<tr key={opt.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
+													<td style={{ padding: "5px 8px" }}>
+														<input value={opt.label || ""} onChange={function (e) { updLeverRow(lv.key, idx, "label", e.target.value); }} style={inputStyle("100%")} />
+													</td>
+													<td style={{ padding: "5px 8px" }}><InlineNum value={opt.discount} decimals={0} onChange={function (v) { updLeverRow(lv.key, idx, "discount", v || 0); }} /></td>
+													<td style={{ padding: "5px 8px", textAlign: "center" }}>
+														<DeleteRowButton onClick={function () { removeLeverRow(lv.key, idx); }} />
+													</td>
+												</tr>
+											);
+										})}
+									</tbody>
+								</table>
+							</div>
+							<AddRowButton label="Agregar opción" onClick={function () { addLeverRow(lv.key); }} />
+						</div>
+					);
+				})}
+			</SectionCard>
+
 			{/* ── Parámetros derivados ── */}
 			<SectionCard
-				title="5 · Parámetros derivados del esquema de costos"
+				title="6 · Parámetros derivados del esquema de costos"
 				description="Estos valores se calculan automáticamente desde Configuración → Costos. No se editan a mano."
 			>
 				<div style={{ maxWidth: 320 }}>

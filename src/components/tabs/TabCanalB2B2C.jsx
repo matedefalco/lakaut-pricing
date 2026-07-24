@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
+import { CommercialLevers } from "@/components/ui/CommercialLevers";
+import { resolveLevers, defaultLeverSelection } from "@/lib/commercialLevers";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
@@ -35,6 +37,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const b2b2cSegments = channelConfig.b2b2cSegments;
 	const b2b2cApiTiers = channelConfig.b2b2cApiTiers;
 	const slaPlans = channelConfig.slaPlans;
+	const commercialLevers = channelConfig.commercialLevers;
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const { toast } = useToast();
 	const cvCert = costs.cvCertBase;
@@ -53,6 +56,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
+	// Palancas de descuento por condiciones (time-to-cash, duración, velocidad de cierre).
+	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
 	// Precio de la firma extra (excedente sobre lo cotizado). Por defecto usa el
 	// precio de firma del segmento alcanzado (dinámico); "" = dinámico. Se puede
 	// sobrescribir a mano para ese excedente.
@@ -127,6 +132,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
+		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		// Precio de firma extra: si el deal guardó un override lo tomamos; si no,
 		// queda dinámico ("" = precio de firma del segmento).
 		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
@@ -188,7 +194,15 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const revFirmasFisica = firmasFisica * precioFirmaLista;
 	const revFirmasJuridica = firmasJuridica * precioFirmaLista;
 	const revFirmas = firmasIncl * precioFirmaLista;
-	const revServicio = revIDC + revFirmas;
+	const revServicioBruto = revIDC + revFirmas;
+
+	// Descuento por condiciones comerciales (además del precio por segmento). Aplica
+	// sobre el subtotal de servicio de la activación (certs + firmas), no sobre el
+	// fee ni el SLA ni el abono. Se guarda como snapshot en el deal.
+	const leverRes = resolveLevers(commercialLevers, levers);
+	const descCondPct = leverRes.pct;
+	const descCondMonto = revServicioBruto * descCondPct;
+	const revServicio = revServicioBruto - descCondMonto;
 
 	const feeAplicado = conApi ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
@@ -230,6 +244,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		conApi ? api.label : "sin integración API",
 		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
 		overrideActive ? "precio ajustado" : "precio de tabla",
+		descCondPct > 0 ? "−" + leverRes.cappedPts + "% condiciones" : null,
 		abono ? "con abono mensual" : "sin abono",
 	].filter(Boolean).join(" · ");
 
@@ -290,6 +305,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				// del dinámico, para reabrir la cotización con el mismo valor.
 				...(precioFirmaExtra !== "" ? { precioFirmaExtra: precioFirmaExtraEff } : {}),
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
+				// Palancas de descuento: selección + snapshot resuelto (estable ante
+				// cambios posteriores de la config de tramos).
+				levers,
+				descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items },
 				casosDeUso, abono,
 				...(proyEnabled && proySteps.length ? {
 					proyeccion: {
@@ -319,6 +338,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				firmasTotales: firmasIncl, firmasMes: firmasIncl,
 				precioIDC, precioFirma: precioFirmaLista, precioFirmaExtra: precioFirmaExtraEff,
 				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
+				descCondPct, descCondMonto, revServicioBruto,
 				margen, margenPct,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
 			},
@@ -426,6 +446,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 					{/* Condiciones comerciales */}
 					<div>
+						{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />}
 						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney} /> : "incluido"} />}
 						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney} />} />}
 						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney} />/mes</>} accent="success" />}
@@ -598,6 +619,14 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				)}
 
 				{conApi && <Separator />}
+
+				{/* Descuento por condiciones comerciales (además del precio por volumen) */}
+				<div className="flex flex-col gap-2">
+					<span className="text-sm font-medium">Descuento por condiciones</span>
+					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
+				</div>
+
+				<Separator />
 
 				{/* Abono mensual */}
 				<div className="flex flex-col gap-3">

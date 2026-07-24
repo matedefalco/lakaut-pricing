@@ -118,6 +118,24 @@ function discountBadge(text) {
   </div>`;
 }
 
+// Desglose de descuentos (nivel + condiciones) como líneas de "argumento de venta".
+// `rows` = [{ label, amount(number), sub? }]; el monto va en azul con "−".
+function descRows(rows, currency, tc) {
+	return rows.filter(Boolean).map(function (r) {
+		return `<div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:8.5pt;">
+      <span style="color:${GR};">${r.label}${r.sub ? `<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">${r.sub}</span>` : ""}</span>
+      <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(r.amount, currency, tc)}</span>
+    </div>`;
+	}).join("");
+}
+
+// Texto de las condiciones aplicadas (para el sub-detalle del descuento).
+// Lee el snapshot inputs.descCond.items guardado con el deal.
+function condTermsText(descCond) {
+	if (!descCond || !Array.isArray(descCond.items) || !descCond.items.length) return "";
+	return descCond.items.map(function (it) { return it.optionLabel + " (−" + it.discount + "%)"; }).join(" · ");
+}
+
 // Barra inferior "cómo se paga": mes 1 → abono mensual, con el total de referencia
 // para toda la vigencia del certificado. Solo se usa cuando el abono está activo.
 function scheduleBar({ mes1Value, abonoValue, totalValue, totalNote }) {
@@ -359,6 +377,11 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const lista = res.facturacionLista || 0;
 	const neto = res.netoLakaut || 0;
 	const desc = lista - neto;
+	// Desglose del descuento: nivel + condiciones comerciales (snapshot del deal).
+	const descNivel = res.descNivelMonto != null ? res.descNivelMonto : (tierRecord ? lista * tierRecord.descuento : desc);
+	const descCondMontoV = res.descCondMonto || 0;
+	const condPctV = res.descCondPct != null ? Math.round(res.descCondPct * 100) : 0;
+	const condTerms = condTermsText(inp.descCond);
 
 	// desglose totales
 	const totalPacks = packRows.reduce((s,r) => s + r.qty, 0);
@@ -401,9 +424,15 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 		heading: "Activás tu volumen",
 		body: `
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
-        Adquirís el volumen contratado con el nivel <strong style="color:${DK};">${res.tier || "—"}</strong>, con un descuento del ${descPct}% sobre precio de lista.
+        Adquirís el volumen contratado con el nivel <strong style="color:${DK};">${res.tier || "—"}</strong>${condPctV > 0 ? " y un descuento adicional por tus condiciones comerciales" : ""}.
       </div>
       <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
+      <div style="display:flex;flex-direction:column;gap:0.14cm;border-top:1px solid ${GRL};margin-top:0.1cm;padding-top:0.14cm;">
+        ${descRows([
+					{ label: `Descuento nivel ${res.tier || "—"} (−${descPct}%)`, amount: descNivel },
+					condPctV > 0 ? { label: `Descuento por condiciones (−${condPctV}%)`, amount: descCondMontoV, sub: condTerms } : null,
+				], currency, tc)}
+      </div>
       ${bigPrice({
 				dark: false,
 				label: abonoActivo ? "Pago único de activación" : "Total a pagar",
@@ -412,7 +441,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 			})}
       ${miniStats(false, [
 				{ label: "Precio de lista", value: fm(lista, currency, tc) },
-				{ label: `Descuento (${descPct}%)`, value: "−" + fm(desc, currency, tc) },
+				{ label: "Descuento total", value: "−" + fm(desc, currency, tc) },
 			])}
     `,
 	});
@@ -529,7 +558,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
 	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
-	const subtotal = revIDC + revFirmasIncl + revFirmasAdic + slaMesVal + feeVal;
+	// Descuento por condiciones comerciales (snapshot del deal): aplica sobre el
+	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
+	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic;
+	const descCondPct = (inp.descCond && inp.descCond.pct) || 0;
+	const descCondMonto = servicioBruto * descCondPct;
+	const condPctV = Math.round(descCondPct * 100);
+	const condTerms = condTermsText(inp.descCond);
+	const subtotal = servicioBruto - descCondMonto + slaMesVal + feeVal;
 	// Con API: el certificado se factura como consumo del servicio de validación
 	// de identidad y la firma como documento firmado (ver comentario arriba).
 	const certLbl = conApi ? "Consumos de validación · persona jurídica" : "Certificados jurídicos";
@@ -578,12 +614,18 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 
 	// Cuando hay un único concepto (solo IDC, sin fee/SLA/firmas adicionales), el
 	// desglose se reduce a una sola cuenta "cantidad × precio" — sin listar items.
-	const singleItem = items.length === 1;
+	// Si hay descuento por condiciones, siempre listamos los items (para poder
+	// mostrar la línea del descuento); no colapsamos a "cantidad × precio".
+	const singleItem = items.length === 1 && descCondPct <= 0;
 	const subtotalLabel = singleItem ? `Subtotal (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})` : "Subtotal (sin IVA)";
+	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+      <span style="color:${GR};">Descuento por condiciones (−${condPctV}%)${condTerms ? `<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">${condTerms}</span>` : ""}</span>
+      <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(descCondMonto, currency, tc)}</span>
+    </div>` : "";
 	const itemsListHtml = !singleItem ? items.map(it => `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
       <span style="color:${GR};">${it.l}</span>
       <span style="color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
-    </div>`).join("") : "";
+    </div>`).join("") + descCondLineHtml : "";
 	const stats = [{ label: subtotalLabel, value: fm(subtotal, currency, tc) }];
 	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
 
@@ -742,7 +784,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
       </table>
     </div>
     <div style="margin-top:auto;padding:0.3cm 0;font-size:7.5pt;color:${GR};line-height:1.5;">
-      Costo estimado sobre el volumen de ${certNpl} y ${firmaNpl} de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez ni el abono de soporte / SLA). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
+      Costo estimado sobre el volumen de ${certNpl} y ${firmaNpl} de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez, el abono de soporte / SLA ni el descuento por condiciones comerciales). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
     </div>
   </div>
   ${foot(pageN || 4)}

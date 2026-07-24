@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { NumberField, StatCard } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
+import { CommercialLevers } from "@/components/ui/CommercialLevers";
+import { resolveLevers, defaultLeverSelection } from "@/lib/commercialLevers";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
@@ -30,6 +32,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const models = allModels.filter(function (m) { return m.activo !== false; });
 	const { channelConfig } = useChannelConfig();
 	const distributorTiers = channelConfig.distributorTiers;
+	const commercialLevers = channelConfig.commercialLevers;
 	const { fMoney } = makeMoney(currency, tc);
 	const { toast } = useToast();
 	const cvCert = costs.cvCertBase;
@@ -46,6 +49,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const [flash, setFlash] = useState(false);
 	const [saved, setSaved] = useState(null);
 	const [abono, setAbono] = useState(false);
+	// Palancas de descuento por condiciones (se suman al descuento de nivel).
+	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
 
 	// Auto-completar certs activos desde la suma de deals previos del cliente
 	useEffect(function () {
@@ -69,6 +74,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		setFirmasAdic(i.firmasAdic || 0);
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
+		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setEditingId(pendingEdit.id);
 		setSaved(null);
 		onConsumeEdit && onConsumeEdit();
@@ -112,7 +118,14 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const tierByCertsOnly = getDistributorTier(calc.certsTotal, 0, distributorTiers);
 	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "volumen cotizado" : (calc.certsTotal > 0 ? "certs cotizados" : "sin volumen");
 
-	const netoLakaut = calc.facturacionLista * (1 - tier.descuento);
+	// Descuento por condiciones comerciales: se suma al descuento de nivel (aditivo),
+	// con un piso de seguridad para no pasar de 95% de descuento total.
+	const leverRes = resolveLevers(commercialLevers, levers);
+	const descCondPct = leverRes.pct;
+	const descTotal = Math.min(0.95, tier.descuento + descCondPct);
+	const descNivelMonto = calc.facturacionLista * tier.descuento;
+	const descCondMonto = calc.facturacionLista * Math.max(0, descTotal - tier.descuento);
+	const netoLakaut = calc.facturacionLista * (1 - descTotal);
 	const cvTotal = calc.certsTotal * cvCert + calc.firmasTotal * cvFirma;
 	const margenLakaut = netoLakaut - cvTotal;
 	const margenPct = netoLakaut > 0 ? margenLakaut / netoLakaut : 0;
@@ -150,10 +163,17 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			channel: "distribuidores",
 			fecha: fecha,
 			updatedAt: editingId ? new Date().toISOString() : undefined,
-			inputs: { certsActivos, qtys, firmasAdic, casosDeUso, abono },
+			inputs: {
+				certsActivos, qtys, firmasAdic, casosDeUso, abono,
+				// Palancas de descuento: selección + snapshot resuelto (estable ante
+				// cambios posteriores de la config de tramos).
+				levers,
+				descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items },
+			},
 			resumen: {
 				tier: tier.label, certsActivos: calc.certsTotal, certsComprados: calc.certsTotal,
 				facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal, netoLakaut, margenPct,
+				descNivelPct: tier.descuento, descCondPct, descTotal, descNivelMonto, descCondMonto,
 				...(abono && abonoMes > 0 ? { abonoMes, abonoAnual, facturacionAnio1 } : {}),
 			},
 		};
@@ -259,7 +279,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 
 					{/* Lista → descuento → neto */}
 					<ResultRow label="Facturación a lista" value={<AnimatedNumber value={calc.facturacionLista} format={fMoney} />} />
-					<ResultRow label={"Descuento " + tier.label + " (" + (tier.descuento * 100).toFixed(0) + "%)"} value={<>−<AnimatedNumber value={calc.facturacionLista - netoLakaut} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />
+					<ResultRow label={"Descuento " + tier.label + " (" + (tier.descuento * 100).toFixed(0) + "%)"} value={<>−<AnimatedNumber value={descNivelMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />
+					{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />}
 					<div className="flex items-center justify-between border-t-2 border-border pt-2">
 						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conAbono ? "Mes 1 · compra inicial" : "Ingreso neto Lakaut"}</span>
 						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={netoLakaut} format={fMoney} /></span>
@@ -360,6 +381,14 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 				subtitle={conAbono ? "Abono mensual activo" : "Sin abono mensual"}
 				action={abono ? <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">abono activo</Badge> : null}
 			>
+				{/* Descuento por condiciones comerciales (se suma al descuento de nivel) */}
+				<div className="flex flex-col gap-2">
+					<span className="text-sm font-medium">Descuento por condiciones</span>
+					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
+				</div>
+
+				<Separator />
+
 				<label className="flex items-center gap-2.5 cursor-pointer select-none">
 					<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
 					<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
@@ -407,7 +436,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 						<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Total cotizado</TableHead></TableRow></TableHeader>
 						<TableBody>
 							<TableRow><TableCell>Facturación a lista (compromiso)</TableCell><TableCell className="text-right tabular-nums">{fMoney(calc.facturacionLista)}</TableCell></TableRow>
-							<TableRow><TableCell>Descuento distribuidor ({(tier.descuento * 100).toFixed(0)}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(calc.facturacionLista - netoLakaut)}</TableCell></TableRow>
+							<TableRow><TableCell>Descuento distribuidor ({(tier.descuento * 100).toFixed(0)}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(descNivelMonto)}</TableCell></TableRow>
+							{descCondPct > 0 && <TableRow><TableCell>Descuento por condiciones (−{leverRes.cappedPts}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(descCondMonto)}</TableCell></TableRow>}
 							<TableRow><TableCell className="font-semibold">Ingreso neto Lakaut</TableCell><TableCell className="text-right tabular-nums font-semibold">{fMoney(netoLakaut)}</TableCell></TableRow>
 							<TableRow><TableCell>Costo variable ({calc.certsTotal.toLocaleString("es-AR")} certs + {calc.firmasTotal.toLocaleString("es-AR")} firmas)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(cvTotal)}</TableCell></TableRow>
 							<TableRow className="bg-success/5"><TableCell className="font-semibold text-[var(--success)]">Contribución marginal</TableCell><TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fMoney(margenLakaut)} ({(margenPct * 100).toFixed(0)}%)</TableCell></TableRow>
