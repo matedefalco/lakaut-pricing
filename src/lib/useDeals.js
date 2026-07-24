@@ -1,5 +1,34 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase, loadConfig } from "./supabase";
+import { supabase, loadConfig, saveConfig } from "./supabase";
+import { maxCotNumber, maxCotVersion } from "./cotId";
+
+const COT_COUNTER_KEY = "cot_last_number";
+
+// Próximo correlativo global. Se lee en vivo desde la DB (no del estado local,
+// para evitar valores stale y carreras) combinando el high-water de app_config
+// con el mayor número ya usado en deals; el que sea mayor, +1. Persiste el nuevo
+// high-water. Ver [[cotId]].
+async function nextCotNumber() {
+	const hw = Number(await loadConfig(COT_COUNTER_KEY)) || 0;
+	const { data } = await supabase.from("deals").select("inputs");
+	const maxExisting = maxCotNumber(data || []);
+	const next = Math.max(hw, maxExisting) + 1;
+	await saveConfig(COT_COUNTER_KEY, next);
+	return next;
+}
+
+// Resuelve el bloque `cot` (correlativo + versión + tipo) al guardar: preserva
+// el existente (del deal entrante o del registro previo) y solo asigna un
+// correlativo nuevo cuando la cotización todavía no tiene. El tipo se refresca
+// desde el cliente (`clientTipo`) si viene.
+async function resolveCot(deal, existing, clientTipo) {
+	const prevCot = (deal.inputs && deal.inputs.cot) || (existing && existing.inputs && existing.inputs.cot) || null;
+	if (prevCot && prevCot.number != null) {
+		return { number: prevCot.number, version: prevCot.version || 1, tipo: clientTipo || prevCot.tipo || null };
+	}
+	const number = await nextCotNumber();
+	return { number: number, version: 1, tipo: clientTipo || null };
+}
 
 function normalize(deal) {
 	return Object.assign({}, deal, {
@@ -68,14 +97,16 @@ export function useDeals() {
 		migrate().then(fetchDeals);
 	}, []);
 
-	const save = useCallback(async function (deal, clientId) {
+	const save = useCallback(async function (deal, clientId, clientTipo) {
+		const existing = deals.find(function (d) { return d.id === deal.id; });
+		const cot = await resolveCot(deal, existing, clientTipo);
 		const row = {
 			id: deal.id,
 			client_id: clientId || null,
 			channel: deal.channel,
 			fecha: deal.fecha,
 			updated_at: deal.updatedAt || null,
-			inputs: deal.inputs,
+			inputs: Object.assign({}, deal.inputs, { cot: cot }),
 			resumen: deal.resumen,
 			slide_url: deal.slideUrl || null,
 		};
@@ -95,7 +126,41 @@ export function useDeals() {
 		}
 		console.error("useDeals.save error:", error);
 		return null;
-	}, []);
+	}, [deals]);
+
+	// Clona una cotización como versión nueva (mismo correlativo, v+1, id nuevo),
+	// dejando la anterior intacta como historial. El estado arranca en pendiente.
+	const newVersion = useCallback(async function (deal, clientId, clientTipo) {
+		const baseCot = (deal.inputs && deal.inputs.cot) || null;
+		const number = baseCot && baseCot.number != null ? baseCot.number : await nextCotNumber();
+		const version = maxCotVersion(deals, number) + 1;
+		const tipo = clientTipo || (baseCot && baseCot.tipo) || null;
+		const newId = Date.now().toString(36);
+		const nextResumen = Object.assign({}, deal.resumen);
+		delete nextResumen.status;
+		const row = {
+			id: newId,
+			client_id: clientId || null,
+			channel: deal.channel,
+			fecha: new Date().toISOString(),
+			updated_at: null,
+			inputs: Object.assign({}, deal.inputs, { cot: { number: number, version: version, tipo: tipo } }),
+			resumen: nextResumen,
+			slide_url: null,
+		};
+		const { data, error } = await supabase
+			.from("deals")
+			.upsert(row, { onConflict: "id" })
+			.select("*, clients(id, name, channel, certs_activos)")
+			.single();
+		if (!error && data) {
+			const norm = normalize(data);
+			setDeals(function (prev) { return [norm].concat(prev); });
+			return norm;
+		}
+		console.error("useDeals.newVersion error:", error);
+		return null;
+	}, [deals]);
 
 	const remove = useCallback(async function (id) {
 		const { error, count } = await supabase.from("deals").delete({ count: "exact" }).eq("id", id);
@@ -156,5 +221,5 @@ export function useDeals() {
 	// Backwards-compat alias so old refs to quotesApi.quotes still work
 	const quotes = deals;
 
-	return { deals, quotes, loading, migrated, save, remove, updateStatus, updateSlideUrl, refetch: fetchDeals };
+	return { deals, quotes, loading, migrated, save, newVersion, remove, updateStatus, updateSlideUrl, refetch: fetchDeals };
 }

@@ -3,12 +3,41 @@ import { UserPlus, ChevronDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { channelShort } from "@/data/channelMeta";
+import { TIPOS, DEFAULT_TIPO } from "@/lib/cotId";
 
-export function ClientSelector({ channel, clients, onCreate, value, onChange }) {
+// Selector de tipo de cliente (DIS/DIR/PAR): define el TIPO del ID de cotización.
+function TipoPicker({ value, onChange }) {
+	return (
+		<div className="flex gap-1.5">
+			{TIPOS.map(function (t) {
+				const active = value === t.code;
+				return (
+					<button
+						key={t.code}
+						type="button"
+						onClick={function () { onChange(t.code); }}
+						title={t.label}
+						className={
+							"flex-1 rounded-md border px-2 py-1 text-xs font-semibold transition-colors cursor-pointer " +
+							(active
+								? "bg-primary text-primary-foreground border-primary"
+								: "bg-background border-border text-muted-foreground hover:text-foreground")
+						}
+					>
+						{t.code}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+export function ClientSelector({ channel, clients, onCreate, onSetTipo, value, onChange }) {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [creating, setCreating] = useState(false);
 	const [newName, setNewName] = useState("");
+	const [newTipo, setNewTipo] = useState(DEFAULT_TIPO);
 	const ref = useRef(null);
 
 	// Close on outside click
@@ -36,8 +65,16 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 
 	async function handleCreate() {
 		if (!newName.trim()) return;
-		const client = await onCreate(newName.trim(), channel);
-		if (client) { select(client); setNewName(""); }
+		const client = await onCreate(newName.trim(), channel, newTipo);
+		if (client) { select(client); setNewName(""); setNewTipo(DEFAULT_TIPO); }
+	}
+
+	// Cambia el tipo del cliente seleccionado (se refleja en el objeto en memoria
+	// y persiste vía onSetTipo).
+	function changeTipo(code) {
+		if (!value || !onSetTipo) return;
+		onSetTipo(value.id, code);
+		onChange(Object.assign({}, value, { tipo: code }));
 	}
 
 	return (
@@ -49,6 +86,7 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 				{value ? (
 					<>
 						<span className="flex-1 text-sm font-medium">{value.name}</span>
+						{value.tipo && <Badge variant="outline" className="text-[10px] shrink-0 font-semibold">{value.tipo}</Badge>}
 						<Badge variant="secondary" className="text-[10px] shrink-0">{channelShort(value.channel)}</Badge>
 						<button onClick={clear} className="text-muted-foreground hover:text-foreground ml-1 shrink-0"><X className="size-3.5" /></button>
 					</>
@@ -62,6 +100,14 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 
 			{open && (
 				<div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-md overflow-hidden">
+					{/* Tipo del cliente seleccionado */}
+					{value && onSetTipo && (
+						<div className="p-2 border-b border-border space-y-1.5">
+							<span className="text-[10px] text-muted-foreground uppercase tracking-wide">Tipo de cliente {!value.tipo && <span className="text-primary normal-case tracking-normal">· sin asignar</span>}</span>
+							<TipoPicker value={value.tipo} onChange={changeTipo} />
+						</div>
+					)}
+
 					<div className="p-2 border-b border-border">
 						<Input
 							autoFocus
@@ -81,9 +127,12 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 									className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-accent text-left"
 								>
 									<span className={value?.id === c.id ? "font-semibold" : ""}>{c.name}</span>
-									{c.channel === "distribuidores" && c.certs_activos > 0 && (
-										<span className="text-xs text-muted-foreground">{c.certs_activos.toLocaleString("es-AR")} certs</span>
-									)}
+									<span className="flex items-center gap-2">
+										{c.tipo && <Badge variant="outline" className="text-[10px] font-semibold">{c.tipo}</Badge>}
+										{c.channel === "distribuidores" && c.certs_activos > 0 && (
+											<span className="text-xs text-muted-foreground">{c.certs_activos.toLocaleString("es-AR")} certs</span>
+										)}
+									</span>
 								</button>
 							);
 						})}
@@ -102,21 +151,25 @@ export function ClientSelector({ channel, clients, onCreate, value, onChange }) 
 								{query ? `Crear "${query}"` : "Nuevo cliente"}
 							</button>
 						) : (
-							<div className="p-2 border-t border-border flex gap-2">
+							<div className="p-2 border-t border-border space-y-2">
 								<Input
 									autoFocus
 									placeholder="Nombre del cliente"
 									value={newName}
 									onChange={function (e) { setNewName(e.target.value); }}
 									onKeyDown={function (e) { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setCreating(false); }}
-									className="h-8 text-sm flex-1"
+									className="h-8 text-sm"
 								/>
+								<div className="space-y-1">
+									<span className="text-[10px] text-muted-foreground uppercase tracking-wide">Tipo de cliente</span>
+									<TipoPicker value={newTipo} onChange={setNewTipo} />
+								</div>
 								<button
 									onClick={handleCreate}
 									disabled={!newName.trim()}
-									className="px-3 py-1 bg-primary text-primary-foreground text-xs rounded-md disabled:opacity-50"
+									className="w-full px-3 py-1.5 bg-primary text-primary-foreground text-xs rounded-md disabled:opacity-50"
 								>
-									Crear
+									Crear cliente
 								</button>
 							</div>
 						)}

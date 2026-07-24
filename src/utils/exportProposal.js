@@ -1,4 +1,5 @@
 import { buildProyeccion } from "@/lib/proyeccion";
+import { formatCotId } from "@/lib/cotId";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -227,7 +228,7 @@ function iconBox(svg, bg, size) {
 // ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
 // `sinApi` engloba las propuestas sin integración (volumen sin API y canal web);
 // `isWeb` afina el copy para la venta directa por tarjeta.
-function s1Cover(clientName, fecha, sinApi, isWeb) {
+function s1Cover(clientName, fecha, sinApi, isWeb, cotId) {
 	const middleBadge = isWeb
 		? { text: "Contratación directa", icon: SVG.check("rgba(255,255,255,0.85)", 11) }
 		: sinApi
@@ -258,7 +259,10 @@ function s1Cover(clientName, fecha, sinApi, isWeb) {
 
   <!-- main content -->
   <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 1.3cm;">
-    <div style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.35cm;">Propuesta Comercial</div>
+    <div style="display:flex;align-items:center;gap:0.4cm;margin-bottom:0.35cm;">
+      <span style="font-size:8.5pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1.5px;">Propuesta Comercial</span>
+      ${cotId ? `<span style="font-size:8pt;font-weight:700;color:${W};background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:0.1cm 0.35cm;letter-spacing:0.5px;">${cotId}</span>` : ""}
+    </div>
     <div style="font-size:44pt;font-weight:700;color:${W};line-height:1.05;letter-spacing:-0.5px;margin-bottom:0.45cm;">${clientName}</div>
     <div style="font-size:10pt;color:rgba(255,255,255,0.72);max-width:15cm;line-height:1.6;margin-bottom:0.9cm;">${subtitle}</div>
     <!-- badges -->
@@ -914,6 +918,9 @@ function s5Cierre(sinApi) {
 // ─── Builder ──────────────────────────────────────────────────────────────────
 function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
+	// ID de cotización (COT-TIPO-NNNN-vN) para la portada. El tipo sale del snapshot
+	// guardado en el deal; si falta, del tipo vivo del cliente. Ver [[cotId]].
+	const cotId = formatCotId(deal.inputs?.cot, client?.tipo);
 	// Cotizaciones sin integración API (volumen sin API o canal web): la propuesta
 	// omite la slide de integración y el lenguaje técnico (fee, SLA, kick-off).
 	const isWeb = deal.channel === "web";
@@ -948,7 +955,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 <style>${SLIDE_CSS}</style>
 </head>
 <body>
-${s1Cover(clientName, deal.fecha, noApi, isWeb)}
+${s1Cover(clientName, deal.fecha, noApi, isWeb, cotId)}
 ${noApi ? "" : s2Integracion(clientName)}
 ${s3}
 ${proySlide}

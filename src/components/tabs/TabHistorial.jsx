@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
-import { Pencil, Trash2, Download, FileText, ChevronDown, X } from "lucide-react";
+import { Pencil, Trash2, Download, FileText, ChevronDown, X, CopyPlus } from "lucide-react";
+import { formatCotId } from "@/lib/cotId";
 import { exportProposal } from "@/utils/exportProposal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -226,6 +227,15 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 		if (window.confirm("¿Borrar la cotización de " + (q.clientName || "(sin nombre)") + "?")) dealsApi.remove(q.id);
 	}
 
+	// Clona la cotización como versión nueva (mismo correlativo, v+1) y la abre para
+	// editar. La anterior queda intacta como historial. Ver [[cotId]].
+	async function newVersion(q) {
+		const client = (q.client_id && clientsById[q.client_id]) || q.clients || null;
+		const tipo = client?.tipo || (q.inputs?.cot?.tipo) || null;
+		const nv = await dealsApi.newVersion(q, q.client_id || null, tipo);
+		if (nv) onEditQuote(nv);
+	}
+
 	const orderedChannels = Object.keys(groups).sort();
 
 	return (
@@ -421,6 +431,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 										<TableRow>
 											<TableHead>Fecha</TableHead>
 											<TableHead>Cliente</TableHead>
+											<TableHead>Cotización</TableHead>
 											<TableHead>Estado</TableHead>
 											{cols.map(function (c) { return <TableHead key={c.label} className="text-right">{c.label}</TableHead>; })}
 											<TableHead className="text-right">Acciones</TableHead>
@@ -439,6 +450,9 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 															</Badge>
 														)}
 													</TableCell>
+													<TableCell className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
+														{formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo) || "—"}
+													</TableCell>
 													<TableCell>
 														<Select value={dealStatus(q)} onValueChange={function (v) { dealsApi.updateStatus(q.id, v); }}>
 															<SelectTrigger className={cn("h-7 w-[120px] text-xs border", DEAL_STATUS_META[dealStatus(q)].className)}>
@@ -455,6 +469,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 														)}
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
+														<Button variant="ghost" size="icon" className="size-8" onClick={function () { newVersion(q); }} title="Nueva versión (clona subiendo la versión)"><CopyPlus className="size-4 text-muted-foreground" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>
 													</TableCell>
 												</TableRow>

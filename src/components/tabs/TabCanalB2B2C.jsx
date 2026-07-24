@@ -338,17 +338,20 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		const deal = buildDeal(editingId || Date.now().toString(36), prev ? prev.fecha : now);
 		if (prev?.resumen?.status) deal.resumen.status = prev.resumen.status;
 
-		await dealsApi.save(deal, client?.id || null);
+		// El deal normalizado que vuelve de save() ya trae el bloque cot (correlativo,
+		// versión, tipo), que el export usa para el ID en la portada.
+		const norm = await dealsApi.save(deal, client?.id || null, client?.tipo || null);
+		const savedDeal = norm || deal;
 
-		setEditingId(null);
+		setEditingId(savedDeal.id);
 		setFlash(true);
-		setSaved({ deal, client });
+		setSaved({ deal: savedDeal, client });
 		setTimeout(function () { setFlash(false); }, 1500);
 
 		notifyQuoteSaved(toast, {
 			clientName: client?.name,
-			onExport: function () { onExport && onExport(deal, client); },
-			onGoHistorial: function () { onGoHistorial && onGoHistorial(deal.id); },
+			onExport: function () { onExport && onExport(savedDeal, client); },
+			onGoHistorial: function () { onGoHistorial && onGoHistorial(savedDeal.id); },
 		});
 	}
 
@@ -493,7 +496,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						Cliente
 						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 					</Label>
-					<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} value={selectedClient} onChange={setSelectedClient} />
+					<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} onSetTipo={clientsApi?.setTipo} value={selectedClient} onChange={setSelectedClient} />
 					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
 				</div>
 
