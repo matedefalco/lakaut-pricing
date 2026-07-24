@@ -393,6 +393,8 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 
 	// Abono: repone la bolsa de firmas del pack desde el mes 2, durante la vigencia del certificado.
 	const abonoActivo = !!inp.abono && (res.abonoMes || 0) > 0;
+	// Descuento del abono: snapshot de la cotización; fallback al legacy 35% para deals viejos.
+	const abonoPct = inp.abonoDescuentoPct != null ? inp.abonoDescuentoPct / 100 : DESCUENTO_ABONO;
 	const abonoVigenciaTotal = abonoActivo ? neto + res.abonoMes * (ABONO_VIGENCIA_MESES - 1) : 0;
 
 	const chips = [
@@ -455,12 +457,12 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
       <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
         Tus packs contratados renuevan su bolsa de firmas cada mes, con un abono fijo y previsible.
       </div>
-      ${discountBadge(`${(DESCUENTO_ABONO * 100).toFixed(0)}% de ahorro sobre precio de lista`)}
+      ${discountBadge(`${(abonoPct * 100).toFixed(0)}% de ahorro sobre precio de lista`)}
       ${bigPrice({
 				dark: true, perMes: true,
 				label: "Abono mensual",
 				value: showIva ? fmGross(res.abonoMes, currency, tc) : fm(res.abonoMes, currency, tc),
-				note: `Precio de lista (${fm(lista, currency, tc)}) × ${((1 - DESCUENTO_ABONO) * 100).toFixed(0)}%${showIva ? ` · IVA 21% incluido (neto ${fm(res.abonoMes, currency, tc)})` : ""}`,
+				note: `Precio de lista (${fm(lista, currency, tc)}) × ${((1 - abonoPct) * 100).toFixed(0)}%${showIva ? ` · IVA 21% incluido (neto ${fm(res.abonoMes, currency, tc)})` : ""}`,
 			})}
     `,
 	}) : "";
@@ -598,7 +600,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// (cantidad × precio) para que el monto nunca aparezca como un número sin origen visible.
 	const abonoActivo = !!inp.abono && (res.revAbonoMes || 0) > 0;
 	const abonoMensual = abonoActivo ? res.revAbonoMes : 0;
-	const precioAbonoUnit = precioFirmaAdicN * (1 - DESCUENTO_ABONO);
+	// Descuento del abono: snapshot de la cotización; fallback al legacy 35% para deals viejos.
+	const abonoPct = inp.abonoDescuentoPct != null ? inp.abonoDescuentoPct / 100 : DESCUENTO_ABONO;
+	const precioAbonoUnit = precioFirmaAdicN * (1 - abonoPct);
 	const abonoVigenciaTotal = abonoActivo ? subtotal + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
 
 	const chips = [
@@ -669,7 +673,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
       <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
         Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} se renueva cada mes, con un abono fijo y previsible.
       </div>
-      ${discountBadge(`${(DESCUENTO_ABONO * 100).toFixed(0)}% de ahorro · ${fm(precioAbonoUnit, currency, tc)} en vez de ${fm(precioFirmaAdicN, currency, tc)} por ${firmaSing}`)}
+      ${discountBadge(`${(abonoPct * 100).toFixed(0)}% de ahorro · ${fm(precioAbonoUnit, currency, tc)} en vez de ${fm(precioFirmaAdicN, currency, tc)} por ${firmaSing}`)}
       ${bigPrice({
 				dark: true, perMes: true,
 				label: "Abono mensual",

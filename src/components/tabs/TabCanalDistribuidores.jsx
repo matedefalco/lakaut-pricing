@@ -37,8 +37,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const { toast } = useToast();
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
-
-	const DESCUENTO_ABONO = 0.35;
+	const ABONO_DESC_FALLBACK = 10;
 
 	const [selectedClient, setSelectedClient] = useState(null);
 	const [certsActivos, setCertsActivos] = useState(0);
@@ -49,6 +48,8 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 	const [flash, setFlash] = useState(false);
 	const [saved, setSaved] = useState(null);
 	const [abono, setAbono] = useState(false);
+	// Descuento del abono mensual (%): default de la config, editable por cotización.
+	const [abonoDescPct, setAbonoDescPct] = useState(function () { return channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK; });
 	// Palancas de descuento por condiciones (se suman al descuento de nivel).
 	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
 
@@ -74,6 +75,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		setFirmasAdic(i.firmasAdic || 0);
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
+		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setEditingId(pendingEdit.id);
 		setSaved(null);
@@ -105,13 +107,15 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas, precioFirmaAdic, items };
 	}, [models, qtys, firmasAdic]);
 
+	// Descuento del abono configurable (default de la config, editable por cotización).
+	const descAbono = Math.min(1, Math.max(0, Number(abonoDescPct) || 0) / 100);
 	const abonoMes = useMemo(function () {
 		return models.reduce(function (sum, p) {
 			const q = Math.max(0, Number(qtys[p.id]) || 0);
 			if (q <= 0 || !p.priceUSD) return sum;
-			return sum + q * p.priceUSD * (1 - DESCUENTO_ABONO);
+			return sum + q * p.priceUSD * (1 - descAbono);
 		}, 0);
-	}, [models, qtys]);
+	}, [models, qtys, descAbono]);
 	const abonoAnual = abonoMes * 12;
 
 	const tier = getDistributorTier(calc.certsTotal, calc.facturacionLista, distributorTiers);
@@ -165,6 +169,7 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 			updatedAt: editingId ? new Date().toISOString() : undefined,
 			inputs: {
 				certsActivos, qtys, firmasAdic, casosDeUso, abono,
+				...(abono ? { abonoDescuentoPct: Number(abonoDescPct) || 0 } : {}),
 				// Palancas de descuento: selección + snapshot resuelto (estable ante
 				// cambios posteriores de la config de tramos).
 				levers,
@@ -393,9 +398,18 @@ export function TabCanalDistribuidores({ costs, currency, tc, dealsApi, clientsA
 					<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
 					<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
 				</label>
+				{abono && (
+					<div className="pl-6 border-l-2 border-muted ml-1 flex items-center gap-2">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del abono</Label>
+						<div className="flex items-center gap-1">
+							<Input type="number" min={0} max={100} value={abonoDescPct} onChange={function (e) { setAbonoDescPct(e.target.value === "" ? "" : Number(e.target.value)); }} className="h-8 w-20 text-right tabular-nums" />
+							<span className="text-sm text-muted-foreground">%</span>
+						</div>
+					</div>
+				)}
 				{conAbono && (
 					<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1.5">
-						<p>Precio de lista × {((1 - DESCUENTO_ABONO) * 100).toFixed(0)}% ({(DESCUENTO_ABONO * 100).toFixed(0)}% de descuento). El pack se abona completo cada mes.</p>
+						<p>Precio de lista × {((1 - descAbono) * 100).toFixed(0)}% ({(descAbono * 100).toFixed(0)}% de descuento). El pack se abona completo cada mes.</p>
 						<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
 							<span className="text-muted-foreground">Mes 1 (compra inicial)</span>
 							<span className="font-semibold text-foreground">{fMoney(netoLakaut)} <span className="font-normal text-muted-foreground">· descuento {(tier.descuento * 100).toFixed(0)}% tier</span></span>

@@ -27,7 +27,8 @@ function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0
 function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
 function margWord(pct) { return pct >= 0.5 ? "saludable" : pct >= 0.2 ? "ajustado" : "a revisar"; }
 
-const DESCUENTO_ABONO = 0.35;
+// Fallback del descuento de abono si la config no lo tiene cargado todavía.
+const ABONO_DESC_FALLBACK = 10;
 // Fallback del precio de firma si un segmento de la config no tiene `precioFirma`
 // cargado todavía (config vieja). Con la columna cargada, el precio es dinámico.
 const DEFAULT_FIRMA_PRICE = 0.5;
@@ -58,6 +59,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [slaBonificado, setSlaBonificado] = useState(false);
 	// Palancas de descuento por condiciones (time-to-cash, duración, velocidad de cierre).
 	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
+	// Descuento del abono mensual (%): arranca en el default de la config, editable por cotización.
+	const [abonoDescPct, setAbonoDescPct] = useState(function () { return channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK; });
 	// Precio de la firma extra (excedente sobre lo cotizado). Por defecto usa el
 	// precio de firma del segmento alcanzado (dinámico); "" = dinámico. Se puede
 	// sobrescribir a mano para ese excedente.
@@ -138,6 +141,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
+		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
 		// Proyección de crecimiento: se reabre con el driver y los escalones guardados.
 		const p = i.proyeccion;
 		if (p && p.enabled) {
@@ -212,8 +216,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const margen = revServicio - costoTotal;
 	const margenPct = revServicio > 0 ? margen / revServicio : 0;
 
-	// Abono (opcional): repone la bolsa de firmas cada mes con el 35% de descuento.
-	const precioFirmaAbono = precioFirmaLista * (1 - DESCUENTO_ABONO);
+	// Abono (opcional): repone la bolsa de firmas cada mes con un descuento configurable
+	// (default de la config, editable por cotización).
+	const descAbono = Math.min(1, Math.max(0, Number(abonoDescPct) || 0) / 100);
+	const precioFirmaAbono = precioFirmaLista * (1 - descAbono);
 	const revAbonoMes = firmasIncl * precioFirmaAbono;
 	const revAbonoAnual = revAbonoMes * 12;
 
@@ -310,6 +316,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				levers,
 				descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items },
 				casosDeUso, abono,
+				...(abono ? { abonoDescuentoPct: Number(abonoDescPct) || 0 } : {}),
 				...(proyEnabled && proySteps.length ? {
 					proyeccion: {
 						enabled: true,
@@ -635,9 +642,18 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
 						{abono && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
 					</label>
+					{abono && (
+						<div className="pl-6 border-l-2 border-muted ml-1 flex items-center gap-2">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del abono</Label>
+							<div className="flex items-center gap-1">
+								<Input type="number" min={0} max={100} value={abonoDescPct} onChange={function (e) { setAbonoDescPct(e.target.value === "" ? "" : Number(e.target.value)); }} className="h-8 w-20 text-sm tabular-nums" />
+								<span className="text-sm text-muted-foreground">%</span>
+							</div>
+						</div>
+					)}
 					{abono && hasVolume && (
 						<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1">
-							<p>Repone la bolsa de firmas cada mes con un descuento del {(DESCUENTO_ABONO * 100).toFixed(0)}% sobre el precio de firma.</p>
+							<p>Repone la bolsa de firmas cada mes con un descuento del {(descAbono * 100).toFixed(0)}% sobre el precio de firma.</p>
 							<p className="text-xs">{firmasIncl.toLocaleString("es-AR")} firmas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
 						</div>
 					)}
@@ -646,14 +662,15 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				<Separator />
 
 				{/* Ajuste de precios personalizado (por componente) */}
-				<div className="flex flex-col gap-2">
-					<button onClick={function () { setShowOverrides(function (v) { return !v; }); }} className="flex items-center gap-2 text-sm font-medium border border-dashed border-border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors w-full text-left">
-						<span>Ajuste de precios personalizado</span>
-						<span className="ml-auto text-muted-foreground text-xs">{showOverrides ? "▲ ocultar" : "▼ mostrar"}</span>
-						{overrideActive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)]">activo</Badge>}
-					</button>
+				<div className="flex flex-col gap-3">
+					<label className="flex items-center gap-2.5 cursor-pointer select-none">
+						<input type="checkbox" checked={showOverrides} onChange={function (e) { setShowOverrides(e.target.checked); }} className="rounded" />
+						<span className="text-sm font-medium">Ajuste de precios personalizado</span>
+						{overrideActive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
+					</label>
+					{!showOverrides && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Fijá a mano el precio de certificado o de firma para esta cotización; lo que dejes vacío usa el precio del segmento.</p>}
 					{showOverrides && (
-						<div className="pl-1 border-l-2 border-muted ml-1 space-y-2">
+						<div className="space-y-2">
 							<p className="text-[11px] text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
 							<div className="grid grid-cols-2 gap-3 max-w-sm">
 								<div className="flex flex-col gap-1.5">

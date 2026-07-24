@@ -161,25 +161,33 @@ export const B2B2C_API_TIERS = [
 //   - velocidad: cuánto tarda en confirmar el acuerdo (más rápido → más descuento).
 // `cap` = tope máximo de la SUMA de las 3 palancas (puntos %). El default de cada
 // palanca es la opción con 0% (precio base; el vendedor sube desde ahí).
+// Descuento del abono mensual (reposición de la bolsa de firmas). Valor por
+// defecto en puntos %; se puede sobrescribir manualmente en cada cotización.
+// Aplica a Volumen y Distribuidores.
+export const ABONO_DESCUENTO_PCT = 10;
+
+// Cada opción es { id, value (número), discount (puntos %) }. El texto visible se
+// deriva del número según la palanca (ver src/lib/commercialLevers.js): la opción
+// de mayor valor se muestra como "N o más". time-to-cash con value 0 = "contado".
 export const COMMERCIAL_LEVERS = {
 	cap: 15,
 	timeToCash: [
-		{ id: "anticipado", label: "Pago anticipado / contado", discount: 8 },
-		{ id: "d30", label: "30 días", discount: 4 },
-		{ id: "d60", label: "60 días", discount: 2 },
-		{ id: "d90", label: "90 días o más", discount: 0 },
+		{ id: "ttc0", value: 0, discount: 8 },
+		{ id: "ttc30", value: 30, discount: 4 },
+		{ id: "ttc60", value: 60, discount: 2 },
+		{ id: "ttc90", value: 90, discount: 0 },
 	],
 	duracion: [
-		{ id: "m12", label: "12 meses", discount: 0 },
-		{ id: "m24", label: "24 meses", discount: 3 },
-		{ id: "m36", label: "36 meses", discount: 6 },
-		{ id: "m48", label: "48 meses o más", discount: 9 },
+		{ id: "dur12", value: 12, discount: 0 },
+		{ id: "dur24", value: 24, discount: 3 },
+		{ id: "dur36", value: 36, discount: 6 },
+		{ id: "dur48", value: 48, discount: 9 },
 	],
 	velocidad: [
-		{ id: "d15", label: "Confirma en 15 días", discount: 4 },
-		{ id: "d30", label: "Confirma en 30 días", discount: 2 },
-		{ id: "d60", label: "Confirma en 60 días", discount: 1 },
-		{ id: "mas", label: "Más de 60 días", discount: 0 },
+		{ id: "vel15", value: 15, discount: 4 },
+		{ id: "vel30", value: 30, discount: 2 },
+		{ id: "vel60", value: 60, discount: 1 },
+		{ id: "vel90", value: 90, discount: 0 },
 	],
 };
 

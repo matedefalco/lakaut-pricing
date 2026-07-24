@@ -3,23 +3,40 @@
 // velocidad de cierre) que se suman con tope sobre el subtotal de servicio.
 // El volumen NO entra acá: ya vive en el precio (segmento/tabla o nivel).
 // Config en channelConfig.commercialLevers. Ver [[modelo-canales-borrador-v5]].
+//
+// Cada opción es { id, value (número), discount (puntos %) }. El texto visible se
+// deriva del número: la opción de mayor valor se muestra como "N o más".
 
-// Orden y etiquetas de las palancas (para la UI y el desglose del PDF).
+// Orden, etiquetas y metadatos de cada palanca (unidad + encabezado de columna
+// para el editor de config).
 export const LEVER_META = [
-	{ key: "timeToCash", label: "Time to cash", short: "Pago" },
-	{ key: "duracion", label: "Duración de la vinculación", short: "Duración" },
-	{ key: "velocidad", label: "Velocidad de cierre", short: "Cierre" },
+	{ key: "timeToCash", label: "Time to cash", short: "Pago", col: "Días de plazo de pago" },
+	{ key: "duracion", label: "Duración de la vinculación", short: "Duración", col: "Meses de vinculación" },
+	{ key: "velocidad", label: "Velocidad de cierre", short: "Cierre", col: "Días para confirmar" },
 ];
 
-// % (puntos) de la opción seleccionada de una palanca.
-function optionDiscount(options, id) {
-	const o = (options || []).find(function (x) { return x.id === id; });
-	return o ? (Number(o.discount) || 0) : 0;
+// Valor numérico de una opción, tolerante al formato viejo {label} (extrae el
+// primer número del texto) para no romper configs guardadas antes del cambio.
+function optionValueOf(opt) {
+	if (opt == null) return 0;
+	if (opt.value != null) return Number(opt.value) || 0;
+	const m = String(opt.label || "").match(/\d+/);
+	return m ? Number(m[0]) : 0;
 }
 
-function optionLabel(options, id) {
-	const o = (options || []).find(function (x) { return x.id === id; });
-	return o ? o.label : null;
+// Texto visible derivado del número, por palanca. `isMax` agrega "o más" a la
+// opción de mayor valor (tramo abierto).
+export function leverLabel(leverKey, value, isMax) {
+	const suf = isMax ? " o más" : "";
+	if (leverKey === "timeToCash") return value === 0 ? "Pago contado" : "Pago a " + value + " días" + suf;
+	if (leverKey === "duracion") return value + " meses" + suf;
+	if (leverKey === "velocidad") return "Confirma en " + value + " días" + suf;
+	return String(value) + suf;
+}
+
+function maxValueOf(options) {
+	const vals = (options || []).map(optionValueOf);
+	return vals.length ? Math.max.apply(null, vals) : 0;
 }
 
 // Selección por defecto: la opción de 0% de cada palanca (precio base). Si ninguna
@@ -47,12 +64,14 @@ export function resolveLevers(levers, selection) {
 	let raw = 0;
 	const items = [];
 	LEVER_META.forEach(function (m) {
-		const options = levers && levers[m.key];
+		const options = (levers && levers[m.key]) || [];
 		const id = sel[m.key];
-		const d = optionDiscount(options, id);
+		const opt = options.find(function (o) { return o.id === id; });
+		const d = opt ? (Number(opt.discount) || 0) : 0;
 		raw += d;
 		if (d > 0) {
-			items.push({ key: m.key, label: m.label, optionId: id, optionLabel: optionLabel(options, id), discount: d });
+			const v = optionValueOf(opt);
+			items.push({ key: m.key, label: m.label, optionId: id, optionLabel: leverLabel(m.key, v, v === maxValueOf(options)), discount: d });
 		}
 	});
 	const cappedPts = Math.min(raw, cap);
@@ -66,10 +85,13 @@ export function resolveLevers(levers, selection) {
 	};
 }
 
-// Opciones para el <SelectField> de una palanca (value/label), con el % en el label.
-export function leverOptions(options) {
+// Opciones para el <SelectField> de una palanca (value/label), con el texto
+// derivado + el % en el label.
+export function leverOptions(options, leverKey) {
+	const maxV = maxValueOf(options);
 	return (options || []).map(function (o) {
+		const v = optionValueOf(o);
 		const d = Number(o.discount) || 0;
-		return { value: o.id, label: o.label + (d > 0 ? " · −" + d + "%" : "") };
+		return { value: o.id, label: leverLabel(leverKey, v, v === maxV) + (d > 0 ? " · −" + d + "%" : "") };
 	});
 }

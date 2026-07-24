@@ -31,7 +31,7 @@ export function CommercialLevers({ levers, value, onChange }) {
 							label={m.label}
 							value={sel[m.key] || ""}
 							onValueChange={function (v) { set(m.key, v); }}
-							options={leverOptions(levers[m.key])}
+							options={leverOptions(levers[m.key], m.key)}
 							note={HINTS[m.key]}
 						/>
 					);

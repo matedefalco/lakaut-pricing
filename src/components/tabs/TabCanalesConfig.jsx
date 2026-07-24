@@ -1,113 +1,66 @@
 import { useState, useEffect } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, OK, WN, ER, os, mont } from "../../theme/tokens";
+import { Plus, Trash2 } from "lucide-react";
 import { markSaved, readSaved, formatSaved } from "../../lib/savedAt";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { SectionCard as SharedSectionCard } from "@/components/ui/SectionCard";
-import { Toast } from "@/components/ui/Toast";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/Toaster";
+import { LEVER_META } from "@/lib/commercialLevers";
 
 const FIRMAS_INCL_REF = 1; // 1 IDC = 1 cert + 1 firma, igual que en Canal B2B2C · Tabla de referencia
 
-function margColor(pct) { return pct >= 0.5 ? OK : pct >= 0.2 ? WN : ER; }
-
-function InlineNum({ value, onChange, decimals }) {
-	return (
-		<input
-			type="number"
-			value={value === null || value === undefined ? "" : value}
-			step={decimals > 0 ? Math.pow(10, -decimals) : 1}
-			onChange={function (e) { onChange(e.target.value === "" ? null : Number(e.target.value)); }}
-			style={{
-				width: "100%",
-				border: "1px solid " + BORD,
-				borderRadius: 4,
-				padding: "2px 6px",
-				fontFamily: "Courier New,monospace",
-				fontSize: 12,
-				textAlign: "right",
-				color: BLACK,
-				background: WHITE,
-				outline: "none",
-				boxSizing: "border-box",
-			}}
-		/>
-	);
-}
-
-function inputStyle(width) {
-	return { width: width || "100%", border: "1px solid " + BORD, borderRadius: 4, padding: "2px 6px", fontSize: 11, fontFamily: "'Open Sans',sans-serif", color: BLACK, background: WHITE, outline: "none" };
-}
-
-const thStyle = Object.assign({}, os(10, 700, GRAY), { padding: "8px 10px", borderBottom: "1px solid " + BORD, textTransform: "uppercase", letterSpacing: "0.4px" });
-const thL = Object.assign({}, thStyle, { textAlign: "left" });
-const thR = Object.assign({}, thStyle, { textAlign: "right" });
-
-const ZEBRA = "#f8f9fa";
+function cmClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
 function genId(prefix) {
 	return prefix + "_" + Math.random().toString(36).slice(2, 8);
 }
 
-function AddRowButton({ onClick, label }) {
+// Input numérico compacto para celdas de tabla (design system ShadCN).
+function NumCell({ value, onChange, decimals, className }) {
 	return (
-		<button
-			onClick={onClick}
-			style={{
-				marginTop: 10,
-				padding: "6px 14px",
-				background: "transparent",
-				color: BLUE,
-				border: "1px dashed " + BLUE,
-				borderRadius: 6,
-				fontFamily: "'Open Sans',sans-serif",
-				fontSize: 12,
-				fontWeight: 700,
-				cursor: "pointer",
-			}}
-		>
-			+ {label || "Agregar fila"}
-		</button>
+		<Input
+			type="number"
+			value={value === null || value === undefined ? "" : value}
+			step={decimals > 0 ? Math.pow(10, -decimals) : 1}
+			onChange={function (e) { onChange(e.target.value === "" ? null : Number(e.target.value)); }}
+			className={cn("h-8 text-right tabular-nums", className)}
+		/>
+	);
+}
+
+// Input de texto compacto para celdas de tabla.
+function TextCell({ value, onChange, className }) {
+	return (
+		<Input value={value || ""} onChange={function (e) { onChange(e.target.value); }} className={cn("h-8", className)} />
 	);
 }
 
 function DeleteRowButton({ onClick }) {
 	return (
-		<button
-			onClick={onClick}
-			title="Eliminar fila"
-			style={{
-				width: 22,
-				height: 22,
-				lineHeight: "20px",
-				textAlign: "center",
-				padding: 0,
-				background: "transparent",
-				color: GRAY,
-				border: "1px solid " + BORD,
-				borderRadius: 4,
-				fontSize: 13,
-				cursor: "pointer",
-			}}
-		>
-			×
-		</button>
+		<Button variant="ghost" size="icon" className="size-8" onClick={onClick} title="Eliminar fila">
+			<Trash2 className="size-4 text-muted-foreground" />
+		</Button>
 	);
 }
 
-function SectionCard({ title, description, children }) {
+function AddRowButton({ onClick, label }) {
 	return (
-		<SharedSectionCard title={title} description={description} className="mb-5">
-			{children}
-		</SharedSectionCard>
+		<Button variant="outline" size="sm" className="mt-3 border-dashed" onClick={onClick}>
+			<Plus className="size-4" /> {label || "Agregar fila"}
+		</Button>
 	);
 }
 
 export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) {
 	const [draft, setDraft] = useState(channelConfig);
 	const [isDirty, setIsDirty] = useState(false);
-	const [toast, setToast] = useState(null); // { msg, id }
 	const [segPriceMode, setSegPriceMode] = useState("manual"); // "manual" | "margen"
 	const [savedAt, setSavedAt] = useState(function () { return readSaved("channelConfig"); });
+	const { toast } = useToast();
 
 	const cvCert = costs?.cvCertBase ?? 0;
 	const cvFirma = costs?.cvFirmaBase ?? 0;
@@ -118,12 +71,6 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 		setDraft(channelConfig);
 		setIsDirty(false);
 	}, [channelConfig]);
-
-	function showToast(msg) {
-		const id = Date.now();
-		setToast({ msg, id });
-		setTimeout(function () { setToast(function (t) { return t && t.id === id ? null : t; }); }, 3000);
-	}
 
 	function updDraft(patch) {
 		setDraft(function (prev) {
@@ -137,7 +84,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 		updateChannelConfig(draft);
 		setIsDirty(false);
 		setSavedAt(markSaved("channelConfig"));
-		showToast("Cambios guardados");
+		toast({ variant: "success", title: "Cambios guardados" });
 	}
 
 	function addRow(key, blankRow) {
@@ -160,7 +107,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 		updLevers({ [key]: list });
 	}
 	function addLeverRow(key) {
-		updLevers({ [key]: (levers[key] || []).concat([{ id: genId(key), label: "Nueva opción", discount: 0 }]) });
+		updLevers({ [key]: (levers[key] || []).concat([{ id: genId(key), value: 0, discount: 0 }]) });
 	}
 	function removeLeverRow(key, idx) {
 		updLevers({ [key]: (levers[key] || []).filter(function (_, i) { return i !== idx; }) });
@@ -168,342 +115,263 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 
 	if (!channelConfig || !updateChannelConfig) return null;
 
+	const thNum = "text-right";
+
 	return (
-		<div className="space-y-6" style={{ maxWidth: 920 }}>
-
-			<Toast toast={toast} />
-
+		<div className="space-y-4" style={{ maxWidth: 960 }}>
 			<PageHeader
 				title="Precios por canal"
 				description={isDirty ? "Cambios sin guardar" : (savedAt ? "Última edición: " + formatSaved(savedAt) : "Sin cambios registrados")}
 				actions={<Button onClick={handleSave} disabled={!isDirty}>Guardar cambios</Button>}
 			/>
 
-			{/* ── Tiers de distribuidores ── */}
-			<SectionCard
+			{/* ── 1 · Tiers de distribuidores ── */}
+			<CollapsibleSection
+				defaultOpen
 				title="1 · Precio de lista con descuento · Niveles y descuentos"
-				description="El nivel se asigna por el mayor entre certificados activos y compromiso anual de facturación (USD)."
+				subtitle="El nivel se asigna por el mayor entre certificados activos y compromiso anual de facturación (USD)."
 			>
-				<div style={{ overflowX: "auto" }}>
-					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 700 }}>
-						<thead>
-							<tr>
-								{["Nivel", "Label", "Certs mín.", "Certs máx.", "Descuento %", "Compromiso mín. (USD)", "Compromiso máx. (USD)"].map(function (h, i) {
-									return <th key={h} style={i <= 1 ? thL : thR}>{h}</th>;
-								})}
-								<th style={thR}></th>
-							</tr>
-						</thead>
-						<tbody>
-							{(draft.distributorTiers || []).map(function (tier, idx) {
-								function upd(field, val) {
-									const next = draft.distributorTiers.map(function (t, i) {
-										return i === idx ? Object.assign({}, t, { [field]: val }) : t;
-									});
-									updDraft({ distributorTiers: next });
-								}
-								return (
-									<tr key={tier.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
-										<td style={{ padding: "5px 8px" }}>
-											<input value={tier.id || ""} onChange={function (e) { upd("id", e.target.value); }} style={inputStyle(80)} />
-										</td>
-										<td style={{ padding: "5px 8px" }}>
-											<input value={tier.label || ""} onChange={function (e) { upd("label", e.target.value); }} style={inputStyle(90)} />
-										</td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.certsMin} decimals={0} onChange={function (v) { upd("certsMin", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.certsMax} decimals={0} onChange={function (v) { upd("certsMax", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></td>
-										<td style={{ padding: "5px 8px", textAlign: "center" }}>
-											<DeleteRowButton onClick={function () { removeRow("distributorTiers", idx); }} />
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-				<AddRowButton
-					label="Agregar tier"
-					onClick={function () {
-						addRow("distributorTiers", { id: genId("tier"), label: "Nuevo tier", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null });
-					}}
-				/>
-			</SectionCard>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Nivel</TableHead>
+							<TableHead>Label</TableHead>
+							<TableHead className={thNum}>Certs mín.</TableHead>
+							<TableHead className={thNum}>Certs máx.</TableHead>
+							<TableHead className={thNum}>Descuento %</TableHead>
+							<TableHead className={thNum}>Compromiso mín. (USD)</TableHead>
+							<TableHead className={thNum}>Compromiso máx. (USD)</TableHead>
+							<TableHead className="w-10" />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.distributorTiers || []).map(function (tier, idx) {
+							function upd(field, val) {
+								const next = draft.distributorTiers.map(function (t, i) { return i === idx ? Object.assign({}, t, { [field]: val }) : t; });
+								updDraft({ distributorTiers: next });
+							}
+							return (
+								<TableRow key={tier.id || idx}>
+									<TableCell><TextCell value={tier.id} onChange={function (v) { upd("id", v); }} className="w-20" /></TableCell>
+									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-24" /></TableCell>
+									<TableCell><NumCell value={tier.certsMin} decimals={0} onChange={function (v) { upd("certsMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.certsMax} decimals={0} onChange={function (v) { upd("certsMax", v); }} /></TableCell>
+									<TableCell><NumCell value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
+									<TableCell><NumCell value={tier.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("distributorTiers", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distributorTiers", { id: genId("tier"), label: "Nuevo nivel", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null }); }} />
+			</CollapsibleSection>
 
-			{/* ── Segmentos B2B2C ── */}
-			<SectionCard
+			{/* ── 2 · Segmentos B2B2C ── */}
+			<CollapsibleSection
 				title="2 · Volumen · Segmentos por unidades y facturación"
-				description={"El segmento se alcanza por el mayor entre unidades (certs + firmas) y facturación a lista. Precio de cert y de firma bajan con el volumen. CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + "."}
+				subtitle={"El segmento se alcanza por el mayor entre unidades (certs + firmas) y facturación a lista. CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + "."}
 			>
-				{/* Toggle de modo de carga de precio */}
-				<div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-					{[
-						{ id: "manual", label: "Precio manual" },
-						{ id: "margen", label: "Margen objetivo" },
-					].map(function (m) {
+				<div className="mb-3 flex gap-1.5">
+					{[{ id: "manual", label: "Precio manual" }, { id: "margen", label: "Margen objetivo" }].map(function (m) {
 						const active = segPriceMode === m.id;
 						return (
-							<button
-								key={m.id}
-								onClick={function () { setSegPriceMode(m.id); }}
-								style={{
-									padding: "5px 12px",
-									borderRadius: 6,
-									border: "1px solid " + (active ? BLUE : BORD),
-									background: active ? BLUE : WHITE,
-									color: active ? WHITE : GRAY,
-									fontFamily: "'Open Sans',sans-serif",
-									fontSize: 11,
-									fontWeight: 700,
-									cursor: "pointer",
-								}}
-							>
-								{m.label}
-							</button>
+							<Button key={m.id} variant={active ? "default" : "outline"} size="sm" onClick={function () { setSegPriceMode(m.id); }}>{m.label}</Button>
 						);
 					})}
 				</div>
 
-				<div style={{ overflowX: "auto" }}>
-					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
-						<thead>
-							<tr>
-								<th style={thL}>Segmento</th>
-								<th style={thR}>Unid. mín.</th>
-								<th style={thR}>Unid. máx.</th>
-								<th style={thR}>Fact. mín (USD)</th>
-								<th style={thR}>Fact. máx (USD)</th>
-								{segPriceMode === "margen" && <th style={thR}>Margen objetivo (%)</th>}
-								<th style={thR}>Precio IDC (USD){segPriceMode === "margen" ? " (calc.)" : ""}</th>
-								<th style={thR}>Precio firma (USD)</th>
-								<th style={thR}>Costo CV (USD/IDC)</th>
-								<th style={thR}>CM $</th>
-								<th style={thR}>CM %</th>
-								<th style={thR}>BE (IDC)</th>
-								<th style={thR}></th>
-							</tr>
-						</thead>
-						<tbody>
-							{(draft.b2b2cSegments || []).map(function (seg, idx) {
-								function upd(field, val) {
-									const next = draft.b2b2cSegments.map(function (s, i) {
-										return i === idx ? Object.assign({}, s, { [field]: val }) : s;
-									});
-									updDraft({ b2b2cSegments: next });
-								}
-								function updMargen(v) {
-									const m = (v || 0) / 100;
-									const newPrecio = m > 0 && m < 1 ? costoRealIDC / (1 - m) : costoRealIDC;
-									upd("precioIDC", Math.round(newPrecio * 10000) / 10000);
-								}
-								const precioIDC = seg.precioIDC || 0;
-								const cmVal = precioIDC - costoRealIDC;
-								const cmPct = precioIDC > 0 ? cmVal / precioIDC : 0;
-								const beVal = cmVal > 0 ? Math.ceil(cfDirecto / cmVal) : null;
-								const margenPct = precioIDC > 0 ? Math.round((cmVal / precioIDC) * 1000) / 10 : 0;
-								return (
-									<tr key={seg.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
-										<td style={{ padding: "5px 8px" }}>
-											<input value={seg.label || ""} onChange={function (e) { upd("label", e.target.value); }} style={inputStyle(140)} />
-										</td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></td>
-										{segPriceMode === "margen" && (
-											<td style={{ padding: "5px 8px" }}><InlineNum value={margenPct} decimals={1} onChange={updMargen} /></td>
-										)}
-										<td style={{ padding: "5px 8px" }}>
-											{segPriceMode === "manual"
-												? <InlineNum value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} />
-												: <div style={Object.assign({}, os(12, 700, BLACK), { textAlign: "right", padding: "2px 6px" })}>{precioIDC.toFixed(4)}</div>}
-										</td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={seg.precioFirma} decimals={4} onChange={function (v) { upd("precioFirma", v); }} /></td>
-										<td style={{ padding: "5px 8px", textAlign: "right", color: GRAY }}>{costoRealIDC.toFixed(4)}</td>
-										<td style={{ padding: "5px 8px", textAlign: "right", color: margColor(cmPct), fontWeight: 700 }}>{cmVal.toFixed(4)}</td>
-										<td style={{ padding: "5px 8px", textAlign: "right", color: margColor(cmPct), fontWeight: 700 }}>{(cmPct * 100).toFixed(0)}%</td>
-										<td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700 }}>{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</td>
-										<td style={{ padding: "5px 8px", textAlign: "center" }}>
-											<DeleteRowButton onClick={function () { removeRow("b2b2cSegments", idx); }} />
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-				<AddRowButton
-					label="Agregar segmento"
-					onClick={function () {
-						addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, precioFirma: 0 });
-					}}
-				/>
-			</SectionCard>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Segmento</TableHead>
+							<TableHead className={thNum}>Unid. mín.</TableHead>
+							<TableHead className={thNum}>Unid. máx.</TableHead>
+							<TableHead className={thNum}>Fact. mín (USD)</TableHead>
+							<TableHead className={thNum}>Fact. máx (USD)</TableHead>
+							{segPriceMode === "margen" && <TableHead className={thNum}>Margen obj. (%)</TableHead>}
+							<TableHead className={thNum}>Precio IDC (USD){segPriceMode === "margen" ? " (calc.)" : ""}</TableHead>
+							<TableHead className={thNum}>Precio firma (USD)</TableHead>
+							<TableHead className={thNum}>CV (USD/IDC)</TableHead>
+							<TableHead className={thNum}>CM $</TableHead>
+							<TableHead className={thNum}>CM %</TableHead>
+							<TableHead className={thNum}>BE (IDC)</TableHead>
+							<TableHead className="w-10" />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.b2b2cSegments || []).map(function (seg, idx) {
+							function upd(field, val) {
+								const next = draft.b2b2cSegments.map(function (s, i) { return i === idx ? Object.assign({}, s, { [field]: val }) : s; });
+								updDraft({ b2b2cSegments: next });
+							}
+							function updMargen(v) {
+								const m = (v || 0) / 100;
+								const newPrecio = m > 0 && m < 1 ? costoRealIDC / (1 - m) : costoRealIDC;
+								upd("precioIDC", Math.round(newPrecio * 10000) / 10000);
+							}
+							const precioIDC = seg.precioIDC || 0;
+							const cmVal = precioIDC - costoRealIDC;
+							const cmPct = precioIDC > 0 ? cmVal / precioIDC : 0;
+							const beVal = cmVal > 0 ? Math.ceil(cfDirecto / cmVal) : null;
+							const margenPct = precioIDC > 0 ? Math.round((cmVal / precioIDC) * 1000) / 10 : 0;
+							return (
+								<TableRow key={seg.id || idx}>
+									<TableCell><TextCell value={seg.label} onChange={function (v) { upd("label", v); }} className="w-32" /></TableCell>
+									<TableCell><NumCell value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></TableCell>
+									{segPriceMode === "margen" && <TableCell><NumCell value={margenPct} decimals={1} onChange={updMargen} /></TableCell>}
+									<TableCell>
+										{segPriceMode === "manual"
+											? <NumCell value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} />
+											: <div className="text-right font-semibold tabular-nums px-2">{precioIDC.toFixed(4)}</div>}
+									</TableCell>
+									<TableCell><NumCell value={seg.precioFirma} decimals={4} onChange={function (v) { upd("precioFirma", v); }} /></TableCell>
+									<TableCell className="text-right tabular-nums text-muted-foreground">{costoRealIDC.toFixed(4)}</TableCell>
+									<TableCell className={cn("text-right tabular-nums font-semibold", cmClass(cmPct))}>{cmVal.toFixed(4)}</TableCell>
+									<TableCell className={cn("text-right tabular-nums font-semibold", cmClass(cmPct))}>{(cmPct * 100).toFixed(0)}%</TableCell>
+									<TableCell className="text-right tabular-nums font-semibold">{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("b2b2cSegments", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, precioFirma: 0 }); }} />
+			</CollapsibleSection>
 
-			{/* ── API Tiers B2B2C ── */}
-			<SectionCard title="3 · Volumen · API · Fee de implementación">
-				<div style={{ overflowX: "auto" }}>
-					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
-						<thead>
-							<tr>
-								<th style={thL}>Label</th>
-								{["Fee mín. (USD)", "Fee máx. (USD)", "Fee default (USD)"].map(function (h) {
-									return <th key={h} style={thR}>{h}</th>;
-								})}
-								<th style={thR}></th>
-							</tr>
-						</thead>
-						<tbody>
-							{(draft.b2b2cApiTiers || []).map(function (tier, idx) {
-								function upd(field, val) {
-									const next = draft.b2b2cApiTiers.map(function (t, i) {
-										return i === idx ? Object.assign({}, t, { [field]: val }) : t;
-									});
-									updDraft({ b2b2cApiTiers: next });
-								}
-								return (
-									<tr key={tier.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
-										<td style={{ padding: "5px 8px" }}>
-											<input value={tier.label || ""} onChange={function (e) { upd("label", e.target.value); }} style={inputStyle(160)} />
-										</td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.feeMin} decimals={0} onChange={function (v) { upd("feeMin", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.feeMax} decimals={0} onChange={function (v) { upd("feeMax", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={tier.feeDefault} decimals={0} onChange={function (v) { upd("feeDefault", v); }} /></td>
-										<td style={{ padding: "5px 8px", textAlign: "center" }}>
-											<DeleteRowButton onClick={function () { removeRow("b2b2cApiTiers", idx); }} />
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-				<AddRowButton
-					label="Agregar API tier"
-					onClick={function () {
-						addRow("b2b2cApiTiers", { id: genId("api"), label: "Nuevo API tier", feeMin: 0, feeMax: 0, feeDefault: 0 });
-					}}
-				/>
-			</SectionCard>
+			{/* ── 3 · API Tiers B2B2C ── */}
+			<CollapsibleSection title="3 · Volumen · API · Fee de implementación">
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Label</TableHead>
+							<TableHead className={thNum}>Fee mín. (USD)</TableHead>
+							<TableHead className={thNum}>Fee máx. (USD)</TableHead>
+							<TableHead className={thNum}>Fee default (USD)</TableHead>
+							<TableHead className="w-10" />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.b2b2cApiTiers || []).map(function (tier, idx) {
+							function upd(field, val) {
+								const next = draft.b2b2cApiTiers.map(function (t, i) { return i === idx ? Object.assign({}, t, { [field]: val }) : t; });
+								updDraft({ b2b2cApiTiers: next });
+							}
+							return (
+								<TableRow key={tier.id || idx}>
+									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-40" /></TableCell>
+									<TableCell><NumCell value={tier.feeMin} decimals={0} onChange={function (v) { upd("feeMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.feeMax} decimals={0} onChange={function (v) { upd("feeMax", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.feeDefault} decimals={0} onChange={function (v) { upd("feeDefault", v); }} /></TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("b2b2cApiTiers", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar API tier" onClick={function () { addRow("b2b2cApiTiers", { id: genId("api"), label: "Nuevo API tier", feeMin: 0, feeMax: 0, feeDefault: 0 }); }} />
+			</CollapsibleSection>
 
-			{/* ── Planes SLA ── */}
-			<SectionCard title="4 · Volumen · Planes SLA">
-				<div style={{ overflowX: "auto" }}>
-					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
-						<thead>
-							<tr>
-								<th style={thL}>Label</th>
-								<th style={thR}>Precio/mes (USD)</th>
-								<th style={thR}>SLA (%)</th>
-								<th style={thR}>TX/mes</th>
-								<th style={thL}>Descripción</th>
-								<th style={thR}></th>
-							</tr>
-						</thead>
-						<tbody>
-							{(draft.slaPlans || []).map(function (plan, idx) {
-								function upd(field, val) {
-									const next = draft.slaPlans.map(function (p, i) {
-										return i === idx ? Object.assign({}, p, { [field]: val }) : p;
-									});
-									updDraft({ slaPlans: next });
-								}
-								return (
-									<tr key={plan.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
-										<td style={{ padding: "5px 8px" }}>
-											<input value={plan.label || ""} onChange={function (e) { upd("label", e.target.value); }} style={inputStyle(120)} />
-										</td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={plan.precioMes} decimals={0} onChange={function (v) { upd("precioMes", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={plan.sla !== null && plan.sla !== undefined ? Math.round(plan.sla * 1000) / 10 : null} decimals={1} onChange={function (v) { upd("sla", v === null ? null : v / 100); }} /></td>
-										<td style={{ padding: "5px 8px" }}><InlineNum value={plan.txMes} decimals={0} onChange={function (v) { upd("txMes", v); }} /></td>
-										<td style={{ padding: "5px 8px" }}>
-											<input value={plan.desc || ""} onChange={function (e) { upd("desc", e.target.value); }} style={inputStyle("100%")} />
-										</td>
-										<td style={{ padding: "5px 8px", textAlign: "center" }}>
-											<DeleteRowButton onClick={function () { removeRow("slaPlans", idx); }} />
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-				<AddRowButton
-					label="Agregar plan SLA"
-					onClick={function () {
-						addRow("slaPlans", { id: genId("sla"), label: "Nuevo plan", precioMes: 0, sla: null, txMes: null, desc: "" });
-					}}
-				/>
-			</SectionCard>
+			{/* ── 4 · Planes SLA ── */}
+			<CollapsibleSection title="4 · Volumen · Planes SLA">
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Label</TableHead>
+							<TableHead className={thNum}>Precio/mes (USD)</TableHead>
+							<TableHead className={thNum}>SLA (%)</TableHead>
+							<TableHead className={thNum}>TX/mes</TableHead>
+							<TableHead>Descripción</TableHead>
+							<TableHead className="w-10" />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.slaPlans || []).map(function (plan, idx) {
+							function upd(field, val) {
+								const next = draft.slaPlans.map(function (p, i) { return i === idx ? Object.assign({}, p, { [field]: val }) : p; });
+								updDraft({ slaPlans: next });
+							}
+							return (
+								<TableRow key={plan.id || idx}>
+									<TableCell><TextCell value={plan.label} onChange={function (v) { upd("label", v); }} className="w-28" /></TableCell>
+									<TableCell><NumCell value={plan.precioMes} decimals={0} onChange={function (v) { upd("precioMes", v); }} /></TableCell>
+									<TableCell><NumCell value={plan.sla !== null && plan.sla !== undefined ? Math.round(plan.sla * 1000) / 10 : null} decimals={1} onChange={function (v) { upd("sla", v === null ? null : v / 100); }} /></TableCell>
+									<TableCell><NumCell value={plan.txMes} decimals={0} onChange={function (v) { upd("txMes", v); }} /></TableCell>
+									<TableCell><TextCell value={plan.desc} onChange={function (v) { upd("desc", v); }} className="min-w-[220px]" /></TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("slaPlans", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar plan SLA" onClick={function () { addRow("slaPlans", { id: genId("sla"), label: "Nuevo plan", precioMes: 0, sla: null, txMes: null, desc: "" }); }} />
+			</CollapsibleSection>
 
-			{/* ── Palancas de descuento comercial ── */}
-			<SectionCard
+			{/* ── 5 · Palancas de descuento comercial ── */}
+			<CollapsibleSection
 				title="5 · Palancas de descuento comercial (Volumen y Distribuidores)"
-				description="Descuentos por condiciones favorables, además del volumen. Se suman con tope y aplican sobre el subtotal de servicio. El % de cada opción está en puntos (ej. 8 = −8%)."
+				subtitle="Descuentos por condiciones favorables, además del volumen. Se suman con tope y aplican sobre el subtotal de servicio. El texto que ve el cliente se arma con el número."
 			>
-				<div style={{ maxWidth: 260, marginBottom: 16 }}>
-					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Tope máximo de la suma (%)</div>
-					<InlineNum value={levers.cap} decimals={0} onChange={function (v) { updLevers({ cap: v }); }} />
+				<div className="mb-5 flex flex-wrap gap-6">
+					<div className="w-48">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Tope máximo de la suma (%)</Label>
+						<NumCell value={levers.cap} decimals={0} onChange={function (v) { updLevers({ cap: v }); }} className="mt-1.5" />
+					</div>
+					<div className="w-56">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento de abono · default (%)</Label>
+						<NumCell value={draft.abonoDescuentoPct} decimals={0} onChange={function (v) { updDraft({ abonoDescuentoPct: v }); }} className="mt-1.5" />
+						<p className="text-[11px] text-muted-foreground mt-1">Valor sugerido al activar el abono; ajustable por cotización.</p>
+					</div>
 				</div>
 
-				{[
-					{ key: "timeToCash", title: "Time to cash · cuánto tardan en pagarnos" },
-					{ key: "duracion", title: "Duración de la vinculación" },
-					{ key: "velocidad", title: "Velocidad de cierre del acuerdo" },
-				].map(function (lv) {
+				{LEVER_META.map(function (lv) {
 					return (
-						<div key={lv.key} style={{ marginBottom: 16 }}>
-							<div style={Object.assign({}, os(11, 700, BLACK), { marginBottom: 6 })}>{lv.title}</div>
-							<div style={{ overflowX: "auto" }}>
-								<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 360, maxWidth: 520 }}>
-									<thead>
-										<tr>
-											<th style={thL}>Opción</th>
-											<th style={thR}>Descuento %</th>
-											<th style={thR}></th>
-										</tr>
-									</thead>
-									<tbody>
-										{(levers[lv.key] || []).map(function (opt, idx) {
-											return (
-												<tr key={opt.id || idx} style={{ background: idx % 2 === 0 ? ZEBRA : WHITE }}>
-													<td style={{ padding: "5px 8px" }}>
-														<input value={opt.label || ""} onChange={function (e) { updLeverRow(lv.key, idx, "label", e.target.value); }} style={inputStyle("100%")} />
-													</td>
-													<td style={{ padding: "5px 8px" }}><InlineNum value={opt.discount} decimals={0} onChange={function (v) { updLeverRow(lv.key, idx, "discount", v || 0); }} /></td>
-													<td style={{ padding: "5px 8px", textAlign: "center" }}>
-														<DeleteRowButton onClick={function () { removeLeverRow(lv.key, idx); }} />
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
+						<div key={lv.key} className="mb-5">
+							<div className="text-sm font-semibold mb-1.5">{lv.label}</div>
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>{lv.col}</TableHead>
+										<TableHead className={thNum}>Descuento %</TableHead>
+										<TableHead className="w-10" />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{(levers[lv.key] || []).map(function (opt, idx) {
+										return (
+											<TableRow key={opt.id || idx}>
+												<TableCell><NumCell value={opt.value != null ? opt.value : (parseInt(String(opt.label || "").replace(/[^0-9]/g, ""), 10) || 0)} decimals={0} onChange={function (v) { updLeverRow(lv.key, idx, "value", v || 0); }} className="w-32" /></TableCell>
+												<TableCell><NumCell value={opt.discount} decimals={0} onChange={function (v) { updLeverRow(lv.key, idx, "discount", v || 0); }} className="w-24 ml-auto" /></TableCell>
+												<TableCell><DeleteRowButton onClick={function () { removeLeverRow(lv.key, idx); }} /></TableCell>
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
 							<AddRowButton label="Agregar opción" onClick={function () { addLeverRow(lv.key); }} />
 						</div>
 					);
 				})}
-			</SectionCard>
+				<p className="text-[11px] text-muted-foreground">
+					El texto visible se arma con el número: la opción de mayor valor se muestra como "N o más"; en Time to cash, 0 = "Pago contado".
+				</p>
+			</CollapsibleSection>
 
-			{/* ── Parámetros derivados ── */}
-			<SectionCard
+			{/* ── 6 · Parámetros derivados ── */}
+			<CollapsibleSection
 				title="6 · Parámetros derivados del esquema de costos"
-				description="Estos valores se calculan automáticamente desde Configuración → Costos. No se editan a mano."
+				subtitle="Se calculan automáticamente desde Configuración → Costos. No se editan a mano."
 			>
-				<div style={{ maxWidth: 320 }}>
-					<div style={Object.assign({}, os(10, 700, GRAY), { textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 })}>Costo IDC referencia (USD)</div>
-					<div style={{ border: "1px solid " + BORD, borderRadius: 4, padding: "6px 10px", fontFamily: "Courier New,monospace", fontSize: 13, textAlign: "right", color: BLACK, background: ZEBRA }}>
-						{costoRealIDC.toFixed(4)}
-					</div>
-					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 6 })}>
-						= cert USD {cvCert.toFixed(4)} + {FIRMAS_INCL_REF} firma USD {cvFirma.toFixed(4)}
-					</div>
+				<div className="max-w-xs">
+					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo IDC referencia (USD)</Label>
+					<div className="mt-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-right font-semibold tabular-nums">{costoRealIDC.toFixed(4)}</div>
+					<p className="text-[11px] text-muted-foreground mt-1.5">= cert USD {cvCert.toFixed(4)} + {FIRMAS_INCL_REF} firma USD {cvFirma.toFixed(4)}</p>
 				</div>
-			</SectionCard>
-
+			</CollapsibleSection>
 		</div>
 	);
 }
