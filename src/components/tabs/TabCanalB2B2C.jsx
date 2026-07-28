@@ -63,6 +63,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
 	// Descuento del abono mensual (%): arranca en el default de la config, editable por cotización.
 	const [abonoDescPct, setAbonoDescPct] = useState(function () { return channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK; });
+	// Firmas bonificadas (opcional): cantidad de firmas del volumen cotizado que no se
+	// cobran. No cambia el volumen ni el compromiso (el segmento sigue saliendo del
+	// total cotizado); solo descuenta su importe del subtotal de la activación.
+	const [firmasBonificadas, setFirmasBonificadas] = useState("");
+	const [showBonif, setShowBonif] = useState(false);
 	// Precio de la firma extra (excedente sobre lo cotizado). Por defecto usa el
 	// precio de firma del segmento alcanzado (dinámico); "" = dinámico. Se puede
 	// sobrescribir a mano para ese excedente.
@@ -100,6 +105,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const firmasFisica = nf * ff;
 	const firmasJuridica = nj * fj;
 	const firmasIncl = firmasFisica + firmasJuridica;
+	// Bonificación: nunca más firmas que las cotizadas. `firmasCobradas` es solo para
+	// mostrar la cuenta; el volumen (y por lo tanto el costo y el segmento) es firmasIncl.
+	const firmasBonif = Math.min(firmasIncl, Math.max(0, Number(firmasBonificadas) || 0));
+	const firmasCobradas = firmasIncl - firmasBonif;
 
 	// ── Segmento único por compromiso ──
 	// El cliente cae en UN SOLO segmento, asignado por el compromiso del contrato en
@@ -153,6 +162,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		// Precio de firma extra: si el deal guardó un override lo tomamos; si no,
 		// queda dinámico ("" = precio de firma del segmento).
 		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
+		setFirmasBonificadas(i.firmasBonificadas != null ? String(i.firmasBonificadas) : "");
+		setShowBonif(i.firmasBonificadas != null);
 		// Compromiso: solo se guarda cuando fue manual; si no, se recalcula solo.
 		setCompromisoOverride(i.compromisoManual && i.compromiso != null ? String(i.compromiso) : "");
 		setCasosDeUso(i.casosDeUso || "");
@@ -217,13 +228,19 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const revFirmas = firmasIncl * precioFirmaLista;
 	const revServicioBruto = revIDC + revFirmas;
 
+	// Bonificación de firmas: se resta del subtotal a precio de firma cotizado. Va
+	// antes del descuento por condiciones para no descontar dos veces sobre firmas
+	// que no se cobran.
+	const bonifMonto = firmasBonif * precioFirmaLista;
+	const revServicioNeto = revServicioBruto - bonifMonto;
+
 	// Descuento por condiciones comerciales (además del precio por segmento). Aplica
-	// sobre el subtotal de servicio de la activación (certs + firmas), no sobre el
-	// fee ni el SLA ni el abono. Se guarda como snapshot en el deal.
+	// sobre el subtotal de servicio de la activación (certs + firmas, ya neto de la
+	// bonificación), no sobre el fee ni el SLA ni el abono. Snapshot en el deal.
 	const leverRes = resolveLevers(commercialLevers, levers);
 	const descCondPct = leverRes.pct;
-	const descCondMonto = revServicioBruto * descCondPct;
-	const revServicio = revServicioBruto - descCondMonto;
+	const descCondMonto = revServicioNeto * descCondPct;
+	const revServicio = revServicioNeto - descCondMonto;
 
 	const feeAplicado = conApi ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
@@ -273,6 +290,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		conApi ? api.label : "sin integración API",
 		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
 		overrideActive ? "precio ajustado" : "precio de tabla",
+		firmasBonif > 0 ? firmasBonif.toLocaleString("es-AR") + " firmas bonificadas" : null,
 		descCondPct > 0 ? "−" + leverRes.cappedPts + "% condiciones" : null,
 		abono ? "con abono mensual" : "sin abono",
 	].filter(Boolean).join(" · ");
@@ -333,6 +351,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				// Precio de firma extra (excedente): guardamos el override solo si difiere
 				// del dinámico, para reabrir la cotización con el mismo valor.
 				...(precioFirmaExtra !== "" ? { precioFirmaExtra: precioFirmaExtraEff } : {}),
+				// Firmas bonificadas: solo viaja al deal cuando hay bonificación.
+				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif } : {}),
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
 				// Palancas de descuento: selección + snapshot resuelto (estable ante
 				// cambios posteriores de la config de tramos).
@@ -372,6 +392,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				precioIDC, precioFirma: precioFirmaLista, precioFirmaExtra: precioFirmaExtraEff,
 				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
 				descCondPct, descCondMonto, revServicioBruto,
+				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif, firmasCobradas, bonifMonto } : {}),
 				margen, margenPct,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
 			},
@@ -479,6 +500,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 					{/* Condiciones comerciales */}
 					<div>
+						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney} /></>} accent="success" valueClass="text-[var(--success)]" />}
 						{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />}
 						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney} /> : "incluido"} />}
 						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney} />} />}
@@ -521,12 +543,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					<div>
 						<div className="text-[10px] text-muted-foreground">Costo variable total</div>
 						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={costoTotal} format={fMoney} /></div>
-						<div className="text-[10px] text-muted-foreground">{idc.toLocaleString("es-AR")} certs + {firmasIncl.toLocaleString("es-AR")} firmas</div>
+						<div className="text-[10px] text-muted-foreground">{idc.toLocaleString("es-AR")} certs + {firmasIncl.toLocaleString("es-AR")} firmas{firmasBonif > 0 ? " (" + firmasBonif.toLocaleString("es-AR") + " bonificadas)" : ""}</div>
 					</div>
 				</div>
 				<div className="space-y-1 border-t border-border/60 pt-2">
 					<ResultRow label={<>Ingreso certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(precioIDC) + " por certificado = " + fMoney(revIDC)} /></>} value={<AnimatedNumber value={revIDC} format={fMoney} />} accent="primary" />
 					<ResultRow label={<>Ingreso firmas<InfoTooltip text={firmasIncl.toLocaleString("es-AR") + " firmas × " + fMoney2(precioFirmaLista) + " por firma = " + fMoney(revFirmas)} /></>} value={revFirmas ? <AnimatedNumber value={revFirmas} format={fMoney} /> : "—"} />
+					{firmasBonif > 0 && <ResultRow label={<>Bonificación de firmas<InfoTooltip text={firmasBonif.toLocaleString("es-AR") + " firmas bonificadas × " + fMoney2(precioFirmaLista) + " = " + fMoney(bonifMonto) + " que no se facturan. Su costo variable se paga igual."} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(bonifMonto)}</span>} />}
 					<ResultRow label={<>Costo certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(cvCert) + " de costo variable c/u = " + fMoney(costoCert)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoCert)}</span>} />
 					<ResultRow label={<>Costo firmas<InfoTooltip text={firmasIncl.toLocaleString("es-AR") + " firmas × " + fMoney2(cvFirma) + " de costo variable c/u = " + fMoney(costoFirmas)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
 				</div>
@@ -664,6 +687,36 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				<div className="flex flex-col gap-2">
 					<span className="text-sm font-medium">Descuento por condiciones</span>
 					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
+				</div>
+
+				<Separator />
+
+				{/* Bonificación de firmas (opcional): parte del volumen cotizado no se cobra.
+				    No toca el volumen ni el compromiso, solo el subtotal a facturar. */}
+				<div className="flex flex-col gap-3">
+					<label className="flex items-center gap-2.5 cursor-pointer select-none">
+						<input type="checkbox" checked={showBonif} onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }} className="rounded" />
+						<span className="text-sm font-medium">Bonificar firmas</span>
+						{firmasBonif > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge>}
+					</label>
+					{!showBonif && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Regalá parte de las firmas cotizadas: el cliente paga la diferencia y el volumen sigue contando completo para el segmento.</p>}
+					{showBonif && (
+						<div className="pl-6 border-l-2 border-muted ml-1 space-y-2">
+							<div className="max-w-xs">
+								<NumberField label="Firmas bonificadas" value={firmasBonificadas} onChange={setFirmasBonificadas} min={0} max={firmasIncl} placeholder="0"
+									note={hasVolume ? "De las " + firmasIncl.toLocaleString("es-AR") + " firmas cotizadas." : "Cargá el volumen primero."} />
+							</div>
+							{firmasBonif > 0 && (
+								<p className="text-sm text-muted-foreground">
+									{firmasBonif.toLocaleString("es-AR")} firmas × {fMoney2(precioFirmaLista)} = <span className="font-semibold text-[var(--success)]">−{fMoney(bonifMonto)}</span> · se facturan {firmasCobradas.toLocaleString("es-AR")} de {firmasIncl.toLocaleString("es-AR")} firmas.
+								</p>
+							)}
+							{Number(firmasBonificadas) > firmasIncl && (
+								<p className="text-[11px] text-[var(--warning)]">No se pueden bonificar más de las {firmasIncl.toLocaleString("es-AR")} firmas cotizadas; se toma el total.</p>
+							)}
+							<p className="text-[11px] text-muted-foreground">El compromiso y el segmento se siguen calculando sobre el volumen completo. El costo variable de las firmas bonificadas se paga igual, así que baja el margen.</p>
+						</div>
+					)}
 				</div>
 
 				<Separator />

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 
 // Campo numérico con label, prefijo opcional y nota.
-export function NumberField({ label, value, onChange, prefix, suffix, note, placeholder, min, step }) {
+export function NumberField({ label, value, onChange, prefix, suffix, note, placeholder, min, max, step }) {
 	return (
 		<div className="flex flex-col gap-1.5">
 			<Label className="text-xs text-muted-foreground uppercase tracking-wide">{label}</Label>
@@ -14,6 +14,7 @@ export function NumberField({ label, value, onChange, prefix, suffix, note, plac
 				<Input
 					type="number"
 					min={min}
+					max={max}
 					step={step}
 					placeholder={placeholder}
 					value={value}

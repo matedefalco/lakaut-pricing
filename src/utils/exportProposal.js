@@ -560,14 +560,21 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
 	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
+	// Bonificación de firmas (snapshot del deal): parte de la bolsa cotizada no se
+	// cobra. Se resta del subtotal a precio de firma de lista y va antes del descuento
+	// por condiciones, para no descontar dos veces sobre firmas que no se facturan.
+	// El volumen no cambia: el cliente recibe (y el compromiso cuenta) las firmas completas.
+	const firmasBonif = Math.min(firmasIncl, Math.max(0, Number(inp.firmasBonificadas) || 0));
+	const bonifMonto = firmasBonif * precioFirmaAdicN;
 	// Descuento por condiciones comerciales (snapshot del deal): aplica sobre el
 	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
 	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic;
+	const servicioNeto = servicioBruto - bonifMonto;
 	const descCondPct = (inp.descCond && inp.descCond.pct) || 0;
-	const descCondMonto = servicioBruto * descCondPct;
+	const descCondMonto = servicioNeto * descCondPct;
 	const condPctV = Math.round(descCondPct * 100);
 	const condTerms = condTermsText(inp.descCond);
-	const subtotal = servicioBruto - descCondMonto + slaMesVal + feeVal;
+	const subtotal = servicioNeto - descCondMonto + slaMesVal + feeVal;
 	// Con API: el certificado se factura como consumo del servicio de validación
 	// de identidad y la firma como documento firmado (ver comentario arriba).
 	const certLbl = conApi ? "Consumos de validación · persona jurídica" : "Certificados jurídicos";
@@ -620,8 +627,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// desglose se reduce a una sola cuenta "cantidad × precio" — sin listar items.
 	// Si hay descuento por condiciones, siempre listamos los items (para poder
 	// mostrar la línea del descuento); no colapsamos a "cantidad × precio".
-	const singleItem = items.length === 1 && descCondPct <= 0;
+	const singleItem = items.length === 1 && descCondPct <= 0 && bonifMonto <= 0;
 	const subtotalLabel = singleItem ? `Subtotal (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})` : "Subtotal (sin IVA)";
+	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
+	// condiciones, para que el valor entregado quede a la vista.
+	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+      <span style="color:${GR};">${firmaCap} bonificad${conApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">Sin cargo: recibís ${conApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${(firmasIncl - firmasBonif).toLocaleString("es-AR")}.</span></span>
+      <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(bonifMonto, currency, tc)}</span>
+    </div>` : "";
 	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
       <span style="color:${GR};">Descuento por condiciones (−${condPctV}%)${condTerms ? `<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">${condTerms}</span>` : ""}</span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(descCondMonto, currency, tc)}</span>
@@ -629,7 +642,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const itemsListHtml = !singleItem ? items.map(it => `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
       <span style="color:${GR};">${it.l}</span>
       <span style="color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
-    </div>`).join("") + descCondLineHtml : "";
+    </div>`).join("") + bonifLineHtml + descCondLineHtml : "";
 	const stats = [{ label: subtotalLabel, value: fm(subtotal, currency, tc) }];
 	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
 
@@ -744,6 +757,9 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
 	const precioFirma = Number(res.precioFirma != null ? res.precioFirma : inp.precioFirmaAdic) || 0;
 	const rows = buildProyeccion({ idc, firmas, precioCert, precioFirma }, proy.driver || "packs", proy.steps || []);
 	const showIva = currency === "ARS";
+	// La proyección es a precio de lista del escenario: la bonificación de la
+	// activación no se arrastra, así que se aclara en la nota al pie.
+	const bonifNota = (Number(inp.firmasBonificadas) || 0) > 0 ? `, ${conApi ? "los" : "las"} ${firmaNpl} bonificad${conApi ? "os" : "as"} de la activación` : "";
 
 	// Precios unitarios chicos (ej. USD 0.65): se formatean aparte para no perder
 	// decimales que fm/USD redondearía a entero.
@@ -800,7 +816,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
       </table>
     </div>
     <div style="margin-top:auto;padding:0.3cm 0;font-size:7.5pt;color:${GR};line-height:1.5;">
-      Costo estimado sobre el volumen de ${certNpl} y ${firmaNpl} de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez, el abono de soporte / SLA ni el descuento por condiciones comerciales). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
+      Costo estimado sobre el volumen de ${certNpl} y ${firmaNpl} de cada escenario${showIva ? ", sin IVA" : ""} (no incluye el fee de implementación por única vez, el abono de soporte / SLA${bonifNota} ni el descuento por condiciones comerciales). Proyección de referencia, exclusiva para esta propuesta y sujeta a la vigencia indicada en la portada.
     </div>
   </div>
   ${foot(pageN || 4)}
