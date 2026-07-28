@@ -85,6 +85,17 @@ export function resolveLevers(levers, selection) {
 	};
 }
 
+// Valor numérico de la opción elegida en una palanca, sin importar su descuento.
+// `resolveLevers` solo devuelve las palancas que aportan > 0, así que para leer los
+// meses de vinculación (cuya opción base es 0%) hace falta este acceso directo.
+// Lo usa Volumen para sugerir el compromiso del contrato (volumen × meses).
+export function leverValue(levers, selection, key) {
+	const options = (levers && levers[key]) || [];
+	const id = (selection || {})[key];
+	const opt = options.find(function (o) { return o.id === id; });
+	return opt ? optionValueOf(opt) : 0;
+}
+
 // Opciones para el <SelectField> de una palanca (value/label), con el texto
 // derivado + el % en el label.
 export function leverOptions(options, leverKey) {

@@ -11,8 +11,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/Toaster";
 import { LEVER_META } from "@/lib/commercialLevers";
 
-const FIRMAS_INCL_REF = 1; // 1 IDC = 1 cert + 1 firma, igual que en Canal B2B2C · Tabla de referencia
-
 function cmClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
 function genId(prefix) {
@@ -58,14 +56,23 @@ function AddRowButton({ onClick, label }) {
 export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) {
 	const [draft, setDraft] = useState(channelConfig);
 	const [isDirty, setIsDirty] = useState(false);
-	const [segPriceMode, setSegPriceMode] = useState("manual"); // "manual" | "margen"
 	const [savedAt, setSavedAt] = useState(function () { return readSaved("channelConfig"); });
 	const { toast } = useToast();
 
 	const cvCert = costs?.cvCertBase ?? 0;
 	const cvFirma = costs?.cvFirmaBase ?? 0;
-	const cfDirecto = costs?.cfDirecto ?? 0;
-	const costoRealIDC = cvCert + FIRMAS_INCL_REF * cvFirma;
+
+	// Precios base del canal Volumen. El descuento de cada segmento se aplica sobre
+	// estos dos valores, así que son el único lugar donde se edita un precio.
+	const base = draft.b2b2cBase || { cert: 0, firma: 0 };
+	function updBase(field, val) {
+		updDraft({ b2b2cBase: Object.assign({}, base, { [field]: val }) });
+	}
+	function cmPctOf(precio, cv) {
+		const p = Number(precio) || 0;
+		return p > 0 ? (p - cv) / p : 0;
+	}
+	function fPct(n) { return (n * 100).toFixed(0) + "%"; }
 
 	useEffect(function () {
 		setDraft(channelConfig);
@@ -168,35 +175,41 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distributorTiers", { id: genId("tier"), label: "Nuevo nivel", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null }); }} />
 			</CollapsibleSection>
 
-			{/* ── 2 · Segmentos B2B2C ── */}
+			{/* ── 2 · Volumen · precios base + escala de descuento ── */}
 			<CollapsibleSection
-				title="2 · Volumen · Segmentos por unidades y facturación"
-				subtitle={"El segmento se alcanza por el mayor entre unidades (certs + firmas) y facturación a lista. CV/IDC = cert USD " + cvCert.toFixed(4) + " + " + FIRMAS_INCL_REF + " firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + "."}
+				title="2 · Volumen · Precio base y segmentos por compromiso"
+				subtitle={"Un precio de lista para el certificado y otro para la firma; el segmento aplica un % de descuento sobre ambos. El segmento sale del compromiso del contrato en USD. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
 			>
-				<div className="mb-3 flex gap-1.5">
-					{[{ id: "manual", label: "Precio manual" }, { id: "margen", label: "Margen objetivo" }].map(function (m) {
-						const active = segPriceMode === m.id;
-						return (
-							<Button key={m.id} variant={active ? "default" : "outline"} size="sm" onClick={function () { setSegPriceMode(m.id); }}>{m.label}</Button>
-						);
-					})}
+				{/* Precios base de lista */}
+				<div className="mb-5 flex flex-wrap gap-6">
+					<div className="w-44">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio base certificado (USD)</Label>
+						<NumCell value={base.cert} decimals={4} onChange={function (v) { updBase("cert", v); }} className="mt-1.5" />
+						<p className="text-[11px] text-muted-foreground mt-1">CM a lista: {fPct(cmPctOf(base.cert, cvCert))}</p>
+					</div>
+					<div className="w-44">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio base firma (USD)</Label>
+						<NumCell value={base.firma} decimals={4} onChange={function (v) { updBase("firma", v); }} className="mt-1.5" />
+						<p className="text-[11px] text-muted-foreground mt-1">CM a lista: {fPct(cmPctOf(base.firma, cvFirma))}</p>
+					</div>
+					<div className="w-44">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Margen mínimo (%)</Label>
+						<NumCell value={Math.round((draft.b2b2cMargenMin != null ? draft.b2b2cMargenMin : 0) * 1000) / 10} decimals={1} onChange={function (v) { updDraft({ b2b2cMargenMin: (v || 0) / 100 }); }} className="mt-1.5" />
+						<p className="text-[11px] text-muted-foreground mt-1">Bajo este margen no se puede guardar ni exportar.</p>
+					</div>
 				</div>
 
 				<Table>
 					<TableHeader>
 						<TableRow>
 							<TableHead>Segmento</TableHead>
-							<TableHead className={thNum}>Unid. mín.</TableHead>
-							<TableHead className={thNum}>Unid. máx.</TableHead>
-							<TableHead className={thNum}>Fact. mín (USD)</TableHead>
-							<TableHead className={thNum}>Fact. máx (USD)</TableHead>
-							{segPriceMode === "margen" && <TableHead className={thNum}>Margen obj. (%)</TableHead>}
-							<TableHead className={thNum}>Precio IDC (USD){segPriceMode === "margen" ? " (calc.)" : ""}</TableHead>
-							<TableHead className={thNum}>Precio firma (USD)</TableHead>
-							<TableHead className={thNum}>CV (USD/IDC)</TableHead>
-							<TableHead className={thNum}>CM $</TableHead>
-							<TableHead className={thNum}>CM %</TableHead>
-							<TableHead className={thNum}>BE (IDC)</TableHead>
+							<TableHead className={thNum}>Compromiso mín. (USD)</TableHead>
+							<TableHead className={thNum}>Compromiso máx. (USD)</TableHead>
+							<TableHead className={thNum}>Descuento %</TableHead>
+							<TableHead className={thNum}>Precio cert</TableHead>
+							<TableHead className={thNum}>CM cert</TableHead>
+							<TableHead className={thNum}>Precio firma</TableHead>
+							<TableHead className={thNum}>CM firma</TableHead>
 							<TableHead className="w-10" />
 						</TableRow>
 					</TableHeader>
@@ -206,41 +219,31 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 								const next = draft.b2b2cSegments.map(function (s, i) { return i === idx ? Object.assign({}, s, { [field]: val }) : s; });
 								updDraft({ b2b2cSegments: next });
 							}
-							function updMargen(v) {
-								const m = (v || 0) / 100;
-								const newPrecio = m > 0 && m < 1 ? costoRealIDC / (1 - m) : costoRealIDC;
-								upd("precioIDC", Math.round(newPrecio * 10000) / 10000);
-							}
-							const precioIDC = seg.precioIDC || 0;
-							const cmVal = precioIDC - costoRealIDC;
-							const cmPct = precioIDC > 0 ? cmVal / precioIDC : 0;
-							const beVal = cmVal > 0 ? Math.ceil(cfDirecto / cmVal) : null;
-							const margenPct = precioIDC > 0 ? Math.round((cmVal / precioIDC) * 1000) / 10 : 0;
+							const desc = Math.min(1, Math.max(0, Number(seg.descuento) || 0));
+							const pCert = (Number(base.cert) || 0) * (1 - desc);
+							const pFirma = (Number(base.firma) || 0) * (1 - desc);
+							const cmCertPct = cmPctOf(pCert, cvCert);
+							const cmFirmaPct = cmPctOf(pFirma, cvFirma);
 							return (
 								<TableRow key={seg.id || idx}>
 									<TableCell><TextCell value={seg.label} onChange={function (v) { upd("label", v); }} className="w-32" /></TableCell>
-									<TableCell><NumCell value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></TableCell>
-									<TableCell><NumCell value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></TableCell>
-									<TableCell><NumCell value={seg.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
-									<TableCell><NumCell value={seg.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></TableCell>
-									{segPriceMode === "margen" && <TableCell><NumCell value={margenPct} decimals={1} onChange={updMargen} /></TableCell>}
-									<TableCell>
-										{segPriceMode === "manual"
-											? <NumCell value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} />
-											: <div className="text-right font-semibold tabular-nums px-2">{precioIDC.toFixed(4)}</div>}
-									</TableCell>
-									<TableCell><NumCell value={seg.precioFirma} decimals={4} onChange={function (v) { upd("precioFirma", v); }} /></TableCell>
-									<TableCell className="text-right tabular-nums text-muted-foreground">{costoRealIDC.toFixed(4)}</TableCell>
-									<TableCell className={cn("text-right tabular-nums font-semibold", cmClass(cmPct))}>{cmVal.toFixed(4)}</TableCell>
-									<TableCell className={cn("text-right tabular-nums font-semibold", cmClass(cmPct))}>{(cmPct * 100).toFixed(0)}%</TableCell>
-									<TableCell className="text-right tabular-nums font-semibold">{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</TableCell>
+									<TableCell><NumCell value={seg.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>
+									<TableCell><NumCell value={Math.round(desc * 1000) / 10} decimals={1} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
+									<TableCell className="text-right tabular-nums font-semibold">{pCert.toFixed(4)}</TableCell>
+									<TableCell className={cn("text-right tabular-nums font-semibold", cmClass(cmCertPct))}>{fPct(cmCertPct)}</TableCell>
+									<TableCell className="text-right tabular-nums font-semibold">{pFirma.toFixed(4)}</TableCell>
+									<TableCell className={cn("text-right tabular-nums font-semibold", cmClass(cmFirmaPct))}>{fPct(cmFirmaPct)}</TableCell>
 									<TableCell><DeleteRowButton onClick={function () { removeRow("b2b2cSegments", idx); }} /></TableCell>
 								</TableRow>
 							);
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, precioFirma: 0 }); }} />
+				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", compromisoMin: 0, compromisoMax: null, descuento: 0 }); }} />
+				<p className="text-[11px] text-muted-foreground mt-3">
+					El compromiso se mide a precio de lista (certificados × base cert + firmas × base firma) por los meses de vinculación. Los precios y CM de cada fila son calculados: se editan el precio base y el descuento.
+				</p>
 			</CollapsibleSection>
 
 			{/* ── 3 · API Tiers B2B2C ── */}
@@ -366,10 +369,17 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				title="6 · Parámetros derivados del esquema de costos"
 				subtitle="Se calculan automáticamente desde Configuración → Costos. No se editan a mano."
 			>
-				<div className="max-w-xs">
-					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo IDC referencia (USD)</Label>
-					<div className="mt-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-right font-semibold tabular-nums">{costoRealIDC.toFixed(4)}</div>
-					<p className="text-[11px] text-muted-foreground mt-1.5">= cert USD {cvCert.toFixed(4)} + {FIRMAS_INCL_REF} firma USD {cvFirma.toFixed(4)}</p>
+				<div className="grid grid-cols-2 gap-4 max-w-md">
+					<div>
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo variable certificado (USD)</Label>
+						<div className="mt-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-right font-semibold tabular-nums">{cvCert.toFixed(4)}</div>
+						<p className="text-[11px] text-muted-foreground mt-1.5">CV por certificado emitido.</p>
+					</div>
+					<div>
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo variable firma (USD)</Label>
+						<div className="mt-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-right font-semibold tabular-nums">{cvFirma.toFixed(4)}</div>
+						<p className="text-[11px] text-muted-foreground mt-1.5">CV por firma emitida.</p>
+					</div>
 				</div>
 			</CollapsibleSection>
 		</div>

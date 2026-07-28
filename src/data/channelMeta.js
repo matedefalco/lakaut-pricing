@@ -32,7 +32,7 @@ export const CHANNELS = {
 		label: "Volumen",
 		shortLabel: "Volumen",
 		full: "Volumen · Identidades Digitales Certificadas",
-		desc: "Empresas que integran los servicios de confianza en sus propios productos. La unidad es el IDC.",
+		desc: "Empresas que integran los servicios de confianza en sus propios productos. Se cotiza por certificados y firmas.",
 		badgeVariant: "default",
 	},
 };

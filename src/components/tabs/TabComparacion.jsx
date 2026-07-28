@@ -15,7 +15,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 const CHANNELS = ["b2b2c", "distribuidores", "web"];
 
 const CHANNEL_META = {
-	b2b2c:         { label: "Volumen (IDC)",   color: "#6366f1" },
+	b2b2c:         { label: "Volumen",         color: "#6366f1" },
 	distribuidores:{ label: "Precio de lista con descuento", color: "#0ea5e9" },
 	web:           { label: "Web (lista)",     color: "#f59e0b" },
 };
@@ -27,9 +27,12 @@ function nextId() { return _nextId++; }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function getB2B2CSeg(certs, segs) {
+// Volumen: un solo segmento, por el compromiso en USD a precio de lista. En la
+// comparación no hay duración de contrato, así que el compromiso es la facturación
+// a lista del volumen comparado. Ver [[modelo-canales-borrador-v5]].
+function getB2B2CSeg(compromisoUSD, segs) {
 	return segs.find(function (s) {
-		return certs >= s.idcMin && (s.idcMax === null || certs <= s.idcMax);
+		return compromisoUSD >= (Number(s.compromisoMin) || 0) && (s.compromisoMax == null || compromisoUSD <= s.compromisoMax);
 	}) || segs[0];
 }
 
@@ -56,10 +59,16 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	const firmasTotal = certs * firmasPorCert;
 	const cvTotal = certs * cvCert + firmasTotal * cvFirma;
 
-	// ── B2B2C ────────────────────────────────────────────────────────────
-	const seg = getB2B2CSeg(certs, b2b2cSegments);
-	const precioIDC = seg.precioIDC;
-	const revB2 = certs * precioIDC;
+	// ── B2B2C (Volumen) ──────────────────────────────────────────────────
+	// El segmento sale de la facturación a lista de certificados + firmas, y su
+	// descuento se aplica por igual a los dos precios base.
+	const base = channelConfig.b2b2cBase || { cert: 0, firma: 0 };
+	const facturacionB2Lista = certs * (Number(base.cert) || 0) + firmasTotal * (Number(base.firma) || 0);
+	const seg = getB2B2CSeg(facturacionB2Lista, b2b2cSegments);
+	const segDesc = Math.min(1, Math.max(0, Number(seg.descuento) || 0));
+	const precioCertB2 = (Number(base.cert) || 0) * (1 - segDesc);
+	const precioFirmaB2 = (Number(base.firma) || 0) * (1 - segDesc);
+	const revB2 = certs * precioCertB2 + firmasTotal * precioFirmaB2;
 	const margenB2 = revB2 - cvTotal;
 
 	// ── Distribuidores / Web ──────────────────────────────────────────────
@@ -81,11 +90,11 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 		firmasTotal,
 		cvTotal,
 		b2b2c: {
-			precioPorCert:  precioIDC,
-			precioPorFirma: firmasPorCert > 0 ? precioIDC / firmasPorCert : null,
-			revLista:       revB2,
+			precioPorCert:  precioCertB2,
+			precioPorFirma: precioFirmaB2,
+			revLista:       facturacionB2Lista,
 			revenueNeto:    revB2,
-			descuento:      null,
+			descuento:      segDesc > 0 ? segDesc : null,
 			cvTotal,
 			margen:         margenB2,
 			margenPct:      revB2 > 0 ? margenB2 / revB2 : 0,

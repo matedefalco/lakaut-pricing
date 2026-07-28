@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
-import { getB2B2CSegment } from "@/lib/tiers";
+import { getB2B2CSegment, facturacionAtBase } from "@/lib/tiers";
 import { buildProyeccion, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
 import { CHANNELS } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CommercialLevers } from "@/components/ui/CommercialLevers";
-import { resolveLevers, defaultLeverSelection } from "@/lib/commercialLevers";
+import { resolveLevers, defaultLeverSelection, leverValue } from "@/lib/commercialLevers";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
@@ -29,13 +29,15 @@ function margWord(pct) { return pct >= 0.5 ? "saludable" : pct >= 0.2 ? "ajustad
 
 // Fallback del descuento de abono si la config no lo tiene cargado todavía.
 const ABONO_DESC_FALLBACK = 10;
-// Fallback del precio de firma si un segmento de la config no tiene `precioFirma`
-// cargado todavía (config vieja). Con la columna cargada, el precio es dinámico.
-const DEFAULT_FIRMA_PRICE = 0.5;
+// Fallbacks de los precios base si la config todavía no los trae.
+const BASE_FALLBACK = { cert: 0.65, firma: 0.5 };
+const MARGEN_MIN_FALLBACK = 0.2;
 
 export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
 	const { channelConfig } = useChannelConfig();
 	const b2b2cSegments = channelConfig.b2b2cSegments;
+	const base = channelConfig.b2b2cBase || BASE_FALLBACK;
+	const margenMin = channelConfig.b2b2cMargenMin != null ? channelConfig.b2b2cMargenMin : MARGEN_MIN_FALLBACK;
 	const b2b2cApiTiers = channelConfig.b2b2cApiTiers;
 	const slaPlans = channelConfig.slaPlans;
 	const commercialLevers = channelConfig.commercialLevers;
@@ -65,6 +67,10 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	// precio de firma del segmento alcanzado (dinámico); "" = dinámico. Se puede
 	// sobrescribir a mano para ese excedente.
 	const [precioFirmaExtra, setPrecioFirmaExtra] = useState("");
+	// Compromiso del contrato en USD: es la métrica que asigna el segmento. Vacío =
+	// sugerido (facturación a lista del volumen × meses de vinculación); se puede
+	// sobrescribir cuando el cliente compromete un volumen distinto al cotizado.
+	const [compromisoOverride, setCompromisoOverride] = useState("");
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
@@ -95,17 +101,25 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const firmasJuridica = nj * fj;
 	const firmasIncl = firmasFisica + firmasJuridica;
 
-	// El segmento se alcanza por el MAYOR entre las unidades (certs + firmas) y la
-	// facturación a precio de lista (rompe la circularidad precio↔segmento: la
-	// facturación de referencia se calcula con el precio del segmento base, el más
-	// caro; el segmento alcanzado recién define el precio final, como Distribuidores).
-	const unidades = idc + firmasIncl;
-	const segBase = b2b2cSegments[0] || {};
-	const precioIDCbase = segBase.precioIDC || 0;
-	const precioFirmaBaseSeg = segBase.precioFirma != null ? segBase.precioFirma : DEFAULT_FIRMA_PRICE;
-	const facturacionAtList = idc * precioIDCbase + firmasIncl * precioFirmaBaseSeg;
-	const seg = getB2B2CSegment(unidades, facturacionAtList, b2b2cSegments);
-	const segFirma = seg && seg.precioFirma != null ? seg.precioFirma : DEFAULT_FIRMA_PRICE;
+	// ── Segmento único por compromiso ──
+	// El cliente cae en UN SOLO segmento, asignado por el compromiso del contrato en
+	// USD a precio de lista. Al ser un único número en dólares la métrica es
+	// conmutativa: 1 certificado con muchas firmas y muchos certificados con 1 firma
+	// caen en el mismo segmento si representan el mismo negocio. El compromiso se
+	// sugiere como facturación a lista × meses de vinculación y se puede sobrescribir.
+	// Usar siempre el precio BASE rompe la circularidad precio↔segmento.
+	const facturacionAtList = facturacionAtBase(idc, firmasIncl, base);
+	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
+	const compromisoSugerido = facturacionAtList * mesesVinculacion;
+	const compromisoManual = compromisoOverride !== "";
+	const compromiso = compromisoManual ? Math.max(0, Number(compromisoOverride) || 0) : compromisoSugerido;
+
+	const seg = getB2B2CSegment(compromiso, b2b2cSegments) || {};
+	const segDesc = Math.min(1, Math.max(0, Number(seg.descuento) || 0));
+	const segLabel = seg.label || "—";
+	// El descuento del segmento se aplica por igual al certificado y a la firma.
+	const precioCertSeg = (Number(base.cert) || 0) * (1 - segDesc);
+	const precioFirmaSeg = (Number(base.firma) || 0) * (1 - segDesc);
 	const hasVolume = idc > 0;
 
 	useEffect(function () {
@@ -139,6 +153,8 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		// Precio de firma extra: si el deal guardó un override lo tomamos; si no,
 		// queda dinámico ("" = precio de firma del segmento).
 		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
+		// Compromiso: solo se guarda cuando fue manual; si no, se recalcula solo.
+		setCompromisoOverride(i.compromisoManual && i.compromiso != null ? String(i.compromiso) : "");
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
 		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
@@ -182,10 +198,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const costoTotal = costoCert + costoFirmas;
 
 	// Ajuste por componente: cada campo cargado sobrescribe ese elemento; vacío usa
-	// el precio normal (precio del segmento para el certificado, dinámico para la firma).
+	// el precio del segmento que le corresponde (certificado por cantidad de certs,
+	// firma por cantidad de firmas).
 	const overrideActive = overridePrecioCert !== "" || overridePrecioFirma !== "";
-	const precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : seg.precioIDC;
-	const precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : segFirma;
+	const precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : precioCertSeg;
+	const precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : precioFirmaSeg;
 
 	// Precio de firma extra (excedente): dinámico = precio de firma del segmento,
 	// salvo que se haya cargado un override manual.
@@ -223,24 +240,30 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const revAbonoMes = firmasIncl * precioFirmaAbono;
 	const revAbonoAnual = revAbonoMes * 12;
 
-	// Distancia al siguiente segmento: contexto de volumen para el vendedor.
+	// Guardarraíl de rentabilidad: se evalúa sobre el margen MEZCLADO (certificados +
+	// firmas), no componente por componente, así un certificado con descuento profundo
+	// no dispara la alarma cuando las firmas compensan. Bajo el mínimo no se puede
+	// guardar ni exportar.
+	const margenBajoMin = hasVolume && revServicio > 0 && margenPct < margenMin;
+
+	// Cuánto falta de compromiso para el siguiente segmento: contexto de negociación.
 	const segIdx = b2b2cSegments.findIndex(function (s) { return s.id === seg.id; });
 	const nextSeg = segIdx >= 0 && segIdx < b2b2cSegments.length - 1 ? b2b2cSegments[segIdx + 1] : null;
 	let segHint = null;
 	if (hasVolume && nextSeg) {
-		const idcFaltan = Math.max(0, nextSeg.idcMin - idc);
-		segHint = "Con " + idcFaltan.toLocaleString("es-AR") + " certificados más entrás en " + nextSeg.label + " · precio de tabla USD " + nextSeg.precioIDC + " por certificado.";
+		const faltan = Math.max(0, (Number(nextSeg.compromisoMin) || 0) - compromiso);
+		segHint = "Con " + fMoney(faltan) + " más de compromiso entra en " + nextSeg.label + " · " + Math.round((Number(nextSeg.descuento) || 0) * 100) + "% de descuento.";
 	} else if (hasVolume) {
 		segHint = "Es el segmento de mayor volumen.";
 	}
 	const segRows = b2b2cSegments.map(function (s) {
+		const min = Number(s.compromisoMin) || 0;
 		return {
 			id: s.id,
 			cells: [
 				s.label,
-				s.idcMin.toLocaleString("es-AR") + (s.idcMax == null ? "+" : "–" + s.idcMax.toLocaleString("es-AR")),
-				"USD " + s.precioIDC,
-				"USD " + (s.precioFirma != null ? s.precioFirma : DEFAULT_FIRMA_PRICE),
+				fMoney(min) + (s.compromisoMax == null ? "+" : "–" + fMoney(Number(s.compromisoMax) || 0)),
+				Math.round((Number(s.descuento) || 0) * 100) + "%",
 			],
 		};
 	});
@@ -315,6 +338,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				// cambios posteriores de la config de tramos).
 				levers,
 				descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items },
+				// Compromiso que asignó el segmento. `compromisoManual` distingue el valor
+				// cargado a mano del sugerido, para reabrir igual la cotización.
+				compromiso, compromisoManual, mesesVinculacion,
 				casosDeUso, abono,
 				...(abono ? { abonoDescuentoPct: Number(abonoDescPct) || 0 } : {}),
 				...(proyEnabled && proySteps.length ? {
@@ -340,7 +366,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				} : {}),
 			},
 			resumen: {
-				segmento: seg.label, idcMensuales: idc,
+				segmento: segLabel, segmentoDescuento: segDesc, compromiso, idcMensuales: idc,
 				certFisicos: nf, certJuridicos: nj,
 				firmasTotales: firmasIncl, firmasMes: firmasIncl,
 				precioIDC, precioFirma: precioFirmaLista, precioFirmaExtra: precioFirmaExtraEff,
@@ -394,7 +420,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			description={
 				<>
 					{CHANNELS.b2b2c.desc}
-					<InfoTooltip text="Un certificado (IDC) es físico o jurídico; cuestan y cotizan igual. Cada uno lleva las firmas que se le carguen, sin firma inicial extra." />
+					<InfoTooltip text="Un certificado es físico o jurídico; cuestan y cotizan igual. Cada uno lleva las firmas que se le carguen, sin firma inicial extra. El certificado baja de precio por su volumen de certificados y la firma por su volumen de firmas." />
 				</>
 			}
 		/>
@@ -417,13 +443,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			{/* Segmento + acceso contextual a la tabla de precios */}
 			<div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
 				<div className="min-w-0">
-					<div className="text-[11px] text-muted-foreground">Segmento · {hasVolume ? unidades.toLocaleString("es-AR") + " unidades" : "por volumen total"}</div>
+					<div className="text-[11px] text-muted-foreground">Segmento · {hasVolume ? "compromiso " + fMoney(compromiso) : "por compromiso"}</div>
 					<div className="text-sm font-semibold">
-						{hasVolume ? <>{seg.label} <span className="font-normal text-[11px] text-muted-foreground">· {fMoney2(precioIDC)}/cert · {fMoney2(precioFirmaLista)}/firma</span></> : <span className="text-muted-foreground/40">—</span>}
+						{hasVolume ? <>{segLabel}{segDesc > 0 && <span className="ml-1.5 text-[11px] font-semibold text-[var(--success)]">−{Math.round(segDesc * 100)}%</span>} <span className="font-normal text-[11px] text-muted-foreground">· {fMoney2(precioIDC)}/cert · {fMoney2(precioFirmaLista)}/firma</span></> : <span className="text-muted-foreground/40">—</span>}
 					</div>
 				</div>
 				{hasVolume && (
-					<TierHint label="ver segmentos" columns={["Segmento", "Unidades", "Cert", "Firma"]} rows={segRows} activeId={seg.id} nextHint={segHint} />
+					<TierHint label="ver segmentos" columns={["Segmento", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />
 				)}
 			</div>
 
@@ -466,6 +492,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					</div>
 
 					<p className="text-[10px] text-muted-foreground">Firma extra (si superan el presupuesto): {fMoney2(precioFirmaExtraEff)} c/u{precioFirmaExtra !== "" ? " · manual" : " · dinámico"}.</p>
+
+					{margenBajoMin && (
+						<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
+							<div className="text-[11px] font-semibold text-destructive">Margen bajo el mínimo ({Math.round(margenMin * 100)}%)</div>
+							<p className="text-[10px] text-muted-foreground mt-0.5">Esta combinación de descuentos deja un margen de {(margenPct * 100).toFixed(0)}%. Subí el precio, bajá el descuento o ajustá las condiciones para poder guardar y exportar.</p>
+						</div>
+					)}
 				</div>
 			) : (
 				<p className="text-[11px] text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
@@ -504,9 +537,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const footer = (
 		<SaveExportBar
-			hint={hasVolume ? "" : "Cargá al menos un certificado para guardar o exportar."}
-			canSave={hasVolume}
-			canExport={hasVolume}
+			hint={!hasVolume ? "Cargá al menos un certificado para guardar o exportar." : (margenBajoMin ? "Margen " + (margenPct * 100).toFixed(0) + "%, bajo el mínimo de " + Math.round(margenMin * 100) + "%. Ajustá precios o condiciones." : "")}
+			canSave={hasVolume && !margenBajoMin}
+			canExport={hasVolume && !margenBajoMin}
 			onSave={saveQuote}
 			onExport={exportNow}
 			onCancelEdit={function () { setEditingId(null); }}
@@ -590,9 +623,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio por firma <span className="normal-case tracking-normal font-normal">(dinámico)</span></Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioFirmaLista) : "—"}</span>
-							<span className="ml-2 text-[11px] text-muted-foreground">{hasVolume ? "según segmento " + seg.label : "según el segmento alcanzado"}</span>
+							<span className="ml-2 text-[11px] text-muted-foreground">{hasVolume ? "segmento " + segLabel + (segDesc > 0 ? " · −" + Math.round(segDesc * 100) + "%" : "") : "según el segmento alcanzado"}</span>
 						</div>
-						<span className="text-[11px] text-muted-foreground">Se calcula por el segmento (volumen facturado o cantidad de certs + firmas).</span>
+						<span className="text-[11px] text-muted-foreground">Precio base {fMoney2(Number(base.firma) || 0)} menos el descuento del segmento.</span>
 					</div>
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio de firma extra <span className="normal-case tracking-normal font-normal">(excedente)</span></Label>
@@ -631,6 +664,35 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				<div className="flex flex-col gap-2">
 					<span className="text-sm font-medium">Descuento por condiciones</span>
 					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
+				</div>
+
+				<Separator />
+
+				{/* Compromiso del contrato: la métrica que asigna el segmento. Se sugiere
+				    volumen × meses de vinculación y se puede sobrescribir. */}
+				<div className="flex flex-col gap-2">
+					<span className="text-sm font-medium">Compromiso del contrato</span>
+					<p className="text-[11px] text-muted-foreground">Define el segmento y su descuento por volumen. Sugerido: facturación a lista del volumen cotizado ({fMoney(facturacionAtList)}) × {mesesVinculacion} {mesesVinculacion === 1 ? "mes" : "meses"} de vinculación.</p>
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso total</Label>
+							<div className="relative flex items-center">
+								<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
+								<Input type="number" min={0} value={compromisoOverride} onChange={function (e) { setCompromisoOverride(e.target.value); }} placeholder={String(Math.round(compromisoSugerido))} className="tabular-nums pl-11" />
+								{compromisoManual && <button onClick={function () { setCompromisoOverride(""); }} className="absolute right-3 text-muted-foreground hover:text-foreground text-xs">✕</button>}
+							</div>
+							<span className="text-[11px] text-muted-foreground">Vacío = sugerido. Cargalo a mano si el cliente compromete un volumen distinto al cotizado.</span>
+						</div>
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>
+							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+								<span className="font-semibold">{hasVolume ? segLabel : "—"}</span>
+								{hasVolume && segDesc > 0 && <span className="ml-1.5 text-[11px] font-semibold text-[var(--success)]">−{Math.round(segDesc * 100)}%</span>}
+								<span className="ml-2 text-[11px] text-muted-foreground">{hasVolume ? "por " + fMoney(compromiso) + (compromisoManual ? " · manual" : "") : "cargá volumen"}</span>
+							</div>
+							<span className="text-[11px] text-muted-foreground">El descuento se aplica al certificado y a la firma por igual.</span>
+						</div>
+					</div>
 				</div>
 
 				<Separator />
@@ -676,14 +738,14 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
 									<div className="flex items-center gap-1">
-										<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={seg.precioIDC != null ? String(seg.precioIDC) : ""} className="h-8 text-sm" />
+										<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={precioCertSeg.toFixed(3)} className="h-8 text-sm" />
 										{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
 									</div>
 								</div>
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
 									<div className="flex items-center gap-1">
-										<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segFirma.toFixed(3)} className="h-8 text-sm" />
+										<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={precioFirmaSeg.toFixed(3)} className="h-8 text-sm" />
 										{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
 									</div>
 								</div>

@@ -5,21 +5,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
-// 1 IDC = 1 cert + 1 firma
-const FIRMAS_INCL_REF = 1;
-
+// Certificado y firma se precian y analizan por separado (ya no como un "IDC"
+// combinado). Cada componente tiene su precio de lista, su CV y su margen.
 const ALL_COLS = [
-	{ key: "precioIDC",     label: "Precio (USD/IDC)" },
+	{ key: "precioCert",    label: "Precio cert (USD)" },
+	{ key: "cvCert",        label: "CV cert (USD)" },
+	{ key: "cmCert",        label: "CM cert" },
+	{ key: "beCert",        label: "BE cert" },
 	{ key: "precioFirma",   label: "Precio firma (USD)" },
-	{ key: "costoReal",     label: "Costo CV (USD/IDC)" },
-	{ key: "cmReal",        label: "CM $" },
-	{ key: "cmRealPct",     label: "CM %" },
-	{ key: "beReal",        label: "BE (IDC)" },
-	{ key: "costoRef",      label: "Costo ref. (USD/IDC)" },
-	{ key: "cmRef",         label: "CM ref. (USD/IDC)" },
+	{ key: "cvFirma",       label: "CV firma (USD)" },
+	{ key: "cmFirma",       label: "CM firma" },
 ];
 
-const DEFAULT_VISIBLE = new Set(["precioIDC", "precioFirma", "costoReal", "cmReal", "cmRealPct", "beReal"]);
+const DEFAULT_VISIBLE = new Set(["precioCert", "cmCert", "precioFirma", "cmFirma"]);
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -110,11 +108,11 @@ function ColFilterDropdown({ visible, onToggle }) {
 export function TabCanalB2B2CPrecios({ costs }) {
 	const { channelConfig } = useChannelConfig();
 	const { b2b2cSegments, b2b2cApiTiers, slaPlans } = channelConfig;
+	const base = channelConfig.b2b2cBase || { cert: 0, firma: 0 };
 
 	const cvCert = costs?.cvCertBase ?? 0;
 	const cvFirma = costs?.cvFirmaBase ?? 0;
-	// Costo real por IDC = cert + firmas incluidas por defecto
-	const costoRealIDC = cvCert + FIRMAS_INCL_REF * cvFirma;
+	const cfDirecto = costs?.cfDirecto ?? 0;
 
 	const [visible, setVisible] = useState(DEFAULT_VISIBLE);
 	function toggleCol(key) {
@@ -132,7 +130,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 		<div className="space-y-6 max-w-4xl">
 			<div>
 				<h2 className="text-base font-semibold font-heading">Canal Volumen · Tabla de referencia</h2>
-				<p className="text-sm text-muted-foreground mt-1">Precios en USD. La unidad comercial es el IDC (Identidad Digital Certificada). El precio final por cotización puede ajustarse en la Cotizadora.</p>
+				<p className="text-sm text-muted-foreground mt-1">Precios en USD. El certificado y la firma tienen precio de lista base, y el segmento alcanzado aplica un descuento sobre ambos. El precio final por cotización puede ajustarse en la Cotizadora.</p>
 			</div>
 
 			{/* ── Pricing por segmento ────────────────────────────────── */}
@@ -146,40 +144,43 @@ export function TabCanalB2B2CPrecios({ costs }) {
 					<Table>
 						<TableHeader>
 							<TableRow>
-								<TableHead>Segmento<InfoTooltip text="El segmento se alcanza por el mayor entre las unidades (certificados + firmas) y la facturación a precio de lista." /></TableHead>
-								<TableHead className="text-right">IDC<InfoTooltip text="Rango de IDC (Identidad Digital Certificada) que define el segmento." /></TableHead>
-								{visible.has("precioIDC")     && <TableHead className="text-right">Precio (USD/IDC)<InfoTooltip text="Precio de lista por IDC del segmento, en USD." /></TableHead>}
-								{visible.has("precioFirma")   && <TableHead className="text-right">Precio firma (USD)<InfoTooltip text="Precio de la firma del segmento, en USD. Baja con el volumen." /></TableHead>}
-								{visible.has("costoReal")     && <TableHead className="text-right">Costo CV<InfoTooltip text={"Costo variable por IDC = cert USD " + cvCert.toFixed(4) + " + 1 firma USD " + cvFirma.toFixed(4) + " = USD " + costoRealIDC.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
-								{visible.has("cmReal")        && <TableHead className="text-right">CM $<InfoTooltip text="Contribución marginal = Precio − CV (sin CF). Ganancia por IDC antes de cubrir costos fijos." /></TableHead>}
-								{visible.has("cmRealPct")     && <TableHead className="text-right">CM %<InfoTooltip text="CM como porcentaje del precio = CM / Precio × 100." /></TableHead>}
-								{visible.has("beReal")        && <TableHead className="text-right">BE (IDC)<InfoTooltip text="Break-even: IDC mínimos para cubrir el CF directo al precio de este segmento. BE = CF directo ÷ CM por IDC." /></TableHead>}
-								{visible.has("costoRef")      && <TableHead className="text-right">Costo ref.<InfoTooltip text="Costo de referencia por IDC calculado desde el esquema de costos (Configuración → Costos). Coincide con el Costo CV." /></TableHead>}
-								{visible.has("cmRef")         && <TableHead className="text-right">CM ref.<InfoTooltip text="Contribución marginal calculada con el costo de referencia (Precio − Costo ref.)." /></TableHead>}
+								<TableHead>Segmento<InfoTooltip text="El cliente cae en un solo segmento, asignado por el compromiso del contrato en USD a precio de lista." /></TableHead>
+								<TableHead className="text-right">Compromiso (USD)<InfoTooltip text="Rango de compromiso del contrato que alcanza el segmento: certificados × precio base cert + firmas × precio base firma, por los meses de vinculación." /></TableHead>
+								<TableHead className="text-right">Desc.<InfoTooltip text="Descuento del segmento, aplicado por igual al precio del certificado y al de la firma." /></TableHead>
+								{visible.has("precioCert")    && <TableHead className="text-right">Precio cert (USD)<InfoTooltip text={"Precio base USD " + (Number(base.cert) || 0).toFixed(4) + " menos el descuento del segmento."} /></TableHead>}
+								{visible.has("cvCert")        && <TableHead className="text-right">CV cert<InfoTooltip text={"Costo variable por certificado = USD " + cvCert.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
+								{visible.has("cmCert")        && <TableHead className="text-right">CM cert<InfoTooltip text="Contribución marginal del certificado = Precio cert − CV cert (sin CF), en USD y como % del precio." /></TableHead>}
+								{visible.has("beCert")        && <TableHead className="text-right">BE cert<InfoTooltip text="Break-even: certificados mínimos para cubrir el CF directo al precio de este segmento. BE = CF directo ÷ CM cert." /></TableHead>}
+								{visible.has("precioFirma")   && <TableHead className="text-right">Precio firma (USD)<InfoTooltip text={"Precio base USD " + (Number(base.firma) || 0).toFixed(4) + " menos el descuento del segmento."} /></TableHead>}
+								{visible.has("cvFirma")       && <TableHead className="text-right">CV firma<InfoTooltip text={"Costo variable por firma = USD " + cvFirma.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
+								{visible.has("cmFirma")       && <TableHead className="text-right">CM firma<InfoTooltip text="Contribución marginal de la firma = Precio firma − CV firma (sin CF), en USD y como % del precio." /></TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
-								const cmVal     = s.precioIDC - costoRealIDC;
-								const cmPct     = s.precioIDC > 0 ? cmVal / s.precioIDC : 0;
-								const beVal     = cmVal > 0 ? Math.ceil((costs?.cfDirecto ?? 0) / cmVal) : null;
-								const cmRefVal  = s.precioIDC - costoRealIDC;
-								const mRefPct   = s.precioIDC > 0 ? cmRefVal / s.precioIDC : 0;
+								const desc       = Math.min(1, Math.max(0, Number(s.descuento) || 0));
+								const precioCert = (Number(base.cert) || 0) * (1 - desc);
+								const precioFirma = (Number(base.firma) || 0) * (1 - desc);
+								const cmCertVal  = precioCert - cvCert;
+								const cmCertPct  = precioCert > 0 ? cmCertVal / precioCert : 0;
+								const beCertVal  = cmCertVal > 0 ? Math.ceil(cfDirecto / cmCertVal) : null;
+								const cmFirmaVal = precioFirma - cvFirma;
+								const cmFirmaPct = precioFirma > 0 ? cmFirmaVal / precioFirma : 0;
 								return (
 									<TableRow key={s.id}>
 										<TableCell className="font-semibold">{s.label}</TableCell>
 										<TableCell className="text-right tabular-nums text-muted-foreground">
-											{s.idcMin.toLocaleString("es-AR")}
-											{s.idcMax == null ? "+" : " – " + s.idcMax.toLocaleString("es-AR")}
+											{(Number(s.compromisoMin) || 0).toLocaleString("es-AR")}
+											{s.compromisoMax == null ? "+" : " – " + (Number(s.compromisoMax) || 0).toLocaleString("es-AR")}
 										</TableCell>
-										{visible.has("precioIDC")     && <TableCell className="text-right tabular-nums font-semibold">{fUSD(s.precioIDC)}</TableCell>}
-										{visible.has("precioFirma")   && <TableCell className="text-right tabular-nums">{s.precioFirma != null ? fUSD(s.precioFirma) : "—"}</TableCell>}
-										{visible.has("costoReal")     && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
-										{visible.has("cmReal")        && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fUSD(cmVal)}</TableCell>}
-										{visible.has("cmRealPct")     && <TableCell className={"text-right tabular-nums font-semibold " + margClass(cmPct)}>{fPct(cmPct)}</TableCell>}
-										{visible.has("beReal")        && <TableCell className="text-right tabular-nums font-semibold">{beVal != null ? beVal.toLocaleString("es-AR") : "—"}</TableCell>}
-										{visible.has("costoRef")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(costoRealIDC)}</TableCell>}
-										{visible.has("cmRef")         && <TableCell className={"text-right tabular-nums font-semibold " + margClass(mRefPct)}>{fUSD(cmRefVal)}</TableCell>}
+										<TableCell className="text-right tabular-nums font-semibold">{desc > 0 ? "−" + fPct(desc) : "—"}</TableCell>
+										{visible.has("precioCert")    && <TableCell className="text-right tabular-nums font-semibold">{fUSD(precioCert)}</TableCell>}
+										{visible.has("cvCert")        && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(cvCert)}</TableCell>}
+										{visible.has("cmCert")        && <TableCell className={"text-right tabular-nums font-semibold whitespace-nowrap " + margClass(cmCertPct)}>{fUSD(cmCertVal)} · {fPct(cmCertPct)}</TableCell>}
+										{visible.has("beCert")        && <TableCell className="text-right tabular-nums font-semibold">{beCertVal != null ? beCertVal.toLocaleString("es-AR") : "—"}</TableCell>}
+										{visible.has("precioFirma")   && <TableCell className="text-right tabular-nums font-semibold">{fUSD(precioFirma)}</TableCell>}
+										{visible.has("cvFirma")       && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(cvFirma)}</TableCell>}
+										{visible.has("cmFirma")       && <TableCell className={"text-right tabular-nums font-semibold whitespace-nowrap " + margClass(cmFirmaPct)}>{fUSD(cmFirmaVal)} · {fPct(cmFirmaPct)}</TableCell>}
 									</TableRow>
 								);
 							})}

@@ -36,7 +36,7 @@ export function TierHint({ label = "¿por qué este nivel?", nextHint, columns, 
 						</thead>
 						<tbody>
 							{rows.map(function (r) {
-								const active = r.id === activeId;
+								const active = Array.isArray(activeId) ? activeId.indexOf(r.id) !== -1 : r.id === activeId;
 								return (
 									<tr key={r.id} className={cn("border-t border-border/60", active && "bg-accent font-semibold text-foreground")}>
 										{r.cells.map(function (cell, i) {

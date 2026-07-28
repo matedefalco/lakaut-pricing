@@ -18,25 +18,24 @@ export function getDistributorTier(certsActivos, compromisoAnualUSD, tiers) {
 	return tiers.indexOf(a) >= tiers.indexOf(b) ? a : b;
 }
 
-// Volumen (B2B2C): el segmento es el MAYOR entre el que da la cantidad de unidades
-// (certificados + firmas) y el que da la facturación a precio de lista. Reproduce
-// la filosofía de Distribuidores (gana el mayor) para premiar el gran caso de
-// negocio: pocos certificados con muchas firmas igual sube de segmento vía la
-// facturación. `segments` viene de channelConfig.b2b2cSegments.
-//   - unidades: certificados + firmas de la cotización.
-//   - facturacionRef: facturación a precio de lista (segmento base). Solo cuenta
-//     para los segmentos que tengan `facturacionMin` configurado.
-export function getB2B2CSegment(unidades, facturacionRef, segments) {
+// Volumen (B2B2C): UN SOLO segmento por cliente, asignado por el compromiso del
+// contrato en USD a precio de lista. Al ser un único número en dólares la métrica
+// es conmutativa: 1 certificado con muchas firmas y muchos certificados con 1 firma
+// caen en el mismo segmento si representan el mismo negocio. `segments` viene de
+// channelConfig.b2b2cSegments y cada uno aporta su `descuento` sobre los precios
+// base. Ver [[modelo-canales-borrador-v5]].
+export function getB2B2CSegment(compromisoUSD, segments) {
 	if (!segments || segments.length === 0) return null;
-	function byUnidades(u) {
-		return segments.find(function (s) { return u >= (s.idcMin || 0) && (s.idcMax == null || u <= s.idcMax); }) || segments[0];
-	}
-	function byFacturacion(f) {
-		const conRango = segments.filter(function (s) { return s.facturacionMin != null; });
-		if (conRango.length === 0) return segments[0];
-		return conRango.find(function (s) { return f >= s.facturacionMin && (s.facturacionMax == null || f <= s.facturacionMax); }) || segments[0];
-	}
-	const a = byUnidades(unidades || 0);
-	const b = byFacturacion(facturacionRef || 0);
-	return segments.indexOf(a) >= segments.indexOf(b) ? a : b;
+	const c = Math.max(0, Number(compromisoUSD) || 0);
+	return segments.find(function (s) {
+		return c >= (Number(s.compromisoMin) || 0) && (s.compromisoMax == null || c <= s.compromisoMax);
+	}) || segments[0];
+}
+
+// Facturación a precio de LISTA de un volumen de certificados y firmas. Es la base
+// del compromiso (nunca usa el precio ya descontado, para no morderse la cola).
+export function facturacionAtBase(certs, firmas, base) {
+	const bc = base && base.cert != null ? Number(base.cert) || 0 : 0;
+	const bf = base && base.firma != null ? Number(base.firma) || 0 : 0;
+	return (Math.max(0, Number(certs) || 0) * bc) + (Math.max(0, Number(firmas) || 0) * bf);
 }

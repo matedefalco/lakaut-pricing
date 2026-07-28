@@ -692,6 +692,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 
 	const subtitleParts = [sinApi ? "Cotización de volumen directo, sin integración API" : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
 	if (showIva) subtitleParts.push("precios en pesos argentinos, IVA discriminado al 21%");
+	// El descuento del segmento ya viene aplicado en el precio unitario, así que se
+	// nombra como condición alcanzada y no como una línea aparte (sería doble conteo).
+	if ((res.segmentoDescuento || 0) > 0) subtitleParts.push(`descuento por volumen del ${Math.round(res.segmentoDescuento * 100)}% ya aplicado`);
 
 	// Con API, aclaración de facturación al pie: el consumo se cobra aunque la
 	// validación resulte inválida, y la firma se cobra por cada documento firmado.
@@ -699,8 +702,17 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		? `<strong style="color:${DK};">Consumo del servicio de validación de identidad:</strong> se factura cada llamada a la API, aunque la validación resulte inválida — el servicio se ejecuta igual. &nbsp;·&nbsp; <strong style="color:${DK};">Documento firmado:</strong> se factura por cada documento firmado; si en una misma operación se firman varios documentos, se cobra cada uno.`
 		: "";
 
+	// Segmento alcanzado: el cliente cae en un solo segmento por su compromiso, y su
+	// descuento por volumen ya está aplicado en los precios de arriba. Se nombra en el
+	// kicker para que la propuesta diga explícitamente en qué segmento entró.
+	const segNombre = res.segmento || "";
+	const segDescPts = res.segmentoDescuento != null ? Math.round(res.segmentoDescuento * 100) : 0;
+	const segKicker = segNombre
+		? `Segmento ${segNombre}${segDescPts > 0 ? ` · ${segDescPts}% por volumen` : ""}`
+		: (conApi ? "Modelo comercial · consumo por API" : "Modelo comercial · volumen");
+
 	return commercialSlide({
-		kicker: conApi ? "Modelo comercial · consumo por API" : "Modelo comercial · volumen IDC",
+		kicker: segKicker,
 		title: "Tu propuesta a medida",
 		subtitle: subtitleParts.join(" · "),
 		chips,

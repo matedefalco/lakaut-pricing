@@ -119,29 +119,36 @@ export function getDistributorTier(certsActivos, compromisoAnualUSD) {
 	return ia >= ib ? a : b;
 }
 
-// ── Canal C · B2B2C (Identidades Digitales Certificadas) ────────────────────────
-// Unidad = certificado (IDC). El segmento se alcanza por el MAYOR entre la
-// cantidad de unidades (certificados + firmas) y la facturación a precio de lista
-// (el precio del segmento base). Cada segmento define su precio de certificado y
-// su precio de firma; ambos bajan con el volumen (premia el gran caso de negocio).
-//   - idcMin/idcMax: rango de UNIDADES (certificados + firmas).
-//   - facturacionMin/facturacionMax: rango de facturación a lista (USD) que alcanza
-//     el segmento; null = sin tope. Si un segmento no tiene rango, esa vía se ignora.
-//   - precioIDC: precio del certificado. precioFirma: precio de la firma.
-// Los valores son escala de referencia (Borrador v5): ajustar en Config → Precios.
+// ── Canal C · B2B2C (Volumen) ───────────────────────────────────────────────────
+// Se cotiza por certificados y firmas, con precio de lista base para cada uno. El
+// cliente cae en UN SOLO segmento, y ese segmento aplica un % de descuento sobre
+// ambos precios base (misma filosofía que el canal de Precio de lista con
+// descuento, para que los dos canales se lean igual).
+//
+// La métrica que asigna el segmento es el COMPROMISO del contrato en USD, medido a
+// precio de lista: certificados × base.cert + firmas × base.firma, por los meses de
+// vinculación. Al ser un único número en dólares, es conmutativo: 1 certificado con
+// muchas firmas y muchos certificados con 1 firma caen en el mismo segmento si
+// representan el mismo negocio. Usar siempre el precio BASE (nunca el ya
+// descontado) es lo que rompe la circularidad precio↔segmento.
+export const B2B2C_BASE = { cert: 0.65, firma: 0.50 };
+
+//   - compromisoMin/compromisoMax: rango de compromiso en USD; null = sin tope.
+//   - descuento: puntos de descuento (0..1) sobre los dos precios base.
+// Los valores son escala de referencia: ajustar en Config → Precios por canal.
 export const B2B2C_SEGMENTS = [
-	{ id: "startup", label: "Start Up", idcMin: 1000, idcMax: 50000, facturacionMin: 0, facturacionMax: 25000, precioIDC: 0.65, precioFirma: 0.50, margenRef: 0.74 },
-	{ id: "growth", label: "Growth", idcMin: 50001, idcMax: 250000, facturacionMin: 25001, facturacionMax: 125000, precioIDC: 0.60, precioFirma: 0.45, margenRef: 0.60 },
-	{ id: "pyme", label: "PyME", idcMin: 250001, idcMax: 1000000, facturacionMin: 125001, facturacionMax: 500000, precioIDC: 0.55, precioFirma: 0.40, margenRef: 0.47 },
-	{ id: "empresa", label: "Empresa", idcMin: 1000001, idcMax: 3000000, facturacionMin: 500001, facturacionMax: 1500000, precioIDC: 0.50, precioFirma: 0.35, margenRef: 0.34 },
-	{ id: "plataforma", label: "Plataforma", idcMin: 3000001, idcMax: null, facturacionMin: 1500001, facturacionMax: null, precioIDC: 0.45, precioFirma: 0.30, margenRef: 0.20 },
+	{ id: "startup", label: "Start Up", compromisoMin: 0, compromisoMax: 25000, descuento: 0 },
+	{ id: "growth", label: "Growth", compromisoMin: 25001, compromisoMax: 125000, descuento: 0.10 },
+	{ id: "pyme", label: "PyME", compromisoMin: 125001, compromisoMax: 500000, descuento: 0.20 },
+	{ id: "empresa", label: "Empresa", compromisoMin: 500001, compromisoMax: 1500000, descuento: 0.30 },
+	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.40 },
 ];
 
-export function getB2B2CSegment(idcMensuales) {
-	return B2B2C_SEGMENTS.find(function (s) {
-		return idcMensuales >= s.idcMin && (s.idcMax === null || idcMensuales <= s.idcMax);
-	}) || B2B2C_SEGMENTS[0];
-}
+// Guardarraíl de rentabilidad: margen mínimo (0..1) sobre el subtotal de servicio de
+// la cotización. Se evalúa sobre el margen MEZCLADO (certificados + firmas), no
+// componente por componente, así un certificado con descuento profundo no dispara la
+// alarma cuando las firmas compensan. Bajo el mínimo no se puede guardar ni exportar.
+export const B2B2C_MARGEN_MIN = 0.20;
 
 // Fee de implementación (única vez). Default = punto medio del rango, editable.
 export const B2B2C_API_TIERS = [
