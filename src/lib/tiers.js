@@ -1,8 +1,8 @@
 // ─── Asignación de nivel / segmento por canal ─────────────────────────────────
-// Lógica compartida por la cotizadora de Distribuidores, el Historial y Clientes.
+// Lógica compartida por la cotizadora de Packs, el Historial y Clientes.
 // Antes estaba duplicada (copiada) en tres componentes; acá vive una sola vez.
 
-// Distribuidores: el nivel es el MAYOR entre el que dan los certificados activos
+// Packs con descuento: el nivel es el MAYOR entre el que dan los certificados activos
 // y el que da el compromiso de facturación (USD a lista). `tiers` viene de la
 // config de canales (channelConfig.distributorTiers).
 export function getDistributorTier(certsActivos, compromisoAnualUSD, tiers) {

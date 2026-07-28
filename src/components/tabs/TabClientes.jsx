@@ -9,14 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { getDistributorTier } from "@/lib/tiers";
-import { CHANNELS, channelLabel, channelShort } from "@/data/channelMeta";
+import { channelLabel, channelShort, channelBadge, resolveChannel, isPacks } from "@/data/channelMeta";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
-
-const CHANNEL_LABEL = { web: channelLabel("web"), distribuidores: channelLabel("distribuidores"), b2b2c: channelLabel("b2b2c") };
-const CHANNEL_SHORT = { web: channelShort("web"), distribuidores: channelShort("distribuidores"), b2b2c: channelShort("b2b2c") };
-const CHANNEL_BADGE = { web: CHANNELS.web.badgeVariant, distribuidores: CHANNELS.distribuidores.badgeVariant, b2b2c: CHANNELS.b2b2c.badgeVariant };
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -50,7 +46,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 
 	const filtered = useMemo(function () {
 		return clients.filter(function (c) {
-			if (channelFilter !== "all" && c.channel !== channelFilter) return false;
+			if (channelFilter !== "all" && resolveChannel(c.channel) !== channelFilter) return false;
 			if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
 			return true;
 		});
@@ -87,8 +83,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 			if (dealStatus(d) === "confirmada") confirmedRevenue += rev;
 		});
 		const byChannel = {
-			web: clients.filter(function (c) { return c.channel === "web"; }).length,
-			distribuidores: clients.filter(function (c) { return c.channel === "distribuidores"; }).length,
+			packs: clients.filter(function (c) { return isPacks(c.channel); }).length,
 			b2b2c: clients.filter(function (c) { return c.channel === "b2b2c"; }).length,
 		};
 		return { totalClients, totalDeals, totalRevenue, confirmedRevenue, byChannel };
@@ -162,7 +157,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 							)}
 						</div>
 						<div className="flex items-center gap-2 pl-11">
-							<Badge variant={CHANNEL_BADGE[selected.channel] || "secondary"}>{CHANNEL_LABEL[selected.channel] || selected.channel}</Badge>
+							<Badge variant={channelBadge(selected.channel)}>{channelLabel(selected.channel)}</Badge>
 							<span className="text-xs text-muted-foreground">Desde {fDate(selected.created_at)}</span>
 						</div>
 					</div>
@@ -171,8 +166,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					</button>
 				</div>
 
-				{/* Certs activos (distribuidores) */}
-				{selected.channel === "distribuidores" && (function () {
+				{/* Certs activos (Packs) */}
+				{isPacks(selected.channel) && (function () {
 					const certsTotal = clientDeals.reduce(function (s, d) { return s + (d.resumen?.certsComprados || 0); }, 0);
 					return (
 						<Card>
@@ -230,7 +225,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										<TableHead>Resumen</TableHead>
 										<TableHead>Estado</TableHead>
 										{selected.channel === "b2b2c" && <TableHead className="text-right">IDC</TableHead>}
-										{selected.channel === "distribuidores" && <TableHead className="text-right">Certs</TableHead>}
+										{isPacks(selected.channel) && <TableHead className="text-right">Certs</TableHead>}
 										<TableHead className="text-right">Revenue</TableHead>
 										<TableHead></TableHead>
 									</TableRow>
@@ -241,9 +236,9 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										return (
 											<TableRow key={d.id}>
 												<TableCell className="text-sm tabular-nums">{fDate(d.fecha)}</TableCell>
-												<TableCell><Badge variant="secondary" className="text-[10px]">{CHANNEL_LABEL[d.channel] || d.channel}</Badge></TableCell>
+												<TableCell><Badge variant="secondary" className="text-[10px]">{channelLabel(d.channel)}</Badge></TableCell>
 												<TableCell className="text-sm text-muted-foreground">
-													{d.channel === "distribuidores" ? (d.resumen?.tier || "—") : (d.resumen?.segmento || "—")}
+													{isPacks(d.channel) ? (d.resumen?.tier || "a lista") : (d.resumen?.segmento || "—")}
 												</TableCell>
 												<TableCell>
 													<Select value={dealStatus(d)} onValueChange={function (v) { dealsApi.updateStatus(d.id, v); }}>
@@ -256,7 +251,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 													</Select>
 												</TableCell>
 												{selected.channel === "b2b2c" && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.idcMensuales || 0).toLocaleString("es-AR")}</TableCell>}
-												{selected.channel === "distribuidores" && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.certsActivos || 0).toLocaleString("es-AR")}</TableCell>}
+												{isPacks(selected.channel) && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.certsActivos || d.resumen?.certsComprados || 0).toLocaleString("es-AR")}</TableCell>}
 												<TableCell className="text-right tabular-nums text-sm font-medium">{rev ? fMoney(rev) : "—"}</TableCell>
 												<TableCell>
 													<div className="flex gap-1 justify-end">
@@ -307,8 +302,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 				{globalStats.confirmedRevenue > 0 && (
 					<StatCard label="Facturado (confirmado)" value={fMoney(globalStats.confirmedRevenue)} accent="success" valueClass="text-[var(--success)]" />
 				)}
-				{globalStats.byChannel.distribuidores > 0 && (
-					<StatCard label={channelShort("distribuidores")} value={globalStats.byChannel.distribuidores} accent="muted" />
+				{globalStats.byChannel.packs > 0 && (
+					<StatCard label={channelShort("packs")} value={globalStats.byChannel.packs} accent="muted" />
 				)}
 				{globalStats.byChannel.b2b2c > 0 && (
 					<StatCard label={channelShort("b2b2c")} value={globalStats.byChannel.b2b2c} accent="muted" />
@@ -324,14 +319,14 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					className="h-8 text-sm max-w-xs"
 				/>
 				<div className="flex gap-1 text-xs">
-					{["all", "distribuidores", "b2b2c"].map(function (ch) {
+					{["all", "packs", "b2b2c"].map(function (ch) {
 						return (
 							<button
 								key={ch}
 								onClick={function () { setChannelFilter(ch); }}
 								className={"px-2.5 py-1 rounded-md transition-colors " + (channelFilter === ch ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
 							>
-								{ch === "all" ? "Todos" : ch === "distribuidores" ? "Lista c/desc." : "Volumen"}
+								{ch === "all" ? "Todos" : channelShort(ch)}
 							</button>
 						);
 					})}
@@ -377,8 +372,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										</div>
 									</TableCell>
 									<TableCell>
-										<Badge variant={CHANNEL_BADGE[c.channel] || "secondary"} className="text-[10px]">
-											{CHANNEL_SHORT[c.channel] || c.channel}
+										<Badge variant={channelBadge(c.channel)} className="text-[10px]">
+											{channelShort(c.channel)}
 										</Badge>
 									</TableCell>
 									<TableCell className="text-right tabular-nums text-sm text-muted-foreground">{dealCount}</TableCell>

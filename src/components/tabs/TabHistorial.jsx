@@ -14,12 +14,13 @@ import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { channelShort, CHANNELS as CHANNEL_META } from "@/data/channelMeta";
+import { channelShort, CHANNELS as CHANNEL_META, resolveChannel, isPacks, packsConDescuento } from "@/data/channelMeta";
 import { PageHeader } from "@/components/ui/PageHeader";
 
+// Las cotizaciones se agrupan por canal vigente: los ex canales web y
+// distribuidores caen los dos en Packs (ver resolveChannel).
 const CHANNELS = {
-	web: { label: channelShort("web"), variant: CHANNEL_META.web.badgeVariant },
-	distribuidores: { label: channelShort("distribuidores"), variant: CHANNEL_META.distribuidores.badgeVariant },
+	packs: { label: channelShort("packs"), variant: CHANNEL_META.packs.badgeVariant },
 	b2b2c: { label: channelShort("b2b2c"), variant: CHANNEL_META.b2b2c.badgeVariant },
 };
 
@@ -33,21 +34,14 @@ const FILTER_DEFS = [
 ];
 
 function summaryCols(channel, fMoney) {
-	if (channel === "web") {
+	if (channel === "packs") {
 		return [
+			// Con descuento muestra el nivel; a lista, que no lleva ninguno.
+			{ label: "Descuento", get: function (q) { return packsConDescuento(q) ? (q.resumen.tier || "—") : "a lista"; } },
 			{ label: "Certs", get: function (q) { return (q.resumen.certsComprados || q.resumen.certsActivos || 0).toLocaleString("es-AR"); } },
 			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
 			{ label: "Precio de lista", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
-			{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
-		];
-	}
-	if (channel === "distribuidores") {
-		return [
-			{ label: "Nivel", get: function (q) { return q.resumen.tier; } },
-			{ label: "Certs activos", get: function (q) { return (q.resumen.certsActivos || 0).toLocaleString("es-AR"); } },
-			{ label: "Compromiso", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
-			{ label: "Firmas/año", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
-			{ label: "Neto", get: function (q) { return fMoney(q.resumen.netoLakaut || 0); } },
+			{ label: "Neto", get: function (q) { return fMoney(q.resumen.netoLakaut != null ? q.resumen.netoLakaut : (q.resumen.facturacionLista || 0)); } },
 			{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
 		];
 	}
@@ -180,12 +174,12 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 
 	const filtered = useMemo(function () {
 		return quotes.filter(function (q) {
-			if (selectedChannels.size > 0 && !selectedChannels.has(q.channel)) return false;
+			if (selectedChannels.size > 0 && !selectedChannels.has(resolveChannel(q.channel))) return false;
 			if (selectedStatuses.size > 0 && !selectedStatuses.has(dealStatus(q))) return false;
 			if (month !== "all" && q.fecha.slice(0, 7) !== month) return false;
 			if (search && !(q.clientName || "").toLowerCase().includes(search.toLowerCase())) return false;
-			if (q.channel === "distribuidores") {
-				const certs = q.resumen.certsActivos || 0;
+			if (isPacks(q.channel)) {
+				const certs = q.resumen.certsActivos || q.resumen.certsComprados || 0;
 				if (certsMin !== "" && certs < Number(certsMin)) return false;
 				if (certsMax !== "" && certs > Number(certsMax)) return false;
 			}
@@ -200,7 +194,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 
 	const groups = useMemo(function () {
 		const byCh = {};
-		filtered.forEach(function (q) { (byCh[q.channel] = byCh[q.channel] || []).push(q); });
+		filtered.forEach(function (q) { const ch = resolveChannel(q.channel); (byCh[ch] = byCh[ch] || []).push(q); });
 		return byCh;
 	}, [filtered]);
 
@@ -380,7 +374,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 								)}
 								{openFilter === "certs" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Certs activos administrados (Precio de lista con descuento)</span>
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Certs cotizados (canal Packs)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={certsMin} onChange={function (e) { setCertsMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>
@@ -412,7 +406,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 			{dealsApi?.loading ? (
 				<p className="text-sm text-muted-foreground">Cargando historial…</p>
 			) : filtered.length === 0 ? (
-				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Web, Precio de lista con descuento o Volumen y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
+				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Packs o Volumen y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
 			) : (
 				orderedChannels.map(function (ch) {
 					const cols = summaryCols(ch, fMoney);
@@ -465,9 +459,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 													</TableCell>
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
-														{(q.channel === "b2b2c" || q.channel === "distribuidores" || q.channel === "web") && (
-															<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
-														)}
+														<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { newVersion(q); }} title="Nueva versión (clona subiendo la versión)"><CopyPlus className="size-4 text-muted-foreground" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>

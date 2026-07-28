@@ -1,5 +1,6 @@
 import { buildProyeccion } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
+import { isPacks, packsConDescuento } from "@/data/channelMeta";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -244,10 +245,10 @@ function iconBox(svg, bg, size) {
 }
 
 // ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
-// `sinApi` engloba las propuestas sin integración (volumen sin API y canal web);
-// `isWeb` afina el copy para la venta directa por tarjeta.
-function s1Cover(clientName, fecha, sinApi, isWeb, cotId) {
-	const middleBadge = isWeb
+// `sinApi` engloba las propuestas sin integración (volumen sin API y packs);
+// `listaPura` afina el copy para la venta directa por tarjeta, sin descuento.
+function s1Cover(clientName, fecha, sinApi, listaPura, cotId) {
+	const middleBadge = listaPura
 		? { text: "Contratación directa", icon: SVG.check("rgba(255,255,255,0.85)", 11) }
 		: sinApi
 			? { text: "Emisión a escala",  icon: SVG.zap(   "rgba(255,255,255,0.85)", 11) }
@@ -257,7 +258,7 @@ function s1Cover(clientName, fecha, sinApi, isWeb, cotId) {
 		middleBadge,
 		{ text: "Validez legal plena", icon: SVG.shield("rgba(255,255,255,0.85)", 11) },
 	];
-	const subtitle = isWeb
+	const subtitle = listaPura
 		? "Firma digital con validez legal,<br>contratada de forma directa y 100% remota."
 		: sinApi
 			? "Firma digital con validez legal,<br>emitida por volumen y 100% remota."
@@ -352,13 +353,15 @@ function s2Integracion(clientName) {
 </div>`;
 }
 
-// ─── SLIDE 3: MODELO COMERCIAL — DISTRIBUIDORES ───────────────────────────────
+// ─── SLIDE 3: MODELO COMERCIAL — PACKS CON DESCUENTO ──────────────────────────
 function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const qtys = inp.qtys || {};
 	const firmasAdic = Number(inp.firmasAdic) || 0;
-	const precioFirmaUSD = Number(inp.precioFirmaUSD) || 0;
+	// Precio de la firma adicional: promedio ponderado de los packs cotizados
+	// (resumen). El fallback cubre deals viejos del ex canal distribuidores.
+	const precioFirmaUSD = Number(res.precioFirmaAdic) || Number(inp.precioFirmaUSD) || 0;
 	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
 
 	const webProducts = models || [];
@@ -475,7 +478,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	}) : "";
 
 	return commercialSlide({
-		kicker: "Modelo comercial · precio de lista con descuento",
+		kicker: "Modelo comercial · packs con descuento",
 		title: "Tu propuesta a medida",
 		subtitle: showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : null,
 		chips,
@@ -823,8 +826,8 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
 </div>`;
 }
 
-// ─── SLIDE 3: MODELO COMERCIAL — WEB (precio de lista, sin descuento) ─────────
-// Venta directa por tarjeta: se cotiza a precio de lista puro. No hay tier ni
+// ─── SLIDE 3: MODELO COMERCIAL — PACKS A LISTA (sin descuento) ────────────────
+// Venta directa por tarjeta: se cotiza a precio de lista puro. No hay nivel ni
 // abono, así que la slide no muestra ninguna sección de descuento — solo el
 // desglose de packs y el precio de lista como total a pagar.
 function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
@@ -900,7 +903,7 @@ function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
 	});
 
 	return commercialSlide({
-		kicker: "Modelo comercial · precio web",
+		kicker: "Modelo comercial · packs a precio de lista",
 		title: "Tu propuesta a medida",
 		subtitle: showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : "Precios de lista web, sin descuento.",
 		chips,
@@ -995,11 +998,16 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	// ID de cotización (COT-TIPO-NNNN-vN) para la portada. El tipo sale del snapshot
 	// guardado en el deal; si falta, del tipo vivo del cliente. Ver [[cotId]].
 	const cotId = formatCotId(deal.inputs?.cot, client?.tipo);
-	// Cotizaciones sin integración API (volumen sin API o canal web): la propuesta
-	// omite la slide de integración y el lenguaje técnico (fee, SLA, kick-off).
-	const isWeb = deal.channel === "web";
+	// Packs: la propuesta se arma según el interruptor de descuento comercial, no
+	// según el canal (los ex canales web y distribuidores hoy son el mismo).
+	// `listaPura` (sin descuento) es la venta directa por tarjeta.
+	const packs = isPacks(deal.channel);
+	const listaPura = packs && !packsConDescuento(deal);
 	const sinApiB2B2C = deal.channel === "b2b2c" && deal.inputs?.integracion === "sin_api";
-	const noApi = sinApiB2B2C || isWeb;
+	// Ningún Packs lleva slide de integración ni lenguaje técnico (fee, SLA,
+	// kick-off): se compran packs cerrados, con o sin descuento. Eso es exclusivo
+	// de Volumen con API.
+	const noApi = sinApiB2B2C || packs;
 
 	// Slide de proyección de crecimiento: solo B2B2C, con la proyección activa y
 	// con volumen cargado. Corre la numeración de páginas de las slides siguientes.
@@ -1013,7 +1021,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 	const proyPage = s3Page + 1;
 	const pasosPage = hasProy ? proyPage + 1 : s3Page + 1;
 
-	const s3 = isWeb
+	const s3 = listaPura
 		? s3Web(deal, clientName, currency, tc, channelConfig, models, s3Page)
 		: deal.channel === "b2b2c"
 			? s3B2B2C(deal, clientName, currency, tc, channelConfig, s3Page)
@@ -1029,7 +1037,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 <style>${SLIDE_CSS}</style>
 </head>
 <body>
-${s1Cover(clientName, deal.fecha, noApi, isWeb, cotId)}
+${s1Cover(clientName, deal.fecha, noApi, listaPura, cotId)}
 ${noApi ? "" : s2Integracion(clientName)}
 ${s3}
 ${proySlide}

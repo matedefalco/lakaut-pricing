@@ -16,8 +16,8 @@ const CHANNELS = ["b2b2c", "distribuidores", "web"];
 
 const CHANNEL_META = {
 	b2b2c:         { label: "Volumen",         color: "#6366f1" },
-	distribuidores:{ label: "Precio de lista con descuento", color: "#0ea5e9" },
-	web:           { label: "Web (lista)",     color: "#f59e0b" },
+	distribuidores:{ label: "Packs con descuento", color: "#0ea5e9" },
+	web:           { label: "Packs a lista",       color: "#f59e0b" },
 };
 
 const SCENARIO_LABELS = ["A","B","C","D","E","F"];
@@ -331,7 +331,7 @@ export function TabComparacion({ costs, currency, tc }) {
 
 			<PageHeader
 				title="Comparación de canales"
-				description="Mismo volumen de certificados y firmas, comparado en los tres canales. Guardá escenarios para contrastar hipótesis."
+				description="Mismo volumen de certificados y firmas, comparado en los tres modelos de precio. Guardá escenarios para contrastar hipótesis."
 			/>
 
 			{/* Scenario tabs */}
@@ -382,7 +382,7 @@ export function TabComparacion({ costs, currency, tc }) {
 							onChange={function (v) { updateScenario("firmasPorCert", v); }}
 						/>
 						<div className="flex flex-col gap-1.5 col-span-2">
-							<label className="text-xs text-muted-foreground uppercase tracking-wide">Pack de referencia (Dist. / Web)</label>
+							<label className="text-xs text-muted-foreground uppercase tracking-wide">Pack de referencia (packs)</label>
 							<select
 								className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 								value={refPackId || ""}

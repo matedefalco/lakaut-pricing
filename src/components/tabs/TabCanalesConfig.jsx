@@ -132,10 +132,10 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				actions={<Button onClick={handleSave} disabled={!isDirty}>Guardar cambios</Button>}
 			/>
 
-			{/* ── 1 · Tiers de distribuidores ── */}
+			{/* ── 1 · Niveles de descuento de Packs ── */}
 			<CollapsibleSection
 				defaultOpen
-				title="1 · Precio de lista con descuento · Niveles y descuentos"
+				title="1 · Packs · Niveles y descuentos"
 				subtitle="El nivel se asigna por el mayor entre certificados activos y compromiso anual de facturación (USD)."
 			>
 				<Table>
@@ -316,7 +316,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 
 			{/* ── 5 · Palancas de descuento comercial ── */}
 			<CollapsibleSection
-				title="5 · Palancas de descuento comercial (Volumen y Distribuidores)"
+				title="5 · Palancas de descuento comercial (Packs y Volumen)"
 				subtitle="Descuentos por condiciones favorables, además del volumen. Se suman con tope y aplican sobre el subtotal de servicio. El texto que ve el cliente se arma con el número."
 			>
 				<div className="mb-5 flex flex-wrap gap-6">

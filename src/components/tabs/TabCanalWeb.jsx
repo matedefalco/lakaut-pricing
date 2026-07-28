@@ -332,8 +332,8 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 			{showPrecios && (
 				<>
 					<PageHeader
-						title="Precios web"
-						description="Personas, profesionales y PyMEs que contratan sin intermediación, abonando con tarjeta. Precios de lista en ARS, USD derivado por TC."
+						title="Precios de lista"
+						description="Precio de lista de cada pack, el que paga el cliente que contrata sin intermediación. Valores en ARS, USD derivado por TC."
 						actions={<ColFilterDropdown visible={visibleCols} onToggle={toggleCol} />}
 					/>
 					<Card>
@@ -402,7 +402,7 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 						<div className="mb-4">
 							<PageHeader
 								title="Simulador de portfolio"
-								description="Break-even con mezcla de ventas del canal web. Estimá el volumen por pack y verás si el mix cubre costos fijos."
+								description="Break-even con mezcla de ventas de packs a precio de lista. Estimá el volumen por pack y verás si el mix cubre costos fijos."
 							/>
 						</div>
 					)}

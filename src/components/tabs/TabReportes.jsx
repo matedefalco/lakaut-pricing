@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { dealStatus } from "@/lib/dealStatus";
-import { channelShort } from "@/data/channelMeta";
+import { channelShort, isPacks, resolveChannel } from "@/data/channelMeta";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 // ─── Reportes: facturación y métricas de cotizaciones ─────────────────────────
@@ -25,12 +25,11 @@ const PERIODS = [
 
 const STATUS_COLORS = { confirmada: "#059669", pendiente: "#c87a00", rechazada: "#dc2626" };
 
-// Valor "revenue año 1" homogéneo entre canales: neto (+ abono) en distribuidores,
+// Valor "revenue año 1" homogéneo entre canales: neto (+ abono si hay) en packs,
 // revenue anual en volumen. Es la misma cifra que muestra cada cotizadora.
 function dealRevenue(d) {
 	const r = d.resumen || {};
-	if (d.channel === "web") return r.facturacionLista || r.netoLakaut || 0;
-	if (d.channel === "distribuidores") return r.facturacionAnio1 || r.netoLakaut || 0;
+	if (isPacks(d.channel)) return r.facturacionAnio1 || r.netoLakaut || r.facturacionLista || 0;
 	if (d.channel === "b2b2c") return r.revAnual || (r.revMesTotal || 0) * 12 || 0;
 	return 0;
 }
@@ -38,7 +37,7 @@ function dealRevenue(d) {
 function dealItems(d) {
 	const r = d.resumen || {};
 	return {
-		certs: (d.channel === "distribuidores" || d.channel === "web") ? (r.certsComprados || r.certsActivos || 0) : 0,
+		certs: isPacks(d.channel) ? (r.certsComprados || r.certsActivos || 0) : 0,
 		idc: d.channel === "b2b2c" ? (r.idcMensuales || 0) : 0,
 		firmas: r.firmasTotal || r.firmasTotales || 0,
 	};
@@ -94,7 +93,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 			else { pendiente += rev; nPend++; }
 			items.certs += it.certs; items.idc += it.idc; items.firmas += it.firmas;
 
-			const ch = d.channel;
+			const ch = resolveChannel(d.channel);
 			if (!byChannel[ch]) byChannel[ch] = { canal: ch, n: 0, nConf: 0, cotizado: 0, confirmado: 0, certs: 0, idc: 0, firmas: 0 };
 			byChannel[ch].n++;
 			byChannel[ch].cotizado += rev;
@@ -215,7 +214,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 						<SectionCard title="Volumen de items" description="Total cotizado en el período (confirmado entre paréntesis).">
 							<div className="space-y-3">
 								{[
-									{ label: "Certificados (lista c/desc.)", tot: agg.items.certs, conf: agg.items.certsConf },
+									{ label: "Certificados (packs)", tot: agg.items.certs, conf: agg.items.certsConf },
 									{ label: "IDC (volumen)", tot: agg.items.idc, conf: agg.items.idcConf },
 									{ label: "Firmas", tot: agg.items.firmas, conf: agg.items.firmasConf },
 								].map(function (row) {

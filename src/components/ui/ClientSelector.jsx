@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { UserPlus, ChevronDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { channelShort } from "@/data/channelMeta";
+import { channelShort, isPacks } from "@/data/channelMeta";
 import { TIPOS, DEFAULT_TIPO } from "@/lib/cotId";
 
 // Selector de tipo de cliente (DIS/DIR/PAR): define el TIPO del ID de cotización.
@@ -129,7 +129,7 @@ export function ClientSelector({ channel, clients, onCreate, onSetTipo, value, o
 									<span className={value?.id === c.id ? "font-semibold" : ""}>{c.name}</span>
 									<span className="flex items-center gap-2">
 										{c.tipo && <Badge variant="outline" className="text-[10px] font-semibold">{c.tipo}</Badge>}
-										{c.channel === "distribuidores" && c.certs_activos > 0 && (
+										{isPacks(c.channel) && c.certs_activos > 0 && (
 											<span className="text-xs text-muted-foreground">{c.certs_activos.toLocaleString("es-AR")} certs</span>
 										)}
 									</span>

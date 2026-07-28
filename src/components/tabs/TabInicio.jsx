@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/field";
 import { DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { CHANNELS, channelShort } from "@/data/channelMeta";
+import { CHANNELS, channelShort, isPacks } from "@/data/channelMeta";
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -16,8 +16,7 @@ function fDate(iso) {
 // Cifra representativa por canal, para la lista de últimas cotizaciones.
 function dealValue(deal, fMoney) {
 	const r = deal.resumen || {};
-	if (deal.channel === "web") return r.facturacionLista != null ? fMoney(r.facturacionLista) : "—";
-	if (deal.channel === "distribuidores") return r.netoLakaut != null ? fMoney(r.netoLakaut) : "—";
+	if (isPacks(deal.channel)) return r.netoLakaut != null ? fMoney(r.netoLakaut) : (r.facturacionLista != null ? fMoney(r.facturacionLista) : "—");
 	if (deal.channel === "b2b2c") return r.revAnual != null ? fMoney(r.revAnual) : (r.revMesTotal != null ? fMoney(r.revMesTotal) : "—");
 	return "—";
 }
@@ -40,8 +39,7 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 	const pendientes = deals.filter(function (d) { return dealStatus(d) === "pendiente"; }).length;
 
 	const channelCards = [
-		{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
-		{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
+		{ key: "packs", label: CHANNELS.packs.label, desc: CHANNELS.packs.desc },
 		{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
 	];
 
