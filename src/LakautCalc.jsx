@@ -353,7 +353,7 @@ function LakautCalcInner() {
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={editQuote} />}
 
 					{/* ── ANÁLISIS ── */}
-					{activeNavItem === "reportes" && <TabReportes dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} />}
+					{activeNavItem === "reportes" && <TabReportes dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} channelConfig={channelConfig} />}
 					{activeNavItem === "comparación" && <TabComparacion costs={costs} currency={currency} tc={tc} />}
 					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
 

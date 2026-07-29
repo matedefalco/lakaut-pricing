@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { dealStatus } from "@/lib/dealStatus";
-import { channelShort, isPacks, resolveChannel } from "@/data/channelMeta";
+import { dealRevenue, dealItems, computePriceMetrics } from "@/lib/dealMetrics";
+import { channelShort, resolveChannel } from "@/data/channelMeta";
 import { STATUS_COLORS } from "@/theme/tokens";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
@@ -27,24 +28,6 @@ const PERIODS = [
 
 
 
-// Valor "revenue año 1" homogéneo entre canales: neto (+ abono si hay) en packs,
-// revenue anual en volumen. Es la misma cifra que muestra cada cotizadora.
-function dealRevenue(d) {
-	const r = d.resumen || {};
-	if (isPacks(d.channel)) return r.facturacionAnio1 || r.netoLakaut || r.facturacionLista || 0;
-	if (d.channel === "b2b2c") return r.revAnual || (r.revMesTotal || 0) * 12 || 0;
-	return 0;
-}
-
-function dealItems(d) {
-	const r = d.resumen || {};
-	return {
-		certs: isPacks(d.channel) ? (r.certsComprados || r.certsActivos || 0) : 0,
-		idc: d.channel === "b2b2c" ? (r.idcMensuales || 0) : 0,
-		firmas: r.firmasTotal || r.firmasTotales || 0,
-	};
-}
-
 function monthKey(iso) { return (iso || "").slice(0, 7); }
 function monthLabel(key) {
 	const [y, m] = key.split("-");
@@ -52,8 +35,24 @@ function monthLabel(key) {
 	return (names[Number(m) - 1] || m) + " " + y.slice(2);
 }
 
-export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
+// Formateador de precios unitarios: a diferencia de fMoney (que redondea a entero),
+// muestra hasta 2 decimales en valores chicos, para no perder el precio de las
+// firmas (suelen ser sub-dólar). Respeta el toggle global ARS/USD.
+function makePrice(currency, tc) {
+	return function (n) {
+		if (n == null || !isFinite(n)) return "—";
+		if (currency === "ARS") {
+			const v = n * tc;
+			return "$ " + (v >= 100 ? Math.round(v).toLocaleString("es-AR") : v.toLocaleString("es-AR", { maximumFractionDigits: 2 }));
+		}
+		return "USD " + (n >= 10 ? Math.round(n).toLocaleString("es-AR") : n.toLocaleString("es-AR", { maximumFractionDigits: 2 }));
+	};
+}
+function fPct(n) { return n == null || !isFinite(n) ? "—" : Math.round(n * 100) + "%"; }
+
+export function TabReportes({ dealsApi, clientsApi, currency, tc, channelConfig }) {
 	const { fMoney } = makeMoney(currency, tc);
+	const fPrice = makePrice(currency, tc);
 	const [period, setPeriod] = useState("m6");
 	const allDeals = (dealsApi && dealsApi.deals) || [];
 	const clients = (clientsApi && clientsApi.clients) || [];
@@ -121,6 +120,14 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 		const topClients = Object.values(byClient).sort(function (a, b) { return (b.confirmado || b.cotizado) - (a.confirmado || a.cotizado); }).slice(0, 8);
 		return { cotizado, confirmado, pendiente, rechazado, nConf, nPend, nRech, conversion, items, months, channels, topClients };
 	}, [deals, clientsById]);
+
+	// ── Métricas de precio por elemento y canal ──
+	const volumenBase = (channelConfig && channelConfig.b2b2cBase) || null;
+	const price = useMemo(function () { return computePriceMetrics(deals, volumenBase); }, [deals, volumenBase]);
+	const priceChannels = [
+		{ key: "volumen", label: "Volumen", block: price.volumen },
+		{ key: "packs", label: "Packs", block: price.packs },
+	].filter(function (c) { return c.block.n > 0; });
 
 	const hasData = deals.length > 0;
 	const chartData = agg.months.map(function (m) {
@@ -257,6 +264,136 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 							</Table>
 						</SectionCard>
 					</div>
+
+					{/* Precio por elemento */}
+					{priceChannels.length > 0 && (
+						<SectionCard
+							title="Precio por elemento"
+							description="Precio promedio por certificado y firma sobre las cotizaciones del período, en USD y separado por canal. Mide dónde está parado nuestro precio de mercado."
+						>
+							<div className="space-y-6">
+								{priceChannels.map(function (ch) {
+									const isPacksCh = ch.key === "packs";
+									const rows = [
+										{ key: "cert", label: isPacksCh ? "Certificado" : "Certificado (IDC)", note: isPacksCh ? "implícito · precio de bundle" : null, stat: ch.block.cert },
+										{ key: "firma", label: isPacksCh ? "Firma adicional" : "Firma", note: isPacksCh ? "excedente sobre el pack" : null, stat: ch.block.firma },
+									];
+									return (
+										<div key={ch.key}>
+											<div className="flex items-center gap-2 mb-2">
+												<Badge variant="secondary" className="text-[10px]">{ch.label}</Badge>
+												<span className="text-[11px] text-muted-foreground">{ch.block.n} {ch.block.n === 1 ? "cotización" : "cotizaciones"}</span>
+											</div>
+											<Table>
+												<TableHeader>
+													<TableRow>
+														<TableHead>Elemento</TableHead>
+														<TableHead className="text-right">Precio unit. (pond.)</TableHead>
+														<TableHead className="text-right">Prom. simple</TableHead>
+														<TableHead className="text-right">Rango mín–máx</TableHead>
+														<TableHead className="text-right">Rev./unidad</TableHead>
+														<TableHead className="text-right">N</TableHead>
+													</TableRow>
+												</TableHeader>
+												<TableBody>
+													{rows.map(function (r) {
+														return (
+															<TableRow key={r.key}>
+																<TableCell>
+																	<span className="font-medium">{r.label}</span>
+																	{r.note && <span className="ml-1.5 text-[10px] text-muted-foreground">{r.note}</span>}
+																</TableCell>
+																<TableCell className="text-right tabular-nums font-semibold">{fPrice(r.stat.weighted)}</TableCell>
+																<TableCell className="text-right tabular-nums text-muted-foreground">{fPrice(r.stat.simple)}</TableCell>
+																<TableCell className="text-right tabular-nums text-muted-foreground">{r.stat.n > 0 ? fPrice(r.stat.min) + " – " + fPrice(r.stat.max) : "—"}</TableCell>
+																<TableCell className="text-right tabular-nums text-muted-foreground">{fMoney(r.stat.revPerUnitWeighted)}</TableCell>
+																<TableCell className="text-right tabular-nums text-muted-foreground">{r.stat.n}</TableCell>
+															</TableRow>
+														);
+													})}
+												</TableBody>
+											</Table>
+										</div>
+									);
+								})}
+							</div>
+							<p className="mt-3 text-[11px] text-muted-foreground">
+								<strong>Ponderado</strong> = Σ(precio × unidades) ÷ Σ unidades (precio efectivo de mercado, pesa más las cotizaciones grandes). <strong>Simple</strong> = promedio por cotización. <strong>Rev./unidad</strong> = revenue año 1 ÷ unidades (blended, incluye todos los componentes). En Packs el precio por certificado es implícito (lista del pack ÷ certificados, incluye las firmas del bundle).
+							</p>
+						</SectionCard>
+					)}
+
+					{/* Descuento y conversión por precio */}
+					{priceChannels.length > 0 && (
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+							<SectionCard title="Descuento promedio vs lista" description="Cuánto bajamos del precio de lista, por canal. Mide erosión de precio y poder de negociación.">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Canal</TableHead>
+											<TableHead className="text-right">Descuento (pond.)</TableHead>
+											<TableHead className="text-right">Simple</TableHead>
+											<TableHead className="text-right">Precio realizado</TableHead>
+											<TableHead className="text-right">Con desc.</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{priceChannels.map(function (ch) {
+											const d = ch.block.discount;
+											return (
+												<TableRow key={ch.key}>
+													<TableCell><Badge variant="secondary" className="text-[10px]">{ch.label}</Badge></TableCell>
+													<TableCell className="text-right tabular-nums font-semibold">{fPct(d.weighted)}</TableCell>
+													<TableCell className="text-right tabular-nums text-muted-foreground">{fPct(d.simple)}</TableCell>
+													<TableCell className="text-right tabular-nums text-muted-foreground">{d.weighted == null ? "—" : Math.round((1 - d.weighted) * 100) + "% de lista"}</TableCell>
+													<TableCell className="text-right tabular-nums text-muted-foreground">{d.conDescuento}/{d.n}</TableCell>
+												</TableRow>
+											);
+										})}
+									</TableBody>
+								</Table>
+							</SectionCard>
+
+							<SectionCard title="Precio vs conversión" description="Win-rate por rango de precio del certificado. ¿Las cotizaciones más baratas se confirman más?">
+								<div className="space-y-4">
+									{priceChannels.map(function (ch) {
+										const conv = ch.block.conversion;
+										return (
+											<div key={ch.key}>
+												<div className="mb-2"><Badge variant="secondary" className="text-[10px]">{ch.label}</Badge></div>
+												{conv.sparse ? (
+													<p className="text-[11px] text-muted-foreground">Faltan cotizaciones cerradas (ganadas o perdidas) con suficiente dispersión de precios para medir conversión. Cerradas: {conv.n}.</p>
+												) : (
+													<Table>
+														<TableHeader>
+															<TableRow>
+																<TableHead>Rango</TableHead>
+																<TableHead className="text-right">Cerradas</TableHead>
+																<TableHead className="text-right">Ganadas</TableHead>
+																<TableHead className="text-right">Win-rate</TableHead>
+															</TableRow>
+														</TableHeader>
+														<TableBody>
+															{conv.bands.map(function (b) {
+																return (
+																	<TableRow key={b.label}>
+																		<TableCell><span className="font-medium">{b.label}</span> <span className="text-[10px] text-muted-foreground">{fPrice(b.from)}–{fPrice(b.to)}</span></TableCell>
+																		<TableCell className="text-right tabular-nums">{b.total}</TableCell>
+																		<TableCell className="text-right tabular-nums text-[var(--success)]">{b.won}</TableCell>
+																		<TableCell className="text-right tabular-nums font-semibold">{fPct(b.winRate)}</TableCell>
+																	</TableRow>
+																);
+															})}
+														</TableBody>
+													</Table>
+												)}
+											</div>
+										);
+									})}
+								</div>
+							</SectionCard>
+						</div>
+					)}
 
 					<p className="text-[11px] text-muted-foreground">Revenue año 1 por cotización: en lista con descuento es el neto Lakaut (más abono × 11 si aplica); en volumen es el revenue anual (IDC + firmas + SLA + fee). Es la misma cifra que muestra cada cotizadora al guardar.</p>
 				</>
