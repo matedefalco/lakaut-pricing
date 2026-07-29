@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { Check, AlertCircle, Info, X, FileText, ArrowRight } from "lucide-react";
+import { Check, AlertCircle, Info, X, FileText, ArrowRight, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,10 @@ const VARIANT_META = {
 	success: { Icon: Check,       ring: "border-[var(--success)]/40", chip: "bg-[var(--success)]" },
 	error:   { Icon: AlertCircle, ring: "border-destructive/40",      chip: "bg-destructive" },
 	info:    { Icon: Info,        ring: "border-primary/40",          chip: "bg-primary" },
+	// "tier" se usa cuando la cotización sube de nivel: el chip lleva el emoji del
+	// material en vez de un icono, así el toast se reconoce como logro y no como
+	// confirmación de sistema.
+	tier:    { Icon: Trophy,      ring: "border-primary/40",          chip: "bg-primary" },
 };
 
 let idSeq = 0;
@@ -64,6 +68,43 @@ export function notifyQuoteSaved(toast, opts) {
 			{ label: "Exportar propuesta", icon: FileText, onClick: opts.onExport },
 			{ label: "Ver en Cotizaciones", icon: ArrowRight, iconPosition: "right", variant: "outline", onClick: opts.onGoHistorial },
 		],
+	});
+}
+
+// Helper: la propuesta se exportó. Exportar es el acto que cierra el trabajo del
+// vendedor y hasta acá no tenía ninguna respuesta: se abría la ventana del PDF y la
+// app no se enteraba. Nombra el cliente, el canal y el ID para que quede registro
+// de qué se mandó.
+export function notifyQuoteExported(toast, opts) {
+	opts = opts || {};
+	const parts = [];
+	if (opts.channelLabel) parts.push(opts.channelLabel);
+	if (opts.cotId) parts.push(opts.cotId);
+	toast({
+		variant: "success",
+		emoji: "📄",
+		title: opts.clientName ? "Propuesta lista · " + opts.clientName : "Propuesta lista",
+		description: (parts.length ? parts.join(" · ") + ". " : "") + "Se abrió en una pestaña nueva para guardarla como PDF.",
+		actions: opts.onGoHistorial
+			? [{ label: "Ver en Cotizaciones", icon: ArrowRight, iconPosition: "right", variant: "outline", onClick: opts.onGoHistorial }]
+			: null,
+	});
+}
+
+// Helper: la cotización subió de nivel / segmento. Es el mejor argumento de venta
+// que tiene la herramienta (el volumen cargado desbloqueó más descuento) y pasaba
+// desapercibido: el nivel cambiaba de texto y nada más.
+export function notifyTierUp(toast, opts) {
+	opts = opts || {};
+	toast({
+		variant: "tier",
+		emoji: opts.emoji,
+		chipStyle: opts.material ? { background: opts.material.solid } : null,
+		duration: 5000,
+		title: "Subió a " + opts.label,
+		description: opts.discountPct != null
+			? "El volumen cargado desbloquea " + opts.discountPct + "% de descuento. Usalo para cerrar."
+			: "El volumen cargado desbloquea un descuento mayor.",
 	});
 }
 
@@ -126,8 +167,11 @@ function ToastItem({ t, onDismiss }) {
 			)}
 		>
 			<div className="flex items-start gap-3">
-				<span className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-white", meta.chip)}>
-					<Icon className="size-4" />
+				<span
+					className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-white", !t.chipStyle && meta.chip)}
+					style={t.chipStyle}
+				>
+					{t.emoji ? <span className="text-sm leading-none">{t.emoji}</span> : <Icon className="size-4" />}
 				</span>
 				<div className="min-w-0 flex-1">
 					{t.title && <p className="text-sm font-semibold text-foreground">{t.title}</p>}

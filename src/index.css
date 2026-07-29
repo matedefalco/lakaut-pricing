@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Tipografía auto-hospedada. Antes se inyectaba por JS desde unpkg en un useEffect,
+   así que el primer segundo de la app (el momento visceral por definición) se
+   renderizaba con system-ui. El peso 800 es el nuevo techo de display: el PDF ya lo
+   usaba y la interfaz se autolimitaba a 600. */
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/montserrat/800.css";
+@import "@fontsource/open-sans/400.css";
+@import "@fontsource/open-sans/600.css";
+@import "@fontsource/open-sans/700.css";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -42,6 +53,16 @@
   --glass-blur: 20px;
   --shadow-card: 0 1px 2px rgba(30, 32, 48, 0.04), 0 8px 24px -12px rgba(48, 65, 213, 0.10);
   --shadow-float: 0 4px 12px rgba(30, 32, 48, 0.06), 0 16px 40px -12px rgba(48, 65, 213, 0.22);
+
+  /* ── Paleta secundaria ──
+     El azul de marca marcaba nueve cosas distintas a la vez, así que dejó de
+     marcar. Estos tonos le dan a cada eje su propio acento sin salirse de la
+     familia fría: violeta para el canal de contrato/integración, cyan para
+     análisis, verde para lo confirmado, ámbar para lo pendiente. */
+  --channel-packs: #3041d5;
+  --channel-volumen: #7c3aed;
+  --accent-analysis: #0891b2;
+  --accent-config: #64748b;
 }
 
 @theme inline {
@@ -130,17 +151,104 @@
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-float { box-shadow: var(--shadow-float); }
 
-  /* Fondo de página: gradiente frío lavanda/celeste derivado del azul Lakaut
-     desaturado. Fixed para que el vidrio del chrome tenga qué difuminar al
-     scrollear. Dos manchas radiales muy suaves + base casi blanca. */
+  /* ── Fondo de página ──
+     Fixed para que el vidrio del chrome tenga qué difuminar al scrollear.
+     Las opacidades originales (0.07-0.10 sobre #f2f4fc) estaban por debajo del
+     umbral de percepción: el único gesto expresivo del sistema se leía como gris
+     plano. Ahora el fondo además cambia de temperatura según la sección, así que
+     cotizar, hacer seguimiento, analizar y configurar se sienten distintos sin
+     necesidad de leer el título. */
   .app-bg {
     background:
-      radial-gradient(ellipse 85% 60% at 8% -10%, rgba(48, 65, 213, 0.10), transparent 60%),
-      radial-gradient(ellipse 70% 55% at 100% 0%, rgba(124, 92, 246, 0.09), transparent 55%),
-      radial-gradient(ellipse 90% 70% at 50% 110%, rgba(8, 145, 178, 0.07), transparent 60%),
-      linear-gradient(180deg, #f2f4fc 0%, #eef1fa 100%);
+      radial-gradient(ellipse 85% 60% at 8% -12%, rgba(48, 65, 213, 0.24), transparent 62%),
+      radial-gradient(ellipse 70% 55% at 100% -2%, rgba(124, 92, 246, 0.20), transparent 58%),
+      radial-gradient(ellipse 90% 70% at 50% 112%, rgba(8, 145, 178, 0.16), transparent 62%),
+      linear-gradient(180deg, #eef1fc 0%, #e8ecf9 100%);
+    background-attachment: fixed;
+    transition: background-color 400ms ease;
+  }
+
+  /* Inicio: la portada, con la mezcla más rica de los tres tonos. */
+  .app-bg[data-section="inicio"] {
+    background:
+      radial-gradient(ellipse 80% 55% at 6% -12%, rgba(48, 65, 213, 0.30), transparent 60%),
+      radial-gradient(ellipse 65% 50% at 100% -4%, rgba(124, 58, 237, 0.26), transparent 56%),
+      radial-gradient(ellipse 95% 65% at 48% 114%, rgba(8, 145, 178, 0.20), transparent 62%),
+      linear-gradient(180deg, #edf0fc 0%, #e6ebf9 100%);
     background-attachment: fixed;
   }
+
+  /* Cotizar · Packs: azul de marca al frente. Es el momento de más energía. */
+  .app-bg[data-section="packs"] {
+    background:
+      radial-gradient(ellipse 90% 60% at 12% -14%, rgba(48, 65, 213, 0.32), transparent 62%),
+      radial-gradient(ellipse 60% 50% at 98% 4%, rgba(48, 65, 213, 0.16), transparent 58%),
+      radial-gradient(ellipse 90% 60% at 55% 116%, rgba(99, 102, 241, 0.16), transparent 60%),
+      linear-gradient(180deg, #ecf0fd 0%, #e5eafa 100%);
+    background-attachment: fixed;
+  }
+
+  /* Cotizar · Volumen: violeta, el canal de contrato e integración. */
+  .app-bg[data-section="b2b2c"] {
+    background:
+      radial-gradient(ellipse 90% 60% at 12% -14%, rgba(124, 58, 237, 0.30), transparent 62%),
+      radial-gradient(ellipse 60% 50% at 98% 4%, rgba(168, 85, 247, 0.16), transparent 58%),
+      radial-gradient(ellipse 90% 60% at 55% 116%, rgba(79, 70, 229, 0.16), transparent 60%),
+      linear-gradient(180deg, #f2eefd 0%, #ece5fb 100%);
+    background-attachment: fixed;
+  }
+
+  /* Seguimiento: teal templado. Trabajo de revisión, no de creación. */
+  .app-bg[data-section="seguimiento"] {
+    background:
+      radial-gradient(ellipse 85% 55% at 8% -12%, rgba(13, 148, 136, 0.20), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 0%, rgba(48, 65, 213, 0.16), transparent 58%),
+      linear-gradient(180deg, #ecf3fa 0%, #e6eff7 100%);
+    background-attachment: fixed;
+  }
+
+  /* Análisis: cyan. Lectura de datos, más frío y más despejado. */
+  .app-bg[data-section="analisis"] {
+    background:
+      radial-gradient(ellipse 85% 55% at 8% -12%, rgba(8, 145, 178, 0.24), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 2%, rgba(48, 65, 213, 0.14), transparent 58%),
+      linear-gradient(180deg, #eaf3fa 0%, #e4eef7 100%);
+    background-attachment: fixed;
+  }
+
+  /* Configuración: calma y precisión. Casi neutro, sin manchas de color, para que
+     40 inputs no compitan con el fondo. */
+  .app-bg[data-section="config"] {
+    background:
+      radial-gradient(ellipse 100% 45% at 50% -14%, rgba(100, 116, 139, 0.14), transparent 62%),
+      linear-gradient(180deg, #f4f6f9 0%, #eef1f5 100%);
+    background-attachment: fixed;
+  }
+
+  /* Display: el peso 800 que el PDF ya usaba y la interfaz no. */
+  .font-display {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* Festejo al cruzar de nivel: un rebote corto con overshoot. El
+     `prefers-reduced-motion` global ya lo neutraliza. */
+  @keyframes tier-pop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .animate-tier-pop { animation: tier-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+  /* Brillo que barre el material del nivel una sola vez, para que el ascenso se
+     lea como que el metal se "encendió". */
+  @keyframes tier-sheen {
+    0%   { opacity: 0; transform: translateX(-120%); }
+    25%  { opacity: 0.9; }
+    100% { opacity: 0; transform: translateX(120%); }
+  }
+  .animate-tier-sheen { animation: tier-sheen 900ms ease-out; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -150,4 +258,7 @@
 @media print {
   .no-print { display: none !important; }
   body { background: white !important; }
+  /* El gradiente de fondo ahora es visible (antes estaba bajo el umbral de
+     percepción), así que al imprimir hay que aplanarlo explícitamente. */
+  .app-bg, .app-bg[data-section] { background: white !important; }
 }

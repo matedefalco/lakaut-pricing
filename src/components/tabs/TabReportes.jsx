@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/field";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { dealStatus } from "@/lib/dealStatus";
 import { channelShort, isPacks, resolveChannel } from "@/data/channelMeta";
+import { STATUS_COLORS } from "@/theme/tokens";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 // ─── Reportes: facturación y métricas de cotizaciones ─────────────────────────
@@ -23,7 +25,7 @@ const PERIODS = [
 	{ id: "y", label: "Este año" },
 ];
 
-const STATUS_COLORS = { confirmada: "#059669", pendiente: "#c87a00", rechazada: "#dc2626" };
+
 
 // Valor "revenue año 1" homogéneo entre canales: neto (+ abono si hay) en packs,
 // revenue anual en volumen. Es la misma cifra que muestra cada cotizadora.
@@ -145,9 +147,8 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 			/>
 
 			{!hasData ? (
-				<Card><CardContent className="py-10 text-center">
-					<p className="text-sm text-muted-foreground">No hay cotizaciones en el período seleccionado.</p>
-					<p className="text-xs text-muted-foreground mt-1">Probá con un rango más amplio o creá una nueva cotización.</p>
+				<Card><CardContent className="p-0">
+					<EmptyState tone="filter" glyph="📊" title="Sin datos en este período" description="No hay cotizaciones en el rango elegido. Probá con un período más amplio o creá una cotización nueva." />
 				</CardContent></Card>
 			) : (
 				<>

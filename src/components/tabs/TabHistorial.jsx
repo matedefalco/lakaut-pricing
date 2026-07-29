@@ -14,14 +14,17 @@ import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { channelShort, CHANNELS as CHANNEL_META, resolveChannel, isPacks, packsConDescuento } from "@/data/channelMeta";
+import { channelShort, resolveChannel, isPacks, packsConDescuento } from "@/data/channelMeta";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TierBadge } from "@/components/ui/TierBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ChannelBadge } from "@/components/ui/ChannelBadge";
 
 // Las cotizaciones se agrupan por canal vigente: los ex canales web y
 // distribuidores caen los dos en Packs (ver resolveChannel).
 const CHANNELS = {
-	packs: { label: channelShort("packs"), variant: CHANNEL_META.packs.badgeVariant },
-	b2b2c: { label: channelShort("b2b2c"), variant: CHANNEL_META.b2b2c.badgeVariant },
+	packs: { label: channelShort("packs") },
+	b2b2c: { label: channelShort("b2b2c") },
 };
 
 const FILTER_DEFS = [
@@ -37,7 +40,7 @@ function summaryCols(channel, fMoney) {
 	if (channel === "packs") {
 		return [
 			// Con descuento muestra el nivel; a lista, que no lleva ninguno.
-			{ label: "Descuento", get: function (q) { return packsConDescuento(q) ? (q.resumen.tier || "—") : "a lista"; } },
+			{ label: "Descuento", get: function (q) { return packsConDescuento(q) ? (q.resumen.tier ? <TierBadge tier={q.resumen.tier} size="sm" /> : "—") : <span className="text-muted-foreground">a lista</span>; } },
 			{ label: "Certs", get: function (q) { return (q.resumen.certsComprados || q.resumen.certsActivos || 0).toLocaleString("es-AR"); } },
 			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
 			{ label: "Precio de lista", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
@@ -46,7 +49,7 @@ function summaryCols(channel, fMoney) {
 		];
 	}
 	return [
-		{ label: "Segmento", get: function (q) { return q.resumen.segmento; } },
+		{ label: "Segmento", get: function (q) { return q.resumen.segmento ? <TierBadge tier={q.resumen.segmento} size="sm" /> : "—"; } },
 		{ label: "IDC", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
 		{ label: "Firmas/mes", get: function (q) { return (q.resumen.firmasMes || 0).toLocaleString("es-AR"); } },
 		{ label: "Rev/mes", get: function (q) { return fMoney(q.resumen.revMesTotal || 0); } },
@@ -406,16 +409,30 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 			{dealsApi?.loading ? (
 				<p className="text-sm text-muted-foreground">Cargando historial…</p>
 			) : filtered.length === 0 ? (
-				<Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay cotizaciones que coincidan con el filtro. Generá una en Packs o Volumen y tocá <strong>Guardar cotización</strong>.</CardContent></Card>
+				<Card><CardContent className="p-0">
+					{quotes.length === 0 ? (
+						<EmptyState
+							glyph="🗂️"
+							title="Todavía no hay cotizaciones guardadas"
+							description="Cuando guardes una cotización en Packs o Volumen, va a aparecer acá para seguirla con el equipo."
+						/>
+					) : (
+						<EmptyState
+							tone="filter"
+							glyph="🔍"
+							title="Ninguna coincide con el filtro"
+							description="Probá aflojar los filtros de canal, estado, mes o volumen para ver más resultados."
+						/>
+					)}
+				</CardContent></Card>
 			) : (
 				orderedChannels.map(function (ch) {
 					const cols = summaryCols(ch, fMoney);
-					const meta = CHANNELS[ch] || { label: ch, variant: "outline" };
 					return (
 						<Card key={ch}>
 							<CardHeader>
 								<CardTitle className="flex items-center gap-2 text-base">
-									<Badge variant={meta.variant}>{meta.label}</Badge>
+									<ChannelBadge channel={ch} />
 									<span className="text-sm font-normal text-muted-foreground">{groups[ch].length} {groups[ch].length === 1 ? "cotización" : "cotizaciones"}</span>
 								</CardTitle>
 							</CardHeader>
@@ -449,7 +466,11 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 													</TableCell>
 													<TableCell>
 														<Select value={dealStatus(q)} onValueChange={function (v) { dealsApi.updateStatus(q.id, v); }}>
-															<SelectTrigger className={cn("h-7 w-[120px] text-xs border", DEAL_STATUS_META[dealStatus(q)].className)}>
+															<SelectTrigger className={cn("h-7 w-[148px] text-xs border font-semibold", DEAL_STATUS_META[dealStatus(q)].className)}>
+																{(function () {
+																	const Icon = DEAL_STATUS_META[dealStatus(q)].Icon;
+																	return Icon ? <Icon className="size-3.5 shrink-0" /> : null;
+																})()}
 																<SelectValue />
 															</SelectTrigger>
 															<SelectContent>

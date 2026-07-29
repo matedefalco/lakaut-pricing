@@ -4,12 +4,14 @@ import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { getDistributorTier } from "@/lib/tiers";
-import { channelLabel, channelShort, channelBadge, resolveChannel, isPacks } from "@/data/channelMeta";
+import { channelShort, channelEmoji, resolveChannel, isPacks } from "@/data/channelMeta";
+import { TierBadge } from "@/components/ui/TierBadge";
+import { ChannelBadge } from "@/components/ui/ChannelBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -19,12 +21,35 @@ function fDate(iso) {
 	return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Paleta de avatares. Derivada de los tonos del sistema, con contraste suficiente
+// sobre su propio fondo claro.
+const AVATAR_COLORS = [
+	{ bg: "#eef0fb", fg: "#2532a8" }, // azul marca
+	{ bg: "#e8f6fa", fg: "#0b6a85" }, // cyan
+	{ bg: "#f1ecfe", fg: "#5b21b6" }, // violeta
+	{ bg: "#e6f7ef", fg: "#046c4e" }, // verde
+	{ bg: "#fdf1e3", fg: "#8a4d12" }, // ámbar
+	{ bg: "#fdecf1", fg: "#9d174d" }, // rosa
+	{ bg: "#e9f0f7", fg: "#41506a" }, // pizarra
+];
+
+function avatarColor(name) {
+	const s = String(name || "?");
+	let h = 0;
+	for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 100000;
+	return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
 function ClientAvatar({ name }) {
 	const initials = name
 		? name.split(" ").slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase()
 		: "?";
+	const c = avatarColor(name);
 	return (
-		<div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+		<div
+			className="size-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+			style={{ background: c.bg, color: c.fg }}
+		>
 			{initials}
 		</div>
 	);
@@ -157,7 +182,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 							)}
 						</div>
 						<div className="flex items-center gap-2 pl-11">
-							<Badge variant={channelBadge(selected.channel)}>{channelLabel(selected.channel)}</Badge>
+							<ChannelBadge channel={selected.channel} />
 							<span className="text-xs text-muted-foreground">Desde {fDate(selected.created_at)}</span>
 						</div>
 					</div>
@@ -180,8 +205,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 									</div>
 									{certsTotal > 0 && (
 										<div className="text-right">
-											<p className="text-xs text-muted-foreground">Nivel actual</p>
-											<p className="text-sm font-semibold">{getDistributorTier(certsTotal, 0, distributorTiers).label}</p>
+											<p className="text-xs text-muted-foreground mb-1">Nivel actual</p>
+											<TierBadge tier={getDistributorTier(certsTotal, 0, distributorTiers)} tiers={distributorTiers} size="lg" />
 										</div>
 									)}
 								</div>
@@ -236,13 +261,19 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										return (
 											<TableRow key={d.id}>
 												<TableCell className="text-sm tabular-nums">{fDate(d.fecha)}</TableCell>
-												<TableCell><Badge variant="secondary" className="text-[10px]">{channelLabel(d.channel)}</Badge></TableCell>
+												<TableCell><ChannelBadge channel={d.channel} size="sm" /></TableCell>
 												<TableCell className="text-sm text-muted-foreground">
-													{isPacks(d.channel) ? (d.resumen?.tier || "a lista") : (d.resumen?.segmento || "—")}
+													{isPacks(d.channel)
+														? (d.resumen?.tier ? <TierBadge tier={d.resumen.tier} tiers={distributorTiers} size="sm" /> : "a lista")
+														: (d.resumen?.segmento ? <TierBadge tier={d.resumen.segmento} size="sm" /> : "—")}
 												</TableCell>
 												<TableCell>
 													<Select value={dealStatus(d)} onValueChange={function (v) { dealsApi.updateStatus(d.id, v); }}>
-														<SelectTrigger className={cn("h-7 w-[120px] text-xs border", DEAL_STATUS_META[dealStatus(d)].className)}>
+														<SelectTrigger className={cn("h-7 w-[148px] text-xs border font-semibold", DEAL_STATUS_META[dealStatus(d)].className)}>
+															{(function () {
+																const Icon = DEAL_STATUS_META[dealStatus(d)].Icon;
+																return Icon ? <Icon className="size-3.5 shrink-0" /> : null;
+															})()}
 															<SelectValue />
 														</SelectTrigger>
 														<SelectContent>
@@ -297,16 +328,16 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 				<StatCard label="Clientes" value={globalStats.totalClients} accent="muted" />
 				<StatCard label="Cotizaciones" value={globalStats.totalDeals} accent="muted" />
 				{globalStats.totalRevenue > 0 && (
-					<StatCard label="Revenue acumulado" value={fMoney(globalStats.totalRevenue)} accent="primary" />
+					<StatCard label="Revenue" sub="acumulado" value={fMoney(globalStats.totalRevenue)} accent="primary" />
 				)}
 				{globalStats.confirmedRevenue > 0 && (
-					<StatCard label="Facturado (confirmado)" value={fMoney(globalStats.confirmedRevenue)} accent="success" valueClass="text-[var(--success)]" />
+					<StatCard label="Facturado" sub="confirmado" value={fMoney(globalStats.confirmedRevenue)} accent="success" valueClass="text-[var(--success)]" />
 				)}
 				{globalStats.byChannel.packs > 0 && (
-					<StatCard label={channelShort("packs")} value={globalStats.byChannel.packs} accent="muted" />
+					<StatCard label={channelEmoji("packs") + " " + channelShort("packs")} value={globalStats.byChannel.packs} accent="muted" />
 				)}
 				{globalStats.byChannel.b2b2c > 0 && (
-					<StatCard label={channelShort("b2b2c")} value={globalStats.byChannel.b2b2c} accent="muted" />
+					<StatCard label={channelEmoji("b2b2c") + " " + channelShort("b2b2c")} value={globalStats.byChannel.b2b2c} accent="muted" />
 				)}
 			</div>
 
@@ -350,8 +381,12 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					<TableBody>
 						{filtered.length === 0 && (
 							<TableRow>
-								<TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-10">
-									{search || channelFilter !== "all" ? "Sin resultados para los filtros aplicados." : "No hay clientes registrados."}
+								<TableCell colSpan={6} className="p-0">
+									{search || channelFilter !== "all" ? (
+										<EmptyState tone="filter" glyph="🔍" title="Ningún cliente coincide" description="Probá con otro nombre o quitá el filtro de canal." />
+									) : (
+										<EmptyState glyph="🤝" title="Todavía no hay clientes" description="Se crean solos cuando guardás una cotización a nombre de un cliente nuevo, o desde el selector de cliente en cualquier cotizador." />
+									)}
 								</TableCell>
 							</TableRow>
 						)}
@@ -372,9 +407,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										</div>
 									</TableCell>
 									<TableCell>
-										<Badge variant={channelBadge(c.channel)} className="text-[10px]">
-											{channelShort(c.channel)}
-										</Badge>
+										<ChannelBadge channel={c.channel} size="sm" />
 									</TableCell>
 									<TableCell className="text-right tabular-nums text-sm text-muted-foreground">{dealCount}</TableCell>
 									<TableCell className="text-right tabular-nums text-sm font-medium">{rev ? fMoney(rev) : <span className="text-muted-foreground">—</span>}</TableCell>

@@ -17,6 +17,25 @@ export const PURPLE = "#8b5cf6";
 
 export const CAT_COLOR = { RRHH: BLUE, Sop: WN, Inf: GRAY, SW: PURPLE, Ops: OK };
 
+// ─── Paleta de gráficos · fuente única ────────────────────────────────────────
+// Espeja los tokens --chart-1..5 de index.css. Antes cada pantalla con gráficos
+// definía su propio array de colores; ahora todas parten de acá. Los recharts no
+// resuelven var(--chart-N) de forma confiable en `fill`, así que se usan los hex.
+export const CHART_COLORS = [
+	"#3041d5", // chart-1 · azul (Packs)
+	"#7c3aed", // chart-3 · violeta (Volumen)
+	"#0891b2", // chart-2 · cyan
+	"#b45309", // chart-4 · ámbar
+	"#059669", // chart-5 · verde
+	"#dc2626", // extra · rojo
+	"#64748b", // extra · pizarra
+	"#c026d3", // extra · magenta
+];
+
+// Colores semánticos de estado, compartidos por los gráficos que segmentan por
+// estado de la cotización (mismos valores que --success / --warning / --destructive).
+export const STATUS_COLORS = { confirmada: OK, pendiente: WN, rechazada: ER };
+
 export function mont(sz) {
 	return {
 		fontFamily: "Montserrat,sans-serif",

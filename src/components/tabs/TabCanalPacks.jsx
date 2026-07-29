@@ -3,6 +3,8 @@ import { makeMoney } from "@/utils/useMoney";
 import { useModels } from "@/context/ModelsContext";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { getDistributorTier } from "@/lib/tiers";
+import { tierMaterialInList } from "@/lib/tierMaterial";
+import { useTierUp } from "@/utils/useTierUp";
 import { CHANNELS } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -17,13 +19,13 @@ import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
 import { QuoteLayout, FieldGroup } from "@/components/ui/QuoteLayout";
+import { TierBadge, TierTrophy } from "@/components/ui/TierBadge";
 import { SwitchField } from "@/components/ui/SwitchField";
 import { ResultPanel, ResultHero, ResultRow, ResultItem, StatusPill, AnimatedNumber } from "@/components/ui/ResultPanel";
 import { TierHint } from "@/components/ui/TierHint";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { useToast, notifyQuoteSaved } from "@/components/ui/Toaster";
+import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
 
-const TIER_BADGE = { azul: "default", bronce: "warning", plata: "secondary", oro: "warning", platinum: "default" };
 function margClass(pct) { return pct >= 0.4 ? "text-[var(--success)]" : pct >= 0.15 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.4 ? "success" : pct >= 0.15 ? "warning" : "destructive"; }
 function margWord(pct) { return pct >= 0.4 ? "saludable" : pct >= 0.15 ? "ajustado" : "a revisar"; }
@@ -47,6 +49,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const ABONO_DESC_FALLBACK = 10;
 
 	const [selectedClient, setSelectedClient] = useState(null);
+	const [loadToken, setLoadToken] = useState(0);
 	const [certsActivos, setCertsActivos] = useState(0);
 	const [qtys, setQtys] = useState({});
 	const [firmasAdic, setFirmasAdic] = useState(0);
@@ -92,6 +95,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setEditingId(pendingEdit.id);
 		setSaved(null);
+		setLoadToken(function (n) { return n + 1; });
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
 
@@ -152,6 +156,12 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const facturacionAnio1 = netoLakaut + abonoMes * 11;
 	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || Math.max(0, Number(firmasAdic) || 0) > 0;
 
+	const tierActive = aplicaDescuento && hasVolume ? tier.id : null;
+	useTierUp(tierActive, distributorTiers, function (next) {
+		const mat = tierMaterialInList(next, distributorTiers);
+		notifyTierUp(toast, { label: next.label, emoji: mat.emoji, material: mat, discountPct: Math.round((next.descuento || 0) * 100) });
+	}, loadToken);
+
 	const cfAnual = costs.cfDirecto * 12;
 	const coberturaPC = cfAnual > 0 ? margenLakaut / cfAnual : 0;
 
@@ -170,7 +180,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 		return {
 			id: t.id,
 			cells: [
-				t.label,
+				<TierBadge key="tier" tier={t} tiers={distributorTiers} size="sm" />,
 				t.certsMin.toLocaleString("es-AR") + (t.certsMax == null ? "+" : "–" + t.certsMax.toLocaleString("es-AR")),
 				(t.descuento * 100).toFixed(0) + "%",
 			],
@@ -240,7 +250,13 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	function exportNow() {
 		const now = new Date().toISOString();
 		const src = saved ? saved.deal : buildDeal(editingId || "preview", now);
-		onExport && onExport(src, saved ? saved.client : selectedClient);
+		const client = saved ? saved.client : selectedClient;
+		onExport && onExport(src, client);
+		notifyQuoteExported(toast, {
+			clientName: client && client.name,
+			channelLabel: CHANNELS.packs.emoji + " " + CHANNELS.packs.label,
+			onGoHistorial: (saved && onGoHistorial) ? function () { onGoHistorial(src.id); } : null,
+		});
 	}
 
 	const header = (
@@ -263,7 +279,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	);
 
 	const result = (
-		<ResultPanel eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
+		<ResultPanel channel="packs" eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
 			<ResultHero
 				label={conAbono ? "Mes 1 · compra inicial" : (aplicaDescuento ? "Ingreso neto Lakaut" : "Total a pagar")}
 				value={hasVolume ? <AnimatedNumber value={netoLakaut} format={fMoney} /> : "—"}
@@ -272,18 +288,23 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 				pill={hasVolume ? <StatusPill tone={margAccent(margenPct)}>Margen {(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</StatusPill> : null}
 			/>
 
-			{/* Nivel + acceso contextual a la matriz. Solo con descuento aplicado. */}
+			{/* Nivel + acceso contextual a la matriz. Solo con descuento aplicado.
+			    El nivel se muestra con su material (bronce, plata, oro, platinum) en
+			    lugar de texto plano: es el momento en que el vendedor descubre cuánto
+			    puede negociar, así que se lee como logro y no como dato. */}
 			{aplicaDescuento && (
-				<div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-					<div className="min-w-0">
-						<div className="text-[11px] text-muted-foreground">Nivel · descuento</div>
-						<div className="text-sm font-semibold">
-							{hasVolume ? <>{tier.label} · {(tier.descuento * 100).toFixed(0)}%</> : <span className="text-muted-foreground/40">—</span>}
-							{hasVolume && <span className="ml-1 font-normal text-[11px] text-muted-foreground">por {drivenBy}</span>}
-						</div>
-					</div>
+				<div className="space-y-2 border-t border-border/60 pt-3">
+					<TierTrophy
+						tier={tier}
+						tiers={distributorTiers}
+						discountPct={(tier.descuento * 100).toFixed(0)}
+						note={"por " + drivenBy}
+						empty={!hasVolume}
+					/>
 					{hasVolume && (
-						<TierHint columns={["Nivel", "Certs", "Desc."]} rows={tierRows} activeId={tier.id} nextHint={nextHint} />
+						<div className="flex justify-end">
+							<TierHint columns={["Nivel", "Certs", "Desc."]} rows={tierRows} activeId={tier.id} nextHint={nextHint} />
+						</div>
 					)}
 				</div>
 			)}
@@ -354,7 +375,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
 			{/* ── 1 · Para la propuesta ── */}
-			<FieldGroup step={1} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+			<FieldGroup step={1} channel="packs" done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente
@@ -371,7 +392,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			</FieldGroup>
 
 			{/* ── 2 · Qué cotizás ── */}
-			<FieldGroup step={2} title="Qué cotizás" subtitle="Cargá los packs a precio de lista. El total se actualiza a la derecha.">
+			<FieldGroup step={2} channel="packs" done={hasVolume} title="Qué cotizás" subtitle="Cargá los packs a precio de lista. El total se actualiza a la derecha.">
 				<Table>
 					<TableHeader>
 						<TableRow>
@@ -433,6 +454,8 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			{/* ── 3 · Condiciones comerciales ── */}
 			<FieldGroup
 				step={3}
+				channel="packs"
+				done={hasVolume}
 				title="Condiciones comerciales"
 				subtitle={aplicaDescuento
 					? "Nivel por volumen + palancas por condiciones" + (conAbono ? " · abono mensual activo" : "")
@@ -530,7 +553,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 								const act = hasVolume && t.id === tier.id;
 								return (
 									<TableRow key={t.id} className={act ? "bg-accent" : ""}>
-										<TableCell className="font-semibold">{t.label}{act && <Badge variant={TIER_BADGE[t.id] || "default"} className="ml-2">actual</Badge>}</TableCell>
+										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={distributorTiers} size="sm" />{act && <span className="text-[10px] font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>
 										<TableCell className="text-right tabular-nums">{t.certsMin.toLocaleString("es-AR")}{t.certsMax == null ? "+" : "–" + t.certsMax.toLocaleString("es-AR")}</TableCell>
 										<TableCell className="text-right tabular-nums font-semibold">{(t.descuento * 100).toFixed(0)}%</TableCell>
 										<TableCell className="text-right tabular-nums">{t.compromisoMax == null ? "> " + t.compromisoMin.toLocaleString("es-AR") : t.compromisoMin.toLocaleString("es-AR") + "–" + t.compromisoMax.toLocaleString("es-AR")}</TableCell>

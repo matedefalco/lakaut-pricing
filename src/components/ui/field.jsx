@@ -56,13 +56,19 @@ const ACCENT_DOT = {
 // (lenguaje Crystal Glass: sombra difusa en lugar de bordes duros).
 export function StatCard({ label, value, sub, accent = "primary", valueClass }) {
 	return (
-		<Card className="flex-1 min-w-[150px] gap-2 py-4">
+		// Chip de ancho de contenido con piso de 150px, sin grow. Con `flex-1` los
+		// primeros KPIs se estiraban y empujaban al último a una fila propia donde
+		// quedaba ocupando todo el ancho; y con un `min-w` fijo una cifra larga
+		// ("USD 350.897") se cortaba. Así ninguno se estira ni se corta.
+		<Card className="grow-0 shrink-0 basis-auto min-w-[150px] gap-2 py-4">
 			<div className="px-4">
 				<div className="flex items-center gap-1.5">
 					<span className={cn("size-1.5 rounded-full shrink-0", ACCENT_DOT[accent] || ACCENT_DOT.primary)} />
 					<span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
 				</div>
-				<div className={cn("font-heading text-2xl font-semibold mt-1 tabular-nums", valueClass)}>{value}</div>
+				{/* whitespace-nowrap: una cifra larga ("USD 350.897") wrappeaba a dos líneas
+			    y rompía la lectura del KPI. */}
+			<div className={cn("font-display text-2xl mt-1 tabular-nums whitespace-nowrap", valueClass)}>{value}</div>
 				{sub && <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>}
 			</div>
 		</Card>

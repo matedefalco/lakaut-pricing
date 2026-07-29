@@ -1,11 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useCountUp } from "@/utils/useCountUp";
+import { channelMeta } from "@/data/channelMeta";
 
 // Panel de resultado de la cotizadora. En desktop queda fijo (sticky) al costado
 // del formulario para que el precio y el margen reaccionen a cada cambio sin que
 // el vendedor pierda de vista el número; en mobile se apila arriba del formulario.
 // Es el "pico" del recorrido: acá vive lo que el vendedor vino a buscar.
+//
+// Material propio, distinto del formulario: barra de acento del canal arriba,
+// lavado del color del canal que se desvanece hacia el blanco (así el número
+// queda sobre fondo claro) y sombra flotante. Antes era la misma card blanca que
+// los campos que lo alimentan, así que el momento en que el vendedor ve el precio
+// se veía igual que el formulario.
 
 const DOT = {
 	primary: "bg-primary",
@@ -15,11 +22,28 @@ const DOT = {
 	muted: "bg-muted-foreground/50",
 };
 
-export function ResultPanel({ eyebrow = "Resultado", children }) {
+export function ResultPanel({ eyebrow = "Resultado", channel, children }) {
+	const meta = channel ? channelMeta(channel) : null;
+
 	return (
-		<Card className="shadow-float gap-0 py-0">
-			<CardContent className="p-5 space-y-4">
-				<div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{eyebrow}</div>
+		<Card className="shadow-float relative gap-0 overflow-hidden py-0">
+			{meta && (
+				<>
+					<span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[3px]" style={{ background: meta.color }} />
+					<span
+						aria-hidden
+						className="pointer-events-none absolute inset-x-0 top-0 h-40"
+						style={{ background: "linear-gradient(180deg, " + meta.glow + " 0%, transparent 100%)" }}
+					/>
+				</>
+			)}
+			<CardContent className="relative p-5 space-y-4">
+				<div
+					className="text-[10px] font-bold uppercase tracking-wide"
+					style={{ color: meta ? meta.colorFg : "var(--muted-foreground)" }}
+				>
+					{eyebrow}
+				</div>
 				{children}
 			</CardContent>
 		</Card>
@@ -32,15 +56,15 @@ export function ResultPanel({ eyebrow = "Resultado", children }) {
 export function ResultHero({ label, value, sub, accent = "primary", pill, empty }) {
 	return (
 		<div>
-			<div className="flex items-center gap-1.5">
-				<span className={cn("size-1.5 rounded-full shrink-0", DOT[accent] || DOT.primary)} />
+			<div className="flex items-center gap-2">
+				<span className={cn("size-2 rounded-full shrink-0", DOT[accent] || DOT.primary)} />
 				<span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
 			</div>
-			<div className="mt-1 flex items-baseline gap-2 flex-wrap">
-				<span className={cn("font-heading text-3xl font-semibold tabular-nums leading-none", empty && "text-muted-foreground/40")}>{value}</span>
+			<div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
+				<span className={cn("font-display text-4xl tabular-nums leading-none [overflow-wrap:anywhere]", empty && "text-muted-foreground/40")}>{value}</span>
 				{pill}
 			</div>
-			{sub && <div className="text-[11px] text-muted-foreground mt-1.5">{sub}</div>}
+			{sub && <div className="text-[11px] text-muted-foreground mt-2">{sub}</div>}
 		</div>
 	);
 }
@@ -51,7 +75,7 @@ export function ResultRow({ label, value, accent = "muted", empty, valueClass })
 	return (
 		<div className="flex items-center justify-between gap-3 py-2 border-t border-border/60">
 			<div className="flex items-center gap-1.5 min-w-0">
-				<span className={cn("size-1.5 rounded-full shrink-0", DOT[accent] || DOT.muted)} />
+				<span className={cn("size-2 rounded-full shrink-0", DOT[accent] || DOT.muted)} />
 				<span className="text-[11px] text-muted-foreground truncate">{label}</span>
 			</div>
 			<span className={cn("text-sm font-semibold tabular-nums shrink-0", empty && "text-muted-foreground/40", valueClass)}>{value}</span>
@@ -67,7 +91,7 @@ export function ResultItem({ title, detail, value, accent = "primary", strong })
 		<div className="py-2 border-t border-border/60">
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex items-center gap-1.5 min-w-0">
-					<span className={cn("size-1.5 rounded-full shrink-0", DOT[accent] || DOT.primary)} />
+					<span className={cn("size-2 rounded-full shrink-0", DOT[accent] || DOT.primary)} />
 					<span className={cn("text-[12px] truncate", strong ? "font-semibold text-foreground" : "font-medium text-foreground")}>{title}</span>
 				</div>
 				<span className="text-sm font-semibold tabular-nums shrink-0">{value}</span>

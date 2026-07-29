@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { getB2B2CSegment, facturacionAtBase } from "@/lib/tiers";
+import { tierMaterialInList } from "@/lib/tierMaterial";
+import { useTierUp } from "@/utils/useTierUp";
 import { buildProyeccion, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
 import { CHANNELS } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,10 +19,11 @@ import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
 import { QuoteLayout, FieldGroup } from "@/components/ui/QuoteLayout";
+import { TierBadge, TierTrophy } from "@/components/ui/TierBadge";
 import { ResultPanel, ResultHero, ResultRow, StatusPill, AnimatedNumber } from "@/components/ui/ResultPanel";
 import { TierHint } from "@/components/ui/TierHint";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { useToast, notifyQuoteSaved } from "@/components/ui/Toaster";
+import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
 import { TabCanalB2B2CPrecios } from "@/components/tabs/TabCanalB2B2CPrecios";
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
@@ -47,6 +50,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const cvFirma = costs.cvFirmaBase;
 
 	const [selectedClient, setSelectedClient] = useState(null);
+	const [loadToken, setLoadToken] = useState(0);
 	const [integracion, setIntegracion] = useState("api"); // "api" | "sin_api"
 	// Modelo por tipo de certificado. Un certificado (IDC) es físico (persona) o
 	// jurídico (empresa/representante). Mismo precio y costo; se separan solo para
@@ -196,8 +200,17 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setShowOverrides(legacyCert != null || i.overridePrecioFirma != null);
 		setEditingId(pendingEdit.id);
 		setSaved(null);
+		setLoadToken(function (n) { return n + 1; });
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
+
+	// Festejo al subir de segmento: sólo con volumen cargado y sólo al cambiar el
+	// segmento efectivo (no en cada tecla). El loadToken evita festejar la carga de
+	// una cotización guardada.
+	useTierUp(hasVolume ? seg.id : null, b2b2cSegments, function (next) {
+		const mat = tierMaterialInList(next, b2b2cSegments);
+		notifyTierUp(toast, { label: next.label, emoji: mat.emoji, material: mat, discountPct: Math.round((next.descuento || 0) * 100) });
+	}, loadToken);
 
 	// ── Precios efectivos ──
 	// precioIDC = precio del certificado (sin firmas). precioFirmaLista = precio
@@ -278,7 +291,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		return {
 			id: s.id,
 			cells: [
-				s.label,
+				<TierBadge key="seg" tier={s} tiers={b2b2cSegments} size="sm" />,
 				fMoney(min) + (s.compromisoMax == null ? "+" : "–" + fMoney(Number(s.compromisoMax) || 0)),
 				Math.round((Number(s.descuento) || 0) * 100) + "%",
 			],
@@ -432,7 +445,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	function exportNow() {
 		const now = new Date().toISOString();
 		const src = saved ? saved.deal : buildDeal(editingId || "preview", now);
-		onExport && onExport(src, saved ? saved.client : selectedClient);
+		const client = saved ? saved.client : selectedClient;
+		onExport && onExport(src, client);
+		notifyQuoteExported(toast, {
+			clientName: client && client.name,
+			channelLabel: CHANNELS.b2b2c.emoji + " " + CHANNELS.b2b2c.label,
+			onGoHistorial: (saved && onGoHistorial) ? function () { onGoHistorial(src.id); } : null,
+		});
 	}
 
 	const header = (
@@ -452,7 +471,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	// entender qué está cotizando de un vistazo.
 	const result = (
 		<>
-		<ResultPanel eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
+		<ResultPanel channel="b2b2c" eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
 			<ResultHero
 				label={conApi ? "Total · mes 1" : "Total"}
 				value={hasVolume ? <AnimatedNumber value={revTotal} format={fMoney} /> : "—"}
@@ -462,15 +481,19 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			/>
 
 			{/* Segmento + acceso contextual a la tabla de precios */}
-			<div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-				<div className="min-w-0">
-					<div className="text-[11px] text-muted-foreground">Segmento · {hasVolume ? "compromiso " + fMoney(compromiso) : "por compromiso"}</div>
-					<div className="text-sm font-semibold">
-						{hasVolume ? <>{segLabel}{segDesc > 0 && <span className="ml-1.5 text-[11px] font-semibold text-[var(--success)]">−{Math.round(segDesc * 100)}%</span>} <span className="font-normal text-[11px] text-muted-foreground">· {fMoney2(precioIDC)}/cert · {fMoney2(precioFirmaLista)}/firma</span></> : <span className="text-muted-foreground/40">—</span>}
-					</div>
-				</div>
+			<div className="space-y-2 border-t border-border/60 pt-3">
+				<TierTrophy
+					tier={seg}
+					tiers={b2b2cSegments}
+					eyebrow="Segmento · descuento"
+					discountPct={segDesc > 0 ? "−" + Math.round(segDesc * 100) : null}
+					note={hasVolume ? "compromiso " + fMoney(compromiso) + " · " + fMoney2(precioIDC) + "/cert · " + fMoney2(precioFirmaLista) + "/firma" : null}
+					empty={!hasVolume}
+				/>
 				{hasVolume && (
-					<TierHint label="ver segmentos" columns={["Segmento", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />
+					<div className="flex justify-end">
+						<TierHint label="ver segmentos" columns={["Segmento", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />
+					</div>
 				)}
 			</div>
 
@@ -574,7 +597,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
 			{/* ── 1 · Para la propuesta ── */}
-			<FieldGroup step={1} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+			<FieldGroup step={1} channel="b2b2c" done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente
@@ -591,7 +614,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			</FieldGroup>
 
 			{/* ── 2 · Qué cotizás ── */}
-			<FieldGroup step={2} title="Qué cotizás" subtitle="Modalidad y volumen de certificados por tipo. El resumen se arma a la derecha.">
+			<FieldGroup step={2} channel="b2b2c" done={hasVolume} title="Qué cotizás" subtitle="Modalidad y volumen de certificados por tipo. El resumen se arma a la derecha.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
 					<div className="flex gap-1 flex-wrap">
@@ -663,7 +686,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			</FieldGroup>
 
 			{/* ── 3 · Condiciones comerciales ── */}
-			<FieldGroup step={3} title="Condiciones comerciales" subtitle={condResumen}>
+			<FieldGroup step={3} channel="b2b2c" done={hasVolume} title="Condiciones comerciales" subtitle={condResumen}>
 				{conApi && (
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
@@ -738,10 +761,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 						</div>
 						<div className="flex flex-col gap-1.5">
 							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>
-							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-								<span className="font-semibold">{hasVolume ? segLabel : "—"}</span>
-								{hasVolume && segDesc > 0 && <span className="ml-1.5 text-[11px] font-semibold text-[var(--success)]">−{Math.round(segDesc * 100)}%</span>}
-								<span className="ml-2 text-[11px] text-muted-foreground">{hasVolume ? "por " + fMoney(compromiso) + (compromisoManual ? " · manual" : "") : "cargá volumen"}</span>
+							<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
+								{hasVolume ? <TierBadge tier={seg} tiers={b2b2cSegments} size="sm" sub={segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null} /> : <span className="text-sm text-muted-foreground/40">—</span>}
+								<span className="text-[11px] text-muted-foreground truncate">{hasVolume ? "por " + fMoney(compromiso) + (compromisoManual ? " · manual" : "") : "cargá volumen"}</span>
 							</div>
 							<span className="text-[11px] text-muted-foreground">El descuento se aplica al certificado y a la firma por igual.</span>
 						</div>

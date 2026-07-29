@@ -5,7 +5,7 @@ export function PageHeader({ title, description, actions, children }) {
 	return (
 		<div className="flex flex-wrap items-end justify-between gap-3">
 			<div className="min-w-0">
-				<h1 className="font-heading text-xl font-semibold text-foreground">{title}</h1>
+				<h1 className="font-display text-xl text-foreground">{title}</h1>
 				{description && <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{description}</p>}
 				{children}
 			</div>

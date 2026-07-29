@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, ER, ERBG, os, mont } from "../../theme/tokens";
+import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, ER, ERBG, CHART_COLORS, os, mont } from "../../theme/tokens";
 import { useModels } from "../../context/ModelsContext";
 import { NumInput } from "../ui/NumInput";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Toast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/Toaster";
 import { Button } from "@/components/ui/button";
 
 const ARCH_OPTIONS = [
@@ -20,10 +20,8 @@ const SEGMENT_OPTIONS = [
 	{ k: "empresa", label: "Empresa" },
 ];
 
-const PRESET_COLORS = [
-	"#3041d5", "#0891b2", "#7c3aed", "#b45309",
-	"#059669", "#dc2626", "#64748b", "#c026d3",
-];
+// Swatches de color de los modelos: la paleta de gráficos compartida.
+const PRESET_COLORS = CHART_COLORS;
 
 const EMPTY_MODEL = {
 	id: "",
@@ -520,12 +518,10 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 	const { models, upsert, remove, duplicate, resetToDefaults } = useModels();
 	const [editingId, setEditingId] = useState(null); // null | "new" | model.id
-	const [toast, setToast] = useState(null); // { msg, id }
+	const { toast } = useToast();
 
 	function showToast(msg) {
-		const id = Date.now();
-		setToast({ msg, id });
-		setTimeout(function () { setToast(function (t) { return t && t.id === id ? null : t; }); }, 3000);
+		toast({ variant: "success", title: msg, duration: 3000 });
 	}
 
 	function handleSave(draft) {
@@ -544,8 +540,6 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 
 	return (
 		<div className="space-y-5">
-			<Toast toast={toast} />
-
 			<PageHeader
 				title="Modelos y packs"
 				description={models.length + " " + (models.length === 1 ? "modelo guardado" : "modelos guardados") + ". Definen los packs que se cotizan en todos los canales."}

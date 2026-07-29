@@ -1,13 +1,15 @@
 import { useState, useMemo } from "react";
-import { Plus, X, ChevronRight } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumberField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TierBadge } from "@/components/ui/TierBadge";
+import { CHANNELS as CHANNEL_IDENTITY } from "@/data/channelMeta";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from "recharts";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -15,9 +17,9 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 const CHANNELS = ["b2b2c", "distribuidores", "web"];
 
 const CHANNEL_META = {
-	b2b2c:         { label: "Volumen",         color: "#6366f1" },
-	distribuidores:{ label: "Packs con descuento", color: "#0ea5e9" },
-	web:           { label: "Packs a lista",       color: "#f59e0b" },
+	b2b2c:          { label: "Volumen",              emoji: CHANNEL_IDENTITY.b2b2c.emoji, color: CHANNEL_IDENTITY.b2b2c.color },
+	distribuidores: { label: "Packs con descuento",  emoji: CHANNEL_IDENTITY.packs.emoji, color: CHANNEL_IDENTITY.packs.color },
+	web:            { label: "Packs a lista",        emoji: CHANNEL_IDENTITY.packs.emoji, color: "#0891b2" },
 };
 
 const SCENARIO_LABELS = ["A","B","C","D","E","F"];
@@ -180,7 +182,10 @@ function buildMetrics(r, fMoney, fMoney2) {
 		{ isHeader: true, label: "Segmento / Tier asignado" },
 		{
 			label: "Nivel",
-			cells: CHANNELS.map(function (ch) { return { v: null, formatted: r[ch].segOrTier, isBest: false }; }),
+			cells: CHANNELS.map(function (ch) {
+				const t = r[ch].segOrTier;
+				return { v: null, formatted: t && t !== "—" ? <TierBadge tier={t} size="sm" /> : "—", isBest: false };
+			}),
 		},
 	];
 }
@@ -198,8 +203,9 @@ function MetricsTable({ metrics }) {
 							return (
 								<TableHead key={ch} className="text-right">
 									<div className="flex items-center justify-end gap-1.5">
+										<span className="text-xs leading-none">{CHANNEL_META[ch].emoji}</span>
 										<span className="size-2 rounded-full shrink-0" style={{ background: CHANNEL_META[ch].color }} />
-										<span className="text-xs">{CHANNEL_META[ch].label}</span>
+										<span className="text-xs font-semibold" style={{ color: CHANNEL_META[ch].color }}>{CHANNEL_META[ch].label}</span>
 									</div>
 								</TableHead>
 							);
@@ -383,16 +389,15 @@ export function TabComparacion({ costs, currency, tc }) {
 						/>
 						<div className="flex flex-col gap-1.5 col-span-2">
 							<label className="text-xs text-muted-foreground uppercase tracking-wide">Pack de referencia (packs)</label>
-							<select
-								className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-								value={refPackId || ""}
-								onChange={function (e) { setRefPackId(e.target.value || null); }}
-							>
-								<option value="">Automático (más cercano al volumen)</option>
-								{packOptions.map(function (p) {
-									return <option key={p.id} value={p.id}>{p.label}</option>;
-								})}
-							</select>
+							<Select value={refPackId || "auto"} onValueChange={function (v) { setRefPackId(v === "auto" ? null : v); }}>
+								<SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+								<SelectContent>
+									<SelectItem value="auto">Automático (más cercano al volumen)</SelectItem>
+									{packOptions.map(function (p) {
+										return <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>;
+									})}
+								</SelectContent>
+							</Select>
 							{result?.refPack && (
 								<p className="text-[10px] text-muted-foreground">
 									Usando: <span className="font-medium text-foreground">{result.refPack.label}</span> · {result.refPack.certs} certs · {fMoney(result.refPack.priceUSD)} · {fMoney2(result.refPack.priceUSD / result.refPack.certs)}/cert

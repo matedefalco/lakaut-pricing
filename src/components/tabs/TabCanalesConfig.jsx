@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/Toaster";
 import { LEVER_META } from "@/lib/commercialLevers";
+import { TierBadge } from "@/components/ui/TierBadge";
 
 function cmClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -141,6 +142,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				<Table>
 					<TableHeader>
 						<TableRow>
+							<TableHead className="w-[130px]">Se ve así</TableHead>
 							<TableHead>Nivel</TableHead>
 							<TableHead>Label</TableHead>
 							<TableHead className={thNum}>Certs mín.</TableHead>
@@ -159,6 +161,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 							}
 							return (
 								<TableRow key={tier.id || idx}>
+									<TableCell><TierBadge tier={tier} tiers={draft.distributorTiers} size="sm" /></TableCell>
 									<TableCell><TextCell value={tier.id} onChange={function (v) { upd("id", v); }} className="w-20" /></TableCell>
 									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-24" /></TableCell>
 									<TableCell><NumCell value={tier.certsMin} decimals={0} onChange={function (v) { upd("certsMin", v); }} /></TableCell>
@@ -202,6 +205,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				<Table>
 					<TableHeader>
 						<TableRow>
+							<TableHead className="w-[140px]">Se ve así</TableHead>
 							<TableHead>Segmento</TableHead>
 							<TableHead className={thNum}>Compromiso mín. (USD)</TableHead>
 							<TableHead className={thNum}>Compromiso máx. (USD)</TableHead>
@@ -226,6 +230,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 							const cmFirmaPct = cmPctOf(pFirma, cvFirma);
 							return (
 								<TableRow key={seg.id || idx}>
+									<TableCell><TierBadge tier={seg} tiers={draft.b2b2cSegments} size="sm" /></TableCell>
 									<TableCell><TextCell value={seg.label} onChange={function (v) { upd("label", v); }} className="w-32" /></TableCell>
 									<TableCell><NumCell value={seg.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>

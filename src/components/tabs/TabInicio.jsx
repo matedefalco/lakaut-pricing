@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/field";
-import { DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { CHANNELS, channelShort, isPacks } from "@/data/channelMeta";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ChannelBadge } from "@/components/ui/ChannelBadge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { dealStatus } from "@/lib/dealStatus";
+import { CHANNELS, channelMeta, isPacks } from "@/data/channelMeta";
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -46,22 +48,49 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 	return (
 		<div className="space-y-6 max-w-4xl">
 			<div>
-				<h1 className="font-heading text-2xl font-semibold text-foreground">Empezá una cotización</h1>
+				<h1 className="font-display text-2xl text-foreground">Empezá una cotización</h1>
 				<p className="text-sm text-muted-foreground mt-1">Elegí el canal, cargá el volumen y exportá la propuesta. Tus cotizaciones quedan guardadas y sincronizadas con el equipo.</p>
 			</div>
 
-			{/* Acción primaria: elegir canal */}
+			{/* Acción primaria: elegir canal. Cada card toma el color, el gradiente y el
+			    icono de su canal (ver channelMeta): eran dos cards blancas idénticas para
+			    dos negocios distintos. */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{channelCards.map(function (c) {
+					const meta = channelMeta(c.key);
+					const Icon = meta.Icon;
 					return (
-						<button key={c.key} onClick={function () { onNewQuote(c.key); }} className="group shadow-card text-left rounded-2xl border border-white/70 bg-card p-5 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-float">
-							<div className="flex items-center justify-between gap-3">
-								<span className="font-heading text-base font-semibold text-foreground">{c.label}</span>
-								<span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-									<Plus className="size-4" />
+						<button
+							key={c.key}
+							onClick={function () { onNewQuote(c.key); }}
+							className="group shadow-card relative overflow-hidden text-left rounded-2xl border border-white/70 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-float"
+						>
+							{/* Lavado de color del canal en la esquina: da identidad sin
+							    comprometer la legibilidad del texto sobre la card. */}
+							<span
+								aria-hidden
+								className="pointer-events-none absolute -right-10 -top-14 size-40 rounded-full opacity-60 transition-opacity duration-200 group-hover:opacity-100"
+								style={{ background: "radial-gradient(circle, " + meta.glow + " 0%, transparent 70%)" }}
+							/>
+							<span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: meta.color, opacity: 0.85 }} />
+							<div className="relative flex items-center justify-between gap-3">
+								<span className="flex items-center gap-2.5 min-w-0">
+									<span
+										className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+										style={{ background: meta.gradient, border: "1px solid " + meta.glow, color: meta.colorFg }}
+									>
+										{Icon && <Icon className="size-[18px]" strokeWidth={2.2} />}
+									</span>
+									<span className="font-display text-lg truncate" style={{ color: meta.colorFg }}>{c.label}</span>
+								</span>
+								<span
+									className="flex size-7 shrink-0 items-center justify-center rounded-full transition-colors"
+									style={{ background: meta.colorSoft, color: meta.color }}
+								>
+									<Plus className="size-4" strokeWidth={2.6} />
 								</span>
 							</div>
-							<p className="text-xs text-muted-foreground mt-2 leading-relaxed">{c.desc}</p>
+							<p className="relative text-xs text-muted-foreground mt-2.5 leading-relaxed">{c.desc}</p>
 						</button>
 					);
 				})}
@@ -87,27 +116,29 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 				<Card>
 					<CardContent className="p-0">
 						{recientes.length === 0 ? (
-							<div className="px-5 py-10 text-center">
-								<p className="text-sm text-muted-foreground">Todavía no hay cotizaciones.</p>
-								<p className="text-xs text-muted-foreground mt-1">Empezá con una de las opciones de arriba.</p>
-							</div>
+							<EmptyState
+								glyph="✍️"
+								title="Todavía no hay cotizaciones"
+								description="Elegí un canal arriba, cargá el volumen y en segundos tenés la propuesta lista para exportar."
+								action={{ label: "Cotizar en Packs", icon: Plus, onClick: function () { onNewQuote("packs"); } }}
+								secondaryAction={{ label: "Cotizar en Volumen", icon: Plus, onClick: function () { onNewQuote("b2b2c"); } }}
+							/>
 						) : (
 							<div className="divide-y divide-border">
 								{recientes.map(function (d) {
 									const client = (d.client_id && clientsById[d.client_id]) || d.clients || null;
 									const name = (client && client.name) || d.clientName || "(sin nombre)";
 									const st = dealStatus(d);
-									const meta = DEAL_STATUS_META[st] || DEAL_STATUS_META.pendiente;
 									return (
 										<div key={d.id} role="button" tabIndex={0} onClick={function () { onEditQuote(d); }} onKeyDown={function (e) { if (e.key === "Enter") onEditQuote(d); }} className="group flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
 											<div className="min-w-0 flex-1">
 												<div className="flex items-center gap-2">
 													<span className="font-semibold text-sm truncate">{name}</span>
-													<Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{channelShort(d.channel)}</Badge>
+													<ChannelBadge channel={d.channel} size="sm" />
 												</div>
 												<div className="text-[11px] text-muted-foreground mt-0.5">{fDate(d.fecha)}</div>
 											</div>
-											<span className={"shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium " + meta.className}>{meta.label}</span>
+											<StatusBadge status={st} />
 											<span className="shrink-0 tabular-nums text-sm font-semibold w-24 text-right">{dealValue(d, fMoney)}</span>
 											<button
 												onClick={function (e) {
