@@ -247,7 +247,18 @@ function iconBox(svg, bg, size) {
 // ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
 // `sinApi` engloba las propuestas sin integración (volumen sin API y packs);
 // `listaPura` afina el copy para la venta directa por tarjeta, sin descuento.
-function s1Cover(clientName, fecha, sinApi, listaPura, cotId) {
+// Nota de tipo de cambio de referencia para propuestas en USD: da contexto al
+// cliente sobre qué dólar y de qué fecha se tomó, sin comprometer la facturación.
+function tcRefNote(tc, tcMeta) {
+	const src = (tcMeta && tcMeta.sourceLabel) ? tcMeta.sourceLabel : "Oficial";
+	const val = (tc && isFinite(tc)) ? "$ " + Number(tc).toLocaleString("es-AR") : "";
+	const iso = (tcMeta && tcMeta.lastUpdated) ? tcMeta.lastUpdated : new Date().toISOString();
+	let d = "";
+	try { d = new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch (e) {}
+	return `Valores en USD · TC ref. ${src} ${val}${d ? ` al ${d}` : ""}`;
+}
+
+function s1Cover(clientName, fecha, sinApi, listaPura, cotId, currency, tc, tcMeta) {
 	const middleBadge = listaPura
 		? { text: "Contratación directa", icon: SVG.check("rgba(255,255,255,0.85)", 11) }
 		: sinApi
@@ -292,7 +303,7 @@ function s1Cover(clientName, fecha, sinApi, listaPura, cotId) {
 
   <!-- footer -->
   <div style="flex-shrink:0;padding:0.3cm 1.3cm;border-top:1px solid rgba(255,255,255,0.18);display:flex;justify-content:space-between;align-items:center;">
-    <span style="font-size:8pt;color:rgba(255,255,255,0.5);">${fecha ? `Emitida el ${fd(fecha)} · Válida hasta el ${fd(addDays(fecha, VALIDEZ_DIAS))}` : ""}</span>
+    <span style="font-size:8pt;color:rgba(255,255,255,0.5);">${fecha ? `Emitida el ${fd(fecha)} · Válida hasta el ${fd(addDays(fecha, VALIDEZ_DIAS))}` : ""}${currency === "USD" ? `${fecha ? " · " : ""}${tcRefNote(tc, tcMeta)}` : ""}</span>
     <span style="font-size:7pt;color:rgba(255,255,255,0.32);">Autoridad Certificante Licenciada · Infraestructura de Firma Digital · Ley N° 25.506</span>
   </div>
 </div>`;
@@ -993,7 +1004,7 @@ function s5Cierre(sinApi) {
 }
 
 // ─── Builder ──────────────────────────────────────────────────────────────────
-function buildHTML(deal, client, currency, tc, channelConfig, models) {
+function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
 	// ID de cotización (COT-TIPO-NNNN-vN) para la portada. El tipo sale del snapshot
 	// guardado en el deal; si falta, del tipo vivo del cliente. Ver [[cotId]].
@@ -1037,7 +1048,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models) {
 <style>${SLIDE_CSS}</style>
 </head>
 <body>
-${s1Cover(clientName, deal.fecha, noApi, listaPura, cotId)}
+${s1Cover(clientName, deal.fecha, noApi, listaPura, cotId, currency, tc, tcMeta)}
 ${noApi ? "" : s2Integracion(clientName)}
 ${s3}
 ${proySlide}
@@ -1047,10 +1058,11 @@ ${s5Cierre(noApi)}
 </html>`;
 }
 
-// La propuesta exportada siempre se factura en pesos, sin importar en qué
-// moneda esté parada la interfaz al momento de crear o exportar la cotización.
-export function exportProposal(deal, client, currency, tc, channelConfig, models) {
-	const html = buildHTML(deal, client, "ARS", tc, channelConfig, models);
+// La propuesta se exporta en la moneda elegida al momento de exportar (ARS o USD).
+// `tcMeta` ({ sourceLabel, lastUpdated }) alimenta la nota de tipo de cambio de
+// referencia que aparece en la portada cuando la moneda es USD.
+export function exportProposal(deal, client, currency, tc, channelConfig, models, tcMeta) {
+	const html = buildHTML(deal, client, currency === "USD" ? "USD" : "ARS", tc, channelConfig, models, tcMeta);
 	const win = window.open("", "_blank");
 	if (!win) { alert("Habilitá ventanas emergentes para exportar la propuesta."); return; }
 	win.document.open();

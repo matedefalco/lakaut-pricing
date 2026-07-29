@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal } from "lucide-react";
-import { useDolarTC } from "./lib/useDolarTC";
+import { useDolarTC, DOLAR_SOURCES } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { BLUE, GRAY, BLACK, WHITE, os } from "./theme/tokens";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "./data/costs";
@@ -199,8 +199,14 @@ function LakautCalcInner() {
 		navTo("historial");
 	}
 
-	function exportDeal(deal, client) {
-		exportProposal(deal, client, currency, tc, channelConfig, models);
+	// Metadata del tipo de cambio para la nota de referencia en propuestas USD.
+	const tcMeta = useMemo(function () {
+		const srcMeta = DOLAR_SOURCES.find(function (s) { return s.k === source; });
+		return { sourceLabel: srcMeta ? srcMeta.label : "Oficial", lastUpdated: tcLastUpdated };
+	}, [source, tcLastUpdated]);
+
+	function exportDeal(deal, client, overrideCurrency) {
+		exportProposal(deal, client, overrideCurrency || currency, tc, channelConfig, models, tcMeta);
 	}
 
 	// Load costConfig from Supabase on mount; subscribe to remote changes
@@ -343,7 +349,7 @@ function LakautCalcInner() {
 					{activeNavItem === "b2b2c" && <TabCanalB2B2C key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 
 					{/* ── SEGUIMIENTO ── */}
-					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} highlightId={historialHighlight} onEditQuote={editQuote} />}
+					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcMeta={tcMeta} highlightId={historialHighlight} onEditQuote={editQuote} />}
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={editQuote} />}
 
 					{/* ── ANÁLISIS ── */}

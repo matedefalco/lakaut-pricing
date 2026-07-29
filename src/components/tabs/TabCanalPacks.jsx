@@ -49,6 +49,10 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const ABONO_DESC_FALLBACK = 10;
 
 	const [selectedClient, setSelectedClient] = useState(null);
+	// Moneda del PDF exportado. Independiente del toggle global de visualización:
+	// arranca en ARS (moneda de facturación histórica) y se puede pasar a USD por
+	// cotización desde la barra de exportar.
+	const [exportCurrency, setExportCurrency] = useState("ARS");
 	const [loadToken, setLoadToken] = useState(0);
 	const [certsActivos, setCertsActivos] = useState(0);
 	const [qtys, setQtys] = useState({});
@@ -251,7 +255,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 		const now = new Date().toISOString();
 		const src = saved ? saved.deal : buildDeal(editingId || "preview", now);
 		const client = saved ? saved.client : selectedClient;
-		onExport && onExport(src, client);
+		onExport && onExport(src, client, exportCurrency);
 		notifyQuoteExported(toast, {
 			clientName: client && client.name,
 			channelLabel: CHANNELS.packs.emoji + " " + CHANNELS.packs.label,
@@ -369,6 +373,8 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			onCancelEdit={function () { setEditingId(null); }}
 			editingId={editingId}
 			flash={flash}
+			exportCurrency={exportCurrency}
+			onExportCurrencyChange={setExportCurrency}
 		/>
 	);
 

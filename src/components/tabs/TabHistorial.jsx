@@ -58,7 +58,7 @@ function summaryCols(channel, fMoney) {
 	];
 }
 
-export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, highlightId }) {
+export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clientsApi, highlightId }) {
 	const { channelConfig } = useChannelConfig();
 	const { models } = useModels();
 	const { fMoney } = makeMoney(currency, tc);
@@ -480,7 +480,7 @@ export function TabHistorial({ dealsApi, currency, tc, onEditQuote, clientsApi, 
 													</TableCell>
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
 													<TableCell className="text-right">
-														<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, currency, tc, channelConfig, models); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
+														<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, "ARS", tc, channelConfig, models, tcMeta); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { newVersion(q); }} title="Nueva versión (clona subiendo la versión)"><CopyPlus className="size-4 text-muted-foreground" /></Button>
 														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>
