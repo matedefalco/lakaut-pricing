@@ -15,6 +15,7 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { channelShort, resolveChannel, isPacks, isUnit, packsConDescuento } from "@/data/channelMeta";
+import { dealRevenue } from "@/lib/dealMetrics";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -55,8 +56,8 @@ function summaryCols(channel, fMoney) {
 			{ label: "Certs", get: function (q) { return (q.resumen.certsComprados || 0).toLocaleString("es-AR"); } },
 			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
 			{ label: "Precio de lista", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
-			{ label: "Neto", get: function (q) { return fMoney(q.resumen.netoLakaut != null ? q.resumen.netoLakaut : (q.resumen.facturacionLista || 0)); } },
-			{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
+			{ label: "Neto", sortKey: "monto", get: function (q) { return fMoney(q.resumen.netoLakaut != null ? q.resumen.netoLakaut : (q.resumen.facturacionLista || 0)); } },
+			{ label: "Margen", sortKey: "margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
 		];
 	}
 	return [
@@ -64,8 +65,8 @@ function summaryCols(channel, fMoney) {
 		{ label: "IDC", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
 		{ label: "Firmas/mes", get: function (q) { return (q.resumen.firmasMes || 0).toLocaleString("es-AR"); } },
 		{ label: "Rev/mes", get: function (q) { return fMoney(q.resumen.revMesTotal || 0); } },
-		{ label: "Rev año 1", get: function (q) { return fMoney(q.resumen.revAnual || 0); } },
-		{ label: "Margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
+		{ label: "Rev año 1", sortKey: "monto", get: function (q) { return fMoney(q.resumen.revAnual || 0); } },
+		{ label: "Margen", sortKey: "margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
 	];
 }
 
@@ -87,6 +88,16 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		const timer = setTimeout(function () { setFlashId(null); }, 2800);
 		return function () { cancelAnimationFrame(raf); clearTimeout(timer); };
 	}, [highlightId]);
+
+	// Vista del listado: "unificada" = todas las cotizaciones en una sola tabla
+	// ordenable (rompe la segmentación por canal); "agrupada" = una card por canal
+	// con sus columnas propias, como el modelo anterior. Arranca en unificada porque
+	// el orden global es lo que no se podía tener con el agrupado.
+	const [view, setView] = useState("unificada");
+	// Orden por clic en encabezado. sortKey ∈ {fecha, cliente, canal, monto, margen}.
+	// El monto usa el revenue año 1 homogéneo entre canales (ver dealRevenue).
+	const [sortKey, setSortKey] = useState("fecha");
+	const [sortDir, setSortDir] = useState("desc");
 
 	const [openFilter, setOpenFilter] = useState(null);
 	const [selectedChannels, setSelectedChannels] = useState(new Set());
@@ -206,11 +217,39 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		});
 	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax]);
 
+	// ── Orden ──
+	// Comparador con soporte de números y acentos (es). Cuando el criterio empata,
+	// desempata por fecha para que el orden sea estable y predecible.
+	const collator = useMemo(function () { return new Intl.Collator("es", { numeric: true, sensitivity: "base" }); }, []);
+	// Dirección por defecto al elegir una columna nueva: texto ascendente (A→Z),
+	// números y fecha descendente (más grande / más reciente primero).
+	function defaultDir(k) { return (k === "cliente" || k === "canal") ? "asc" : "desc"; }
+	function toggleSort(k) {
+		setSortDir(function (prev) { return sortKey === k ? (prev === "asc" ? "desc" : "asc") : defaultDir(k); });
+		setSortKey(k);
+	}
+
+	const sortedFiltered = useMemo(function () {
+		const dir = sortDir === "asc" ? 1 : -1;
+		const arr = filtered.slice();
+		arr.sort(function (a, b) {
+			let r = 0;
+			if (sortKey === "cliente") r = collator.compare(a.clientName || "", b.clientName || "");
+			else if (sortKey === "canal") r = collator.compare(channelShort(a.channel), channelShort(b.channel));
+			else if (sortKey === "monto") r = dealRevenue(a) - dealRevenue(b);
+			else if (sortKey === "margen") r = ((a.resumen && a.resumen.margenPct) || 0) - ((b.resumen && b.resumen.margenPct) || 0);
+			else r = collator.compare(a.fecha || "", b.fecha || "");
+			if (r === 0) r = collator.compare(a.fecha || "", b.fecha || "");
+			return r * dir;
+		});
+		return arr;
+	}, [filtered, sortKey, sortDir, collator]);
+
 	const groups = useMemo(function () {
 		const byCh = {};
-		filtered.forEach(function (q) { const ch = resolveChannel(q.channel); (byCh[ch] = byCh[ch] || []).push(q); });
+		sortedFiltered.forEach(function (q) { const ch = resolveChannel(q.channel); (byCh[ch] = byCh[ch] || []).push(q); });
 		return byCh;
-	}, [filtered]);
+	}, [sortedFiltered]);
 
 	function exportCsv() {
 		const lines = [];
@@ -244,7 +283,86 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		if (nv) onEditQuote(nv);
 	}
 
-	const orderedChannels = Object.keys(groups).sort();
+	// Orden fijo de las cards (como la nav), solo los canales con cotizaciones.
+	const orderedChannels = Object.keys(CHANNELS).filter(function (ch) { return groups[ch] && groups[ch].length; });
+
+	// Encabezado de columna ordenable: clic ordena por su clave; segundo clic invierte.
+	function SortHeader(props) {
+		const active = sortKey === props.k;
+		return (
+			<TableHead className={props.align === "right" ? "text-right" : undefined}>
+				<button
+					type="button"
+					onClick={function () { toggleSort(props.k); }}
+					className={cn(
+						"inline-flex items-center gap-1 cursor-pointer select-none transition-colors hover:text-foreground",
+						props.align === "right" && "flex-row-reverse",
+						active ? "text-foreground font-semibold" : "text-muted-foreground"
+					)}
+				>
+					<span>{props.label}</span>
+					<span className="text-[10px] w-2 opacity-70">{active ? (sortDir === "asc" ? "↑" : "↓") : ""}</span>
+				</button>
+			</TableHead>
+		);
+	}
+
+	// ── Celdas reutilizadas por las dos vistas ──
+	function clientCell(q) {
+		return (
+			<TableCell className="font-medium">
+				{q.clientName || "(sin nombre)"}
+				{isUnit(q.channel) && (
+					<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
+						{q.inputs?.integracion === "sin_api" ? "sin API" : "API"}
+					</Badge>
+				)}
+			</TableCell>
+		);
+	}
+	function idCell(q) {
+		return (
+			<TableCell className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
+				{formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo) || "—"}
+			</TableCell>
+		);
+	}
+	function statusCell(q) {
+		return (
+			<TableCell>
+				<Select value={dealStatus(q)} onValueChange={function (v) { dealsApi.updateStatus(q.id, v); }}>
+					<SelectTrigger className={cn("h-7 w-[148px] text-xs border font-semibold", DEAL_STATUS_META[dealStatus(q)].className)}>
+						{(function () {
+							const Icon = DEAL_STATUS_META[dealStatus(q)].Icon;
+							return Icon ? <Icon className="size-3.5 shrink-0" /> : null;
+						})()}
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{DEAL_STATUSES.map(function (s) { return <SelectItem key={s} value={s}>{DEAL_STATUS_META[s].label}</SelectItem>; })}
+					</SelectContent>
+				</Select>
+			</TableCell>
+		);
+	}
+	function actionsCell(q) {
+		return (
+			<TableCell className="text-right">
+				<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, "ARS", tc, channelConfig, models, tcMeta); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
+				<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
+				<Button variant="ghost" size="icon" className="size-8" onClick={function () { newVersion(q); }} title="Nueva versión (clona subiendo la versión)"><CopyPlus className="size-4 text-muted-foreground" /></Button>
+				<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>
+			</TableCell>
+		);
+	}
+	function fechaCell(q) {
+		return <TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>;
+	}
+	// Volumen genérico para la vista unificada: certs en Packs, IDC en Volumen/IDC.
+	function volumenText(q) {
+		if (isPacks(q.channel)) return (q.resumen?.certsComprados || q.resumen?.certsActivos || 0).toLocaleString("es-AR") + " certs";
+		return (q.resumen?.idcMensuales || 0).toLocaleString("es-AR") + " IDC";
+	}
 
 	return (
 		<div className="space-y-6">
@@ -411,8 +529,27 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 					)}
 
 					<Separator />
-					<div className="flex items-center justify-between">
+					<div className="flex items-center justify-between gap-3">
 						<Badge variant="outline" className="h-6 px-2 text-xs">{filtered.length} {filtered.length === 1 ? "cotización" : "cotizaciones"}</Badge>
+						{/* Toggle de vista: lista única ordenable vs agrupada por canal. */}
+						<div className="inline-flex rounded-md border border-border bg-background p-0.5">
+							{[{ k: "unificada", label: "Unificada" }, { k: "agrupada", label: "Por canal" }].map(function (opt) {
+								const on = view === opt.k;
+								return (
+									<button
+										key={opt.k}
+										type="button"
+										onClick={function () { setView(opt.k); }}
+										className={cn(
+											"rounded px-3 py-1 text-xs font-medium transition-colors cursor-pointer",
+											on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+										)}
+									>
+										{opt.label}
+									</button>
+								);
+							})}
+						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -436,7 +573,46 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 						/>
 					)}
 				</CardContent></Card>
+			) : view === "unificada" ? (
+				/* ── Vista unificada: una sola tabla ordenable, columnas comunes ── */
+				<Card>
+					<CardContent className="pt-4">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<SortHeader label="Canal" k="canal" />
+									<SortHeader label="Fecha" k="fecha" />
+									<SortHeader label="Cliente" k="cliente" />
+									<TableHead>Cotización</TableHead>
+									<TableHead>Estado</TableHead>
+									<TableHead className="text-right">Volumen</TableHead>
+									<SortHeader label="Total" k="monto" align="right" />
+									<SortHeader label="Margen" k="margen" align="right" />
+									<TableHead className="text-right">Acciones</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{sortedFiltered.map(function (q) {
+									return (
+										<TableRow key={q.id} data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
+											<TableCell><ChannelBadge channel={resolveChannel(q.channel)} /></TableCell>
+											{fechaCell(q)}
+											{clientCell(q)}
+											{idCell(q)}
+											{statusCell(q)}
+											<TableCell className="text-right tabular-nums text-muted-foreground">{volumenText(q)}</TableCell>
+											<TableCell className="text-right tabular-nums font-medium">{fMoney(dealRevenue(q))}</TableCell>
+											<TableCell className="text-right tabular-nums">{Math.round(((q.resumen && q.resumen.margenPct) || 0) * 100) + "%"}</TableCell>
+											{actionsCell(q)}
+										</TableRow>
+									);
+								})}
+							</TableBody>
+						</Table>
+					</CardContent>
+				</Card>
 			) : (
+				/* ── Vista agrupada: una card por canal, columnas propias ── */
 				orderedChannels.map(function (ch) {
 					const cols = summaryCols(ch, fMoney);
 					return (
@@ -451,11 +627,13 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>Fecha</TableHead>
-											<TableHead>Cliente</TableHead>
+											<SortHeader label="Fecha" k="fecha" />
+											<SortHeader label="Cliente" k="cliente" />
 											<TableHead>Cotización</TableHead>
 											<TableHead>Estado</TableHead>
-											{cols.map(function (c) { return <TableHead key={c.label} className="text-right">{c.label}</TableHead>; })}
+											{cols.map(function (c) { return c.sortKey
+												? <SortHeader key={c.label} label={c.label} k={c.sortKey} align="right" />
+												: <TableHead key={c.label} className="text-right">{c.label}</TableHead>; })}
 											<TableHead className="text-right">Acciones</TableHead>
 										</TableRow>
 									</TableHeader>
@@ -463,39 +641,12 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 										{groups[ch].map(function (q) {
 											return (
 												<TableRow key={q.id} data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
-													<TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>
-													<TableCell className="font-medium">
-														{q.clientName || "(sin nombre)"}
-														{isUnit(q.channel) && (
-															<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
-																{q.inputs?.integracion === "sin_api" ? "sin API" : "API"}
-															</Badge>
-														)}
-													</TableCell>
-													<TableCell className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
-														{formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo) || "—"}
-													</TableCell>
-													<TableCell>
-														<Select value={dealStatus(q)} onValueChange={function (v) { dealsApi.updateStatus(q.id, v); }}>
-															<SelectTrigger className={cn("h-7 w-[148px] text-xs border font-semibold", DEAL_STATUS_META[dealStatus(q)].className)}>
-																{(function () {
-																	const Icon = DEAL_STATUS_META[dealStatus(q)].Icon;
-																	return Icon ? <Icon className="size-3.5 shrink-0" /> : null;
-																})()}
-																<SelectValue />
-															</SelectTrigger>
-															<SelectContent>
-																{DEAL_STATUSES.map(function (s) { return <SelectItem key={s} value={s}>{DEAL_STATUS_META[s].label}</SelectItem>; })}
-															</SelectContent>
-														</Select>
-													</TableCell>
+													{fechaCell(q)}
+													{clientCell(q)}
+													{idCell(q)}
+													{statusCell(q)}
 													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
-													<TableCell className="text-right">
-														<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, "ARS", tc, channelConfig, models, tcMeta); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
-														<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
-														<Button variant="ghost" size="icon" className="size-8" onClick={function () { newVersion(q); }} title="Nueva versión (clona subiendo la versión)"><CopyPlus className="size-4 text-muted-foreground" /></Button>
-														<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>
-													</TableCell>
+													{actionsCell(q)}
 												</TableRow>
 											);
 										})}
