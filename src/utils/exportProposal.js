@@ -1,6 +1,6 @@
 import { buildProyeccion } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
-import { isPacks, isUnit, packsConDescuento } from "@/data/channelMeta";
+import { isPacks, isUnit, isIDC, packsConDescuento } from "@/data/channelMeta";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -515,14 +515,16 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const res = deal.resumen || {};
 	const sinApi = inp.integracion === "sin_api";
 	const conApi = !sinApi;
-	// Terminología de facturación según modalidad (cambio de presentación, no de
-	// cálculo). Con integración API el certificado se factura como consumo del
-	// servicio de validación de identidad (se cobra aunque la validación resulte
-	// inválida) y la firma como documento firmado (se cobra cada documento, no la
-	// operación). Sin API se mantiene la nomenclatura de certificado + firma.
-	const firmaSing = conApi ? "documento firmado" : "firma";
-	const firmaPlur = conApi ? "documentos firmados" : "firmas";
-	const firmaCap = conApi ? "Documentos firmados" : "Firmas";
+	const esIDC = isIDC(deal.channel);
+	// Terminología de facturación. El lenguaje de "servicio de validación de identidad"
+	// (el certificado como consumo de validación, la firma como documento firmado) es
+	// la propuesta de valor EXCLUSIVA del canal IDC con integración API. Volumen vende
+	// certificados y firmas sueltos, así que siempre usa la nomenclatura llana aunque
+	// tome la modalidad con fee/SLA. `langApi` gobierna sólo el texto, no el cálculo.
+	const langApi = conApi && esIDC;
+	const firmaSing = langApi ? "documento firmado" : "firma";
+	const firmaPlur = langApi ? "documentos firmados" : "firmas";
+	const firmaCap = langApi ? "Documentos firmados" : "Firmas";
 	// La Cotizadora B2B2C no tiene (todavía) un selector de modalidad única/recurrente:
 	// el volumen de IDC es un dato neutro. No hay que asumir periodicidad que no se configuró.
 	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
@@ -609,11 +611,11 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const subtotal = servicioNeto - descCondMonto + slaMesVal + feeVal;
 	// Con API: el certificado se factura como consumo del servicio de validación
 	// de identidad y la firma como documento firmado (ver comentario arriba).
-	const certLbl = conApi ? "Consumos de validación · persona jurídica" : "Certificados jurídicos";
-	const certLblFis = conApi ? "Consumos de validación · persona física" : "Certificados físicos";
-	const certLblGen = conApi ? "Consumos de validación de identidad" : "Certificados";
-	const firmaLblJur = conApi ? "Documentos firmados · persona jurídica" : "Firmas de certificados jurídicos";
-	const firmaLblFis = conApi ? "Documentos firmados · persona física" : "Firmas de certificados físicos";
+	const certLbl = langApi ? "Consumos de validación · persona jurídica" : "Certificados jurídicos";
+	const certLblFis = langApi ? "Consumos de validación · persona física" : "Certificados físicos";
+	const certLblGen = langApi ? "Consumos de validación de identidad" : "Certificados";
+	const firmaLblJur = langApi ? "Documentos firmados · persona jurídica" : "Firmas de certificados jurídicos";
+	const firmaLblFis = langApi ? "Documentos firmados · persona física" : "Firmas de certificados físicos";
 	const items = [
 		// Certificados: se desglosan por tipo solo cuando hay jurídicos en el mix.
 		...(hayJuridicos ? [
@@ -629,7 +631,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclJuridica }] : []),
 			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclFisica }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${conApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
@@ -647,8 +649,8 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const abonoVigenciaTotal = abonoActivo ? subtotal + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
 
 	const chips = [
-		chip(SVG.idcard(B, 15), conApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)`),
-		chip(SVG.shield(B, 15), conApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`),
+		chip(SVG.idcard(B, 15), langApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : (esIDC ? `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)` : `<strong>${idc.toLocaleString("es-AR")}</strong> certificados`)),
+		chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`),
 		...(hayJuridicos ? [
 			chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 		] : [
@@ -668,7 +670,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
 	// condiciones, para que el valor entregado quede a la vista.
 	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
-      <span style="color:${GR};">${firmaCap} bonificad${conApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">Sin cargo: recibís ${conApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${Math.max(0, firmasFacturables - firmasBonif).toLocaleString("es-AR")}.</span></span>
+      <span style="color:${GR};">${firmaCap} bonificad${langApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">Sin cargo: recibís ${langApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${Math.max(0, firmasFacturables - firmasBonif).toLocaleString("es-AR")}.</span></span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(bonifMonto, currency, tc)}</span>
     </div>` : "";
 	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
@@ -683,21 +685,24 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
 
 	const firmaWord = (n) => `${n} ${n === 1 ? firmaSing : firmaPlur}`;
-	const unidadPl = conApi ? "validaciones de identidad" : "identidades";
-	const certJurWord = conApi ? "consumos de validación · persona jurídica" : "certificados jurídicos";
-	const certFisWord = conApi ? "consumos de validación · persona física" : "certificados físicos";
-	const verboAct = conApi ? "Contratás" : "Comprás";
+	// El nombre de la unidad: "validaciones de identidad" (IDC con API), "identidades"
+	// (IDC sin API) o "certificados" (Volumen).
+	const unidadPl = langApi ? "validaciones de identidad" : (esIDC ? "identidades" : "certificados");
+	const unidadArt = esIDC ? "las" : "los"; // identidades/validaciones → las; certificados → los
+	const certJurWord = langApi ? "consumos de validación · persona jurídica" : "certificados jurídicos";
+	const certFisWord = langApi ? "consumos de validación · persona física" : "certificados físicos";
+	const verboAct = langApi ? "Contratás" : "Comprás";
 	const activacionTxt = hayJuridicos
-		? `${verboAct} las ${idc.toLocaleString("es-AR")} ${unidadPl}: ${[
+		? `${verboAct} ${unidadArt} ${idc.toLocaleString("es-AR")} ${unidadPl}: ${[
 				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} ${certJurWord} (${firmaWord(fPorCertJur)} c/u)` : null,
 				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${certFisWord} (${firmaWord(fPorCertFis)} c/u)` : null,
 			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `, ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total` : ""}.`
-		: `${verboAct} las ${idc.toLocaleString("es-AR")} ${unidadPl}: cada una con su ${conApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`} de activación (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total${cupo != null && firmasEnCupo > 0 ? `, ${firmasEnCupo.toLocaleString("es-AR")} sin cargo` : ""})` : ""}.`;
+		: `${verboAct} ${unidadArt} ${idc.toLocaleString("es-AR")} ${unidadPl}: cada ${esIDC ? "una con su" : "uno con su"} ${langApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`}${esIDC ? " de activación" : ""} (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total${cupo != null && firmasEnCupo > 0 ? `, ${firmasEnCupo.toLocaleString("es-AR")} sin cargo` : ""})` : ""}.`;
 	const momento1 = momentoCard({
 		dark: false,
 		kicker: "Momento 1 · mes 1",
 		icon: SVG.shield(B, 16),
-		heading: conApi ? "Activás tu servicio" : "Activás tus identidades",
+		heading: langApi ? "Activás tu servicio" : (esIDC ? "Activás tus identidades" : "Comprás tu volumen"),
 		body: `
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
         ${activacionTxt}
@@ -717,7 +722,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		dark: true,
 		kicker: `Momento 2 · mes ${ABONO_DESDE_MES} a ${ABONO_VIGENCIA_MESES}`,
 		icon: SVG.refresh(W, 16),
-		heading: conApi ? "Reponés tus documentos" : "Reponés tus firmas",
+		heading: langApi ? "Reponés tus documentos" : "Reponés tus firmas",
 		body: `
       <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
         Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} se renueva cada mes, con un abono fijo y previsible.
@@ -747,7 +752,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 
 	// Con API, aclaración de facturación al pie: el consumo se cobra aunque la
 	// validación resulte inválida, y la firma se cobra por cada documento firmado.
-	const footnote = conApi
+	const footnote = langApi
 		? `<strong style="color:${DK};">Consumo del servicio de validación de identidad:</strong> se factura cada llamada a la API, aunque la validación resulte inválida — el servicio se ejecuta igual. &nbsp;·&nbsp; <strong style="color:${DK};">Documento firmado:</strong> se factura por cada documento firmado; si en una misma operación se firman varios documentos, se cobra cada uno.`
 		: "";
 
@@ -758,7 +763,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const segDescPts = res.segmentoDescuento != null ? Math.round(res.segmentoDescuento * 100) : 0;
 	const segKicker = segNombre
 		? `Segmento ${segNombre}${segDescPts > 0 ? ` · ${segDescPts}% por volumen` : ""}`
-		: (conApi ? "Modelo comercial · consumo por API" : "Modelo comercial · volumen");
+		: (langApi ? "Modelo comercial · consumo por API" : "Modelo comercial · volumen");
 
 	return commercialSlide({
 		kicker: segKicker,
@@ -776,16 +781,16 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 // Tabla override por propuesta: parte del volumen y precio cotizados y muestra
 // escalones crecientes con mejor precio, para que el cliente proyecte su costo
 // a distintas escalas. Se calcula con el mismo motor que el preview en pantalla.
-function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
+function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, langApi) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const proy = inp.proyeccion || {};
 	// Wording de facturación alineado a la slide comercial: con API, certificado →
 	// validación de identidad y firma → documento firmado (solo presentación).
-	const certN = conApi ? "validación de identidad" : "certificado";
-	const certNpl = conApi ? "validaciones de identidad" : "certificados";
-	const firmaN = conApi ? "documento firmado" : "firma";
-	const firmaNpl = conApi ? "documentos firmados" : "firmas";
+	const certN = langApi ? "validación de identidad" : "certificado";
+	const certNpl = langApi ? "validaciones de identidad" : "certificados";
+	const firmaN = langApi ? "documento firmado" : "firma";
+	const firmaNpl = langApi ? "documentos firmados" : "firmas";
 	// Base recuperada del resumen del deal (evita re-derivar los inputs por tipo).
 	const idc = Number(res.idcMensuales) || 0;
 	const firmas = Number(res.firmasTotales != null ? res.firmasTotales : res.firmasMes) || 0;
@@ -795,7 +800,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
 	const showIva = currency === "ARS";
 	// La proyección es a precio de lista del escenario: la bonificación de la
 	// activación no se arrastra, así que se aclara en la nota al pie.
-	const bonifNota = (Number(inp.firmasBonificadas) || 0) > 0 ? `, ${conApi ? "los" : "las"} ${firmaNpl} bonificad${conApi ? "os" : "as"} de la activación` : "";
+	const bonifNota = (Number(inp.firmasBonificadas) || 0) > 0 ? `, ${langApi ? "los" : "las"} ${firmaNpl} bonificad${langApi ? "os" : "as"} de la activación` : "";
 
 	// Precios unitarios chicos (ej. USD 0.65): se formatean aparte para no perder
 	// decimales que fm/USD redondearía a entero.
@@ -803,8 +808,8 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
 
 	const driverNote = {
 		packs: `Crecimiento proporcional de ${certNpl} y ${firmaNpl}.`,
-		firmas: `${conApi ? "Los consumos de validación" : "Los certificados"} quedan fijos; crece el volumen de ${firmaNpl}.`,
-		certificados: `${conApi ? "Los documentos firmados quedan fijos" : "Las firmas quedan fijas"}; crece el volumen de ${certNpl}.`,
+		firmas: `${langApi ? "Los consumos de validación" : "Los certificados"} quedan fijos; crece el volumen de ${firmaNpl}.`,
+		certificados: `${langApi ? "Los documentos firmados quedan fijos" : "Las firmas quedan fijas"}; crece el volumen de ${certNpl}.`,
 		manual: "Volúmenes proyectados a medida.",
 	}[proy.driver || "packs"];
 
@@ -843,8 +848,8 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, conApi) {
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr>
           ${th("Volumen proyectado")}
-          ${th(conApi ? "Precio / validación" : "Precio / certificado", "right")}
-          ${th(conApi ? "Precio / documento" : "Precio / firma", "right")}
+          ${th(langApi ? "Precio / validación" : "Precio / certificado", "right")}
+          ${th(langApi ? "Precio / documento" : "Precio / firma", "right")}
           ${th("Costo estimado", "right")}
           ${th("Ahorro vs. actual", "right")}
         </tr></thead>
@@ -1031,6 +1036,9 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 	// ID de cotización (COT-TIPO-NNNN-vN) para la portada. El tipo sale del snapshot
 	// guardado en el deal; si falta, del tipo vivo del cliente. Ver [[cotId]].
 	const cotId = formatCotId(deal.inputs?.cot, client?.tipo);
+	// Título del documento = nombre por defecto del PDF al imprimir. Se antepone el ID
+	// de cotización para que el archivo salga como "COT-DIR-0012-v1 · Propuesta Cliente".
+	const docTitle = (cotId ? cotId + " · " : "") + "Propuesta " + clientName;
 	// Web y Distribuidores comparten catálogo, así que la propuesta se arma según si
 	// hay descuento y no según el canal: `listaPura` es la venta web a precio de lista,
 	// y con descuento (nivel de distribuidor o excepción web) va la slide a medida.
@@ -1059,14 +1067,16 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 		: isUnit(deal.channel)
 			? s3B2B2C(deal, clientName, currency, tc, channelConfig, s3Page)
 			: s3Dist(deal, clientName, currency, tc, channelConfig, models);
-	const proyConApi = isUnit(deal.channel) && deal.inputs?.integracion !== "sin_api";
-	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage, proyConApi) : "";
+	// Sólo IDC con API usa el lenguaje de validación/documento firmado; Volumen (aunque
+	// tome la modalidad con API) mantiene "certificado"/"firma" en la proyección.
+	const proyLangApi = isIDC(deal.channel) && deal.inputs?.integracion !== "sin_api";
+	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage, proyLangApi) : "";
 
 	return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Propuesta Comercial — ${clientName}</title>
+<title>${docTitle}</title>
 <style>${SLIDE_CSS}</style>
 </head>
 <body>

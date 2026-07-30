@@ -81,9 +81,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const [firmasPorCertFisico, setFirmasPorCertFisico] = useState(0);
 	const [certJuridicos, setCertJuridicos] = useState("");
 	const [firmasPorCertJuridico, setFirmasPorCertJuridico] = useState(0);
-	// Solo Volumen: compromiso del contrato en USD, la métrica que asigna el segmento.
-	// Vacío = sugerido (facturación a lista × meses de vinculación).
-	const [compromisoOverride, setCompromisoOverride] = useState("");
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
@@ -142,9 +139,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// aplica un DESCUENTO igual sobre el precio del certificado y el de la firma.
 	// Usar siempre el precio base rompe la circularidad precio↔segmento.
 	const facturacionAtList = facturacionAtBase(idc, firmasTotales, volumenBase);
-	const compromisoSugerido = facturacionAtList * mesesVinculacion;
-	const compromisoManual = compromisoOverride !== "";
-	const compromiso = compromisoManual ? Math.max(0, Number(compromisoOverride) || 0) : compromisoSugerido;
+	// El compromiso no se ingresa a mano: sale del volumen cotizado a precio de lista
+	// por los meses de vinculación. Es la métrica que asigna el segmento de Volumen.
+	const compromiso = facturacionAtList * mesesVinculacion;
 
 	const seg = (esIDC ? getB2B2CSegment(idc, b2b2cSegments) : getVolumenSegment(compromiso, volumenSegments)) || {};
 	const segLabel = seg.label || "—";
@@ -204,9 +201,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setFirmasBonificadas(i.firmasBonificadas != null ? String(i.firmasBonificadas) : "");
 		setShowBonif(i.firmasBonificadas != null);
-		// Volumen: el compromiso manual asigna el segmento; las firmas por tipo ya se
-		// cargaron arriba (mismo formato que IDC).
-		setCompromisoOverride(i.compromisoManual && i.compromiso != null ? String(i.compromiso) : "");
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
 		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
@@ -428,7 +422,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				firmasAdicPorIDC: 0,
 				// Volumen: el compromiso en USD es lo que asignó el segmento. Las firmas
 				// por tipo se guardan igual que en IDC (certFisicos/firmasPorCert…).
-				...(esIDC ? {} : { compromiso, compromisoManual }),
+				...(esIDC ? {} : { compromiso }),
 				// Cupo de firmas del bundle y precio de la firma que lo excede: viajan al
 				// deal para que la propuesta y los reportes no dependan de la config viva.
 				firmasIncluidasPorIDC: cupo,
@@ -877,25 +871,23 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<p className="text-[11px] text-muted-foreground">
 						{esIDC
 							? "El segmento lo define el volumen mensual de IDC del paso 2. La duración sale de la palanca de vinculación."
-							: "Define el segmento y su descuento. Sugerido: facturación a lista del volumen cotizado (" + fMoney(facturacionAtList) + ") × " + mesesVinculacion + " " + (mesesVinculacion === 1 ? "mes" : "meses") + " de vinculación."}
+							: "El segmento sale del compromiso del contrato, que se calcula solo: facturación a lista del volumen cotizado × meses de vinculación (palanca de duración)."}
 					</p>
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 						{!esIDC && (
 							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso total</Label>
-								<div className="relative flex items-center">
-									<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
-									<Input type="number" min={0} value={compromisoOverride} onChange={function (e) { setCompromisoOverride(e.target.value); }} placeholder={String(Math.round(compromisoSugerido))} className="tabular-nums pl-11" />
-									{compromisoManual && <button onClick={function () { setCompromisoOverride(""); }} className="absolute right-3 text-muted-foreground hover:text-foreground text-xs">✕</button>}
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso del contrato</Label>
+								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+									<span className="font-semibold tabular-nums">{hasVolume ? fMoney(compromiso) : "—"}</span>
 								</div>
-								<span className="text-[11px] text-muted-foreground">Vacío = sugerido.</span>
+								<span className="text-[11px] text-muted-foreground">{hasVolume ? fMoney(facturacionAtList) + " a lista × " + mesesVinculacion + " " + (mesesVinculacion === 1 ? "mes" : "meses") : "se calcula del volumen cotizado"}</span>
 							</div>
 						)}
 						<div className="flex flex-col gap-1.5">
 							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>
 							<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
 								{hasVolume ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={esIDC ? fMoney2(segPrice.precioIDC) : (segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null)} /> : <span className="text-sm text-muted-foreground/40">—</span>}
-								<span className="text-[11px] text-muted-foreground truncate">{hasVolume ? (esIDC ? "por " + idc.toLocaleString("es-AR") + " IDC/mes" : "por " + fMoney(compromiso) + (compromisoManual ? " · manual" : "")) : "cargá volumen"}</span>
+								<span className="text-[11px] text-muted-foreground truncate">{hasVolume ? (esIDC ? "por " + idc.toLocaleString("es-AR") + " IDC/mes" : "por " + fMoney(compromiso)) : "cargá volumen"}</span>
 							</div>
 							<span className="text-[11px] text-muted-foreground">{esIDC ? "Precio de tabla del segmento." : "Descuento sobre los dos precios de lista."}</span>
 						</div>
