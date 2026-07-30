@@ -1,25 +1,31 @@
 import { useState, useRef, useEffect } from "react";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
+import { segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
-// Certificado y firma se precian y analizan por separado (ya no como un "IDC"
-// combinado). Cada componente tiene su precio de lista, su CV y su margen.
+// La unidad del canal es la IDC: un bundle de certificado más el cupo de firmas
+// incluidas. El análisis se hace contra el costo de ese bundle, no del certificado
+// suelto, porque es lo que efectivamente se entrega por el precio de tabla.
 const ALL_COLS = [
-	{ key: "precioCert",    label: "Precio cert (USD)" },
-	{ key: "cvCert",        label: "CV cert (USD)" },
-	{ key: "cmCert",        label: "CM cert" },
-	{ key: "beCert",        label: "BE cert" },
-	{ key: "precioFirma",   label: "Precio firma (USD)" },
+	{ key: "precioIDC",     label: "Precio IDC (USD)" },
+	{ key: "cupo",          label: "Firmas incluidas" },
+	{ key: "cvBundle",      label: "CV bundle (USD)" },
+	{ key: "markup",        label: "Markup" },
+	{ key: "minViable",     label: "Precio mín. viable" },
+	{ key: "cmIDC",         label: "CM IDC" },
+	{ key: "beIDC",         label: "BE IDC" },
+	{ key: "precioFirma",   label: "Firma sobre cupo (USD)" },
 	{ key: "cvFirma",       label: "CV firma (USD)" },
 	{ key: "cmFirma",       label: "CM firma" },
 ];
 
-const DEFAULT_VISIBLE = new Set(["precioCert", "cmCert", "precioFirma", "cmFirma"]);
+const DEFAULT_VISIBLE = new Set(["precioIDC", "cupo", "cvBundle", "markup", "minViable", "precioFirma"]);
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
+function markupClass(m, min) { return m == null || m >= min * 1.4 ? "text-[var(--success)]" : m >= min ? "text-[var(--warning)]" : "text-destructive"; }
 
 const SLA_STYLES = {
 	standard:     { background: "#64748B", color: "#fff" },
@@ -108,7 +114,7 @@ function ColFilterDropdown({ visible, onToggle }) {
 export function TabCanalB2B2CPrecios({ costs }) {
 	const { channelConfig } = useChannelConfig();
 	const { b2b2cSegments, b2b2cApiTiers, slaPlans } = channelConfig;
-	const base = channelConfig.b2b2cBase || { cert: 0, firma: 0 };
+	const markupMin = channelConfig.b2b2cMarkupMin != null ? channelConfig.b2b2cMarkupMin : 1.2;
 
 	const cvCert = costs?.cvCertBase ?? 0;
 	const cvFirma = costs?.cvFirmaBase ?? 0;
@@ -126,12 +132,35 @@ export function TabCanalB2B2CPrecios({ costs }) {
 	function fUSD(n) { return "USD " + n.toFixed(2); }
 	function fPct(n) { return (n * 100).toFixed(0) + "%"; }
 
+	// Segmentos cuyo precio de tabla no alcanza el markup mínimo contra el costo de su
+	// bundle. Se avisa arriba porque es una decisión de política de precios, no un
+	// detalle de una cotización puntual.
+	const noViables = (b2b2cSegments || []).filter(function (s) {
+		const p = segmentPricing(s, { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
+		const m = markupOf(p.precioIDC, idcBundleCost(cvCert, cvFirma, p.firmasIncluidas));
+		return m != null && m < markupMin;
+	});
+
 	return (
 		<div className="space-y-6 max-w-4xl">
 			<div>
 				<h2 className="text-base font-semibold font-heading">Canal Volumen · Tabla de referencia</h2>
-				<p className="text-sm text-muted-foreground mt-1">Precios en USD. El certificado y la firma tienen precio de lista base, y el segmento alcanzado aplica un descuento sobre ambos. El precio final por cotización puede ajustarse en la Cotizadora.</p>
+				<p className="text-sm text-muted-foreground mt-1">Precios en USD. Cada segmento tiene su propio precio por IDC según el volumen mensual, con un cupo de firmas incluidas; las firmas que exceden el cupo se facturan por unidad. El precio final por cotización puede ajustarse en la Cotizadora.</p>
 			</div>
+
+			{noViables.length > 0 && (
+				<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3">
+					<div className="text-sm font-semibold text-destructive">
+						{noViables.length === 1 ? "1 segmento no cierra" : noViables.length + " segmentos no cierran"} contra el costo del bundle
+					</div>
+					<p className="text-xs text-muted-foreground mt-1">
+						{noViables.map(function (s) { return s.label; }).join(", ")}: el precio por IDC no alcanza el markup mínimo de {markupMin.toFixed(2)}x. Las cotizaciones que caigan en estos segmentos no se van a poder guardar ni exportar.
+					</p>
+					<p className="text-xs text-muted-foreground mt-1.5">
+						El cupo de firmas incluidas es lo que empuja el costo: cada firma del bundle suma USD {cvFirma.toFixed(4)} de costo variable. Se resuelve subiendo el precio por IDC hasta el mínimo viable de la tabla, o bajando el cupo en Config → Precios por canal.
+					</p>
+				</div>
+			)}
 
 			{/* ── Pricing por segmento ────────────────────────────────── */}
 			<Card>
@@ -144,41 +173,47 @@ export function TabCanalB2B2CPrecios({ costs }) {
 					<Table>
 						<TableHeader>
 							<TableRow>
-								<TableHead>Segmento<InfoTooltip text="El cliente cae en un solo segmento, asignado por el compromiso del contrato en USD a precio de lista." /></TableHead>
-								<TableHead className="text-right">Compromiso (USD)<InfoTooltip text="Rango de compromiso del contrato que alcanza el segmento: certificados × precio base cert + firmas × precio base firma, por los meses de vinculación." /></TableHead>
-								<TableHead className="text-right">Desc.<InfoTooltip text="Descuento del segmento, aplicado por igual al precio del certificado y al de la firma." /></TableHead>
-								{visible.has("precioCert")    && <TableHead className="text-right">Precio cert (USD)<InfoTooltip text={"Precio base USD " + (Number(base.cert) || 0).toFixed(4) + " menos el descuento del segmento."} /></TableHead>}
-								{visible.has("cvCert")        && <TableHead className="text-right">CV cert<InfoTooltip text={"Costo variable por certificado = USD " + cvCert.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
-								{visible.has("cmCert")        && <TableHead className="text-right">CM cert<InfoTooltip text="Contribución marginal del certificado = Precio cert − CV cert (sin CF), en USD y como % del precio." /></TableHead>}
-								{visible.has("beCert")        && <TableHead className="text-right">BE cert<InfoTooltip text="Break-even: certificados mínimos para cubrir el CF directo al precio de este segmento. BE = CF directo ÷ CM cert." /></TableHead>}
-								{visible.has("precioFirma")   && <TableHead className="text-right">Precio firma (USD)<InfoTooltip text={"Precio base USD " + (Number(base.firma) || 0).toFixed(4) + " menos el descuento del segmento."} /></TableHead>}
+								<TableHead>Segmento<InfoTooltip text="El cliente cae en un solo segmento, asignado por su volumen mensual de IDC." /></TableHead>
+								<TableHead className="text-right">IDC / mes<InfoTooltip text="Rango de volumen mensual de identidades digitales certificadas que alcanza el segmento." /></TableHead>
+								{visible.has("precioIDC")     && <TableHead className="text-right">Precio IDC (USD)<InfoTooltip text="Precio unitario de la IDC en este segmento. Es un precio propio del tramo, no un descuento sobre una lista." /></TableHead>}
+								{visible.has("cupo")          && <TableHead className="text-right">Firmas incl.<InfoTooltip text="Cupo de firmas que entran en el precio de la IDC: la firma inicial que requiere la institución más las firmas de activación." /></TableHead>}
+								{visible.has("cvBundle")      && <TableHead className="text-right">CV bundle<InfoTooltip text={"Costo variable de lo que se entrega por el precio de la IDC = certificado (USD " + cvCert.toFixed(4) + ") + las firmas del cupo (USD " + cvFirma.toFixed(4) + " cada una)."} /></TableHead>}
+								{visible.has("markup")        && <TableHead className="text-right">Markup<InfoTooltip text={"Precio de la IDC ÷ CV del bundle. Es la métrica de la columna MARGEN del Borrador v5. Mínimo exigido: " + markupMin.toFixed(2) + "x."} /></TableHead>}
+								{visible.has("minViable")     && <TableHead className="text-right">Mín. viable<InfoTooltip text={"Precio por IDC más bajo que cumple el markup mínimo de " + markupMin.toFixed(2) + "x contra el CV del bundle."} /></TableHead>}
+								{visible.has("cmIDC")         && <TableHead className="text-right">CM IDC<InfoTooltip text="Contribución marginal de la IDC = Precio IDC − CV bundle (sin CF), en USD y como % del precio." /></TableHead>}
+								{visible.has("beIDC")         && <TableHead className="text-right">BE IDC<InfoTooltip text="Break-even: IDC mínimas para cubrir el CF directo al precio de este segmento. BE = CF directo ÷ CM IDC." /></TableHead>}
+								{visible.has("precioFirma")   && <TableHead className="text-right">Firma sobre cupo<InfoTooltip text="Precio unitario de cada firma que excede el cupo del bundle." /></TableHead>}
 								{visible.has("cvFirma")       && <TableHead className="text-right">CV firma<InfoTooltip text={"Costo variable por firma = USD " + cvFirma.toFixed(4) + ". Sin costos fijos."} /></TableHead>}
-								{visible.has("cmFirma")       && <TableHead className="text-right">CM firma<InfoTooltip text="Contribución marginal de la firma = Precio firma − CV firma (sin CF), en USD y como % del precio." /></TableHead>}
+								{visible.has("cmFirma")       && <TableHead className="text-right">CM firma<InfoTooltip text="Contribución marginal de la firma sobre el cupo = Precio firma − CV firma (sin CF), en USD y como % del precio." /></TableHead>}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{b2b2cSegments.map(function (s) {
-								const desc       = Math.min(1, Math.max(0, Number(s.descuento) || 0));
-								const precioCert = (Number(base.cert) || 0) * (1 - desc);
-								const precioFirma = (Number(base.firma) || 0) * (1 - desc);
-								const cmCertVal  = precioCert - cvCert;
-								const cmCertPct  = precioCert > 0 ? cmCertVal / precioCert : 0;
-								const beCertVal  = cmCertVal > 0 ? Math.ceil(cfDirecto / cmCertVal) : null;
-								const cmFirmaVal = precioFirma - cvFirma;
-								const cmFirmaPct = precioFirma > 0 ? cmFirmaVal / precioFirma : 0;
+								const p           = segmentPricing(s, { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
+								const cvBundle    = idcBundleCost(cvCert, cvFirma, p.firmasIncluidas);
+								const markup      = markupOf(p.precioIDC, cvBundle);
+								const minViable   = minPriceForMarkup(cvBundle, markupMin);
+								const cmIDCVal    = p.precioIDC - cvBundle;
+								const cmIDCPct    = p.precioIDC > 0 ? cmIDCVal / p.precioIDC : 0;
+								const beIDCVal    = cmIDCVal > 0 ? Math.ceil(cfDirecto / cmIDCVal) : null;
+								const cmFirmaVal  = p.precioFirmaExtra - cvFirma;
+								const cmFirmaPct  = p.precioFirmaExtra > 0 ? cmFirmaVal / p.precioFirmaExtra : 0;
+								const viable      = markup == null || markup >= markupMin;
 								return (
-									<TableRow key={s.id}>
+									<TableRow key={s.id} className={viable ? "" : "bg-destructive/5"}>
 										<TableCell className="font-semibold">{s.label}</TableCell>
 										<TableCell className="text-right tabular-nums text-muted-foreground">
-											{(Number(s.compromisoMin) || 0).toLocaleString("es-AR")}
-											{s.compromisoMax == null ? "+" : " – " + (Number(s.compromisoMax) || 0).toLocaleString("es-AR")}
+											{(Number(s.idcMin) || 0).toLocaleString("es-AR")}
+											{s.idcMax == null ? "+" : " – " + (Number(s.idcMax) || 0).toLocaleString("es-AR")}
 										</TableCell>
-										<TableCell className="text-right tabular-nums font-semibold">{desc > 0 ? "−" + fPct(desc) : "—"}</TableCell>
-										{visible.has("precioCert")    && <TableCell className="text-right tabular-nums font-semibold">{fUSD(precioCert)}</TableCell>}
-										{visible.has("cvCert")        && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(cvCert)}</TableCell>}
-										{visible.has("cmCert")        && <TableCell className={"text-right tabular-nums font-semibold whitespace-nowrap " + margClass(cmCertPct)}>{fUSD(cmCertVal)} · {fPct(cmCertPct)}</TableCell>}
-										{visible.has("beCert")        && <TableCell className="text-right tabular-nums font-semibold">{beCertVal != null ? beCertVal.toLocaleString("es-AR") : "—"}</TableCell>}
-										{visible.has("precioFirma")   && <TableCell className="text-right tabular-nums font-semibold">{fUSD(precioFirma)}</TableCell>}
+										{visible.has("precioIDC")     && <TableCell className="text-right tabular-nums font-semibold">{fUSD(p.precioIDC)}</TableCell>}
+										{visible.has("cupo")          && <TableCell className="text-right tabular-nums text-muted-foreground">{p.firmasIncluidas}</TableCell>}
+										{visible.has("cvBundle")      && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(cvBundle)}</TableCell>}
+										{visible.has("markup")        && <TableCell className={"text-right tabular-nums font-semibold " + markupClass(markup, markupMin)}>{markup == null ? "—" : markup.toFixed(2) + "x"}</TableCell>}
+										{visible.has("minViable")     && <TableCell className={"text-right tabular-nums " + (viable ? "text-muted-foreground" : "font-semibold text-destructive")}>{fUSD(minViable)}</TableCell>}
+										{visible.has("cmIDC")         && <TableCell className={"text-right tabular-nums font-semibold whitespace-nowrap " + margClass(cmIDCPct)}>{fUSD(cmIDCVal)} · {fPct(cmIDCPct)}</TableCell>}
+										{visible.has("beIDC")         && <TableCell className="text-right tabular-nums font-semibold">{beIDCVal != null ? beIDCVal.toLocaleString("es-AR") : "—"}</TableCell>}
+										{visible.has("precioFirma")   && <TableCell className="text-right tabular-nums font-semibold">{fUSD(p.precioFirmaExtra)}</TableCell>}
 										{visible.has("cvFirma")       && <TableCell className="text-right tabular-nums text-muted-foreground">{fUSD(cvFirma)}</TableCell>}
 										{visible.has("cmFirma")       && <TableCell className={"text-right tabular-nums font-semibold whitespace-nowrap " + margClass(cmFirmaPct)}>{fUSD(cmFirmaVal)} · {fPct(cmFirmaPct)}</TableCell>}
 									</TableRow>

@@ -14,17 +14,20 @@ import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { channelShort, resolveChannel, isPacks, packsConDescuento } from "@/data/channelMeta";
+import { channelShort, resolveChannel, isPacks, isUnit, packsConDescuento } from "@/data/channelMeta";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
 
-// Las cotizaciones se agrupan por canal vigente: los ex canales web y
-// distribuidores caen los dos en Packs (ver resolveChannel).
+// Las cotizaciones se agrupan por canal vigente (ver resolveChannel para los ids
+// históricos). Web y Distribuidores comparten columnas porque cotizan el mismo
+// catálogo; lo que las distingue es el descuento, que ya es una de las columnas.
 const CHANNELS = {
-	packs: { label: channelShort("packs") },
+	web: { label: channelShort("web") },
+	distribuidores: { label: channelShort("distribuidores") },
 	b2b2c: { label: channelShort("b2b2c") },
+	volumen: { label: channelShort("volumen") },
 };
 
 const FILTER_DEFS = [
@@ -32,16 +35,24 @@ const FILTER_DEFS = [
 	{ key: "estado", label: "Estado" },
 	{ key: "mes", label: "Mes" },
 	{ key: "cliente", label: "Cliente" },
-	{ key: "certs", label: "Certs activos" },
+	{ key: "certs", label: "Certs cotizados" },
 	{ key: "idc", label: "IDC" },
 ];
 
 function summaryCols(channel, fMoney) {
-	if (channel === "packs") {
+	if (isPacks(channel)) {
 		return [
-			// Con descuento muestra el nivel; a lista, que no lleva ninguno.
-			{ label: "Descuento", get: function (q) { return packsConDescuento(q) ? (q.resumen.tier ? <TierBadge tier={q.resumen.tier} size="sm" /> : "—") : <span className="text-muted-foreground">a lista</span>; } },
-			{ label: "Certs", get: function (q) { return (q.resumen.certsComprados || q.resumen.certsActivos || 0).toLocaleString("es-AR"); } },
+			// En Distribuidores muestra el nivel; en Web, que va a lista, o la marca de
+			// excepción si se habilitó un descuento puntual.
+			{
+				label: "Descuento",
+				get: function (q) {
+					if (q.resumen.tier) return <TierBadge tier={q.resumen.tier} size="sm" />;
+					if (packsConDescuento(q)) return <span className="text-[var(--warning)]">excepción −{Math.round((q.resumen.descTotal || 0) * 100)}%</span>;
+					return <span className="text-muted-foreground">a lista</span>;
+				},
+			},
+			{ label: "Certs", get: function (q) { return (q.resumen.certsComprados || 0).toLocaleString("es-AR"); } },
 			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
 			{ label: "Precio de lista", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
 			{ label: "Neto", get: function (q) { return fMoney(q.resumen.netoLakaut != null ? q.resumen.netoLakaut : (q.resumen.facturacionLista || 0)); } },
@@ -182,11 +193,11 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			if (month !== "all" && q.fecha.slice(0, 7) !== month) return false;
 			if (search && !(q.clientName || "").toLowerCase().includes(search.toLowerCase())) return false;
 			if (isPacks(q.channel)) {
-				const certs = q.resumen.certsActivos || q.resumen.certsComprados || 0;
+				const certs = q.resumen.certsComprados || q.resumen.certsActivos || 0;
 				if (certsMin !== "" && certs < Number(certsMin)) return false;
 				if (certsMax !== "" && certs > Number(certsMax)) return false;
 			}
-			if (q.channel === "b2b2c") {
+			if (isUnit(q.channel)) {
 				const idc = q.resumen.idcMensuales || 0;
 				if (idcMin !== "" && idc < Number(idcMin)) return false;
 				if (idcMax !== "" && idc > Number(idcMax)) return false;
@@ -455,7 +466,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 													<TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>
 													<TableCell className="font-medium">
 														{q.clientName || "(sin nombre)"}
-														{q.channel === "b2b2c" && (
+														{isUnit(q.channel) && (
 															<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
 																{q.inputs?.integracion === "sin_api" ? "sin API" : "API"}
 															</Badge>

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { getDistributorTier } from "@/lib/tiers";
-import { channelShort, channelEmoji, resolveChannel, isPacks } from "@/data/channelMeta";
+import { channelShort, channelEmoji, resolveChannel, isPacks, isUnit, isVolumen } from "@/data/channelMeta";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -108,8 +108,10 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 			if (dealStatus(d) === "confirmada") confirmedRevenue += rev;
 		});
 		const byChannel = {
-			packs: clients.filter(function (c) { return isPacks(c.channel); }).length,
+			web: clients.filter(function (c) { return resolveChannel(c.channel) === "web"; }).length,
+			distribuidores: clients.filter(function (c) { return resolveChannel(c.channel) === "distribuidores"; }).length,
 			b2b2c: clients.filter(function (c) { return c.channel === "b2b2c"; }).length,
+			volumen: clients.filter(function (c) { return c.channel === "volumen"; }).length,
 		};
 		return { totalClients, totalDeals, totalRevenue, confirmedRevenue, byChannel };
 	}, [clients, deals]);
@@ -191,22 +193,30 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					</button>
 				</div>
 
-				{/* Certs activos (Packs) */}
-				{isPacks(selected.channel) && (function () {
+				{/* Base instalada y nivel · solo para socios del canal Distribuidores, que
+				    es donde el nivel se negocia. En Web el precio es la lista, sin nivel. */}
+				{resolveChannel(selected.channel) === "distribuidores" && (function () {
 					const certsTotal = clientDeals.reduce(function (s, d) { return s + (d.resumen?.certsComprados || 0); }, 0);
+					// Mayor compromiso anual declarado en las cotizaciones del socio: es la
+					// otra variable que define el nivel.
+					const compromisoMax = clientDeals.reduce(function (m, d) { return Math.max(m, (d.resumen && d.resumen.compromisoAnual) || 0); }, 0);
 					return (
 						<Card>
 							<CardContent className="pt-4">
 								<div className="flex items-center justify-between">
 									<div>
 										<p className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos administrados</p>
-										<p className="text-[10px] text-muted-foreground mt-0.5">Calculado de todos los deals del cliente</p>
+										<p className="text-[10px] text-muted-foreground mt-0.5">Suma de las cotizaciones del socio en la app</p>
 										<span className="text-xl font-semibold tabular-nums mt-1 block">{certsTotal.toLocaleString("es-AR")}</span>
+										{compromisoMax > 0 && (
+											<p className="text-[10px] text-muted-foreground mt-1.5">Mayor compromiso anual declarado: {fMoney(compromisoMax)}</p>
+										)}
 									</div>
-									{certsTotal > 0 && (
+									{(certsTotal > 0 || compromisoMax > 0) && (
 										<div className="text-right">
 											<p className="text-xs text-muted-foreground mb-1">Nivel actual</p>
-											<TierBadge tier={getDistributorTier(certsTotal, 0, distributorTiers)} tiers={distributorTiers} size="lg" />
+											<TierBadge tier={getDistributorTier(certsTotal, compromisoMax, distributorTiers)} tiers={distributorTiers} size="lg" />
+											<p className="text-[10px] text-muted-foreground mt-1">Gana el mayor de las dos variables</p>
 										</div>
 									)}
 								</div>
@@ -249,7 +259,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										<TableHead>Canal</TableHead>
 										<TableHead>Resumen</TableHead>
 										<TableHead>Estado</TableHead>
-										{selected.channel === "b2b2c" && <TableHead className="text-right">IDC</TableHead>}
+										{isUnit(selected.channel) && <TableHead className="text-right">{isVolumen(selected.channel) ? "Certs" : "IDC"}</TableHead>}
 										{isPacks(selected.channel) && <TableHead className="text-right">Certs</TableHead>}
 										<TableHead className="text-right">Revenue</TableHead>
 										<TableHead></TableHead>
@@ -281,8 +291,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 														</SelectContent>
 													</Select>
 												</TableCell>
-												{selected.channel === "b2b2c" && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.idcMensuales || 0).toLocaleString("es-AR")}</TableCell>}
-												{isPacks(selected.channel) && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.certsActivos || d.resumen?.certsComprados || 0).toLocaleString("es-AR")}</TableCell>}
+												{isUnit(selected.channel) && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.idcMensuales || 0).toLocaleString("es-AR")}</TableCell>}
+												{isPacks(selected.channel) && <TableCell className="text-right tabular-nums text-sm">{(d.resumen?.certsComprados || d.resumen?.certsActivos || 0).toLocaleString("es-AR")}</TableCell>}
 												<TableCell className="text-right tabular-nums text-sm font-medium">{rev ? fMoney(rev) : "—"}</TableCell>
 												<TableCell>
 													<div className="flex gap-1 justify-end">
@@ -333,12 +343,10 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 				{globalStats.confirmedRevenue > 0 && (
 					<StatCard label="Facturado" sub="confirmado" value={fMoney(globalStats.confirmedRevenue)} accent="success" valueClass="text-[var(--success)]" />
 				)}
-				{globalStats.byChannel.packs > 0 && (
-					<StatCard label={channelEmoji("packs") + " " + channelShort("packs")} value={globalStats.byChannel.packs} accent="muted" />
-				)}
-				{globalStats.byChannel.b2b2c > 0 && (
-					<StatCard label={channelEmoji("b2b2c") + " " + channelShort("b2b2c")} value={globalStats.byChannel.b2b2c} accent="muted" />
-				)}
+				{["web", "distribuidores", "b2b2c", "volumen"].map(function (ch) {
+					if (!globalStats.byChannel[ch]) return null;
+					return <StatCard key={ch} label={channelEmoji(ch) + " " + channelShort(ch)} value={globalStats.byChannel[ch]} accent="muted" />;
+				})}
 			</div>
 
 			{/* Filters */}
@@ -350,7 +358,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					className="h-8 text-sm max-w-xs"
 				/>
 				<div className="flex gap-1 text-xs">
-					{["all", "packs", "b2b2c"].map(function (ch) {
+					{["all", "web", "distribuidores", "b2b2c", "volumen"].map(function (ch) {
 						return (
 							<button
 								key={ch}

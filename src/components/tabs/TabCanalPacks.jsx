@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useModels } from "@/context/ModelsContext";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
-import { getDistributorTier } from "@/lib/tiers";
+import { getDistributorTier, distributorTierDriver } from "@/lib/tiers";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
 import { CHANNELS } from "@/data/channelMeta";
@@ -30,19 +30,27 @@ function margClass(pct) { return pct >= 0.4 ? "text-[var(--success)]" : pct >= 0
 function margAccent(pct) { return pct >= 0.4 ? "success" : pct >= 0.15 ? "warning" : "destructive"; }
 function margWord(pct) { return pct >= 0.4 ? "saludable" : pct >= 0.15 ? "ajustado" : "a revisar"; }
 
-// ─── Cotizador de Packs ───────────────────────────────────────────────────────
-// Unifica los ex canales Web y "Precio de lista con descuento": son los mismos
-// packs y el mismo cálculo. La diferencia es una condición comercial, no un canal:
-// el interruptor "Aplicar descuento comercial" habilita nivel por volumen,
-// palancas por condiciones y abono mensual. Apagado, el neto es la lista completa
-// (venta directa por tarjeta, sin intermediación).
-export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
+// ─── Cotizador de packs · Web y Distribuidores ────────────────────────────────
+// Los dos canales venden el mismo catálogo con el mismo cálculo, así que comparten
+// este componente y se distinguen por la prop `channel`. Lo que cambia es la
+// política de precios, no la aritmética:
+//
+//   · web            → el precio es la lista. El descuento existe solo como
+//                      EXCEPCIÓN explícita (palancas y abono, nunca nivel por
+//                      volumen), y la cotización queda marcada como tal.
+//   · distribuidores → el descuento es la regla del canal. El nivel sale de dos
+//                      variables declaradas del socio (certificados activos y
+//                      compromiso anual de facturación), no del volumen cotizado.
+export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
+	const canal = channel === "distribuidores" ? "distribuidores" : "web";
+	const esDistribuidor = canal === "distribuidores";
+	const meta = CHANNELS[canal];
 	const { models: allModels } = useModels();
 	const models = allModels.filter(function (m) { return m.activo !== false; });
 	const { channelConfig } = useChannelConfig();
 	const distributorTiers = channelConfig.distributorTiers;
 	const commercialLevers = channelConfig.commercialLevers;
-	const { fMoney } = makeMoney(currency, tc);
+	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const { toast } = useToast();
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
@@ -54,29 +62,39 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	// cotización desde la barra de exportar.
 	const [exportCurrency, setExportCurrency] = useState("ARS");
 	const [loadToken, setLoadToken] = useState(0);
-	const [certsActivos, setCertsActivos] = useState(0);
+	// ── Variables declaradas del socio (solo Distribuidores) ──
+	// Definen el nivel de descuento y son datos de la RELACIÓN comercial, no de esta
+	// cotización: certificados que Lakaut ya le administra y facturación anual que el
+	// socio se compromete a generar. Gana el mayor de los dos.
+	const [certsActivos, setCertsActivos] = useState("");
+	const [compromisoAnual, setCompromisoAnual] = useState("");
 	const [qtys, setQtys] = useState({});
 	const [firmasAdic, setFirmasAdic] = useState(0);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
 	const [saved, setSaved] = useState(null);
-	// Interruptor maestro de los descuentos comerciales. Arranca apagado: el
-	// descuento es una decisión explícita del vendedor, no el default.
-	const [aplicaDescuento, setAplicaDescuento] = useState(false);
+	// En Web el descuento es una excepción que el vendedor habilita a mano; en
+	// Distribuidores es la regla del canal y no se puede apagar.
+	const [excepcionWeb, setExcepcionWeb] = useState(false);
 	const [abono, setAbono] = useState(false);
 	// Descuento del abono mensual (%): default de la config, editable por cotización.
 	const [abonoDescPct, setAbonoDescPct] = useState(function () { return channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK; });
 	// Palancas de descuento por condiciones (se suman al descuento de nivel).
 	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
 
-	// Auto-completar certs activos desde la suma de deals previos del cliente
+	// Sugerencia de certificados activos: lo que el cliente ya compró en cotizaciones
+	// anteriores. Es una sugerencia editable, no un dato del sistema: la base instalada
+	// real la conoce el vendedor y puede incluir certificados que no pasaron por acá.
+	const certsHistoricos = useMemo(function () {
+		if (!selectedClient) return 0;
+		return (dealsApi?.deals || [])
+			.filter(function (d) { return d.client_id === selectedClient.id; })
+			.reduce(function (s, d) { return s + ((d.resumen && d.resumen.certsComprados) || 0); }, 0);
+	}, [selectedClient, dealsApi]);
+
 	useEffect(function () {
-		if (selectedClient && !pendingEdit) {
-			const past = (dealsApi?.deals || []).filter(function (d) { return d.client_id === selectedClient.id; });
-			const sum = past.reduce(function (s, d) { return s + (d.resumen?.certsComprados || 0); }, 0);
-			setCertsActivos(sum);
-		}
+		if (selectedClient && !pendingEdit) setCertsActivos(certsHistoricos ? String(certsHistoricos) : "");
 	}, [selectedClient]);
 
 	useEffect(function () {
@@ -91,9 +109,18 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setQtys(i.qtys || {});
 		setFirmasAdic(i.firmasAdic || 0);
 		setCasosDeUso(i.casosDeUso || "");
-		// Cotizaciones viejas: el canal decía si había descuento (distribuidores sí,
-		// web no). Ver packsConDescuento() en channelMeta.
-		setAplicaDescuento(i.aplicaDescuento != null ? !!i.aplicaDescuento : pendingEdit.channel === "distribuidores");
+		// Variables del socio. Las cotizaciones del modelo anterior no las declaraban
+		// (el nivel salía del volumen cotizado), así que se reconstruye lo que se pueda:
+		// los certificados activos ya se guardaban, y el compromiso se aproxima con la
+		// facturación a lista que en ese modelo hacía de compromiso.
+		setCertsActivos(i.certsActivos != null ? String(i.certsActivos) : "");
+		setCompromisoAnual(
+			i.compromisoAnual != null ? String(i.compromisoAnual)
+				: (pendingEdit.resumen && pendingEdit.resumen.facturacionLista ? String(Math.round(pendingEdit.resumen.facturacionLista)) : "")
+		);
+		// En Web el flag guardado marca la excepción. Las cotizaciones del ex canal
+		// unificado guardaban el mismo `aplicaDescuento`.
+		setExcepcionWeb(!!i.aplicaDescuento);
 		setAbono(i.abono || false);
 		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
@@ -139,15 +166,27 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	}, [models, qtys, descAbono]);
 	const abonoAnual = abonoMes * 12;
 
-	const tier = getDistributorTier(calc.certsTotal, calc.facturacionLista, distributorTiers);
-	const tierByCertsOnly = getDistributorTier(calc.certsTotal, 0, distributorTiers);
-	const drivenBy = calc.facturacionLista > 0 && tier.id !== tierByCertsOnly.id ? "volumen cotizado" : (calc.certsTotal > 0 ? "certs cotizados" : "sin volumen");
+	// ── Nivel del distribuidor ──
+	// Sale de las dos variables declaradas del socio, nunca del volumen de esta
+	// cotización: es lo que permite que un integrador con pocos certificados activos
+	// pero un compromiso anual grande entre directo en un nivel alto. En Web no hay
+	// nivel: el precio es la lista, con o sin excepción.
+	const certsActivosNum = Math.max(0, Number(certsActivos) || 0);
+	const compromisoAnualNum = Math.max(0, Number(compromisoAnual) || 0);
+	const tier = getDistributorTier(certsActivosNum, compromisoAnualNum, distributorTiers) || distributorTiers[0];
+	const tierDriver = distributorTierDriver(certsActivosNum, compromisoAnualNum, distributorTiers);
+	const tieneDeclarado = certsActivosNum > 0 || compromisoAnualNum > 0;
+	const drivenBy = !tieneDeclarado ? "sin datos del socio"
+		: tierDriver === "compromiso" ? "compromiso anual"
+			: tierDriver === "certificados" ? "certificados activos"
+				: "certificados y compromiso";
 
-	// Con el interruptor apagado no hay nivel, ni condiciones, ni abono: el neto es
-	// la lista completa. Encendido, el descuento por condiciones se suma al de nivel
-	// (aditivo), con un piso de seguridad para no pasar de 95% de descuento total.
+	// Qué descuentos aplican. En Distribuidores el nivel es la regla del canal; en Web
+	// solo hay descuento si se habilitó la excepción, y nunca por nivel.
+	const aplicaDescuento = esDistribuidor || excepcionWeb;
+	const aplicaNivel = esDistribuidor;
 	const leverRes = resolveLevers(commercialLevers, levers);
-	const descNivelPct = aplicaDescuento ? tier.descuento : 0;
+	const descNivelPct = aplicaNivel ? tier.descuento : 0;
 	const descCondPct = aplicaDescuento ? leverRes.pct : 0;
 	const descTotal = Math.min(0.95, descNivelPct + descCondPct);
 	const descNivelMonto = calc.facturacionLista * descNivelPct;
@@ -160,7 +199,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const facturacionAnio1 = netoLakaut + abonoMes * 11;
 	const hasVolume = calc.facturacionLista > 0 || calc.certsTotal > 0 || Math.max(0, Number(firmasAdic) || 0) > 0;
 
-	const tierActive = aplicaDescuento && hasVolume ? tier.id : null;
+	const tierActive = aplicaNivel && tieneDeclarado ? tier.id : null;
 	useTierUp(tierActive, distributorTiers, function (next) {
 		const mat = tierMaterialInList(next, distributorTiers);
 		notifyTierUp(toast, { label: next.label, emoji: mat.emoji, material: mat, discountPct: Math.round((next.descuento || 0) * 100) });
@@ -170,14 +209,15 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const coberturaPC = cfAnual > 0 ? margenLakaut / cfAnual : 0;
 
 	// Distancia al siguiente nivel: convierte la matriz en herramienta de upselling.
+	// Se mide contra las variables declaradas, que son las que mueven el nivel.
 	const tierIdx = distributorTiers.findIndex(function (t) { return t.id === tier.id; });
 	const nextTier = tierIdx >= 0 && tierIdx < distributorTiers.length - 1 ? distributorTiers[tierIdx + 1] : null;
 	let nextHint = null;
-	if (hasVolume && nextTier) {
-		const certsFaltan = Math.max(0, nextTier.certsMin - calc.certsTotal);
-		const volFaltan = Math.max(0, nextTier.compromisoMin - calc.facturacionLista);
-		nextHint = "Te faltan " + certsFaltan.toLocaleString("es-AR") + " certs (o " + fMoney(volFaltan) + " de volumen) para " + nextTier.label + " · " + (nextTier.descuento * 100).toFixed(0) + "% de descuento.";
-	} else if (hasVolume) {
+	if (nextTier) {
+		const certsFaltan = Math.max(0, nextTier.certsMin - certsActivosNum);
+		const compFaltan = Math.max(0, nextTier.compromisoMin - compromisoAnualNum);
+		nextHint = "Con " + certsFaltan.toLocaleString("es-AR") + " certificados activos más (o " + fMoney(compFaltan) + " de compromiso anual) pasa a " + nextTier.label + " · " + (nextTier.descuento * 100).toFixed(0) + "% de descuento.";
+	} else {
 		nextHint = "Es el nivel máximo: " + (tier.descuento * 100).toFixed(0) + "% de descuento.";
 	}
 	const tierRows = distributorTiers.map(function (t) {
@@ -194,13 +234,17 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	function buildDeal(id, fecha) {
 		return {
 			id: id,
-			channel: "packs",
+			channel: canal,
 			fecha: fecha,
 			updatedAt: editingId ? new Date().toISOString() : undefined,
 			inputs: {
-				certsActivos, qtys, firmasAdic, casosDeUso,
-				// Interruptor de descuentos. Las selecciones de abono y palancas se
-				// guardan siempre (aunque esté apagado) para no perderlas al reabrir.
+				qtys, firmasAdic, casosDeUso,
+				// Variables declaradas del socio que definieron el nivel. Se guardan como
+				// número para que el nivel sea reproducible al reabrir la cotización.
+				...(esDistribuidor ? { certsActivos: certsActivosNum, compromisoAnual: compromisoAnualNum } : {}),
+				// En Web marca la venta con descuento por excepción. En Distribuidores el
+				// descuento es la regla del canal, pero se guarda igual para que quien lea
+				// el deal no dependa de conocer la política del canal.
 				aplicaDescuento, abono,
 				abonoDescuentoPct: Number(abonoDescPct) || 0,
 				levers,
@@ -209,11 +253,12 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 				...(aplicaDescuento ? { descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items } } : {}),
 			},
 			resumen: {
-				certsActivos: calc.certsTotal, certsComprados: calc.certsTotal,
+				certsActivos: certsActivosNum, certsComprados: calc.certsTotal,
 				facturacionLista: calc.facturacionLista, firmasTotal: calc.firmasTotal,
 				precioFirmaAdic: calc.precioFirmaAdic, netoLakaut, margenPct,
+				...(esDistribuidor ? { compromisoAnual: compromisoAnualNum, tierDriver } : {}),
+				...(aplicaNivel ? { tier: tier.label } : {}),
 				...(aplicaDescuento ? {
-					tier: tier.label,
 					descNivelPct: descNivelPct, descCondPct, descTotal, descNivelMonto, descCondMonto,
 				} : {}),
 				...(conAbono ? { abonoMes, abonoAnual, facturacionAnio1 } : {}),
@@ -227,7 +272,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 		let client = selectedClient;
 		if (!client && clientsApi) {
-			client = await clientsApi.create("(sin nombre)", "packs");
+			client = await clientsApi.create("(sin nombre)", canal, esDistribuidor ? "DIS" : undefined);
 			setSelectedClient(client);
 		}
 
@@ -258,24 +303,29 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 		onExport && onExport(src, client, exportCurrency);
 		notifyQuoteExported(toast, {
 			clientName: client && client.name,
-			channelLabel: CHANNELS.packs.emoji + " " + CHANNELS.packs.label,
+			channelLabel: meta.emoji + " " + meta.label,
 			onGoHistorial: (saved && onGoHistorial) ? function () { onGoHistorial(src.id); } : null,
 		});
 	}
 
 	const header = (
 		<PageHeader
-			title={CHANNELS.packs.full + (selectedClient ? " · " + selectedClient.name : "")}
+			title={meta.full + (selectedClient ? " · " + selectedClient.name : "")}
 			description={
-				aplicaDescuento ? (
+				esDistribuidor ? (
 					<>
-						Con descuento comercial: el nivel se asigna por certificados y compromiso de facturación, y aplica sobre toda la lista.
-						<InfoTooltip text="El compromiso se calcula a precios de lista. Junto con los certificados cotizados define el nivel: gana el mayor de los dos." />
+						El nivel de descuento sale de los certificados activos del socio y de su compromiso anual de facturación: gana el mayor de los dos.
+						<InfoTooltip text="Las dos variables son datos declarados de la relación comercial, no del volumen de esta cotización. Un integrador con 200 certificados que compromete USD 40.000 anuales entra como Plata. El nivel queda sujeto al cumplimiento efectivo del compromiso." />
+					</>
+				) : excepcionWeb ? (
+					<>
+						Venta directa con descuento por excepción: se aplica por condiciones comerciales, sin nivel por volumen.
+						<InfoTooltip text="El canal web es precio de lista. Esta cotización queda marcada como excepción para poder seguirla aparte en Reportes. Si el cliente es un socio que revende, corresponde cotizar en Distribuidores." />
 					</>
 				) : (
 					<>
-						A precio de lista, sin descuento por nivel ni abono.
-						<InfoTooltip text="Venta directa: el cliente abona con tarjeta y el neto de Lakaut es la lista completa. Activá el descuento en Condiciones comerciales para cotizar a un distribuidor." />
+						Precio de lista. El cliente abona con tarjeta, sin intermediación.
+						<InfoTooltip text="El neto de Lakaut es la lista completa. Para un socio que revende, cotizá en el canal Distribuidores; para un descuento puntual en venta directa, habilitá la excepción en Condiciones comerciales." />
 					</>
 				)
 			}
@@ -283,11 +333,11 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	);
 
 	const result = (
-		<ResultPanel channel="packs" eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
+		<ResultPanel channel={canal} eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
 			<ResultHero
 				label={conAbono ? "Mes 1 · compra inicial" : (aplicaDescuento ? "Ingreso neto Lakaut" : "Total a pagar")}
-				value={hasVolume ? <AnimatedNumber value={netoLakaut} format={fMoney} /> : "—"}
-				sub={aplicaDescuento ? "Con descuento comercial aplicado" : "Precio de lista, sin descuento"}
+				value={hasVolume ? <AnimatedNumber value={netoLakaut} format={fMoney2} /> : "—"}
+				sub={esDistribuidor ? "Con descuento de nivel aplicado" : (excepcionWeb ? "Lista con descuento por excepción" : "Precio de lista, sin descuento")}
 				empty={!hasVolume}
 				pill={hasVolume ? <StatusPill tone={margAccent(margenPct)}>Margen {(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</StatusPill> : null}
 			/>
@@ -296,20 +346,18 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			    El nivel se muestra con su material (bronce, plata, oro, platinum) en
 			    lugar de texto plano: es el momento en que el vendedor descubre cuánto
 			    puede negociar, así que se lee como logro y no como dato. */}
-			{aplicaDescuento && (
+			{aplicaNivel && (
 				<div className="space-y-2 border-t border-border/60 pt-3">
 					<TierTrophy
 						tier={tier}
 						tiers={distributorTiers}
 						discountPct={(tier.descuento * 100).toFixed(0)}
 						note={"por " + drivenBy}
-						empty={!hasVolume}
+						empty={!tieneDeclarado}
 					/>
-					{hasVolume && (
-						<div className="flex justify-end">
-							<TierHint columns={["Nivel", "Certs", "Desc."]} rows={tierRows} activeId={tier.id} nextHint={nextHint} />
-						</div>
-					)}
+					<div className="flex justify-end">
+						<TierHint columns={["Nivel", "Certs activos", "Desc."]} rows={tierRows} activeId={tier.id} nextHint={nextHint} />
+					</div>
 				</div>
 			)}
 
@@ -323,15 +371,15 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 									key={it.id}
 									title={it.label + (it.segment ? " · " + (it.segment === "empresa" ? "jurídica" : "física") : "")}
 									detail={it.qty.toLocaleString("es-AR") + " u · " + it.certs.toLocaleString("es-AR") + " certs · " + (it.ilimitadas ? "firmas ilim." : it.firmas.toLocaleString("es-AR") + " firmas")}
-									value={<AnimatedNumber value={it.subtotal} format={fMoney} />}
+									value={<AnimatedNumber value={it.subtotal} format={fMoney2} />}
 								/>
 							);
 						})}
 						{Math.max(0, Number(firmasAdic) || 0) > 0 && (
 							<ResultItem
 								title="Firmas adicionales"
-								detail={Math.max(0, Number(firmasAdic) || 0).toLocaleString("es-AR") + " firmas × " + fMoney(calc.precioFirmaAdic)}
-								value={<AnimatedNumber value={Math.max(0, Number(firmasAdic) || 0) * calc.precioFirmaAdic} format={fMoney} />}
+								detail={Math.max(0, Number(firmasAdic) || 0).toLocaleString("es-AR") + " firmas × " + fMoney2(calc.precioFirmaAdic)}
+								value={<AnimatedNumber value={Math.max(0, Number(firmasAdic) || 0) * calc.precioFirmaAdic} format={fMoney2} />}
 								accent="muted"
 							/>
 						)}
@@ -340,25 +388,25 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 					{/* Lista → descuento → neto */}
 					{aplicaDescuento && (
 						<>
-							<ResultRow label="Facturación a lista" value={<AnimatedNumber value={calc.facturacionLista} format={fMoney} />} />
-							<ResultRow label={"Descuento " + tier.label + " (" + (tier.descuento * 100).toFixed(0) + "%)"} value={<>−<AnimatedNumber value={descNivelMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />
-							{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />}
+							<ResultRow label="Facturación a lista" value={<AnimatedNumber value={calc.facturacionLista} format={fMoney2} />} />
+							{aplicaNivel && <ResultRow label={"Descuento " + tier.label + " (" + (tier.descuento * 100).toFixed(0) + "%)"} value={<>−<AnimatedNumber value={descNivelMonto} format={fMoney2} /></>} accent="destructive" valueClass="text-destructive" />}
+							{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney2} /></>} accent="destructive" valueClass="text-destructive" />}
 						</>
 					)}
 					<div className="flex items-center justify-between border-t-2 border-border pt-2">
 						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conAbono ? "Mes 1 · compra inicial" : (aplicaDescuento ? "Ingreso neto Lakaut" : "Total a pagar")}</span>
-						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={netoLakaut} format={fMoney} /></span>
+						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={netoLakaut} format={fMoney2} /></span>
 					</div>
 
 					{conAbono && (
 						<div className="pt-1">
-							<ResultRow label="Mes 2 en adelante" value={<><AnimatedNumber value={abonoMes} format={fMoney} />/mes</>} accent="success" />
-							<ResultRow label="Facturación año 1" value={<AnimatedNumber value={facturacionAnio1} format={fMoney} />} accent="success" />
+							<ResultRow label="Mes 2 en adelante" value={<><AnimatedNumber value={abonoMes} format={fMoney2} />/mes</>} accent="success" />
+							<ResultRow label="Facturación año 1" value={<AnimatedNumber value={facturacionAnio1} format={fMoney2} />} accent="success" />
 						</div>
 					)}
 				</div>
 			) : (
-				<p className="text-[11px] text-muted-foreground">Cargá al menos un producto para ver el precio{aplicaDescuento ? " y el nivel" : ""}.</p>
+				<p className="text-[11px] text-muted-foreground">Cargá al menos un producto para ver el precio.</p>
 			)}
 		</ResultPanel>
 	);
@@ -381,13 +429,13 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
 			{/* ── 1 · Para la propuesta ── */}
-			<FieldGroup step={1} channel="packs" done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+			<FieldGroup step={1} channel={canal} done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente
 						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 					</Label>
-					<ClientSelector channel="packs" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} onSetTipo={clientsApi?.setTipo} value={selectedClient} onChange={setSelectedClient} />
+					<ClientSelector channel={canal} clients={clientsApi?.clients || []} onCreate={clientsApi?.create} onSetTipo={clientsApi?.setTipo} value={selectedClient} onChange={setSelectedClient} />
 					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
 				</div>
 
@@ -398,7 +446,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			</FieldGroup>
 
 			{/* ── 2 · Qué cotizás ── */}
-			<FieldGroup step={2} channel="packs" done={hasVolume} title="Qué cotizás" subtitle="Cargá los packs a precio de lista. El total se actualiza a la derecha.">
+			<FieldGroup step={2} channel={canal} done={hasVolume} title="Qué cotizás" subtitle="Cargá los packs a precio de lista. El total se actualiza a la derecha.">
 				<Table>
 					<TableHeader>
 						<TableRow>
@@ -460,26 +508,75 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			{/* ── 3 · Condiciones comerciales ── */}
 			<FieldGroup
 				step={3}
-				channel="packs"
-				done={hasVolume}
+				channel={canal}
+				done={esDistribuidor ? tieneDeclarado : hasVolume}
 				title="Condiciones comerciales"
-				subtitle={aplicaDescuento
-					? "Nivel por volumen + palancas por condiciones" + (conAbono ? " · abono mensual activo" : "")
-					: "Precio de lista puro: sin descuento por nivel, condiciones ni abono"}
+				subtitle={esDistribuidor
+					? "Nivel del socio + palancas por condiciones" + (conAbono ? " · abono mensual activo" : "")
+					: (excepcionWeb
+						? "Excepción habilitada: palancas por condiciones" + (conAbono ? " · abono mensual activo" : "")
+						: "Precio de lista puro: sin descuento por condiciones ni abono")}
 				action={aplicaDescuento
 					? <Badge variant="secondary" className="text-[10px] px-1.5 py-0">−{((descTotal) * 100).toFixed(0)}% total</Badge>
 					: <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">a lista</Badge>}
 			>
-				<SwitchField
-					label="Aplicar descuento comercial"
-					description="Habilita el descuento por nivel (certificados y compromiso), las palancas por condiciones y el abono mensual de firmas. Apagado, se cotiza a precio de lista."
-					checked={aplicaDescuento}
-					onChange={setAplicaDescuento}
-				/>
+				{/* ── Variables del socio (solo Distribuidores) ── */}
+				{esDistribuidor && (
+					<>
+						<div className="flex flex-col gap-2">
+							<span className="text-sm font-medium">Nivel del socio</span>
+							<p className="text-[11px] text-muted-foreground">
+								El nivel es el mayor de las dos variables. Son datos de la relación comercial, no de esta cotización.
+							</p>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<NumberField
+									label="Certificados activos"
+									value={certsActivos}
+									onChange={setCertsActivos}
+									min={0}
+									placeholder="0"
+									note={certsHistoricos > 0
+										? "Sugerido: " + certsHistoricos.toLocaleString("es-AR") + " del histórico del cliente. Editalo si la base instalada real es otra."
+										: "Certificados que Lakaut le administra hoy al socio."}
+								/>
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso anual de facturación</Label>
+									<div className="relative flex items-center">
+										<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
+										<Input type="number" min={0} value={compromisoAnual} onChange={function (e) { setCompromisoAnual(e.target.value); }} placeholder="0" className="tabular-nums pl-11" />
+									</div>
+									<span className="text-[11px] text-muted-foreground">Facturación anual que el socio se compromete a generar por certificados y firmas.</span>
+								</div>
+							</div>
+							{!tieneDeclarado && (
+								<p className="text-[11px] text-[var(--warning)]">
+									Sin certificados activos ni compromiso, el socio queda en {distributorTiers[0] ? distributorTiers[0].label : "el primer nivel"} ({((distributorTiers[0] ? distributorTiers[0].descuento : 0) * 100).toFixed(0)}% de descuento).
+								</p>
+							)}
+							{tieneDeclarado && (
+								<p className="text-[11px] text-muted-foreground">
+									Nivel <strong>{tier.label}</strong> por {drivenBy} · {(tier.descuento * 100).toFixed(0)}% de descuento sobre la lista.
+								</p>
+							)}
+						</div>
+
+						<Separator />
+					</>
+				)}
+
+				{/* ── Excepción de descuento (solo Web) ── */}
+				{!esDistribuidor && (
+					<SwitchField
+						label="Descuento por excepción"
+						description="El canal web es precio de lista. Habilitá esto solo para un descuento puntual en venta directa: aplica las palancas por condiciones y el abono, nunca el nivel por volumen. La cotización queda marcada como excepción."
+						checked={excepcionWeb}
+						onChange={setExcepcionWeb}
+					/>
+				)}
 
 				{aplicaDescuento && (
 					<>
-						<Separator />
+						{!esDistribuidor && <Separator />}
 
 						{/* Descuento por condiciones comerciales (se suma al descuento de nivel) */}
 						<div className="flex flex-col gap-2">
@@ -508,7 +605,7 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 								<p>Precio de lista × {((1 - descAbono) * 100).toFixed(0)}% ({(descAbono * 100).toFixed(0)}% de descuento). El pack se abona completo cada mes.</p>
 								<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
 									<span className="text-muted-foreground">Mes 1 (compra inicial)</span>
-									<span className="font-semibold text-foreground">{fMoney(netoLakaut)} <span className="font-normal text-muted-foreground">· descuento {(tier.descuento * 100).toFixed(0)}% tier</span></span>
+									<span className="font-semibold text-foreground">{fMoney(netoLakaut)} <span className="font-normal text-muted-foreground">· descuento total {(descTotal * 100).toFixed(0)}%</span></span>
 									<span className="text-muted-foreground">Mes 2 en adelante</span>
 									<span className="font-semibold text-foreground">{fMoney(abonoMes)}/mes <span className="font-normal text-muted-foreground">· {fMoney(abonoAnual)}/año</span></span>
 									<span className="text-muted-foreground">Facturación año 1</span>
@@ -533,8 +630,8 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 						<TableBody>
 							{aplicaDescuento ? (
 								<>
-									<TableRow><TableCell>Facturación a lista (compromiso)</TableCell><TableCell className="text-right tabular-nums">{fMoney(calc.facturacionLista)}</TableCell></TableRow>
-									<TableRow><TableCell>Descuento por nivel ({(tier.descuento * 100).toFixed(0)}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(descNivelMonto)}</TableCell></TableRow>
+									<TableRow><TableCell>Facturación a lista</TableCell><TableCell className="text-right tabular-nums">{fMoney(calc.facturacionLista)}</TableCell></TableRow>
+									{aplicaNivel && <TableRow><TableCell>Descuento por nivel {tier.label} ({(tier.descuento * 100).toFixed(0)}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(descNivelMonto)}</TableCell></TableRow>}
 									{descCondPct > 0 && <TableRow><TableCell>Descuento por condiciones (−{leverRes.cappedPts}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(descCondMonto)}</TableCell></TableRow>}
 									<TableRow><TableCell className="font-semibold">Ingreso neto Lakaut</TableCell><TableCell className="text-right tabular-nums font-semibold">{fMoney(netoLakaut)}</TableCell></TableRow>
 								</>
@@ -550,13 +647,13 @@ export function TabCanalPacks({ costs, currency, tc, dealsApi, clientsApi, onExp
 			)}
 
 			{/* ── Referencia: matriz completa de niveles ── */}
-			{aplicaDescuento && (
-				<CollapsibleSection title="Matriz de niveles" subtitle="Tabla completa. El nivel asignado se resalta.">
+			{aplicaNivel && (
+				<CollapsibleSection title="Matriz de niveles" subtitle="Tabla completa del Borrador v5. El nivel asignado se resalta. Gana el mayor entre las dos columnas de umbral.">
 					<Table>
-						<TableHeader><TableRow><TableHead>Nivel</TableHead><TableHead className="text-right">Certificados activos</TableHead><TableHead className="text-right">Descuento</TableHead><TableHead className="text-right">Volumen cotizado (USD)</TableHead></TableRow></TableHeader>
+						<TableHeader><TableRow><TableHead>Nivel</TableHead><TableHead className="text-right">Certificados activos</TableHead><TableHead className="text-right">Descuento</TableHead><TableHead className="text-right">Compromiso anual (USD)</TableHead></TableRow></TableHeader>
 						<TableBody>
 							{distributorTiers.map(function (t) {
-								const act = hasVolume && t.id === tier.id;
+								const act = tieneDeclarado && t.id === tier.id;
 								return (
 									<TableRow key={t.id} className={act ? "bg-accent" : ""}>
 										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={distributorTiers} size="sm" />{act && <span className="text-[10px] font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { dealStatus } from "@/lib/dealStatus";
 import { dealRevenue, dealItems, computePriceMetrics } from "@/lib/dealMetrics";
-import { channelShort, resolveChannel } from "@/data/channelMeta";
+import { channelShort, channelEmoji, resolveChannel } from "@/data/channelMeta";
 import { STATUS_COLORS } from "@/theme/tokens";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
@@ -50,7 +50,7 @@ function makePrice(currency, tc) {
 }
 function fPct(n) { return n == null || !isFinite(n) ? "—" : Math.round(n * 100) + "%"; }
 
-export function TabReportes({ dealsApi, clientsApi, currency, tc, channelConfig }) {
+export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 	const { fMoney } = makeMoney(currency, tc);
 	const fPrice = makePrice(currency, tc);
 	const [period, setPeriod] = useState("m6");
@@ -122,11 +122,15 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc, channelConfig 
 	}, [deals, clientsById]);
 
 	// ── Métricas de precio por elemento y canal ──
-	const volumenBase = (channelConfig && channelConfig.b2b2cBase) || null;
-	const price = useMemo(function () { return computePriceMetrics(deals, volumenBase); }, [deals, volumenBase]);
+	// Un bloque por canal. Web y Distribuidores van separados a propósito: comparten
+	// catálogo pero no política de precios, y promediarlos taparía el dato que importa,
+	// que es cuánto se descuenta al revender.
+	const price = useMemo(function () { return computePriceMetrics(deals); }, [deals]);
 	const priceChannels = [
-		{ key: "volumen", label: "Volumen", block: price.volumen },
-		{ key: "packs", label: "Packs", block: price.packs },
+		{ key: "b2b2c", label: channelShort("b2b2c"), block: price.b2b2c },
+		{ key: "volumen", label: channelShort("volumen"), block: price.volumen },
+		{ key: "web", label: channelShort("web"), block: price.web },
+		{ key: "distribuidores", label: channelShort("distribuidores"), block: price.distribuidores },
 	].filter(function (c) { return c.block.n > 0; });
 
 	const hasData = deals.length > 0;
@@ -203,12 +207,12 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc, channelConfig 
 								{agg.channels.map(function (c) {
 									return (
 										<TableRow key={c.canal}>
-											<TableCell><Badge variant="secondary" className="text-[10px]">{channelShort(c.canal)}</Badge></TableCell>
+											<TableCell><Badge variant="secondary" className="text-[10px]">{channelEmoji(c.canal)} {channelShort(c.canal)}</Badge></TableCell>
 											<TableCell className="text-right tabular-nums">{c.n}</TableCell>
 											<TableCell className="text-right tabular-nums">{c.nConf}</TableCell>
 											<TableCell className="text-right tabular-nums">{fMoney(c.cotizado)}</TableCell>
 											<TableCell className={"text-right tabular-nums font-semibold " + (c.confirmado > 0 ? "text-[var(--success)]" : "text-muted-foreground")}>{c.confirmado > 0 ? fMoney(c.confirmado) : "—"}</TableCell>
-											<TableCell className="text-right tabular-nums text-muted-foreground">{c.canal === "b2b2c" ? c.idc.toLocaleString("es-AR") + " IDC" : c.certs.toLocaleString("es-AR") + " certs"}</TableCell>
+											<TableCell className="text-right tabular-nums text-muted-foreground">{c.canal === "b2b2c" ? c.idc.toLocaleString("es-AR") + " IDC" : c.canal === "volumen" ? c.idc.toLocaleString("es-AR") + " certs" : c.certs.toLocaleString("es-AR") + " certs"}</TableCell>
 											<TableCell className="text-right tabular-nums text-muted-foreground">{c.firmas.toLocaleString("es-AR")}</TableCell>
 										</TableRow>
 									);
@@ -222,7 +226,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc, channelConfig 
 						<SectionCard title="Volumen de items" description="Total cotizado en el período (confirmado entre paréntesis).">
 							<div className="space-y-3">
 								{[
-									{ label: "Certificados (packs)", tot: agg.items.certs, conf: agg.items.certsConf },
+									{ label: "Certificados (web y distribuidores)", tot: agg.items.certs, conf: agg.items.certsConf },
 									{ label: "IDC (volumen)", tot: agg.items.idc, conf: agg.items.idcConf },
 									{ label: "Firmas", tot: agg.items.firmas, conf: agg.items.firmasConf },
 								].map(function (row) {
@@ -273,15 +277,20 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc, channelConfig 
 						>
 							<div className="space-y-6">
 								{priceChannels.map(function (ch) {
-									const isPacksCh = ch.key === "packs";
-									const rows = [
-										{ key: "cert", label: isPacksCh ? "Certificado" : "Certificado (IDC)", note: isPacksCh ? "implícito · precio de bundle" : null, stat: ch.block.cert },
-										{ key: "firma", label: isPacksCh ? "Firma adicional" : "Firma", note: isPacksCh ? "excedente sobre el pack" : null, stat: ch.block.firma },
-									];
+									const esIDCCh = ch.key === "b2b2c";
+									const rows = esIDCCh
+										? [
+											{ key: "cert", label: "IDC", note: ch.block.certBundle ? "bundle · incluye el cupo de firmas" : null, stat: ch.block.cert },
+											{ key: "firma", label: "Firma sobre el cupo", note: "se factura por unidad", stat: ch.block.firma },
+										]
+										: [
+											{ key: "cert", label: "Certificado", note: "implícito · precio de bundle", stat: ch.block.cert },
+											{ key: "firma", label: "Firma adicional", note: "excedente sobre el pack", stat: ch.block.firma },
+										];
 									return (
 										<div key={ch.key}>
 											<div className="flex items-center gap-2 mb-2">
-												<Badge variant="secondary" className="text-[10px]">{ch.label}</Badge>
+												<Badge variant="secondary" className="text-[10px]">{channelEmoji(ch.key)} {ch.label}</Badge>
 												<span className="text-[11px] text-muted-foreground">{ch.block.n} {ch.block.n === 1 ? "cotización" : "cotizaciones"}</span>
 											</div>
 											<Table>

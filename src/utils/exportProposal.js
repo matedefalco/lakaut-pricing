@@ -1,6 +1,6 @@
 import { buildProyeccion } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
-import { isPacks, packsConDescuento } from "@/data/channelMeta";
+import { isPacks, isUnit, packsConDescuento } from "@/data/channelMeta";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -387,7 +387,10 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 		}));
 
 	const tierRecord = distributorTiers.find(t => t.label === res.tier);
-	const descPct = tierRecord ? (tierRecord.descuento * 100).toFixed(0) : "—";
+	// Sin nivel es una venta web con descuento por excepción: el único descuento que
+	// se muestra es el de condiciones comerciales.
+	const conNivel = !!res.tier;
+	const descPct = tierRecord ? (tierRecord.descuento * 100).toFixed(0) : (res.descNivelPct != null ? (res.descNivelPct * 100).toFixed(0) : "—");
 	const lista = res.facturacionLista || 0;
 	const neto = res.netoLakaut || 0;
 	const desc = lista - neto;
@@ -440,12 +443,14 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 		heading: "Activás tu volumen",
 		body: `
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
-        Adquirís el volumen contratado con el nivel <strong style="color:${DK};">${res.tier || "—"}</strong>${condPctV > 0 ? " y un descuento adicional por tus condiciones comerciales" : ""}.
+        ${conNivel
+					? `Adquirís el volumen contratado con el nivel <strong style="color:${DK};">${res.tier}</strong>${condPctV > 0 ? " y un descuento adicional por tus condiciones comerciales" : ""}.`
+					: "Adquirís el volumen contratado con un descuento especial por tus condiciones comerciales."}
       </div>
       <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
       <div style="display:flex;flex-direction:column;gap:0.14cm;border-top:1px solid ${GRL};margin-top:0.1cm;padding-top:0.14cm;">
         ${descRows([
-					{ label: `Descuento nivel ${res.tier || "—"} (−${descPct}%)`, amount: descNivel },
+					conNivel ? { label: `Descuento nivel ${res.tier} (−${descPct}%)`, amount: descNivel } : null,
 					condPctV > 0 ? { label: `Descuento por condiciones (−${condPctV}%)`, amount: descCondMontoV, sub: condTerms } : null,
 				], currency, tc)}
       </div>
@@ -489,9 +494,14 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	}) : "";
 
 	return commercialSlide({
-		kicker: "Modelo comercial · packs con descuento",
+		kicker: conNivel ? "Modelo comercial · packs con descuento por nivel" : "Modelo comercial · packs con descuento especial",
 		title: "Tu propuesta a medida",
-		subtitle: showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : null,
+		// El Borrador v5 condiciona el nivel al cumplimiento efectivo de los compromisos
+		// asumidos, así que la propuesta lo dice en lugar de dejarlo implícito.
+		subtitle: [
+			showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : null,
+			conNivel ? "El nivel comercial asignado queda sujeto al cumplimiento efectivo de los compromisos asumidos." : null,
+		].filter(Boolean).join(" ") || null,
 		chips,
 		cardsHtml: momento1 + momento2,
 		scheduleHtml: schedule,
@@ -556,6 +566,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const firmasInclJuridica = idcJuridicos * fPorCertJur;
 	const firmasInclFisica = idcFisicos * fPorCertFis;
 	const firmasIncl = firmasInclJuridica + firmasInclFisica;
+	// Cupo de firmas del bundle de la IDC: las que entran en el cupo ya están dentro
+	// del precio de la identidad y no se facturan aparte. `null` = cotización del
+	// modelo anterior, donde cada firma se facturaba por unidad.
+	const cupo = inp.firmasIncluidasPorIDC != null ? Math.max(0, Number(inp.firmasIncluidasPorIDC) || 0) : null;
+	const firmasFacturablesJur = cupo == null ? firmasInclJuridica : idcJuridicos * Math.max(0, fPorCertJur - cupo);
+	const firmasFacturablesFis = cupo == null ? firmasInclFisica : idcFisicos * Math.max(0, fPorCertFis - cupo);
+	const firmasFacturables = firmasFacturablesJur + firmasFacturablesFis;
+	const firmasEnCupo = firmasIncl - firmasFacturables;
 	const firmasAdicTotal = idc * adicPorIDC;
 	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
 	// Precio de firma a precio de lista (mes 1, sin el 35% del abono). Se formatea
@@ -568,8 +586,8 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// de lista + firmas adicionales. El 35% de descuento aplica recién al abono (mes 2
 	// en adelante); por eso las firmas del mes 1 van a precio de lista.
 	const revIDC = idc * precioIDC;
-	const revFirmasInclJuridica = firmasInclJuridica * precioFirmaAdicN;
-	const revFirmasInclFisica = firmasInclFisica * precioFirmaAdicN;
+	const revFirmasInclJuridica = firmasFacturablesJur * precioFirmaAdicN;
+	const revFirmasInclFisica = firmasFacturablesFis * precioFirmaAdicN;
 	const revFirmasIncl = revFirmasInclJuridica + revFirmasInclFisica;
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
 	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
@@ -578,7 +596,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// cobra. Se resta del subtotal a precio de firma de lista y va antes del descuento
 	// por condiciones, para no descontar dos veces sobre firmas que no se facturan.
 	// El volumen no cambia: el cliente recibe (y el compromiso cuenta) las firmas completas.
-	const firmasBonif = Math.min(firmasIncl, Math.max(0, Number(inp.firmasBonificadas) || 0));
+	const firmasBonif = Math.min(firmasFacturables, Math.max(0, Number(inp.firmasBonificadas) || 0));
 	const bonifMonto = firmasBonif * precioFirmaAdicN;
 	// Descuento por condiciones comerciales (snapshot del deal): aplica sobre el
 	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
@@ -604,12 +622,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		] : [
 			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
 		]),
-		// Firmas incluidas: se atribuyen al tipo de certificado que las genera.
+		// Firmas que exceden el cupo del bundle: se atribuyen al tipo de certificado que
+		// las genera. Las que entran en el cupo no llevan línea de cargo (ya están en el
+		// precio de la IDC) y se muestran como parte de lo incluido, más abajo.
 		...(hayJuridicos ? [
-			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasInclJuridica.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclJuridica }] : []),
-			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasInclFisica.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclFisica }] : []),
+			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclJuridica }] : []),
+			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclFisica }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} inclu${conApi ? "idos" : "idas"} (${firmasIncl.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${conApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
@@ -632,7 +652,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		...(hayJuridicos ? [
 			chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 		] : [
-			chip(SVG.checkSquare(B, 15), `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`),
+			chip(SVG.checkSquare(B, 15), cupo != null
+				? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. por identidad`
+				: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`),
 		]),
 		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
 	];
@@ -646,7 +668,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
 	// condiciones, para que el valor entregado quede a la vista.
 	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
-      <span style="color:${GR};">${firmaCap} bonificad${conApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">Sin cargo: recibís ${conApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${(firmasIncl - firmasBonif).toLocaleString("es-AR")}.</span></span>
+      <span style="color:${GR};">${firmaCap} bonificad${conApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">Sin cargo: recibís ${conApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${Math.max(0, firmasFacturables - firmasBonif).toLocaleString("es-AR")}.</span></span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(bonifMonto, currency, tc)}</span>
     </div>` : "";
 	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
@@ -670,7 +692,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} ${certJurWord} (${firmaWord(fPorCertJur)} c/u)` : null,
 				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${certFisWord} (${firmaWord(fPorCertFis)} c/u)` : null,
 			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `, ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total` : ""}.`
-		: `${verboAct} las ${idc.toLocaleString("es-AR")} ${unidadPl}: cada una con su ${conApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`} de activación (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total)` : ""}.`;
+		: `${verboAct} las ${idc.toLocaleString("es-AR")} ${unidadPl}: cada una con su ${conApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`} de activación (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total${cupo != null && firmasEnCupo > 0 ? `, ${firmasEnCupo.toLocaleString("es-AR")} sin cargo` : ""})` : ""}.`;
 	const momento1 = momentoCard({
 		dark: false,
 		kicker: "Momento 1 · mes 1",
@@ -1009,12 +1031,12 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 	// ID de cotización (COT-TIPO-NNNN-vN) para la portada. El tipo sale del snapshot
 	// guardado en el deal; si falta, del tipo vivo del cliente. Ver [[cotId]].
 	const cotId = formatCotId(deal.inputs?.cot, client?.tipo);
-	// Packs: la propuesta se arma según el interruptor de descuento comercial, no
-	// según el canal (los ex canales web y distribuidores hoy son el mismo).
-	// `listaPura` (sin descuento) es la venta directa por tarjeta.
+	// Web y Distribuidores comparten catálogo, así que la propuesta se arma según si
+	// hay descuento y no según el canal: `listaPura` es la venta web a precio de lista,
+	// y con descuento (nivel de distribuidor o excepción web) va la slide a medida.
 	const packs = isPacks(deal.channel);
 	const listaPura = packs && !packsConDescuento(deal);
-	const sinApiB2B2C = deal.channel === "b2b2c" && deal.inputs?.integracion === "sin_api";
+	const sinApiB2B2C = isUnit(deal.channel) && deal.inputs?.integracion === "sin_api";
 	// Ningún Packs lleva slide de integración ni lenguaje técnico (fee, SLA,
 	// kick-off): se compran packs cerrados, con o sin descuento. Eso es exclusivo
 	// de Volumen con API.
@@ -1022,7 +1044,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 
 	// Slide de proyección de crecimiento: solo B2B2C, con la proyección activa y
 	// con volumen cargado. Corre la numeración de páginas de las slides siguientes.
-	const proy = deal.channel === "b2b2c" ? deal.inputs?.proyeccion : null;
+	const proy = isUnit(deal.channel) ? deal.inputs?.proyeccion : null;
 	const hasProy = !!(proy && proy.enabled)
 		&& (Number(deal.resumen?.idcMensuales) || 0) > 0
 		&& Array.isArray(proy.steps) && proy.steps.length > 0;
@@ -1034,10 +1056,10 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 
 	const s3 = listaPura
 		? s3Web(deal, clientName, currency, tc, channelConfig, models, s3Page)
-		: deal.channel === "b2b2c"
+		: isUnit(deal.channel)
 			? s3B2B2C(deal, clientName, currency, tc, channelConfig, s3Page)
 			: s3Dist(deal, clientName, currency, tc, channelConfig, models);
-	const proyConApi = deal.channel === "b2b2c" && deal.inputs?.integracion !== "sin_api";
+	const proyConApi = isUnit(deal.channel) && deal.inputs?.integracion !== "sin_api";
 	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage, proyConApi) : "";
 
 	return `<!DOCTYPE html>

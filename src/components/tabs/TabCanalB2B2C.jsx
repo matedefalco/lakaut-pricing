@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
-import { getB2B2CSegment, facturacionAtBase } from "@/lib/tiers";
+import { getB2B2CSegment, getVolumenSegment, facturacionAtBase, segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
 import { buildProyeccion, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
@@ -26,21 +26,38 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
 import { TabCanalB2B2CPrecios } from "@/components/tabs/TabCanalB2B2CPrecios";
 
-function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
-function margAccent(pct) { return pct >= 0.5 ? "success" : pct >= 0.2 ? "warning" : "destructive"; }
-function margWord(pct) { return pct >= 0.5 ? "saludable" : pct >= 0.2 ? "ajustado" : "a revisar"; }
+// La rentabilidad de este canal se lee como MARKUP sobre el costo variable
+// (precio ÷ costo), que es la métrica de la columna "MARGEN" del Borrador v5: los
+// 74% de Start Up son 0,65 ÷ 0,3741. Los umbrales son relativos al mínimo
+// configurado, así que mover el guardarraíl mueve la semántica de los colores con él.
+function markupClass(m, min) { return m == null || m >= min * 1.4 ? "text-[var(--success)]" : m >= min ? "text-[var(--warning)]" : "text-destructive"; }
+function markupAccent(m, min) { return m == null || m >= min * 1.4 ? "success" : m >= min ? "warning" : "destructive"; }
+function markupWord(m, min) { return m == null || m >= min * 1.4 ? "saludable" : m >= min ? "ajustado" : "a revisar"; }
+function fMarkup(m) { return m == null ? "—" : m.toFixed(2) + "x"; }
 
 // Fallback del descuento de abono si la config no lo tiene cargado todavía.
 const ABONO_DESC_FALLBACK = 10;
-// Fallbacks de los precios base si la config todavía no los trae.
-const BASE_FALLBACK = { cert: 0.65, firma: 0.5 };
-const MARGEN_MIN_FALLBACK = 0.2;
+// Fallbacks del precio de segmento si la config todavía no lo trae.
+const SEG_FALLBACK = { precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 0.5 };
+const MARKUP_MIN_FALLBACK = 1.2;
+const VOLUMEN_BASE_FALLBACK = { cert: 0.65, firma: 0.5 };
 
-export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
+export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
+	// Los dos canales por elemento comparten este cotizador y se distinguen por la
+	// prop `channel`. La diferencia es qué se vende y cómo se le pone precio:
+	//   · b2b2c (IDC) → un bundle por IDC mensual, con cupo de firmas incluidas. El
+	//                   segmento sale de la cantidad de IDC y trae su propio precio.
+	//   · volumen     → certificados y firmas como items sueltos, cantidades cargadas
+	//                   a mano y sin cupo. El segmento sale del compromiso en USD y
+	//                   aplica un descuento sobre los dos precios de lista.
+	const canal = channel === "volumen" ? "volumen" : "b2b2c";
+	const esIDC = canal === "b2b2c";
+	const meta = CHANNELS[canal];
 	const { channelConfig } = useChannelConfig();
 	const b2b2cSegments = channelConfig.b2b2cSegments;
-	const base = channelConfig.b2b2cBase || BASE_FALLBACK;
-	const margenMin = channelConfig.b2b2cMargenMin != null ? channelConfig.b2b2cMargenMin : MARGEN_MIN_FALLBACK;
+	const volumenSegments = channelConfig.volumenSegments || [];
+	const volumenBase = channelConfig.volumenBase || VOLUMEN_BASE_FALLBACK;
+	const markupMin = channelConfig.b2b2cMarkupMin != null ? channelConfig.b2b2cMarkupMin : MARKUP_MIN_FALLBACK;
 	const b2b2cApiTiers = channelConfig.b2b2cApiTiers;
 	const slaPlans = channelConfig.slaPlans;
 	const commercialLevers = channelConfig.commercialLevers;
@@ -64,6 +81,12 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [firmasPorCertFisico, setFirmasPorCertFisico] = useState(0);
 	const [certJuridicos, setCertJuridicos] = useState("");
 	const [firmasPorCertJuridico, setFirmasPorCertJuridico] = useState(0);
+	// Solo Volumen: la cantidad de firmas se carga como un total suelto, no por
+	// certificado, porque el cliente compra los dos elementos por separado.
+	const [firmasManual, setFirmasManual] = useState("");
+	// Solo Volumen: compromiso del contrato en USD, la métrica que asigna el segmento.
+	// Vacío = sugerido (facturación a lista × meses de vinculación).
+	const [compromisoOverride, setCompromisoOverride] = useState("");
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
@@ -71,19 +94,11 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
 	// Descuento del abono mensual (%): arranca en el default de la config, editable por cotización.
 	const [abonoDescPct, setAbonoDescPct] = useState(function () { return channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK; });
-	// Firmas bonificadas (opcional): cantidad de firmas del volumen cotizado que no se
-	// cobran. No cambia el volumen ni el compromiso (el segmento sigue saliendo del
-	// total cotizado); solo descuenta su importe del subtotal de la activación.
+	// Firmas bonificadas (opcional): firmas facturables (las que exceden el cupo del
+	// bundle) que no se cobran. No cambia el volumen ni el segmento, que salen de la
+	// cantidad de IDC; solo descuenta su importe del subtotal.
 	const [firmasBonificadas, setFirmasBonificadas] = useState("");
 	const [showBonif, setShowBonif] = useState(false);
-	// Precio de la firma extra (excedente sobre lo cotizado). Por defecto usa el
-	// precio de firma del segmento alcanzado (dinámico); "" = dinámico. Se puede
-	// sobrescribir a mano para ese excedente.
-	const [precioFirmaExtra, setPrecioFirmaExtra] = useState("");
-	// Compromiso del contrato en USD: es la métrica que asigna el segmento. Vacío =
-	// sugerido (facturación a lista del volumen × meses de vinculación); se puede
-	// sobrescribir cuando el cliente compromete un volumen distinto al cotizado.
-	const [compromisoOverride, setCompromisoOverride] = useState("");
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	const [flash, setFlash] = useState(false);
@@ -109,35 +124,56 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	const nj = Math.max(0, Number(certJuridicos) || 0);
 	const ff = Math.max(0, Number(firmasPorCertFisico) || 0);
 	const fj = Math.max(0, Number(firmasPorCertJuridico) || 0);
-	const idc = nf + nj; // total de certificados (IDC)
+	const idc = nf + nj; // total de certificados / IDC
+	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
+
+	// ── Cantidad de firmas ──
+	// IDC: las firmas se cargan por certificado (cada IDC lleva las suyas). Volumen:
+	// se carga un total suelto, porque los dos elementos se compran por separado.
 	const firmasFisica = nf * ff;
 	const firmasJuridica = nj * fj;
-	const firmasIncl = firmasFisica + firmasJuridica;
-	// Bonificación: nunca más firmas que las cotizadas. `firmasCobradas` es solo para
-	// mostrar la cuenta; el volumen (y por lo tanto el costo y el segmento) es firmasIncl.
-	const firmasBonif = Math.min(firmasIncl, Math.max(0, Number(firmasBonificadas) || 0));
-	const firmasCobradas = firmasIncl - firmasBonif;
+	const firmasTotales = esIDC ? firmasFisica + firmasJuridica : Math.max(0, Number(firmasManual) || 0);
 
-	// ── Segmento único por compromiso ──
-	// El cliente cae en UN SOLO segmento, asignado por el compromiso del contrato en
-	// USD a precio de lista. Al ser un único número en dólares la métrica es
-	// conmutativa: 1 certificado con muchas firmas y muchos certificados con 1 firma
-	// caen en el mismo segmento si representan el mismo negocio. El compromiso se
-	// sugiere como facturación a lista × meses de vinculación y se puede sobrescribir.
-	// Usar siempre el precio BASE rompe la circularidad precio↔segmento.
-	const facturacionAtList = facturacionAtBase(idc, firmasIncl, base);
-	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
+	// ── Segmento ──
+	// IDC: sale de la cantidad de IDC mensuales (umbrales del Borrador v5) y cada
+	// segmento trae su propio PRECIO por IDC, no un descuento. Debajo del primer
+	// umbral se cotiza como Start Up en lugar de quedar sin precio.
+	// Volumen: sale del compromiso del contrato en USD medido a precio de lista, y
+	// aplica un DESCUENTO igual sobre el precio del certificado y el de la firma.
+	// Usar siempre el precio base rompe la circularidad precio↔segmento.
+	const facturacionAtList = facturacionAtBase(idc, firmasTotales, volumenBase);
 	const compromisoSugerido = facturacionAtList * mesesVinculacion;
 	const compromisoManual = compromisoOverride !== "";
 	const compromiso = compromisoManual ? Math.max(0, Number(compromisoOverride) || 0) : compromisoSugerido;
 
-	const seg = getB2B2CSegment(compromiso, b2b2cSegments) || {};
-	const segDesc = Math.min(1, Math.max(0, Number(seg.descuento) || 0));
+	const seg = (esIDC ? getB2B2CSegment(idc, b2b2cSegments) : getVolumenSegment(compromiso, volumenSegments)) || {};
 	const segLabel = seg.label || "—";
-	// El descuento del segmento se aplica por igual al certificado y a la firma.
-	const precioCertSeg = (Number(base.cert) || 0) * (1 - segDesc);
-	const precioFirmaSeg = (Number(base.firma) || 0) * (1 - segDesc);
-	const hasVolume = idc > 0;
+	const segDesc = esIDC ? 0 : Math.min(1, Math.max(0, Number(seg.descuento) || 0));
+	// Precios de lista del segmento. En IDC vienen del propio tramo; en Volumen se
+	// derivan del precio base menos el descuento del segmento.
+	const segPrice = esIDC
+		? segmentPricing(seg, SEG_FALLBACK)
+		: {
+			precioIDC: (Number(volumenBase.cert) || 0) * (1 - segDesc),
+			firmasIncluidas: 0,
+			precioFirmaExtra: (Number(volumenBase.firma) || 0) * (1 - segDesc),
+		};
+
+	// Cupo del bundle: cada IDC incluye `firmasIncluidas` sin cargo (la firma inicial
+	// que requiere la institución más las de activación). Lo que exceda el cupo se
+	// factura por unidad. En Volumen el cupo es cero: todas las firmas se facturan.
+	const cupo = segPrice.firmasIncluidas;
+	const firmasExtra = esIDC
+		? nf * Math.max(0, ff - cupo) + nj * Math.max(0, fj - cupo)
+		: firmasTotales;
+	const firmasEnCupo = firmasTotales - firmasExtra;
+	// Bonificación: solo aplica a las firmas que efectivamente se facturan, porque las
+	// del cupo ya van sin cargo. El volumen no cambia, así que el costo variable de las
+	// firmas bonificadas se paga igual y baja el markup.
+	const firmasBonif = Math.min(firmasExtra, Math.max(0, Number(firmasBonificadas) || 0));
+	const firmasCobradas = firmasExtra - firmasBonif;
+
+	const hasVolume = idc > 0 || firmasTotales > 0;
 
 	useEffect(function () {
 		if (!pendingEdit) return;
@@ -167,12 +203,15 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
-		// Precio de firma extra: si el deal guardó un override lo tomamos; si no,
-		// queda dinámico ("" = precio de firma del segmento).
-		setPrecioFirmaExtra(i.precioFirmaExtra != null ? String(i.precioFirmaExtra) : "");
 		setFirmasBonificadas(i.firmasBonificadas != null ? String(i.firmasBonificadas) : "");
 		setShowBonif(i.firmasBonificadas != null);
-		// Compromiso: solo se guarda cuando fue manual; si no, se recalcula solo.
+		// Volumen: total de firmas suelto y compromiso manual. En cotizaciones del
+		// modelo anterior (cuando Volumen e IDC eran el mismo canal) el total de firmas
+		// se derivaba de las firmas por certificado, así que se reconstruye de ahí.
+		setFirmasManual(
+			i.firmasTotalManual != null ? String(i.firmasTotalManual)
+				: (pendingEdit.resumen && pendingEdit.resumen.firmasTotales ? String(pendingEdit.resumen.firmasTotales) : "")
+		);
 		setCompromisoOverride(i.compromisoManual && i.compromiso != null ? String(i.compromiso) : "");
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
@@ -211,49 +250,53 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	// Festejo al subir de segmento: sólo con volumen cargado y sólo al cambiar el
 	// segmento efectivo (no en cada tecla). El loadToken evita festejar la carga de
 	// una cotización guardada.
-	useTierUp(hasVolume ? seg.id : null, b2b2cSegments, function (next) {
-		const mat = tierMaterialInList(next, b2b2cSegments);
+	const segmentList = esIDC ? b2b2cSegments : volumenSegments;
+	useTierUp(hasVolume ? seg.id : null, segmentList, function (next) {
+		const mat = tierMaterialInList(next, segmentList);
 		notifyTierUp(toast, { label: next.label, emoji: mat.emoji, material: mat, discountPct: Math.round((next.descuento || 0) * 100) });
 	}, loadToken);
 
-	// ── Precios efectivos ──
-	// precioIDC = precio del certificado (sin firmas). precioFirmaLista = precio
-	// unitario de cada firma, dinámico según el segmento alcanzado (ya no se ingresa
-	// a mano). El ajuste personalizado puede sobrescribir ambos; el certificado y la
-	// firma nunca se mezclan en un mismo valor.
+	// ── Costos ──
+	// El costo del bundle de una IDC incluye el certificado y las firmas de su cupo.
+	// El costo total se calcula sobre las firmas REALES cotizadas (dentro y fuera del
+	// cupo, bonificadas incluidas): todas se emiten y todas se pagan.
 	const costoCert = idc * cvCert;
-	const costoFirmas = firmasIncl * cvFirma;
+	const costoFirmas = firmasTotales * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
+	const costoBundle = idcBundleCost(cvCert, cvFirma, cupo);
 
-	// Ajuste por componente: cada campo cargado sobrescribe ese elemento; vacío usa
-	// el precio del segmento que le corresponde (certificado por cantidad de certs,
-	// firma por cantidad de firmas).
+	// ── Precios efectivos ──
+	// El precio de la IDC y el de la firma extra salen del segmento alcanzado. El
+	// ajuste personalizado puede sobrescribir cualquiera de los dos; la IDC y la firma
+	// nunca se mezclan en un mismo valor.
 	const overrideActive = overridePrecioCert !== "" || overridePrecioFirma !== "";
-	const precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : precioCertSeg;
-	const precioFirmaLista = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : precioFirmaSeg;
+	const precioIDC = overridePrecioCert !== "" ? Math.max(0, Number(overridePrecioCert) || 0) : segPrice.precioIDC;
+	const precioFirmaExtraEff = overridePrecioFirma !== "" ? Math.max(0, Number(overridePrecioFirma) || 0) : segPrice.precioFirmaExtra;
 
-	// Precio de firma extra (excedente): dinámico = precio de firma del segmento,
-	// salvo que se haya cargado un override manual.
-	const precioFirmaExtraEff = precioFirmaExtra !== "" ? Math.max(0, Number(precioFirmaExtra) || 0) : precioFirmaLista;
-
-	// ── Ingresos (mes 1 · activación) ──
+	// ── Ingresos ──
+	// El volumen cotizado es mensual, así que este subtotal es el del mes tipo. Las
+	// firmas del cupo no generan ingreso propio: ya están dentro del precio de la IDC.
 	const revCertFisicos = nf * precioIDC;
 	const revCertJuridicos = nj * precioIDC;
 	const revIDC = idc * precioIDC;
-	const revFirmasFisica = firmasFisica * precioFirmaLista;
-	const revFirmasJuridica = firmasJuridica * precioFirmaLista;
-	const revFirmas = firmasIncl * precioFirmaLista;
+	// En Volumen no hay firmas por tipo de certificado: son un item suelto, así que el
+	// desglose por tipo solo cubre los certificados.
+	const firmasExtraFisica = esIDC ? nf * Math.max(0, ff - cupo) : 0;
+	const firmasExtraJuridica = esIDC ? nj * Math.max(0, fj - cupo) : 0;
+	const revFirmasFisica = firmasExtraFisica * precioFirmaExtraEff;
+	const revFirmasJuridica = firmasExtraJuridica * precioFirmaExtraEff;
+	const revFirmas = firmasExtra * precioFirmaExtraEff;
 	const revServicioBruto = revIDC + revFirmas;
 
-	// Bonificación de firmas: se resta del subtotal a precio de firma cotizado. Va
-	// antes del descuento por condiciones para no descontar dos veces sobre firmas
-	// que no se cobran.
-	const bonifMonto = firmasBonif * precioFirmaLista;
+	// Bonificación de firmas: se resta del subtotal a precio de firma extra. Va antes
+	// del descuento por condiciones para no descontar dos veces sobre firmas que no se
+	// cobran.
+	const bonifMonto = firmasBonif * precioFirmaExtraEff;
 	const revServicioNeto = revServicioBruto - bonifMonto;
 
 	// Descuento por condiciones comerciales (además del precio por segmento). Aplica
-	// sobre el subtotal de servicio de la activación (certs + firmas, ya neto de la
-	// bonificación), no sobre el fee ni el SLA ni el abono. Snapshot en el deal.
+	// sobre el subtotal de servicio (IDC + firmas extra, ya neto de la bonificación),
+	// no sobre el fee ni el SLA ni el abono. Snapshot en el deal.
 	const leverRes = resolveLevers(commercialLevers, levers);
 	const descCondPct = leverRes.pct;
 	const descCondMonto = revServicioNeto * descCondPct;
@@ -266,36 +309,63 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const margen = revServicio - costoTotal;
 	const margenPct = revServicio > 0 ? margen / revServicio : 0;
+	// Markup del deal: es la métrica del guardarraíl y la que se compara contra la
+	// columna de margen del Borrador v5.
+	const markup = markupOf(revServicio, costoTotal);
+	// Markup del precio de tabla del segmento contra el costo de su bundle: dice si el
+	// precio configurado es viable antes de cualquier negociación.
+	const markupSeg = markupOf(segPrice.precioIDC, costoBundle);
+	const precioMinSeg = minPriceForMarkup(costoBundle, markupMin);
 
 	// Abono (opcional): repone la bolsa de firmas cada mes con un descuento configurable
 	// (default de la config, editable por cotización).
 	const descAbono = Math.min(1, Math.max(0, Number(abonoDescPct) || 0) / 100);
-	const precioFirmaAbono = precioFirmaLista * (1 - descAbono);
-	const revAbonoMes = firmasIncl * precioFirmaAbono;
+	const precioFirmaAbono = precioFirmaExtraEff * (1 - descAbono);
+	const revAbonoMes = firmasTotales * precioFirmaAbono;
 	const revAbonoAnual = revAbonoMes * 12;
 
-	// Guardarraíl de rentabilidad: se evalúa sobre el margen MEZCLADO (certificados +
-	// firmas), no componente por componente, así un certificado con descuento profundo
-	// no dispara la alarma cuando las firmas compensan. Bajo el mínimo no se puede
-	// guardar ni exportar.
-	const margenBajoMin = hasVolume && revServicio > 0 && margenPct < margenMin;
+	// Guardarraíl de rentabilidad: se evalúa sobre el markup MEZCLADO (IDC + firmas
+	// extra), no componente por componente, así una IDC con precio agresivo no dispara
+	// la alarma cuando las firmas compensan. Bajo el mínimo no se puede guardar ni
+	// exportar.
+	const markupBajoMin = hasVolume && costoTotal > 0 && markup != null && markup < markupMin;
 
-	// Cuánto falta de compromiso para el siguiente segmento: contexto de negociación.
-	const segIdx = b2b2cSegments.findIndex(function (s) { return s.id === seg.id; });
-	const nextSeg = segIdx >= 0 && segIdx < b2b2cSegments.length - 1 ? b2b2cSegments[segIdx + 1] : null;
+	// Cuánto falta para el siguiente segmento: contexto de negociación. En IDC el salto
+	// no es un descuento sino un precio unitario más bajo, así que se muestra la
+	// diferencia de precio; en Volumen sí es un descuento.
+	const segIdx = segmentList.findIndex(function (s) { return s.id === seg.id; });
+	const nextSeg = segIdx >= 0 && segIdx < segmentList.length - 1 ? segmentList[segIdx + 1] : null;
 	let segHint = null;
 	if (hasVolume && nextSeg) {
-		const faltan = Math.max(0, (Number(nextSeg.compromisoMin) || 0) - compromiso);
-		segHint = "Con " + fMoney(faltan) + " más de compromiso entra en " + nextSeg.label + " · " + Math.round((Number(nextSeg.descuento) || 0) * 100) + "% de descuento.";
+		if (esIDC) {
+			const faltan = Math.max(0, (Number(nextSeg.idcMin) || 0) - idc);
+			const precioNext = segmentPricing(nextSeg, SEG_FALLBACK).precioIDC;
+			segHint = "Con " + faltan.toLocaleString("es-AR") + " IDC más entra en " + nextSeg.label + " · " + fMoney2(precioNext) + " por IDC.";
+		} else {
+			const faltan = Math.max(0, (Number(nextSeg.compromisoMin) || 0) - compromiso);
+			segHint = "Con " + fMoney(faltan) + " más de compromiso entra en " + nextSeg.label + " · " + Math.round((Number(nextSeg.descuento) || 0) * 100) + "% de descuento.";
+		}
 	} else if (hasVolume) {
 		segHint = "Es el segmento de mayor volumen.";
 	}
-	const segRows = b2b2cSegments.map(function (s) {
+	const segRows = segmentList.map(function (s) {
+		if (esIDC) {
+			const min = Number(s.idcMin) || 0;
+			const p = segmentPricing(s, SEG_FALLBACK);
+			return {
+				id: s.id,
+				cells: [
+					<TierBadge key="seg" tier={s} tiers={segmentList} size="sm" />,
+					min.toLocaleString("es-AR") + (s.idcMax == null ? "+" : "–" + (Number(s.idcMax) || 0).toLocaleString("es-AR")),
+					fMoney2(p.precioIDC),
+				],
+			};
+		}
 		const min = Number(s.compromisoMin) || 0;
 		return {
 			id: s.id,
 			cells: [
-				<TierBadge key="seg" tier={s} tiers={b2b2cSegments} size="sm" />,
+				<TierBadge key="seg" tier={s} tiers={segmentList} size="sm" />,
 				fMoney(min) + (s.compromisoMax == null ? "+" : "–" + fMoney(Number(s.compromisoMax) || 0)),
 				Math.round((Number(s.descuento) || 0) * 100) + "%",
 			],
@@ -314,7 +384,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	// ── Proyección de crecimiento (preview) ──
 	// Base = volumen y precio ya cotizados. El motor es el mismo que usa el export.
-	const proyBase = { idc: idc, firmas: firmasIncl, precioCert: precioIDC, precioFirma: precioFirmaLista };
+	const proyBase = { idc: idc, firmas: firmasExtra, precioCert: precioIDC, precioFirma: precioFirmaExtraEff };
 	const proyRows = proyEnabled && hasVolume ? buildProyeccion(proyBase, proyDriver, proySteps) : [];
 
 	function updateStep(i, patch) {
@@ -342,7 +412,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					return {
 						...s,
 						idc: s.idc != null && s.idc !== "" ? s.idc : Math.round(idc * k),
-						firmas: s.firmas != null && s.firmas !== "" ? s.firmas : Math.round(firmasIncl * k),
+						firmas: s.firmas != null && s.firmas !== "" ? s.firmas : Math.round(firmasExtra * k),
 					};
 				});
 			});
@@ -353,7 +423,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	function buildDeal(id, fecha) {
 		return {
 			id: id,
-			channel: "b2b2c",
+			channel: canal,
 			fecha: fecha,
 			updatedAt: editingId ? new Date().toISOString() : undefined,
 			inputs: {
@@ -362,12 +432,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				certJuridicos: nj, firmasPorCertJuridico: fj,
 				idcMensuales: idc, // compat: consumido por historial/reportes/clientes
 				firmasAdicPorIDC: 0,
-				// precioFirmaAdic = precio de firma con que se cotizan las firmas del mes 1
-				// (dinámico del segmento o ajuste). La propuesta exportada usa este valor.
-				precioFirmaAdic: precioFirmaLista,
-				// Precio de firma extra (excedente): guardamos el override solo si difiere
-				// del dinámico, para reabrir la cotización con el mismo valor.
-				...(precioFirmaExtra !== "" ? { precioFirmaExtra: precioFirmaExtraEff } : {}),
+				// Volumen: el total de firmas es un dato propio (no derivado de las firmas
+				// por certificado) y el compromiso es lo que asignó el segmento.
+				...(esIDC ? {} : { firmasTotalManual: firmasTotales, compromiso, compromisoManual }),
+				// Cupo de firmas del bundle y precio de la firma que lo excede: viajan al
+				// deal para que la propuesta y los reportes no dependan de la config viva.
+				firmasIncluidasPorIDC: cupo,
+				precioFirmaAdic: precioFirmaExtraEff,
 				// Firmas bonificadas: solo viaja al deal cuando hay bonificación.
 				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif } : {}),
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
@@ -375,9 +446,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				// cambios posteriores de la config de tramos).
 				levers,
 				descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items },
-				// Compromiso que asignó el segmento. `compromisoManual` distingue el valor
-				// cargado a mano del sugerido, para reabrir igual la cotización.
-				compromiso, compromisoManual, mesesVinculacion,
+				mesesVinculacion,
 				casosDeUso, abono,
 				...(abono ? { abonoDescuentoPct: Number(abonoDescPct) || 0 } : {}),
 				...(proyEnabled && proySteps.length ? {
@@ -403,14 +472,26 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				} : {}),
 			},
 			resumen: {
-				segmento: segLabel, segmentoDescuento: segDesc, compromiso, idcMensuales: idc,
+				segmento: segLabel, idcMensuales: idc,
+				// Volumen: el segmento es un descuento, así que se guarda como tal para que
+				// Reportes y el export lo lean igual que en el canal de distribuidores.
+				...(esIDC ? {} : { segmentoDescuento: segDesc, compromiso }),
 				certFisicos: nf, certJuridicos: nj,
-				firmasTotales: firmasIncl, firmasMes: firmasIncl,
-				precioIDC, precioFirma: precioFirmaLista, precioFirmaExtra: precioFirmaExtraEff,
+				firmasTotales, firmasMes: firmasTotales,
+				// Firmas dentro del cupo del bundle vs facturadas por unidad. La distinción
+				// es la que permite leer el precio por elemento en Reportes sin confundir
+				// una firma incluida (sin precio propio) con una vendida.
+				firmasEnCupo, firmasExtra, firmasIncluidasPorIDC: cupo,
+				// precioIDC = precio realizado; precioIDCLista = precio de tabla del
+				// segmento. Con los dos, el descuento negociado se deriva sin mirar la
+				// config, que puede haber cambiado desde que se guardó la cotización.
+				precioIDC, precioIDCLista: segPrice.precioIDC,
+				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
+				precioFirmaExtraLista: segPrice.precioFirmaExtra,
 				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
 				descCondPct, descCondMonto, revServicioBruto,
 				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif, firmasCobradas, bonifMonto } : {}),
-				margen, margenPct,
+				margen, margenPct, markup, costoTotal,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
 			},
 		};
@@ -422,7 +503,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 		let client = selectedClient;
 		if (!client && clientsApi) {
-			client = await clientsApi.create("(sin nombre)", "b2b2c");
+			client = await clientsApi.create("(sin nombre)", canal);
 			setSelectedClient(client);
 		}
 
@@ -453,18 +534,20 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 		onExport && onExport(src, client, exportCurrency);
 		notifyQuoteExported(toast, {
 			clientName: client && client.name,
-			channelLabel: CHANNELS.b2b2c.emoji + " " + CHANNELS.b2b2c.label,
+			channelLabel: meta.emoji + " " + meta.label,
 			onGoHistorial: (saved && onGoHistorial) ? function () { onGoHistorial(src.id); } : null,
 		});
 	}
 
 	const header = (
 		<PageHeader
-			title={CHANNELS.b2b2c.full + (selectedClient ? " · " + selectedClient.name : "")}
+			title={meta.full + (selectedClient ? " · " + selectedClient.name : "")}
 			description={
 				<>
-					{CHANNELS.b2b2c.desc}
-					<InfoTooltip text="Un certificado es físico o jurídico; cuestan y cotizan igual. Cada uno lleva las firmas que se le carguen, sin firma inicial extra. El certificado baja de precio por su volumen de certificados y la firma por su volumen de firmas." />
+					{meta.desc}
+					<InfoTooltip text={esIDC
+						? "Un certificado es físico o jurídico; cuestan y cotizan igual. Cada IDC incluye un cupo de firmas sin cargo y las que lo excedan se facturan por unidad. El segmento sale de la cantidad de IDC mensuales y define el precio unitario."
+						: "Certificados y firmas se cotizan como items independientes: se cargan las cantidades a mano, sin cupo de firmas incluidas. El segmento sale del compromiso del contrato en USD y aplica el mismo descuento sobre los dos precios de lista."} />
 				</>
 			}
 		/>
@@ -475,28 +558,32 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	// entender qué está cotizando de un vistazo.
 	const result = (
 		<>
-		<ResultPanel channel="b2b2c" eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
+		<ResultPanel channel={canal} eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
 			<ResultHero
 				label={conApi ? "Total · mes 1" : "Total"}
-				value={hasVolume ? <AnimatedNumber value={revTotal} format={fMoney} /> : "—"}
-				sub={hasVolume ? (conApi ? "Certificados + firmas + SLA · fee incluido" : "Certificados + firmas · sin integración API") : "Cargá certificados para ver el total"}
+				value={hasVolume ? <AnimatedNumber value={revTotal} format={fMoney2} /> : "—"}
+				sub={hasVolume ? (conApi ? "Certificados + firmas + SLA · fee incluido" : "Certificados + firmas · sin integración API") : (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
 				empty={!hasVolume}
-				pill={hasVolume ? <StatusPill tone={margAccent(margenPct)}>Margen {(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</StatusPill> : null}
+				pill={hasVolume ? <StatusPill tone={markupAccent(markup, markupMin)}>Markup {fMarkup(markup)} · {markupWord(markup, markupMin)}</StatusPill> : null}
 			/>
 
 			{/* Segmento + acceso contextual a la tabla de precios */}
 			<div className="space-y-2 border-t border-border/60 pt-3">
 				<TierTrophy
 					tier={seg}
-					tiers={b2b2cSegments}
-					eyebrow="Segmento · descuento"
-					discountPct={segDesc > 0 ? "−" + Math.round(segDesc * 100) : null}
-					note={hasVolume ? "compromiso " + fMoney(compromiso) + " · " + fMoney2(precioIDC) + "/cert · " + fMoney2(precioFirmaLista) + "/firma" : null}
+					tiers={segmentList}
+					eyebrow={esIDC ? "Segmento · precio por IDC" : "Segmento · descuento"}
+					discountPct={!esIDC && segDesc > 0 ? "−" + Math.round(segDesc * 100) : null}
+					note={hasVolume
+						? (esIDC
+							? idc.toLocaleString("es-AR") + " IDC/mes · " + fMoney2(precioIDC) + " por IDC · " + cupo + " firma" + (cupo === 1 ? "" : "s") + " incluidas"
+							: "compromiso " + fMoney(compromiso) + " · " + fMoney2(precioIDC) + "/cert · " + fMoney2(precioFirmaExtraEff) + "/firma")
+						: null}
 					empty={!hasVolume}
 				/>
 				{hasVolume && (
 					<div className="flex justify-end">
-						<TierHint label="ver segmentos" columns={["Segmento", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />
+						<TierHint label="ver segmentos" columns={esIDC ? ["Segmento", "IDC/mes", "Precio"] : ["Segmento", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />
 					</div>
 				)}
 			</div>
@@ -507,45 +594,67 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					{nf > 0 && (
 						<div className="rounded-lg bg-sky-50 px-3 py-2">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold text-sky-700">Certificados físicos</span>
-								<span className="text-[11px] text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>
+								<span className="text-[11px] font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
+								{esIDC && <span className="text-[11px] text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>}
 							</div>
-							<ResultRow label={"Certificados (" + nf.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertFisicos} format={fMoney} />} accent="primary" />
-							{firmasFisica > 0 && <ResultRow label={"Firmas (" + firmasFisica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasFisica} format={fMoney} />} />}
+							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nf.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertFisicos} format={fMoney2} />} accent="primary" />
+							{firmasExtraFisica > 0 && <ResultRow label={"Firmas sobre el cupo (" + firmasExtraFisica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasFisica} format={fMoney2} />} />}
 						</div>
 					)}
 					{nj > 0 && (
 						<div className="rounded-lg bg-violet-50 px-3 py-2">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold text-violet-700">Certificados jurídicos</span>
-								<span className="text-[11px] text-muted-foreground">{nj.toLocaleString("es-AR")} × {fj} firma{fj !== 1 ? "s" : ""}</span>
+								<span className="text-[11px] font-semibold text-violet-700">{esIDC ? "IDC jurídicas" : "Certificados jurídicos"}</span>
+								{esIDC && <span className="text-[11px] text-muted-foreground">{nj.toLocaleString("es-AR")} × {fj} firma{fj !== 1 ? "s" : ""}</span>}
 							</div>
-							<ResultRow label={"Certificados (" + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney} />} accent="primary" />
-							{firmasJuridica > 0 && <ResultRow label={"Firmas (" + firmasJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney} />} />}
+							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney2} />} accent="primary" />
+							{firmasExtraJuridica > 0 && <ResultRow label={"Firmas sobre el cupo (" + firmasExtraJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney2} />} />}
+						</div>
+					)}
+
+					{/* Firmas · en Volumen son un item independiente del certificado */}
+					{!esIDC && firmasTotales > 0 && (
+						<div className="rounded-lg bg-amber-50 px-3 py-2">
+							<div className="flex items-center justify-between">
+								<span className="text-[11px] font-semibold text-amber-700">Firmas</span>
+								<span className="text-[11px] text-muted-foreground">{firmasTotales.toLocaleString("es-AR")} × {fMoney2(precioFirmaExtraEff)}</span>
+							</div>
+							<ResultRow label={"Firmas (" + firmasTotales.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmas} format={fMoney2} />} accent="primary" />
 						</div>
 					)}
 
 					{/* Condiciones comerciales */}
 					<div>
-						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney} /></>} accent="success" valueClass="text-[var(--success)]" />}
-						{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney} /></>} accent="destructive" valueClass="text-destructive" />}
-						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney} /> : "incluido"} />}
-						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney} />} />}
-						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney} />/mes</>} accent="success" />}
+						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney2} /></>} accent="success" valueClass="text-[var(--success)]" />}
+						{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney2} /></>} accent="destructive" valueClass="text-destructive" />}
+						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney2} /> : "incluido"} />}
+						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney2} />} />}
+						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney2} />/mes</>} accent="success" />}
 					</div>
 
 					{/* Total */}
 					<div className="flex items-center justify-between border-t-2 border-border pt-2">
 						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conApi ? "Total mes 1" : "Total"}</span>
-						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney} /></span>
+						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney2} /></span>
 					</div>
 
-					<p className="text-[10px] text-muted-foreground">Firma extra (si superan el presupuesto): {fMoney2(precioFirmaExtraEff)} c/u{precioFirmaExtra !== "" ? " · manual" : " · dinámico"}.</p>
+					<p className="text-[10px] text-muted-foreground">
+						{esIDC
+							? "Cada IDC incluye " + cupo + " firma" + (cupo === 1 ? "" : "s") + ". Firma sobre el cupo: " + fMoney2(precioFirmaExtraEff) + " c/u" + (overridePrecioFirma !== "" ? " · manual" : " · segmento") + "."
+							: "Certificado " + fMoney2(precioIDC) + " y firma " + fMoney2(precioFirmaExtraEff) + ", cada uno por unidad" + (overrideActive ? " · precio ajustado a mano" : " · segmento " + segLabel) + "."}
+					</p>
 
-					{margenBajoMin && (
+					{markupBajoMin && (
 						<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-							<div className="text-[11px] font-semibold text-destructive">Margen bajo el mínimo ({Math.round(margenMin * 100)}%)</div>
-							<p className="text-[10px] text-muted-foreground mt-0.5">Esta combinación de descuentos deja un margen de {(margenPct * 100).toFixed(0)}%. Subí el precio, bajá el descuento o ajustá las condiciones para poder guardar y exportar.</p>
+							<div className="text-[11px] font-semibold text-destructive">Markup bajo el mínimo ({markupMin.toFixed(2)}x)</div>
+							<p className="text-[10px] text-muted-foreground mt-0.5">
+								Esta cotización factura {fMarkup(markup)} su costo variable ({fMoney(costoTotal)}). Subí el precio, bajá el cupo de firmas incluidas o ajustá las condiciones para poder guardar y exportar.
+							</p>
+							{markupSeg != null && markupSeg < markupMin && (
+								<p className="text-[10px] text-muted-foreground mt-1">
+									El precio de tabla del segmento {segLabel} ya no cierra por sí solo: con {cupo} firma{cupo === 1 ? "" : "s"} incluidas el bundle cuesta {fMoney2(costoBundle)} y el mínimo viable es {fMoney2(precioMinSeg)} por IDC.
+								</p>
+							)}
 						</div>
 					)}
 				</div>
@@ -561,24 +670,32 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 				<div className="mb-3">
 					<span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rentabilidad · uso interno</span>
 				</div>
-				<div className="mb-3 grid grid-cols-2 gap-3">
+				<div className="mb-3 grid grid-cols-3 gap-3">
+					<div>
+						<div className="text-[10px] text-muted-foreground">Markup sobre costo</div>
+						<div className={"font-heading text-base font-semibold tabular-nums " + markupClass(markup, markupMin)}>{fMarkup(markup)}</div>
+						<div className="text-[10px] text-muted-foreground">mín. {markupMin.toFixed(2)}x · {markupWord(markup, markupMin)}</div>
+					</div>
 					<div>
 						<div className="text-[10px] text-muted-foreground">Contribución marginal</div>
-						<div className={"font-heading text-base font-semibold tabular-nums " + margClass(margenPct)}><AnimatedNumber value={margen} format={fMoney} /></div>
-						<div className="text-[10px] text-muted-foreground">{(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</div>
+						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={margen} format={fMoney2} /></div>
+						<div className="text-[10px] text-muted-foreground">{(margenPct * 100).toFixed(0)}% sobre ingreso</div>
 					</div>
 					<div>
 						<div className="text-[10px] text-muted-foreground">Costo variable total</div>
-						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={costoTotal} format={fMoney} /></div>
-						<div className="text-[10px] text-muted-foreground">{idc.toLocaleString("es-AR")} certs + {firmasIncl.toLocaleString("es-AR")} firmas{firmasBonif > 0 ? " (" + firmasBonif.toLocaleString("es-AR") + " bonificadas)" : ""}</div>
+						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={costoTotal} format={fMoney2} /></div>
+						<div className="text-[10px] text-muted-foreground">{idc.toLocaleString("es-AR")} {esIDC ? "IDC" : "certs"} + {firmasTotales.toLocaleString("es-AR")} firmas{firmasBonif > 0 ? " (" + firmasBonif.toLocaleString("es-AR") + " bonificadas)" : ""}</div>
 					</div>
 				</div>
 				<div className="space-y-1 border-t border-border/60 pt-2">
-					<ResultRow label={<>Ingreso certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(precioIDC) + " por certificado = " + fMoney(revIDC)} /></>} value={<AnimatedNumber value={revIDC} format={fMoney} />} accent="primary" />
-					<ResultRow label={<>Ingreso firmas<InfoTooltip text={firmasIncl.toLocaleString("es-AR") + " firmas × " + fMoney2(precioFirmaLista) + " por firma = " + fMoney(revFirmas)} /></>} value={revFirmas ? <AnimatedNumber value={revFirmas} format={fMoney} /> : "—"} />
-					{firmasBonif > 0 && <ResultRow label={<>Bonificación de firmas<InfoTooltip text={firmasBonif.toLocaleString("es-AR") + " firmas bonificadas × " + fMoney2(precioFirmaLista) + " = " + fMoney(bonifMonto) + " que no se facturan. Su costo variable se paga igual."} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(bonifMonto)}</span>} />}
+					<ResultRow label={<>{esIDC ? "Ingreso IDC" : "Ingreso certificados"}<InfoTooltip text={idc.toLocaleString("es-AR") + (esIDC ? " IDC × " : " certificados × ") + fMoney2(precioIDC) + (esIDC ? " por IDC = " : " por certificado = ") + fMoney2(revIDC)} /></>} value={<AnimatedNumber value={revIDC} format={fMoney2} />} accent="primary" />
+					<ResultRow label={<>{esIDC ? "Ingreso firmas sobre el cupo" : "Ingreso firmas"}<InfoTooltip text={esIDC
+						? firmasExtra.toLocaleString("es-AR") + " firmas por encima del cupo de " + cupo + " × " + fMoney2(precioFirmaExtraEff) + " = " + fMoney2(revFirmas) + ". Las " + firmasEnCupo.toLocaleString("es-AR") + " firmas del cupo ya están en el precio de la IDC."
+						: firmasTotales.toLocaleString("es-AR") + " firmas × " + fMoney2(precioFirmaExtraEff) + " = " + fMoney2(revFirmas) + ". Todas se facturan: en este canal no hay cupo incluido."} /></>} value={revFirmas ? <AnimatedNumber value={revFirmas} format={fMoney2} /> : "—"} />
+					{firmasBonif > 0 && <ResultRow label={<>Bonificación de firmas<InfoTooltip text={firmasBonif.toLocaleString("es-AR") + " firmas bonificadas × " + fMoney2(precioFirmaExtraEff) + " = " + fMoney(bonifMonto) + " que no se facturan. Su costo variable se paga igual."} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(bonifMonto)}</span>} />}
 					<ResultRow label={<>Costo certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(cvCert) + " de costo variable c/u = " + fMoney(costoCert)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoCert)}</span>} />
-					<ResultRow label={<>Costo firmas<InfoTooltip text={firmasIncl.toLocaleString("es-AR") + " firmas × " + fMoney2(cvFirma) + " de costo variable c/u = " + fMoney(costoFirmas)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
+					<ResultRow label={<>Costo firmas<InfoTooltip text={firmasTotales.toLocaleString("es-AR") + (esIDC ? " firmas emitidas (cupo incluido) × " : " firmas × ") + fMoney2(cvFirma) + " de costo variable c/u = " + fMoney(costoFirmas)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
+					{esIDC && <ResultRow label={<>Costo del bundle por IDC<InfoTooltip text={"Certificado (" + fMoney2(cvCert) + ") + " + cupo + " firma" + (cupo === 1 ? "" : "s") + " del cupo (" + fMoney2(cvFirma) + " c/u) = " + fMoney2(costoBundle) + ". Precio mínimo viable a " + markupMin.toFixed(2) + "x: " + fMoney2(precioMinSeg) + "."} /></>} value={<span className="tabular-nums">{fMoney2(costoBundle)}</span>} />}
 				</div>
 			</div>
 		)}
@@ -587,9 +704,9 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 	const footer = (
 		<SaveExportBar
-			hint={!hasVolume ? "Cargá al menos un certificado para guardar o exportar." : (margenBajoMin ? "Margen " + (margenPct * 100).toFixed(0) + "%, bajo el mínimo de " + Math.round(margenMin * 100) + "%. Ajustá precios o condiciones." : "")}
-			canSave={hasVolume && !margenBajoMin}
-			canExport={hasVolume && !margenBajoMin}
+			hint={!hasVolume ? "Cargá al menos una IDC para guardar o exportar." : (markupBajoMin ? "Markup " + fMarkup(markup) + ", bajo el mínimo de " + markupMin.toFixed(2) + "x. Ajustá precio, cupo de firmas o condiciones." : "")}
+			canSave={hasVolume && !markupBajoMin}
+			canExport={hasVolume && !markupBajoMin}
 			onSave={saveQuote}
 			onExport={exportNow}
 			onCancelEdit={function () { setEditingId(null); }}
@@ -603,13 +720,13 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
 			{/* ── 1 · Para la propuesta ── */}
-			<FieldGroup step={1} channel="b2b2c" done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+			<FieldGroup step={1} channel={canal} done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente
 						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 					</Label>
-					<ClientSelector channel="b2b2c" clients={clientsApi?.clients || []} onCreate={clientsApi?.create} onSetTipo={clientsApi?.setTipo} value={selectedClient} onChange={setSelectedClient} />
+					<ClientSelector channel={canal} clients={clientsApi?.clients || []} onCreate={clientsApi?.create} onSetTipo={clientsApi?.setTipo} value={selectedClient} onChange={setSelectedClient} />
 					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
 				</div>
 
@@ -620,7 +737,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 			</FieldGroup>
 
 			{/* ── 2 · Qué cotizás ── */}
-			<FieldGroup step={2} channel="b2b2c" done={hasVolume} title="Qué cotizás" subtitle="Modalidad y volumen de certificados por tipo. El resumen se arma a la derecha.">
+			<FieldGroup step={2} channel={canal} done={hasVolume} title="Qué cotizás" subtitle={esIDC ? "Modalidad y volumen de IDC por tipo. El resumen se arma a la derecha." : "Modalidad y cantidades de certificados y firmas. Cada elemento se cotiza por separado."}>
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
 					<div className="flex gap-1 flex-wrap">
@@ -647,52 +764,82 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
 						<div className="mb-2.5 flex items-center gap-1.5">
 							<span className="inline-block size-2 rounded-full bg-sky-500" />
-							<span className="text-xs font-semibold text-sky-700">Certificados físicos</span>
+							<span className="text-xs font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
 							<span className="text-[10px] text-muted-foreground">· personas</span>
 						</div>
-						<div className="grid grid-cols-2 gap-2.5">
-							<NumberField label="Cantidad" value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" />
-							<NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} />
+						<div className={esIDC ? "grid grid-cols-2 gap-2.5" : ""}>
+							<NumberField label={esIDC ? "Cantidad / mes" : "Cantidad"} value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" />
+							{esIDC && <NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note={ff > cupo ? (ff - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo} />}
 						</div>
 					</div>
 					<div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
 						<div className="mb-2.5 flex items-center gap-1.5">
 							<span className="inline-block size-2 rounded-full bg-violet-500" />
-							<span className="text-xs font-semibold text-violet-700">Certificados jurídicos</span>
+							<span className="text-xs font-semibold text-violet-700">{esIDC ? "IDC jurídicas" : "Certificados jurídicos"}</span>
 							<span className="text-[10px] text-muted-foreground">· empresas</span>
 						</div>
-						<div className="grid grid-cols-2 gap-2.5">
-							<NumberField label="Cantidad" value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
-							<NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} />
+						<div className={esIDC ? "grid grid-cols-2 gap-2.5" : ""}>
+							<NumberField label={esIDC ? "Cantidad / mes" : "Cantidad"} value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
+							{esIDC && <NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note={fj > cupo ? (fj - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo} />}
 						</div>
 					</div>
 				</div>
 
-				{/* Precio de firma: dinámico según el segmento (no se ingresa a mano). El
-				    input es solo el precio de la firma extra (excedente), con override. */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio por firma <span className="normal-case tracking-normal font-normal">(dinámico)</span></Label>
-						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioFirmaLista) : "—"}</span>
-							<span className="ml-2 text-[11px] text-muted-foreground">{hasVolume ? "segmento " + segLabel + (segDesc > 0 ? " · −" + Math.round(segDesc * 100) + "%" : "") : "según el segmento alcanzado"}</span>
+				{/* Volumen: las firmas son un item propio, con su cantidad cargada a mano. */}
+				{!esIDC && (
+					<div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 sm:max-w-xs">
+						<div className="mb-2.5 flex items-center gap-1.5">
+							<span className="inline-block size-2 rounded-full bg-amber-500" />
+							<span className="text-xs font-semibold text-amber-700">Firmas</span>
+							<span className="text-[10px] text-muted-foreground">· item independiente</span>
 						</div>
-						<span className="text-[11px] text-muted-foreground">Precio base {fMoney2(Number(base.firma) || 0)} menos el descuento del segmento.</span>
+						<NumberField label="Cantidad total" value={firmasManual} onChange={setFirmasManual} min={0} placeholder="0" note="Sin cupo: todas se facturan." />
 					</div>
+				)}
+
+				{/* Precios derivados del segmento. En IDC es el precio del bundle más su cupo;
+				    en Volumen, los dos precios de lista ya con el descuento del segmento. Ninguno
+				    se edita acá: se ajustan desde el bloque de precio personalizado del paso 3. */}
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio de firma extra <span className="normal-case tracking-normal font-normal">(excedente)</span></Label>
-						<div className="relative flex items-center">
-							<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
-							<Input type="number" min={0} value={precioFirmaExtra} onChange={function (e) { setPrecioFirmaExtra(e.target.value); }} placeholder={hasVolume ? precioFirmaLista.toFixed(3) : "dinámico"} className="tabular-nums pl-11" />
-							{precioFirmaExtra !== "" && <button onClick={function () { setPrecioFirmaExtra(""); }} className="absolute right-3 text-muted-foreground hover:text-foreground text-xs">✕</button>}
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Precio por IDC" : "Precio por certificado"}</Label>
+						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioIDC) : "—"}</span>
+							<span className="ml-2 text-[11px] text-muted-foreground truncate">{hasVolume ? "segmento " + segLabel + (overridePrecioCert !== "" ? " · manual" : "") : (esIDC ? "según el volumen de IDC" : "según el compromiso")}</span>
 						</div>
-						<span className="text-[11px] text-muted-foreground">Precio si superan lo cotizado y siguen consumiendo. Vacío = usa el precio del segmento.</span>
+						<span className="text-[11px] text-muted-foreground">{esIDC ? "Escala por volumen mensual de IDC." : "Precio base menos el descuento del segmento."}</span>
+					</div>
+					{esIDC ? (
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Firmas incluidas por IDC</Label>
+							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+								<span className="font-semibold tabular-nums">{cupo}</span>
+								<span className="ml-2 text-[11px] text-muted-foreground truncate">{hasVolume && firmasExtra > 0 ? firmasExtra.toLocaleString("es-AR") + " sobre el cupo" : "cupo del bundle"}</span>
+							</div>
+							<span className="text-[11px] text-muted-foreground">Firma inicial de la institución más firmas de activación.</span>
+						</div>
+					) : (
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del segmento</Label>
+							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+								<span className="font-semibold tabular-nums">{segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : "sin descuento"}</span>
+							</div>
+							<span className="text-[11px] text-muted-foreground">Se aplica por igual al certificado y a la firma.</span>
+						</div>
+					)}
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Firma sobre el cupo" : "Precio por firma"}</Label>
+						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+							<span className="font-semibold tabular-nums">{fMoney2(precioFirmaExtraEff)}</span>
+							<span className="ml-2 text-[11px] text-muted-foreground truncate">{overridePrecioFirma !== "" ? "manual" : "segmento"}</span>
+						</div>
+						<span className="text-[11px] text-muted-foreground">{esIDC ? "Se factura por unidad a partir de la firma " + (cupo + 1) + " de cada IDC." : "Cada firma se factura por unidad."}</span>
 					</div>
 				</div>
 			</FieldGroup>
 
 			{/* ── 3 · Condiciones comerciales ── */}
-			<FieldGroup step={3} channel="b2b2c" done={hasVolume} title="Condiciones comerciales" subtitle={condResumen}>
+			<FieldGroup step={3} channel={canal} done={hasVolume} title="Condiciones comerciales" subtitle={condResumen}>
 				{conApi && (
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
@@ -720,59 +867,83 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 
 				<Separator />
 
-				{/* Bonificación de firmas (opcional): parte del volumen cotizado no se cobra.
-				    No toca el volumen ni el compromiso, solo el subtotal a facturar. */}
+				{/* Bonificación de firmas (opcional): parte de las firmas facturables no se
+				    cobra. No toca el volumen ni el segmento, solo el subtotal a facturar. */}
 				<div className="flex flex-col gap-3">
 					<label className="flex items-center gap-2.5 cursor-pointer select-none">
 						<input type="checkbox" checked={showBonif} onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }} className="rounded" />
 						<span className="text-sm font-medium">Bonificar firmas</span>
 						{firmasBonif > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge>}
 					</label>
-					{!showBonif && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Regalá parte de las firmas cotizadas: el cliente paga la diferencia y el volumen sigue contando completo para el segmento.</p>}
+					{!showBonif && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Regalá firmas que estén por encima del cupo del bundle: son las únicas que se facturan por unidad.</p>}
 					{showBonif && (
 						<div className="pl-6 border-l-2 border-muted ml-1 space-y-2">
 							<div className="max-w-xs">
-								<NumberField label="Firmas bonificadas" value={firmasBonificadas} onChange={setFirmasBonificadas} min={0} max={firmasIncl} placeholder="0"
-									note={hasVolume ? "De las " + firmasIncl.toLocaleString("es-AR") + " firmas cotizadas." : "Cargá el volumen primero."} />
+								<NumberField label="Firmas bonificadas" value={firmasBonificadas} onChange={setFirmasBonificadas} min={0} max={firmasExtra} placeholder="0"
+									note={hasVolume ? (firmasExtra > 0 ? "De las " + firmasExtra.toLocaleString("es-AR") + " firmas sobre el cupo." : "Este volumen no tiene firmas sobre el cupo.") : "Cargá el volumen primero."} />
 							</div>
 							{firmasBonif > 0 && (
 								<p className="text-sm text-muted-foreground">
-									{firmasBonif.toLocaleString("es-AR")} firmas × {fMoney2(precioFirmaLista)} = <span className="font-semibold text-[var(--success)]">−{fMoney(bonifMonto)}</span> · se facturan {firmasCobradas.toLocaleString("es-AR")} de {firmasIncl.toLocaleString("es-AR")} firmas.
+									{firmasBonif.toLocaleString("es-AR")} firmas × {fMoney2(precioFirmaExtraEff)} = <span className="font-semibold text-[var(--success)]">−{fMoney(bonifMonto)}</span> · se facturan {firmasCobradas.toLocaleString("es-AR")} de {firmasExtra.toLocaleString("es-AR")} firmas sobre el cupo.
 								</p>
 							)}
-							{Number(firmasBonificadas) > firmasIncl && (
-								<p className="text-[11px] text-[var(--warning)]">No se pueden bonificar más de las {firmasIncl.toLocaleString("es-AR")} firmas cotizadas; se toma el total.</p>
+							{Number(firmasBonificadas) > firmasExtra && (
+								<p className="text-[11px] text-[var(--warning)]">Solo se pueden bonificar las {firmasExtra.toLocaleString("es-AR")} firmas que exceden el cupo; las del cupo ya van sin cargo.</p>
 							)}
-							<p className="text-[11px] text-muted-foreground">El compromiso y el segmento se siguen calculando sobre el volumen completo. El costo variable de las firmas bonificadas se paga igual, así que baja el margen.</p>
+							<p className="text-[11px] text-muted-foreground">El segmento se sigue calculando sobre el volumen completo de IDC. El costo variable de las firmas bonificadas se paga igual, así que baja el markup.</p>
 						</div>
 					)}
 				</div>
 
 				<Separator />
 
-				{/* Compromiso del contrato: la métrica que asigna el segmento. Se sugiere
-				    volumen × meses de vinculación y se puede sobrescribir. */}
+				{/* Segmento y proyección. En IDC el segmento sale del volumen del paso 2 y acá
+				    solo se muestra; en Volumen lo define el compromiso del contrato en USD, que
+				    se sugiere como facturación a lista × meses de vinculación y se puede
+				    sobrescribir cuando el cliente compromete un volumen distinto al cotizado. */}
 				<div className="flex flex-col gap-2">
-					<span className="text-sm font-medium">Compromiso del contrato</span>
-					<p className="text-[11px] text-muted-foreground">Define el segmento y su descuento por volumen. Sugerido: facturación a lista del volumen cotizado ({fMoney(facturacionAtList)}) × {mesesVinculacion} {mesesVinculacion === 1 ? "mes" : "meses"} de vinculación.</p>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<div className="flex flex-col gap-1.5">
-							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso total</Label>
-							<div className="relative flex items-center">
-								<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
-								<Input type="number" min={0} value={compromisoOverride} onChange={function (e) { setCompromisoOverride(e.target.value); }} placeholder={String(Math.round(compromisoSugerido))} className="tabular-nums pl-11" />
-								{compromisoManual && <button onClick={function () { setCompromisoOverride(""); }} className="absolute right-3 text-muted-foreground hover:text-foreground text-xs">✕</button>}
+					<span className="text-sm font-medium">{esIDC ? "Segmento y proyección" : "Compromiso del contrato"}</span>
+					<p className="text-[11px] text-muted-foreground">
+						{esIDC
+							? "El segmento lo define el volumen mensual de IDC del paso 2. La duración sale de la palanca de vinculación."
+							: "Define el segmento y su descuento. Sugerido: facturación a lista del volumen cotizado (" + fMoney(facturacionAtList) + ") × " + mesesVinculacion + " " + (mesesVinculacion === 1 ? "mes" : "meses") + " de vinculación."}
+					</p>
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+						{!esIDC && (
+							<div className="flex flex-col gap-1.5">
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso total</Label>
+								<div className="relative flex items-center">
+									<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
+									<Input type="number" min={0} value={compromisoOverride} onChange={function (e) { setCompromisoOverride(e.target.value); }} placeholder={String(Math.round(compromisoSugerido))} className="tabular-nums pl-11" />
+									{compromisoManual && <button onClick={function () { setCompromisoOverride(""); }} className="absolute right-3 text-muted-foreground hover:text-foreground text-xs">✕</button>}
+								</div>
+								<span className="text-[11px] text-muted-foreground">Vacío = sugerido.</span>
 							</div>
-							<span className="text-[11px] text-muted-foreground">Vacío = sugerido. Cargalo a mano si el cliente compromete un volumen distinto al cotizado.</span>
-						</div>
+						)}
 						<div className="flex flex-col gap-1.5">
 							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>
 							<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
-								{hasVolume ? <TierBadge tier={seg} tiers={b2b2cSegments} size="sm" sub={segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null} /> : <span className="text-sm text-muted-foreground/40">—</span>}
-								<span className="text-[11px] text-muted-foreground truncate">{hasVolume ? "por " + fMoney(compromiso) + (compromisoManual ? " · manual" : "") : "cargá volumen"}</span>
+								{hasVolume ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={esIDC ? fMoney2(segPrice.precioIDC) : (segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null)} /> : <span className="text-sm text-muted-foreground/40">—</span>}
+								<span className="text-[11px] text-muted-foreground truncate">{hasVolume ? (esIDC ? "por " + idc.toLocaleString("es-AR") + " IDC/mes" : "por " + fMoney(compromiso) + (compromisoManual ? " · manual" : "")) : "cargá volumen"}</span>
 							</div>
-							<span className="text-[11px] text-muted-foreground">El descuento se aplica al certificado y a la firma por igual.</span>
+							<span className="text-[11px] text-muted-foreground">{esIDC ? "Precio de tabla del segmento." : "Descuento sobre los dos precios de lista."}</span>
 						</div>
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Facturación mensual</Label>
+							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+								<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(revSinFee) : "—"}</span>
+							</div>
+							<span className="text-[11px] text-muted-foreground">Servicio + SLA, sin el fee.</span>
+						</div>
+						{esIDC && (
+							<div className="flex flex-col gap-1.5">
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Por la vinculación</Label>
+								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+									<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(revSinFee * mesesVinculacion + feeAplicado) : "—"}</span>
+								</div>
+								<span className="text-[11px] text-muted-foreground">{mesesVinculacion} {mesesVinculacion === 1 ? "mes" : "meses"} + fee.</span>
+							</div>
+						)}
 					</div>
 				</div>
 
@@ -797,7 +968,7 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 					{abono && hasVolume && (
 						<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1">
 							<p>Repone la bolsa de firmas cada mes con un descuento del {(descAbono * 100).toFixed(0)}% sobre el precio de firma.</p>
-							<p className="text-xs">{firmasIncl.toLocaleString("es-AR")} firmas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
+							<p className="text-xs">{firmasTotales.toLocaleString("es-AR")} firmas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
 						</div>
 					)}
 				</div>
@@ -819,19 +990,19 @@ export function TabCanalB2B2C({ costs, currency, tc, dealsApi, clientsApi, onExp
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
 									<div className="flex items-center gap-1">
-										<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={precioCertSeg.toFixed(3)} className="h-8 text-sm" />
+										<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={segPrice.precioIDC.toFixed(3)} className="h-8 text-sm" />
 										{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
 									</div>
 								</div>
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
 									<div className="flex items-center gap-1">
-										<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={precioFirmaSeg.toFixed(3)} className="h-8 text-sm" />
+										<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segPrice.precioFirmaExtra.toFixed(3)} className="h-8 text-sm" />
 										{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
 									</div>
 								</div>
 							</div>
-							<p className="text-[10px] text-muted-foreground">Precio efectivo: cert {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma {fMoney2(precioFirmaLista)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
+							<p className="text-[10px] text-muted-foreground">Precio efectivo: IDC {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma sobre el cupo {fMoney2(precioFirmaExtraEff)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
 						</div>
 					)}
 				</div>

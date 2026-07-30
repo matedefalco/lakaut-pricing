@@ -36,8 +36,11 @@ export function ClientSelector({ channel, clients, onCreate, onSetTipo, value, o
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [creating, setCreating] = useState(false);
-	const [newName, setNewName] = useState("");
-	const [newTipo, setNewTipo] = useState(DEFAULT_TIPO);
+	// Tipo sugerido según el canal desde el que se crea el cliente: en el canal de
+	// distribuidores el cliente es, por definición, un distribuidor. El vendedor lo
+	// puede cambiar antes de crearlo. Define el TIPO del ID de cotización (ver cotId).
+	const tipoSugerido = channel === "distribuidores" ? "DIS" : DEFAULT_TIPO;
+	const [newTipo, setNewTipo] = useState(tipoSugerido);
 	const ref = useRef(null);
 
 	// Close on outside click
@@ -66,7 +69,7 @@ export function ClientSelector({ channel, clients, onCreate, onSetTipo, value, o
 	async function handleCreate() {
 		if (!newName.trim()) return;
 		const client = await onCreate(newName.trim(), channel, newTipo);
-		if (client) { select(client); setNewName(""); setNewTipo(DEFAULT_TIPO); }
+		if (client) { select(client); setNewName(""); setNewTipo(tipoSugerido); }
 	}
 
 	// Cambia el tipo del cliente seleccionado (se refleja en el objeto en memoria

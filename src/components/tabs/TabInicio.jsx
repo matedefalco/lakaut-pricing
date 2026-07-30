@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { dealStatus } from "@/lib/dealStatus";
-import { CHANNELS, channelMeta, isPacks } from "@/data/channelMeta";
+import { CHANNELS, channelMeta, isPacks, isUnit } from "@/data/channelMeta";
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -19,7 +19,7 @@ function fDate(iso) {
 function dealValue(deal, fMoney) {
 	const r = deal.resumen || {};
 	if (isPacks(deal.channel)) return r.netoLakaut != null ? fMoney(r.netoLakaut) : (r.facturacionLista != null ? fMoney(r.facturacionLista) : "—");
-	if (deal.channel === "b2b2c") return r.revAnual != null ? fMoney(r.revAnual) : (r.revMesTotal != null ? fMoney(r.revMesTotal) : "—");
+	if (isUnit(deal.channel)) return r.revAnual != null ? fMoney(r.revAnual) : (r.revMesTotal != null ? fMoney(r.revMesTotal) : "—");
 	return "—";
 }
 
@@ -41,8 +41,10 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 	const pendientes = deals.filter(function (d) { return dealStatus(d) === "pendiente"; }).length;
 
 	const channelCards = [
-		{ key: "packs", label: CHANNELS.packs.label, desc: CHANNELS.packs.desc },
+		{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
+		{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
 		{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
+		{ key: "volumen", label: CHANNELS.volumen.label, desc: CHANNELS.volumen.desc },
 	];
 
 	return (
@@ -120,8 +122,8 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 								glyph="✍️"
 								title="Todavía no hay cotizaciones"
 								description="Elegí un canal arriba, cargá el volumen y en segundos tenés la propuesta lista para exportar."
-								action={{ label: "Cotizar en Packs", icon: Plus, onClick: function () { onNewQuote("packs"); } }}
-								secondaryAction={{ label: "Cotizar en Volumen", icon: Plus, onClick: function () { onNewQuote("b2b2c"); } }}
+								action={{ label: "Cotizar en Web", icon: Plus, onClick: function () { onNewQuote("web"); } }}
+								secondaryAction={{ label: "Cotizar en IDC", icon: Plus, onClick: function () { onNewQuote("b2b2c"); } }}
 							/>
 						) : (
 							<div className="divide-y divide-border">

@@ -1,16 +1,19 @@
-import { isPacks } from "@/data/channelMeta";
+import { isPacks, isUnit, resolveChannel } from "@/data/channelMeta";
 import { dealStatus } from "@/lib/dealStatus";
 
 // ─── Métricas de cotizaciones ─────────────────────────────────────────────────
 // Fuente única de verdad para leer números de un deal guardado. Reportes lo usa
 // para facturación, volumen de items y, sobre todo, precios por elemento.
 //
-// Precio por elemento (certificados y firmas): en Volumen los precios unitarios
-// se guardan limpios (precioIDC, precioFirma). En Packs el precio es de bundle
-// (un pack agrupa certs + firmas incluidas en un precio de lista), así que el
-// "precio por cert" es implícito (lista ÷ certs) y solo las firmas adicionales
-// tienen precio unitario propio (precioFirmaAdic). Por eso todo se mide separado
-// por canal y nunca se promedian ambos en un mismo número.
+// Precio por elemento: en Volumen los precios unitarios se guardan limpios
+// (precioIDC y el precio de la firma que excede el cupo del bundle). En Web y
+// Distribuidores el precio es de bundle (un pack agrupa certs + firmas incluidas en
+// un precio de lista), así que el "precio por cert" es implícito (lista ÷ certs) y
+// solo las firmas adicionales tienen precio unitario propio (precioFirmaAdic).
+//
+// Los tres canales se miden separados y nunca se promedian entre sí: Web y
+// Distribuidores comparten catálogo pero no política de precios, y mezclarlos
+// esconde justamente el dato que se quiere ver (cuánto se descuenta al revender).
 
 function num(x) { return typeof x === "number" && isFinite(x) ? x : 0; }
 
@@ -19,7 +22,7 @@ function num(x) { return typeof x === "number" && isFinite(x) ? x : 0; }
 export function dealRevenue(d) {
 	const r = d.resumen || {};
 	if (isPacks(d.channel)) return r.facturacionAnio1 || r.netoLakaut || r.facturacionLista || 0;
-	if (d.channel === "b2b2c") return r.revAnual || (r.revMesTotal || 0) * 12 || 0;
+	if (isUnit(d.channel)) return r.revAnual || (r.revMesTotal || 0) * 12 || 0;
 	return 0;
 }
 
@@ -27,7 +30,7 @@ export function dealItems(d) {
 	const r = d.resumen || {};
 	return {
 		certs: isPacks(d.channel) ? (r.certsComprados || r.certsActivos || 0) : 0,
-		idc: d.channel === "b2b2c" ? (r.idcMensuales || 0) : 0,
+		idc: isUnit(d.channel) ? (r.idcMensuales || 0) : 0,
 		firmas: r.firmasTotal || r.firmasTotales || 0,
 	};
 }
@@ -36,18 +39,26 @@ export function dealItems(d) {
 // canal no participa de la métrica de precios.
 export function dealUnitPrice(d) {
 	const r = d.resumen || {};
-	if (d.channel === "b2b2c") {
+	if (isUnit(d.channel)) {
+		// En IDC el precio es de bundle (certificado + cupo de firmas) y las firmas con
+		// precio unitario propio son las que exceden el cupo. En Volumen no hay cupo:
+		// todas las firmas se facturan por unidad, igual que en las cotizaciones del
+		// modelo anterior a la separación de los dos canales.
+		const firmasConPrecio = r.firmasExtra != null ? num(r.firmasExtra) : num(r.firmasTotales || r.firmasTotal);
 		return {
-			channel: "volumen",
-			cert: { units: num(r.idcMensuales), price: num(r.precioIDC), bundle: false },
-			firma: { units: num(r.firmasTotales || r.firmasTotal), price: num(r.precioFirma), bundle: false },
+			channel: resolveChannel(d.channel),
+			cert: { units: num(r.idcMensuales), price: num(r.precioIDC), bundle: r.firmasIncluidasPorIDC != null && num(r.firmasIncluidasPorIDC) > 0 },
+			firma: { units: firmasConPrecio, price: num(r.precioFirmaExtra || r.precioFirma), bundle: false, additional: r.firmasExtra != null },
 		};
 	}
 	if (isPacks(d.channel)) {
-		const certs = num(r.certsComprados || r.certsActivos);
+		// `certsComprados` es el volumen de esta cotización; `certsActivos` pasó a ser la
+		// base instalada declarada del socio, así que ya no sirve como fallback de
+		// unidades vendidas salvo en cotizaciones viejas que no guardaban el primero.
+		const certs = num(r.certsComprados) || num(r.certsActivos);
 		const lista = num(r.facturacionLista);
 		return {
-			channel: "packs",
+			channel: resolveChannel(d.channel), // "web" | "distribuidores"
 			// Precio por cert implícito: lista del pack ÷ certs (incluye las firmas
 			// del bundle). Las firmas medibles con precio propio son las adicionales.
 			cert: { units: certs, price: certs > 0 ? lista / certs : 0, bundle: true },
@@ -60,19 +71,24 @@ export function dealUnitPrice(d) {
 // Descuento efectivo sobre el precio de lista (fracción 0..1). Puede ser negativo
 // si se cotizó por encima de lista.
 //
-// Volumen: se deriva del precio realizado vs el precio base de lista (captura
-// descuento por segmento, por condiciones y overrides manuales, y funciona con
-// deals viejos que no guardaron el snapshot del segmento). Requiere `base`
-// ({ cert, firma }); si no se pasa, cae al snapshot segmentoDescuento + descCond.
+// Volumen: el precio de lista es el del SEGMENTO alcanzado, no un precio base único
+// (el modelo del Borrador v5 es una escala de precios por volumen de IDC). Así el
+// número mide lo que efectivamente se negoció (condiciones y overrides manuales) y
+// no el descuento estructural de caer en un tramo alto, que no es una concesión
+// comercial. `precioIDCLista` viaja en el deal; si falta, se cae al snapshot del
+// modelo anterior (segmentoDescuento + descCond).
 // Packs: usa el descuento total ya guardado (0 = precio de lista).
-export function dealDiscountPct(d, base) {
+export function dealDiscountPct(d) {
 	const r = d.resumen || {};
-	if (d.channel === "b2b2c") {
-		if (base && (num(base.cert) > 0 || num(base.firma) > 0)) {
-			const idc = num(r.idcMensuales), firmas = num(r.firmasTotales || r.firmasTotal);
-			const listRev = idc * num(base.cert) + firmas * num(base.firma);
+	if (isUnit(d.channel)) {
+		const listaIDC = num(r.precioIDCLista);
+		if (listaIDC > 0) {
+			const idc = num(r.idcMensuales);
+			const firmas = r.firmasExtra != null ? num(r.firmasExtra) : num(r.firmasTotales || r.firmasTotal);
+			const listaFirma = num(r.precioFirmaExtraLista) || num(r.precioFirmaExtra);
+			const listRev = idc * listaIDC + firmas * listaFirma;
 			const cond = num(r.descCondPct);
-			const realRev = (idc * num(r.precioIDC) + firmas * num(r.precioFirma)) * (1 - cond);
+			const realRev = (idc * num(r.precioIDC) + firmas * num(r.precioFirmaExtra || r.precioFirma)) * (1 - cond);
 			return listRev > 0 ? 1 - realRev / listRev : 0;
 		}
 		const seg = num(r.segmentoDescuento), cond = num(r.descCondPct);
@@ -83,11 +99,14 @@ export function dealDiscountPct(d, base) {
 }
 
 // Valor de lista (pre-descuento) para ponderar el descuento promedio.
-function dealListValue(d, base) {
+function dealListValue(d) {
 	const r = d.resumen || {};
-	if (d.channel === "b2b2c") {
-		if (base && (num(base.cert) > 0 || num(base.firma) > 0)) {
-			return num(r.idcMensuales) * num(base.cert) + num(r.firmasTotales || r.firmasTotal) * num(base.firma);
+	if (isUnit(d.channel)) {
+		const listaIDC = num(r.precioIDCLista);
+		if (listaIDC > 0) {
+			const firmas = r.firmasExtra != null ? num(r.firmasExtra) : num(r.firmasTotales || r.firmasTotal);
+			const listaFirma = num(r.precioFirmaExtraLista) || num(r.precioFirmaExtra);
+			return num(r.idcMensuales) * listaIDC + firmas * listaFirma;
 		}
 		return num(r.revServicioBruto) || num(r.revMesTotal) * 12 || dealRevenue(d);
 	}
@@ -122,11 +141,11 @@ function aggregateElement(entries) {
 }
 
 // Descuento promedio (ponderado por valor de lista y simple) para un set de deals.
-function aggregateDiscount(deals, base) {
+function aggregateDiscount(deals) {
 	let sumW = 0, sumWD = 0, sumD = 0, n = 0, nCon = 0;
 	deals.forEach(function (d) {
-		const disc = dealDiscountPct(d, base);
-		const w = dealListValue(d, base);
+		const disc = dealDiscountPct(d);
+		const w = dealListValue(d);
 		sumW += w; sumWD += disc * w; sumD += disc; n++;
 		if (disc > 0.005) nCon++;
 	});
@@ -187,30 +206,32 @@ function conversionByPrice(deals) {
 	return { sparse: false, n: closed.length, bands: bands };
 }
 
-// Métricas de precio por canal (volumen / packs) para un set de deals ya filtrado.
-// `volumenBase` ({ cert, firma }) es el precio base de lista de Volumen (config),
-// necesario para medir el descuento vs lista de forma robusta.
-export function computePriceMetrics(deals, volumenBase) {
-	const byChannel = { volumen: [], packs: [] };
+// Métricas de precio por canal para un set de deals ya filtrado. Un bloque por
+// canal: los tres se leen por separado porque su unidad y su política de precios son
+// distintas.
+export function computePriceMetrics(deals) {
+	const byChannel = { web: [], distribuidores: [], b2b2c: [], volumen: [] };
 	deals.forEach(function (d) {
 		const up = dealUnitPrice(d);
-		if (!up) return;
+		if (!up || !byChannel[up.channel]) return;
 		byChannel[up.channel].push({ deal: d, up: up });
 	});
 
-	function channelBlock(rows, base) {
+	function channelBlock(rows) {
 		return {
 			n: rows.length,
 			cert: aggregateElement(rows.map(function (x) { return { units: x.up.cert.units, price: x.up.cert.price, revenue: dealRevenue(x.deal) }; })),
 			firma: aggregateElement(rows.map(function (x) { return { units: x.up.firma.units, price: x.up.firma.price, revenue: dealRevenue(x.deal) }; })),
 			certBundle: rows.length > 0 && rows[0].up.cert.bundle,
-			discount: aggregateDiscount(rows.map(function (x) { return x.deal; }), base),
+			discount: aggregateDiscount(rows.map(function (x) { return x.deal; })),
 			conversion: conversionByPrice(rows.map(function (x) { return x.deal; })),
 		};
 	}
 
 	return {
-		volumen: channelBlock(byChannel.volumen, volumenBase),
-		packs: channelBlock(byChannel.packs, null),
+		web: channelBlock(byChannel.web),
+		distribuidores: channelBlock(byChannel.distribuidores),
+		b2b2c: channelBlock(byChannel.b2b2c),
+		volumen: channelBlock(byChannel.volumen),
 	};
 }

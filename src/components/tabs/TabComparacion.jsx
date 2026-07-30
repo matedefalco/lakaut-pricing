@@ -10,16 +10,19 @@ import { NumberField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { CHANNELS as CHANNEL_IDENTITY } from "@/data/channelMeta";
+import { getB2B2CSegment, segmentPricing, getDistributorTier } from "@/lib/tiers";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from "recharts";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const CHANNELS = ["b2b2c", "distribuidores", "web"];
 
+// Los tres canales ya tienen identidad propia en channelMeta, así que se toma de
+// ahí en lugar de redefinirla acá.
 const CHANNEL_META = {
-	b2b2c:          { label: "Volumen",              emoji: CHANNEL_IDENTITY.b2b2c.emoji, color: CHANNEL_IDENTITY.b2b2c.color },
-	distribuidores: { label: "Packs con descuento",  emoji: CHANNEL_IDENTITY.packs.emoji, color: CHANNEL_IDENTITY.packs.color },
-	web:            { label: "Packs a lista",        emoji: CHANNEL_IDENTITY.packs.emoji, color: "#0891b2" },
+	b2b2c:          { label: CHANNEL_IDENTITY.b2b2c.label,          emoji: CHANNEL_IDENTITY.b2b2c.emoji,          color: CHANNEL_IDENTITY.b2b2c.color },
+	distribuidores: { label: CHANNEL_IDENTITY.distribuidores.label, emoji: CHANNEL_IDENTITY.distribuidores.emoji, color: CHANNEL_IDENTITY.distribuidores.color },
+	web:            { label: CHANNEL_IDENTITY.web.label,            emoji: CHANNEL_IDENTITY.web.emoji,            color: CHANNEL_IDENTITY.web.color },
 };
 
 const SCENARIO_LABELS = ["A","B","C","D","E","F"];
@@ -28,23 +31,6 @@ let _nextId = 1;
 function nextId() { return _nextId++; }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-// Volumen: un solo segmento, por el compromiso en USD a precio de lista. En la
-// comparación no hay duración de contrato, así que el compromiso es la facturación
-// a lista del volumen comparado. Ver [[modelo-canales-borrador-v5]].
-function getB2B2CSeg(compromisoUSD, segs) {
-	return segs.find(function (s) {
-		return compromisoUSD >= (Number(s.compromisoMin) || 0) && (s.compromisoMax == null || compromisoUSD <= s.compromisoMax);
-	}) || segs[0];
-}
-
-function getDistribTier(certs, facturacion, tiers) {
-	function byCerts(c) { return tiers.find(function (t) { return c >= t.certsMin && (t.certsMax === null || c <= t.certsMax); }) || tiers[0]; }
-	function byVol(u)   { return tiers.find(function (t) { return u >= t.compromisoMin && (t.compromisoMax === null || u <= t.compromisoMax); }) || tiers[0]; }
-	const a = byCerts(certs || 0);
-	const b = byVol(facturacion || 0);
-	return tiers.indexOf(a) >= tiers.indexOf(b) ? a : b;
-}
 
 function closestPack(certs, packs) {
 	return packs.reduce(function (best, p) {
@@ -62,15 +48,19 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	const cvTotal = certs * cvCert + firmasTotal * cvFirma;
 
 	// ── B2B2C (Volumen) ──────────────────────────────────────────────────
-	// El segmento sale de la facturación a lista de certificados + firmas, y su
-	// descuento se aplica por igual a los dos precios base.
-	const base = channelConfig.b2b2cBase || { cert: 0, firma: 0 };
-	const facturacionB2Lista = certs * (Number(base.cert) || 0) + firmasTotal * (Number(base.firma) || 0);
-	const seg = getB2B2CSeg(facturacionB2Lista, b2b2cSegments);
-	const segDesc = Math.min(1, Math.max(0, Number(seg.descuento) || 0));
-	const precioCertB2 = (Number(base.cert) || 0) * (1 - segDesc);
-	const precioFirmaB2 = (Number(base.firma) || 0) * (1 - segDesc);
-	const revB2 = certs * precioCertB2 + firmasTotal * precioFirmaB2;
+	// El segmento sale del volumen de IDC y trae su propio precio unitario. Las firmas
+	// que entran en el cupo del bundle no generan ingreso propio; solo las que lo
+	// exceden se facturan por unidad.
+	const seg = getB2B2CSegment(certs, b2b2cSegments) || {};
+	const segPrice = segmentPricing(seg, { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
+	const firmasExtraB2 = certs * Math.max(0, firmasPorCert - segPrice.firmasIncluidas);
+	const revB2 = certs * segPrice.precioIDC + firmasExtraB2 * segPrice.precioFirmaExtra;
+	// Lista del canal = el precio del primer segmento (el más caro), para poder leer
+	// cuánto cede la escala de volumen frente al tramo de entrada.
+	const segEntrada = segmentPricing(b2b2cSegments[0], { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
+	const firmasExtraEntrada = certs * Math.max(0, firmasPorCert - segEntrada.firmasIncluidas);
+	const facturacionB2Lista = certs * segEntrada.precioIDC + firmasExtraEntrada * segEntrada.precioFirmaExtra;
+	const segDesc = facturacionB2Lista > 0 ? Math.max(0, 1 - revB2 / facturacionB2Lista) : 0;
 	const margenB2 = revB2 - cvTotal;
 
 	// ── Distribuidores / Web ──────────────────────────────────────────────
@@ -80,7 +70,10 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	const precioCertLista = refPack ? refPack.priceUSD / refPack.certs : 0;
 	const facturacionLista = certs * precioCertLista;
 
-	const tier = getDistribTier(certs, facturacionLista, distributorTiers);
+	// En la comparación no hay un socio con base instalada declarada: se asume que el
+	// volumen comparado ES su cartera y su facturación anual, que es la lectura útil
+	// para responder "cuánto rinde este volumen por cada canal".
+	const tier = getDistributorTier(certs, facturacionLista, distributorTiers);
 	const netoDistrib = facturacionLista * (1 - tier.descuento);
 	const margenDistrib = netoDistrib - cvTotal;
 
@@ -92,8 +85,8 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 		firmasTotal,
 		cvTotal,
 		b2b2c: {
-			precioPorCert:  precioCertB2,
-			precioPorFirma: precioFirmaB2,
+			precioPorCert:  segPrice.precioIDC,
+			precioPorFirma: segPrice.precioFirmaExtra,
 			revLista:       facturacionB2Lista,
 			revenueNeto:    revB2,
 			descuento:      segDesc > 0 ? segDesc : null,

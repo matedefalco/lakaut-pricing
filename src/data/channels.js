@@ -6,6 +6,9 @@
 //   · Canal Web → precios en ARS (source of truth). El USD se deriva con el TC.
 //   · Distribuidores → descuento % sobre la lista web (mismo ARS).
 //   · B2B2C → precios y costos en USD (unidad IDC).
+//
+// Todo lo de este archivo son DEFAULTS: la config viva se edita en
+// Config → Precios por canal y se persiste en app_config (ver ChannelConfigContext).
 
 // ── Canal A · Web Lakaut ──────────────────────────────────────────────────────
 // Precios de lista en ARS. firmaExtraARS = precio por firma adicional.
@@ -86,8 +89,13 @@ export const WEB_PRODUCTS = [
 ];
 
 // ── Canal B · Distribuidores e Integradores ────────────────────────────────────
-// Descuento sobre la lista web. Nivel = el MAYOR que resulte entre
-// (certificados activos) y (compromiso anual de facturación USD).
+// Descuento sobre la lista web. El nivel es el MAYOR que resulte entre dos
+// variables DECLARADAS del socio, no del volumen de la cotización en curso:
+//   · certsActivos      → certificados activos que Lakaut le administra hoy.
+//   · compromisoAnualUSD → facturación anual que el socio se compromete a generar.
+// Es lo que permite que un integrador con 200 certificados (Bronce) que compromete
+// USD 40.000 al año entre directamente como Plata. El nivel queda sujeto al
+// cumplimiento efectivo del compromiso (cláusula en la propuesta).
 export const DISTRIBUTOR_TIERS = [
 	{ id: "azul", label: "Azul", certsMin: 0, certsMax: 100, descuento: 0.10, compromisoMin: 0, compromisoMax: 10000 },
 	{ id: "bronce", label: "Bronce", certsMin: 101, certsMax: 500, descuento: 0.15, compromisoMin: 10001, compromisoMax: 25000 },
@@ -96,59 +104,83 @@ export const DISTRIBUTOR_TIERS = [
 	{ id: "platinum", label: "Platinum", certsMin: 10001, certsMax: null, descuento: 0.50, compromisoMin: 250001, compromisoMax: null },
 ];
 
-// Devuelve el tier por certificados activos.
-function tierByCerts(certs) {
-	return DISTRIBUTOR_TIERS.find(function (t) {
-		return certs >= t.certsMin && (t.certsMax === null || certs <= t.certsMax);
-	}) || DISTRIBUTOR_TIERS[0];
-}
-
-// Devuelve el tier por compromiso anual de facturación (USD).
-function tierByCompromiso(usd) {
-	return DISTRIBUTOR_TIERS.find(function (t) {
-		return usd >= t.compromisoMin && (t.compromisoMax === null || usd <= t.compromisoMax);
-	}) || DISTRIBUTOR_TIERS[0];
-}
-
-// Asigna el nivel final = el mayor entre certs activos y compromiso anual.
-export function getDistributorTier(certsActivos, compromisoAnualUSD) {
-	const a = tierByCerts(certsActivos || 0);
-	const b = tierByCompromiso(compromisoAnualUSD || 0);
-	const ia = DISTRIBUTOR_TIERS.indexOf(a);
-	const ib = DISTRIBUTOR_TIERS.indexOf(b);
-	return ia >= ib ? a : b;
-}
-
-// ── Canal C · B2B2C (Volumen) ───────────────────────────────────────────────────
-// Se cotiza por certificados y firmas, con precio de lista base para cada uno. El
-// cliente cae en UN SOLO segmento, y ese segmento aplica un % de descuento sobre
-// ambos precios base (misma filosofía que el canal de Precio de lista con
-// descuento, para que los dos canales se lean igual).
+// ── Canal C · IDC ───────────────────────────────────────────────────────────────
+// La unidad de venta es la IDC (Identidad Digital Certificada), no el certificado
+// suelto: un bundle que integra la validación biométrica, la emisión del
+// certificado, su custodia, la firma inicial que requiere la institución y las
+// firmas de activación destinadas a que el usuario descubra la herramienta. Las
+// firmas que superen ese cupo se venden por unidad.
 //
+// El segmento sale del VOLUMEN DE IDC MENSUALES, con los umbrales del Borrador v5.
+// A diferencia del canal de distribuidores, acá el segmento no da un descuento
+// sobre una lista: cada segmento tiene su propio precio por IDC. Es una escala de
+// precios, no de descuentos, y por eso el precio es un dato del segmento y no una
+// fórmula.
+//
+// El umbral inferior del primer segmento es 0 y no 1.000: un volumen menor cotiza
+// como Start Up en lugar de quedar sin precio.
+//   - idcMin/idcMax: rango de IDC mensuales; null = sin tope.
+//   - precioIDC: precio unitario de la IDC en USD.
+//   - firmasIncluidas: cupo de firmas que entran en cada IDC sin cargo extra.
+//   - precioFirmaExtra: precio unitario de cada firma por encima del cupo.
+//
+// ── Por qué estos precios y no los del documento ──
+// La tabla del Borrador v5 (0,65 a 0,45) no cierra contra el costo real del bundle:
+// su columna "MARGEN" está calculada contra el costo del certificado SOLO
+// (USD 0,3741), pero su propia definición de IDC incluye firmas. Con los costos
+// cargados en la app (cert 0,3750 + firma 0,1334) una IDC con 3 firmas cuesta
+// USD 0,7752, y a 0,45 se estaría vendiendo por debajo del costo.
+//
+// La escala se reconstruyó (jul 2026) fijando el precio MÁS BAJO en el mínimo
+// viable (1,20x el costo = USD 0,9303) y subiendo el resto en la misma proporción
+// que el documento (Plataforma paga 69% de Start Up, igual que 0,45 vs 0,65). El
+// resultado reproduce casi exacto la columna MARGEN del doc leída como markup:
+// 1,73x / 1,60x / 1,47x / 1,33x / 1,20x, contra el 74/60/47/34/20% que ahí figura.
+export const B2B2C_SEGMENTS = [
+	{ id: "startup", label: "Start Up", idcMin: 0, idcMax: 10000, precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "growth", label: "Growth", idcMin: 10001, idcMax: 50000, precioIDC: 1.2404, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "pyme", label: "PyME", idcMin: 50001, idcMax: 200000, precioIDC: 1.1370, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "empresa", label: "Empresa", idcMin: 200001, idcMax: 600000, precioIDC: 1.0337, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "plataforma", label: "Plataforma", idcMin: 600001, idcMax: null, precioIDC: 0.9303, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+];
+
+// Cupo de firmas por IDC: la firma inicial que requiere la institución más las de
+// activación. Es el default de los segmentos nuevos.
+export const B2B2C_FIRMAS_INCLUIDAS = 3;
+
+// Guardarraíl de rentabilidad, expresado como MARKUP sobre el costo variable
+// (precio ÷ costo), que es la métrica de la columna "MARGEN" del Borrador v5. Se
+// evalúa sobre el total MEZCLADO (IDC + firmas extra), así una IDC con precio
+// agresivo no dispara la alarma cuando las firmas compensan. Bajo el mínimo no se
+// puede guardar ni exportar. La pantalla de Config muestra el precio mínimo viable
+// de cada segmento contra el costo de su bundle.
+export const B2B2C_MARKUP_MIN = 1.20;
+
+// ── Canal D · Volumen ───────────────────────────────────────────────────────────
+// Certificados y firmas como items independientes: se cargan las cantidades a mano
+// y cada elemento tiene su precio, sin bundle ni cupo de firmas incluidas. Es el
+// canal para cotizar volumen puro, donde el cliente sabe exactamente cuántos
+// certificados y cuántas firmas necesita y quiere ver el ingreso y el costo de cada
+// uno por separado.
+//
+// A diferencia de IDC, acá el segmento SÍ es una escala de descuentos: hay un precio
+// de lista para el certificado y otro para la firma, y el segmento aplica el mismo
+// porcentaje sobre ambos.
+export const VOLUMEN_BASE = { cert: 0.65, firma: 0.50 };
+
 // La métrica que asigna el segmento es el COMPROMISO del contrato en USD, medido a
 // precio de lista: certificados × base.cert + firmas × base.firma, por los meses de
-// vinculación. Al ser un único número en dólares, es conmutativo: 1 certificado con
-// muchas firmas y muchos certificados con 1 firma caen en el mismo segmento si
-// representan el mismo negocio. Usar siempre el precio BASE (nunca el ya
+// vinculación. Al ser un único número en dólares es conmutativo: pocos certificados
+// con muchas firmas y muchos certificados con pocas firmas caen en el mismo segmento
+// si representan el mismo negocio. Usar siempre el precio BASE (nunca el ya
 // descontado) es lo que rompe la circularidad precio↔segmento.
-export const B2B2C_BASE = { cert: 0.65, firma: 0.50 };
-
-//   - compromisoMin/compromisoMax: rango de compromiso en USD; null = sin tope.
-//   - descuento: puntos de descuento (0..1) sobre los dos precios base.
-// Los valores son escala de referencia: ajustar en Config → Precios por canal.
-export const B2B2C_SEGMENTS = [
+export const VOLUMEN_SEGMENTS = [
 	{ id: "startup", label: "Start Up", compromisoMin: 0, compromisoMax: 25000, descuento: 0 },
 	{ id: "growth", label: "Growth", compromisoMin: 25001, compromisoMax: 125000, descuento: 0.10 },
 	{ id: "pyme", label: "PyME", compromisoMin: 125001, compromisoMax: 500000, descuento: 0.20 },
 	{ id: "empresa", label: "Empresa", compromisoMin: 500001, compromisoMax: 1500000, descuento: 0.30 },
 	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.40 },
 ];
-
-// Guardarraíl de rentabilidad: margen mínimo (0..1) sobre el subtotal de servicio de
-// la cotización. Se evalúa sobre el margen MEZCLADO (certificados + firmas), no
-// componente por componente, así un certificado con descuento profundo no dispara la
-// alarma cuando las firmas compensan. Bajo el mínimo no se puede guardar ni exportar.
-export const B2B2C_MARGEN_MIN = 0.20;
 
 // Fee de implementación (única vez). Default = punto medio del rango, editable.
 export const B2B2C_API_TIERS = [

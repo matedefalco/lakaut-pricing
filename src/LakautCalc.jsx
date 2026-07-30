@@ -34,8 +34,10 @@ const NAV_GROUPS = [
 	{
 		groupKey: "cotizar", groupLabel: "COTIZAR", accent: "var(--primary)",
 		items: [
-			{ key: "packs", label: CHANNELS.packs.label, Icon: CHANNELS.packs.Icon, color: CHANNELS.packs.color },
+			{ key: "web", label: CHANNELS.web.label, Icon: CHANNELS.web.Icon, color: CHANNELS.web.color },
+			{ key: "distribuidores", label: CHANNELS.distribuidores.label, Icon: CHANNELS.distribuidores.Icon, color: CHANNELS.distribuidores.color },
 			{ key: "b2b2c", label: CHANNELS.b2b2c.label, Icon: CHANNELS.b2b2c.Icon, color: CHANNELS.b2b2c.color },
+			{ key: "volumen", label: CHANNELS.volumen.label, Icon: CHANNELS.volumen.Icon, color: CHANNELS.volumen.color },
 		],
 	},
 	{
@@ -67,8 +69,10 @@ const NAV_GROUPS = [
 
 // Canales que se pueden cotizar desde "Nueva cotización".
 const QUOTABLE = [
-	{ key: "packs", label: CHANNELS.packs.label, desc: CHANNELS.packs.desc },
+	{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
+	{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
 	{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
+	{ key: "volumen", label: CHANNELS.volumen.label, desc: CHANNELS.volumen.desc },
 ];
 
 // ── Sección visual de cada pantalla ───────────────────────────────────────────
@@ -77,8 +81,10 @@ const QUOTABLE = [
 // propia. Los dos cotizadores tienen su sección para heredar el color del canal.
 const SECTION_BY_ITEM = {
 	inicio: "inicio",
-	packs: "packs",
+	web: "web",
+	distribuidores: "distribuidores",
 	b2b2c: "b2b2c",
+	volumen: "volumen",
 	historial: "seguimiento",
 	clientes: "seguimiento",
 	reportes: "analisis",
@@ -175,14 +181,14 @@ function LakautCalcInner() {
 	const [historialHighlight, setHistorialHighlight] = useState(null);
 	// Nonce por canal: al pedir "nueva cotización" se incrementa y fuerza el
 	// remonte del componente (key) para arrancar con un lienzo en blanco.
-	const [quoteNonce, setQuoteNonce] = useState({ packs: 0, b2b2c: 0 });
+	const [quoteNonce, setQuoteNonce] = useState({ web: 0, distribuidores: 0, b2b2c: 0, volumen: 0 });
 
 	function navTo(key) {
 		setActiveNavItem(key);
 	}
 
-	// Abre una cotización guardada en su cotizador. `resolveChannel` traduce los
-	// canales históricos (web / distribuidores) al unificado (packs).
+	// Abre una cotización guardada en su cotizador. `resolveChannel` cubre los ids de
+	// canal históricos (ver CHANNEL_ALIASES en channelMeta).
 	function editQuote(deal) {
 		setPendingEdit(deal);
 		navTo(resolveChannel(deal.channel));
@@ -344,16 +350,18 @@ function LakautCalcInner() {
 					{activeNavItem === "inicio" && <TabInicio dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcLastUpdated={tcLastUpdated} onNewQuote={newQuote} onOpenHistorial={function () { navTo("historial"); }} onEditQuote={editQuote} />}
 
 					{/* ── COTIZAR ── */}
-					{activeNavItem === "packs" && <TabCanalPacks key={"packs-" + quoteNonce.packs} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("packs"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "packs" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "web" && <TabCanalPacks channel="web" key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "distribuidores" && <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
-					{activeNavItem === "b2b2c" && <TabCanalB2B2C key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "b2b2c" && <TabCanalB2B2C channel="b2b2c" key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "volumen" && <TabCanalB2B2C channel="volumen" key={"volumen-" + quoteNonce.volumen} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("volumen"); }} pendingEdit={pendingEdit && pendingEdit.channel === "volumen" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 
 					{/* ── SEGUIMIENTO ── */}
 					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcMeta={tcMeta} highlightId={historialHighlight} onEditQuote={editQuote} />}
 					{activeNavItem === "clientes" && <TabClientes clientsApi={clientsApi} dealsApi={dealsApi} currency={currency} tc={tc} onEditDeal={editQuote} />}
 
 					{/* ── ANÁLISIS ── */}
-					{activeNavItem === "reportes" && <TabReportes dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} channelConfig={channelConfig} />}
+					{activeNavItem === "reportes" && <TabReportes dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} />}
 					{activeNavItem === "comparación" && <TabComparacion costs={costs} currency={currency} tc={tc} />}
 					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
 

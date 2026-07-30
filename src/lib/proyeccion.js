@@ -10,9 +10,11 @@
 // Qué escala cuando el volumen crece un escalón. El crecimiento casi nunca es
 // proporcional: en la mayoría de los casos escala una sola métrica.
 export const PROYECCION_DRIVERS = [
-	{ id: "packs", label: "Packs · mix fijo", desc: "Crecen certificados y firmas manteniendo la proporción (ej. recibos de sueldo)." },
-	{ id: "firmas", label: "Solo firmas", desc: "Los certificados quedan fijos; crece el volumen de firmas." },
-	{ id: "certificados", label: "Solo certificados", desc: "Las firmas quedan fijas; crece el volumen de certificados." },
+	// El id "packs" es histórico (viene de cuando el driver se llamaba así) y viaja en
+	// cotizaciones ya guardadas, así que no se renombra; sí se nombra por lo que hace.
+	{ id: "packs", label: "Mix fijo", desc: "Crecen IDC y firmas manteniendo la proporción (ej. recibos de sueldo)." },
+	{ id: "firmas", label: "Solo firmas", desc: "Las IDC quedan fijas; crece el volumen de firmas." },
+	{ id: "certificados", label: "Solo IDC", desc: "Las firmas quedan fijas; crece el volumen de IDC." },
 	{ id: "manual", label: "Manual", desc: "Cargás el volumen de cada escalón a mano." },
 ];
 

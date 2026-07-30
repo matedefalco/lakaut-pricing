@@ -178,13 +178,25 @@
     background-attachment: fixed;
   }
 
-  /* Cotizar · Packs: azul de marca al frente. Es el momento de más energía. */
-  .app-bg[data-section="packs"] {
+  /* Cotizar · Web: azul de marca al frente. Es el precio de lista y el momento de
+     más energía. */
+  .app-bg[data-section="web"] {
     background:
       radial-gradient(ellipse 90% 60% at 12% -14%, rgba(48, 65, 213, 0.32), transparent 62%),
       radial-gradient(ellipse 60% 50% at 98% 4%, rgba(48, 65, 213, 0.16), transparent 58%),
       radial-gradient(ellipse 90% 60% at 55% 116%, rgba(99, 102, 241, 0.16), transparent 60%),
       linear-gradient(180deg, #ecf0fd 0%, #e5eafa 100%);
+    background-attachment: fixed;
+  }
+
+  /* Cotizar · Distribuidores: cyan. Pariente del azul de lista (vende el mismo
+     producto) pero reconocible de un vistazo. */
+  .app-bg[data-section="distribuidores"] {
+    background:
+      radial-gradient(ellipse 90% 60% at 12% -14%, rgba(8, 145, 178, 0.30), transparent 62%),
+      radial-gradient(ellipse 60% 50% at 98% 4%, rgba(14, 116, 144, 0.16), transparent 58%),
+      radial-gradient(ellipse 90% 60% at 55% 116%, rgba(45, 212, 191, 0.16), transparent 60%),
+      linear-gradient(180deg, #e9f7fd 0%, #e0f2fa 100%);
     background-attachment: fixed;
   }
 
@@ -195,6 +207,17 @@
       radial-gradient(ellipse 60% 50% at 98% 4%, rgba(168, 85, 247, 0.16), transparent 58%),
       radial-gradient(ellipse 90% 60% at 55% 116%, rgba(79, 70, 229, 0.16), transparent 60%),
       linear-gradient(180deg, #f2eefd 0%, #ece5fb 100%);
+    background-attachment: fixed;
+  }
+
+  /* Cotizar · Volumen: ámbar. Es el único canal cálido, porque no vende un producto
+     empaquetado sino cantidades sueltas. */
+  .app-bg[data-section="volumen"] {
+    background:
+      radial-gradient(ellipse 90% 60% at 12% -14%, rgba(180, 83, 9, 0.26), transparent 62%),
+      radial-gradient(ellipse 60% 50% at 98% 4%, rgba(217, 119, 6, 0.15), transparent 58%),
+      radial-gradient(ellipse 90% 60% at 55% 116%, rgba(234, 179, 8, 0.16), transparent 60%),
+      linear-gradient(180deg, #fdf6ec 0%, #fbf0df 100%);
     background-attachment: fixed;
   }
 
