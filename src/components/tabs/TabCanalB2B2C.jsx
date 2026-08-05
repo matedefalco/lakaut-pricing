@@ -81,6 +81,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const [firmasPorCertFisico, setFirmasPorCertFisico] = useState(0);
 	const [certJuridicos, setCertJuridicos] = useState("");
 	const [firmasPorCertJuridico, setFirmasPorCertJuridico] = useState(0);
+	// Firmas sueltas (solo Volumen): firmas que se cotizan sin certificado asociado y
+	// sin atribución de tipo. Permiten cotizar firmas sin certificados necesariamente.
+	const [firmasSueltas, setFirmasSueltas] = useState("");
 	const [fee, setFee] = useState(3250);
 	const [slaId, setSlaId] = useState("standard");
 	const [slaBonificado, setSlaBonificado] = useState(false);
@@ -118,6 +121,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const nj = Math.max(0, Number(certJuridicos) || 0);
 	const ff = Math.max(0, Number(firmasPorCertFisico) || 0);
 	const fj = Math.max(0, Number(firmasPorCertJuridico) || 0);
+	// Firmas sueltas: solo aplican a Volumen (en IDC la firma va dentro del bundle).
+	const fs = esIDC ? 0 : Math.max(0, Number(firmasSueltas) || 0);
 	const idc = nf + nj; // total de certificados / IDC
 	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
 
@@ -129,7 +134,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// IDC el cupo del bundle va sin cargo, en Volumen se factura cada firma.
 	const firmasFisica = nf * ff;
 	const firmasJuridica = nj * fj;
-	const firmasTotales = firmasFisica + firmasJuridica;
+	// Las firmas sueltas suman al total (y al compromiso que define el segmento) igual
+	// que las firmas por certificado. Cero en IDC.
+	const firmasTotales = firmasFisica + firmasJuridica + fs;
 
 	// ── Segmento ──
 	// IDC: sale de la cantidad de IDC mensuales (umbrales del Borrador v5) y cada
@@ -161,7 +168,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// factura por unidad. En Volumen el cupo es cero, así que la misma fórmula deja
 	// todas las firmas como facturables.
 	const cupo = segPrice.firmasIncluidas;
-	const firmasExtra = nf * Math.max(0, ff - cupo) + nj * Math.max(0, fj - cupo);
+	// Las firmas sueltas se facturan siempre por unidad (no tienen cupo). Cero en IDC.
+	const firmasExtra = nf * Math.max(0, ff - cupo) + nj * Math.max(0, fj - cupo) + fs;
 	const firmasEnCupo = firmasTotales - firmasExtra;
 	// Bonificación: solo aplica a las firmas que efectivamente se facturan, porque las
 	// del cupo ya van sin cargo. El volumen no cambia, así que el costo variable de las
@@ -195,6 +203,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			setFirmasPorCertFisico(legacyFis || 0);
 			setFirmasPorCertJuridico(i.firmasInclJuridicaPorIDC || 0);
 		}
+		setFirmasSueltas(i.firmasSueltas != null ? String(i.firmasSueltas) : "");
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
@@ -273,6 +282,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const firmasExtraJuridica = nj * Math.max(0, fj - cupo);
 	const revFirmasFisica = firmasExtraFisica * precioFirmaExtraEff;
 	const revFirmasJuridica = firmasExtraJuridica * precioFirmaExtraEff;
+	// Firmas sueltas: mismo precio de firma del segmento, sin atribución de tipo.
+	const revFirmasSueltas = fs * precioFirmaExtraEff;
 	const revFirmas = firmasExtra * precioFirmaExtraEff;
 	const revServicioBruto = revIDC + revFirmas;
 
@@ -419,6 +430,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				integracion,
 				certFisicos: nf, firmasPorCertFisico: ff,
 				certJuridicos: nj, firmasPorCertJuridico: fj,
+				// Firmas sueltas (Volumen): firmas sin certificado asociado ni tipo.
+				...(fs > 0 ? { firmasSueltas: fs } : {}),
 				idcMensuales: idc, // compat: consumido por historial/reportes/clientes
 				firmasAdicPorIDC: 0,
 				// Volumen: el compromiso en USD es lo que asignó el segmento. Las firmas
@@ -469,6 +482,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				// Reportes y el export lo lean igual que en el canal de distribuidores.
 				...(esIDC ? {} : { segmentoDescuento: segDesc, compromiso }),
 				certFisicos: nf, certJuridicos: nj,
+				...(fs > 0 ? { firmasSueltas: fs } : {}),
 				firmasTotales, firmasMes: firmasTotales,
 				// Firmas dentro del cupo del bundle vs facturadas por unidad. La distinción
 				// es la que permite leer el precio por elemento en Reportes sin confundir
@@ -604,6 +618,15 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney2} />} accent="primary" />
 							{firmasExtraJuridica > 0 && <ResultRow label={(esIDC ? "Firmas sobre el cupo (" : "Firmas (") + firmasExtraJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney2} />} />}
+						</div>
+					)}
+					{fs > 0 && (
+						<div className="rounded-lg bg-amber-50 px-3 py-2">
+							<div className="flex items-center justify-between">
+								<span className="text-[11px] font-semibold text-amber-700">Firmas sueltas</span>
+								<span className="text-[11px] text-muted-foreground">sin certificado</span>
+							</div>
+							<ResultRow label={"Firmas (" + fs.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasSueltas} format={fMoney2} />} accent="primary" />
 						</div>
 					)}
 
@@ -787,6 +810,29 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						</div>
 					</div>
 				</div>
+
+				{/* Firmas sueltas (solo Volumen): firmas sin certificado asociado ni tipo.
+				    Permiten cotizar firmas sin certificados necesariamente. Se cobran al
+				    precio de firma del segmento y suman al compromiso. */}
+				{!esIDC && (
+					<div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+						<div className="mb-2.5 flex items-center gap-1.5">
+							<span className="inline-block size-2 rounded-full bg-amber-500" />
+							<span className="text-xs font-semibold text-amber-700">Firmas sueltas</span>
+							<span className="text-[10px] text-muted-foreground">· sin certificado</span>
+						</div>
+						<div className="grid grid-cols-2 gap-2.5">
+							<NumberField
+								label="Cantidad"
+								value={firmasSueltas}
+								onChange={setFirmasSueltas}
+								min={0}
+								placeholder="0"
+								note={fs > 0 ? fs.toLocaleString("es-AR") + " firmas · " + fMoney2(precioFirmaExtraEff) + " c/u" : "firmas sin certificado asociado"}
+							/>
+						</div>
+					</div>
+				)}
 
 				{/* Precios derivados del segmento. En IDC es el precio del bundle más su cupo;
 				    en Volumen, los dos precios de lista ya con el descuento del segmento. Ninguno

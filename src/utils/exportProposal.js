@@ -603,6 +603,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const firmasFacturablesFis = cupo == null ? firmasInclFisica : idcFisicos * Math.max(0, fPorCertFis - cupo);
 	const firmasFacturables = firmasFacturablesJur + firmasFacturablesFis;
 	const firmasEnCupo = firmasIncl - firmasFacturables;
+	// Firmas sueltas (Volumen): firmas sin certificado asociado ni tipo. Se facturan
+	// por unidad al precio de firma del segmento.
+	const firmasSueltas = Math.max(0, Number(inp.firmasSueltas) || 0);
 	const firmasAdicTotal = idc * adicPorIDC;
 	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
 	// Precio de firma a precio de lista (mes 1, sin el 35% del abono). Se formatea
@@ -619,6 +622,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const revFirmasInclFisica = firmasFacturablesFis * precioFirmaAdicN;
 	const revFirmasIncl = revFirmasInclJuridica + revFirmasInclFisica;
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
+	const revFirmasSueltas = firmasSueltas * precioFirmaAdicN;
 	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
 	// Bonificación de firmas (snapshot del deal): parte de la bolsa cotizada no se
@@ -629,7 +633,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const bonifMonto = firmasBonif * precioFirmaAdicN;
 	// Descuento por condiciones comerciales (snapshot del deal): aplica sobre el
 	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
-	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic;
+	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic + revFirmasSueltas;
 	const servicioNeto = servicioBruto - bonifMonto;
 	// Modelo "ofrecido": en deals nuevos las condiciones no se restan del subtotal (se
 	// listan aparte). Los deals del modelo anterior las siguen restando.
@@ -665,6 +669,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
+		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasSueltas }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
@@ -696,7 +701,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// desglose se reduce a una sola cuenta "cantidad × precio" — sin listar items.
 	// Si hay descuento por condiciones, siempre listamos los items (para poder
 	// mostrar la línea del descuento); no colapsamos a "cantidad × precio".
-	const singleItem = items.length === 1 && descCondPct <= 0 && bonifMonto <= 0;
+	// El colapso a "cantidad × precio" es solo para el caso de un único concepto de
+	// certificados: no aplica cuando hay firmas sueltas (aunque sean el único item).
+	const singleItem = items.length === 1 && idc > 0 && firmasSueltas <= 0 && descCondPct <= 0 && bonifMonto <= 0;
 	const subtotalLabel = singleItem ? `Subtotal (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})` : "Subtotal (sin IVA)";
 	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
 	// condiciones, para que el valor entregado quede a la vista.
