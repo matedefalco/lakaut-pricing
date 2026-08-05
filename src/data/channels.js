@@ -182,6 +182,26 @@ export const VOLUMEN_SEGMENTS = [
 	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.40 },
 ];
 
+// ── Escalonado de crecimiento · Volumen ──────────────────────────────────────
+// Escala ESTÁNDAR de precios por volumen de firmas que se adjunta a las propuestas
+// de Volumen: un escalonado fijo, el mismo para todas las cotizaciones, para tener
+// referencia y ser justos entre clientes. Cada escalón es un umbral ABSOLUTO de
+// firmas con su descuento sobre el precio base de la firma (VOLUMEN_BASE.firma), así
+// el precio por firma de cada escalón es idéntico en toda propuesta.
+//
+// Es amplio a propósito (varios escalones cubriendo un espectro de volumen) para que
+// cada cliente encuentre el tramo que se adecúa a su necesidad. Se configura una vez
+// en Config → Precios por canal y, por defecto, va en toda propuesta de Volumen; el
+// vendedor puede ajustarlo por propuesta puntual (queda marcado como personalizado).
+export const VOLUMEN_PROYECCION = [
+	{ firmas: 10000, descuento: 5 },
+	{ firmas: 50000, descuento: 10 },
+	{ firmas: 100000, descuento: 15 },
+	{ firmas: 250000, descuento: 20 },
+	{ firmas: 500000, descuento: 25 },
+	{ firmas: 1000000, descuento: 30 },
+];
+
 // Fee de implementación (única vez). Default = punto medio del rango, editable.
 export const B2B2C_API_TIERS = [
 	{ id: "standard", label: "API Standard", feeMin: 1500, feeMax: 5000, feeDefault: 3250 },

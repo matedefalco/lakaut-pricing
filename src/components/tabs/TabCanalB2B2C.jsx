@@ -4,7 +4,7 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { getB2B2CSegment, getVolumenSegment, facturacionAtBase, segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
-import { buildProyeccion, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
+import { buildProyeccion, buildEscalonadoFirmas, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
 import { CHANNELS } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -106,11 +106,17 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const [overridePrecioCert, setOverridePrecioCert] = useState("");
 	const [overridePrecioFirma, setOverridePrecioFirma] = useState("");
 	const [abono, setAbono] = useState(false);
-	// Proyección de crecimiento (opcional, override por propuesta): escalones de
-	// volumen con descuento progresivo para que el cliente proyecte su costo.
-	const [proyEnabled, setProyEnabled] = useState(false);
+	// Proyección de crecimiento:
+	//   · Volumen → escalonado ESTÁNDAR por firmas absolutas (config), activo por
+	//     defecto, con override por propuesta (proyCustom lo marca).
+	//   · IDC → proyección relativa (driver + % de crecimiento), opcional, como antes.
+	const [proyEnabled, setProyEnabled] = useState(!esIDC);
 	const [proyDriver, setProyDriver] = useState("packs");
-	const [proySteps, setProySteps] = useState(function () { return DEFAULT_PROYECCION_STEPS.map(function (s) { return { ...s }; }); });
+	const [proyCustom, setProyCustom] = useState(false);
+	const [proySteps, setProySteps] = useState(function () {
+		const src = !esIDC ? (channelConfig.volumenProyeccion || []) : DEFAULT_PROYECCION_STEPS;
+		return src.map(function (s) { return { ...s }; });
+	});
 
 	const conApi = integracion !== "sin_api";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
@@ -213,9 +219,24 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
 		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
-		// Proyección de crecimiento: se reabre con el driver y los escalones guardados.
+		// Proyección de crecimiento.
 		const p = i.proyeccion;
-		if (p && p.enabled) {
+		if (!esIDC) {
+			// Volumen · escalonado estándar por firmas. Si el deal se guardó con el modelo
+			// nuevo (mode "firmas") se reabre su escalonado; si es un deal viejo (proyección
+			// relativa) o sin datos, se cae al escalonado estándar de la config.
+			setProyDriver("packs");
+			if (p && p.mode === "firmas" && Array.isArray(p.steps) && p.steps.length) {
+				setProyEnabled(p.enabled !== false);
+				setProyCustom(!!p.custom);
+				setProySteps(p.steps.map(function (s) { return { firmas: Number(s.firmas) || 0, descuento: Number(s.descuento) || 0 }; }));
+			} else {
+				setProyEnabled(p ? p.enabled !== false : true);
+				setProyCustom(false);
+				setProySteps((channelConfig.volumenProyeccion || []).map(function (s) { return { ...s }; }));
+			}
+		} else if (p && p.enabled) {
+			// IDC · proyección relativa (driver + % de crecimiento), como antes.
 			setProyEnabled(true);
 			setProyDriver(p.driver || "packs");
 			const steps = Array.isArray(p.steps) && p.steps.length ? p.steps : DEFAULT_PROYECCION_STEPS;
@@ -243,6 +264,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setLoadToken(function (n) { return n + 1; });
 		onConsumeEdit && onConsumeEdit();
 	}, [pendingEdit]);
+
+	// Volumen · escalonado estándar: mientras no sea un override manual ni una edición,
+	// el escalonado sigue a la config (así, si cambia el estándar, las cotizaciones
+	// nuevas lo toman sin recargar). En IDC no aplica.
+	useEffect(function () {
+		if (esIDC || proyCustom || editingId) return;
+		setProySteps((channelConfig.volumenProyeccion || []).map(function (s) { return { ...s }; }));
+	}, [channelConfig.volumenProyeccion, esIDC, proyCustom, editingId]);
 
 	// Festejo al subir de segmento: sólo con volumen cargado y sólo al cambiar el
 	// segmento efectivo (no en cada tecla). El loadToken evita festejar la carga de
@@ -383,23 +412,41 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	].filter(Boolean).join(" · ");
 
 	// ── Proyección de crecimiento (preview) ──
-	// Base = volumen y precio ya cotizados. El motor es el mismo que usa el export.
+	// IDC: proyección relativa (driver + % de crecimiento) sobre el volumen cotizado.
+	// Volumen: escalonado ESTÁNDAR por firmas absolutas, precio de firma sobre el base
+	// (el mismo para toda propuesta). Marca el tramo que alcanza el volumen actual.
 	const proyBase = { idc: idc, firmas: firmasExtra, precioCert: precioIDC, precioFirma: precioFirmaExtraEff };
-	const proyRows = proyEnabled && hasVolume ? buildProyeccion(proyBase, proyDriver, proySteps) : [];
+	const proyRows = esIDC && proyEnabled && hasVolume ? buildProyeccion(proyBase, proyDriver, proySteps) : [];
+	const escalonadoRows = !esIDC && proyEnabled ? buildEscalonadoFirmas(proySteps, volumenBase.firma, firmasTotales) : [];
 
+	// Al editar el escalonado de Volumen queda marcado como personalizado (deja de
+	// seguir a la config).
+	function markCustom() { if (!esIDC) setProyCustom(true); }
 	function updateStep(i, patch) {
+		markCustom();
 		setProySteps(function (prev) { return prev.map(function (s, idx) { return idx === i ? { ...s, ...patch } : s; }); });
 	}
 	function addStep() {
+		markCustom();
 		setProySteps(function (prev) {
-			const last = prev.length ? prev[prev.length - 1] : { pct: 0, descuento: 0 };
+			const last = prev.length ? prev[prev.length - 1] : {};
+			if (!esIDC) {
+				const lastFirmas = Number(last.firmas) || 0;
+				return prev.concat([{ firmas: lastFirmas > 0 ? lastFirmas * 2 : 10000, descuento: (Number(last.descuento) || 0) + 5 }]);
+			}
 			return prev.concat([{ pct: (Number(last.pct) || 0) + 10, descuento: (Number(last.descuento) || 0) + 3 }]);
 		});
 	}
 	function removeStep(i) {
+		markCustom();
 		setProySteps(function (prev) { return prev.filter(function (_, idx) { return idx !== i; }); });
 	}
 	function resetSteps() {
+		if (!esIDC) {
+			setProyCustom(false);
+			setProySteps((channelConfig.volumenProyeccion || []).map(function (s) { return { ...s }; }));
+			return;
+		}
 		setProySteps(DEFAULT_PROYECCION_STEPS.map(function (s) { return { ...s }; }));
 	}
 	// Al pasar a modo manual, pre-cargamos el volumen de cada escalón con el
@@ -455,7 +502,19 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				casosDeUso, abono,
 				...(abono ? { abonoDescuentoPct: Number(abonoDescPct) || 0 } : {}),
 				...(proyEnabled && proySteps.length ? {
-					proyeccion: {
+					proyeccion: !esIDC ? {
+						// Volumen · escalonado estándar por firmas absolutas. Se guarda el
+						// precio base de la firma para que la propuesta sea estable ante
+						// cambios de la config, y el flag `custom` marca los overrides.
+						enabled: true,
+						mode: "firmas",
+						precioFirmaBase: Number(volumenBase.firma) || 0,
+						custom: proyCustom,
+						steps: proySteps.map(function (s) {
+							return { firmas: Math.max(0, Math.round(Number(s.firmas) || 0)), descuento: Math.min(100, Math.max(0, Number(s.descuento) || 0)) };
+						}).filter(function (s) { return s.firmas > 0; }),
+					} : {
+						// IDC · proyección relativa (driver + % de crecimiento), como antes.
 						enabled: true,
 						driver: proyDriver,
 						steps: proySteps.map(function (s) {
@@ -1050,12 +1109,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				<div className="flex flex-col gap-3">
 					<label className="flex items-center gap-2.5 cursor-pointer select-none">
 						<input type="checkbox" checked={proyEnabled} onChange={function (e) { setProyEnabled(e.target.checked); }} className="rounded" />
-						<span className="text-sm font-medium">Proyección de crecimiento en la propuesta</span>
+						<span className="text-sm font-medium">{esIDC ? "Proyección de crecimiento en la propuesta" : "Escalonado de crecimiento en la propuesta"}</span>
 						{proyEnabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
+						{proyEnabled && !esIDC && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">{proyCustom ? "personalizado" : "estándar"}</Badge>}
 					</label>
-					{!proyEnabled && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo.</p>}
+					{!proyEnabled && <p className="text-[11px] text-muted-foreground pl-6">{esIDC ? "Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo." : "Escalonado estándar de precios por volumen de firmas. Va por defecto en la propuesta; podés ajustarlo para esta cotización puntual."}</p>}
 
-				{proyEnabled && (
+				{proyEnabled && (esIDC ? (
 					<div className="space-y-4">
 						<p className="text-[11px] text-muted-foreground">
 							Parte del volumen y el precio de esta cotización y muestra escalones crecientes con mejor precio. Es un override solo para esta propuesta: no cambia tu segmentación.
@@ -1159,7 +1219,74 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						)}
 						<p className="text-[10px] text-muted-foreground">Costo estimado = volumen de certificados y firmas a ese escalón (sin fee ni SLA). El descuento se aplica al precio de cert y de firma por igual.</p>
 						</div>
-					)}
+					) : (
+					<div className="space-y-4">
+						<p className="text-[11px] text-muted-foreground">
+							Escala estándar de precios por cantidad de firmas: el mismo escalonado para todas las propuestas. El precio por firma de cada escalón sale del precio base ({fMoney2(volumenBase.firma)}). {proyCustom ? "Personalizaste el escalonado para esta propuesta." : "Se toma de la config; podés ajustarlo acá para esta propuesta."}
+						</p>
+
+						{/* Escalones editables (firmas absolutas) */}
+						<div className="space-y-2">
+							<div className="flex items-center justify-between">
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Escalones (firmas → descuento)</Label>
+								<button onClick={resetSteps} className="text-[11px] text-muted-foreground hover:text-foreground">restaurar estándar</button>
+							</div>
+							<div className="space-y-1.5">
+								{proySteps.map(function (s, i) {
+									return (
+										<div key={i} className="flex items-end gap-2 flex-wrap">
+											<div className="flex flex-col gap-1">
+												<span className="text-[10px] text-muted-foreground">Desde firmas</span>
+												<Input type="number" min={0} value={s.firmas != null ? s.firmas : ""} onChange={function (e) { updateStep(i, { firmas: e.target.value }); }} className="h-8 w-32 text-sm tabular-nums" />
+											</div>
+											<div className="flex flex-col gap-1">
+												<span className="text-[10px] text-muted-foreground">Descuento</span>
+												<div className="flex items-center">
+													<span className="text-xs text-muted-foreground mr-1">−</span>
+													<Input type="number" min={0} max={100} value={s.descuento} onChange={function (e) { updateStep(i, { descuento: e.target.value }); }} className="h-8 w-20 text-sm tabular-nums" />
+													<span className="text-xs text-muted-foreground ml-1">%</span>
+												</div>
+											</div>
+											<div className="flex flex-col gap-1">
+												<span className="text-[10px] text-muted-foreground">Precio / firma</span>
+												<div className="flex h-8 items-center rounded-md border border-dashed border-border bg-muted/30 px-2 text-sm tabular-nums">{fMoney2(volumenBase.firma * (1 - Math.min(100, Math.max(0, Number(s.descuento) || 0)) / 100))}</div>
+											</div>
+											<button onClick={function () { removeStep(i); }} className="h-8 px-2 text-muted-foreground hover:text-destructive text-xs shrink-0" title="Quitar escalón">✕</button>
+										</div>
+									);
+								})}
+							</div>
+							<button onClick={addStep} className="text-xs font-medium text-primary hover:underline">+ agregar escalón</button>
+						</div>
+
+						{/* Preview del escalonado que va al PDF */}
+						<div className="rounded-lg border border-border overflow-hidden">
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Volumen de firmas</TableHead>
+										<TableHead className="text-right">Descuento</TableHead>
+										<TableHead className="text-right">/ firma</TableHead>
+										<TableHead className="text-right">Costo est.</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{escalonadoRows.map(function (r, i) {
+										return (
+											<TableRow key={i} className={r.actual ? "bg-primary/5" : ""}>
+												<TableCell className="font-medium tabular-nums">{r.firmas.toLocaleString("es-AR")}{r.actual ? <span className="ml-1 text-[10px] text-primary font-semibold">tu volumen</span> : null}</TableCell>
+												<TableCell className="text-right tabular-nums">{r.descuento > 0 ? "−" + r.descuento + "%" : "—"}</TableCell>
+												<TableCell className="text-right tabular-nums">{fMoney2(r.precioFirma)}</TableCell>
+												<TableCell className="text-right tabular-nums font-semibold">{fMoney(r.costo)}</TableCell>
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+						</div>
+						<p className="text-[10px] text-muted-foreground">Escala fija de precios por volumen de firmas (misma en toda propuesta). El costo estimado es el volumen de firmas de cada escalón a su precio, sin certificados, fee ni SLA. Se resalta el tramo que alcanza el volumen de esta cotización.</p>
+						</div>
+					))}
 				</div>
 			</FieldGroup>
 

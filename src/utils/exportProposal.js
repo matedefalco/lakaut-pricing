@@ -1,4 +1,4 @@
-import { buildProyeccion } from "@/lib/proyeccion";
+import { buildProyeccion, buildEscalonadoFirmas } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
 import { isPacks, isUnit, isIDC, packsConDescuento } from "@/data/channelMeta";
 
@@ -820,10 +820,72 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 // Tabla override por propuesta: parte del volumen y precio cotizados y muestra
 // escalones crecientes con mejor precio, para que el cliente proyecte su costo
 // a distintas escalas. Se calcula con el mismo motor que el preview en pantalla.
+// Escalonado estándar de Volumen: escala fija de precios por cantidad de firmas.
+// A diferencia de la proyección relativa, no depende del volumen cotizado: el precio
+// por firma de cada escalón sale del precio base (guardado en el snapshot), así es el
+// mismo en toda propuesta. Se resalta el tramo que alcanza el volumen del cliente.
+function s3VolumenEscalonado(deal, clientName, currency, tc, pageN) {
+	const inp = deal.inputs || {};
+	const res = deal.resumen || {};
+	const proy = inp.proyeccion || {};
+	const precioFirmaBase = Number(proy.precioFirmaBase) || Number(res.precioFirmaExtraLista) || Number(res.precioFirma) || 0;
+	const firmasActual = Number(res.firmasTotales != null ? res.firmasTotales : res.firmasMes) || 0;
+	const rows = buildEscalonadoFirmas(proy.steps || [], precioFirmaBase, firmasActual);
+	const showIva = currency === "ARS";
+	const fmU = (v) => currency === "ARS" ? "$ " + Math.round(v * tc).toLocaleString("es-AR") : "USD " + Number(v).toFixed(2);
+	const th = (txt, align) => `<th style="text-align:${align || "left"};font-size:7.5pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.6px;padding:0.3cm 0.5cm;border-bottom:1.5px solid ${GRL};white-space:nowrap;">${txt}</th>`;
+
+	const bodyRows = rows.map((r) => {
+		const rowBg = r.actual ? "#EEF0FD" : W;
+		const td = (html, align, extra) => `<td style="text-align:${align || "left"};font-size:9.5pt;color:${DK};padding:0.34cm 0.5cm;border-bottom:1px solid ${GRL};${extra || ""}">${html}</td>`;
+		const vol = `${r.firmas.toLocaleString("es-AR")} firmas${r.actual ? ` <span style="font-size:7.5pt;color:${B};font-weight:700;">· tu volumen</span>` : ""}`;
+		const desc = r.descuento > 0 ? `<span style="font-weight:700;color:${B};">−${r.descuento}%</span>` : `<span style="color:${GR};">—</span>`;
+		const ahorro = r.ahorroMonto > 0
+			? `<span style="font-weight:700;color:${B};">${fm(r.ahorroMonto, currency, tc)}</span> <span style="font-size:7.5pt;color:${GR};">(${(r.ahorroPct * 100).toFixed(0)}%)</span>`
+			: `<span style="color:${GR};">—</span>`;
+		return `<tr style="background:${rowBg};">
+      ${td(`<span style="font-weight:${r.actual ? 700 : 400};color:${r.actual ? B : DK};">${vol}</span>`)}
+      ${td(desc, "right")}
+      ${td(fmU(r.precioFirma), "right", "font-weight:600;")}
+      ${td(fm(r.costo, currency, tc), "right", `font-weight:700;color:${r.actual ? B : DK};`)}
+      ${td(ahorro, "right")}
+    </tr>`;
+	}).join("");
+
+	return `<div class="slide" style="background:${OW};">
+  <div style="flex-shrink:0;padding:0.6cm 1cm 0.3cm;">
+    <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.1cm;">Escala de precios por volumen</div>
+    <div style="font-size:21pt;font-weight:800;color:${DK};line-height:1.15;">Cuantas más firmas, mejor tu precio</div>
+    <div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">Escala fija de precios por cantidad de firmas. Elegí el volumen que se adecúa a tu necesidad: a mayor volumen, menor el precio por firma.</div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;padding:0.2cm 1cm 0;overflow:hidden;">
+    <div style="background:${W};border:1px solid ${GRL};border-radius:14px;box-shadow:0 2px 10px rgba(48,65,213,0.06);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          ${th("Volumen de firmas")}
+          ${th("Descuento", "right")}
+          ${th("Precio / firma", "right")}
+          ${th("Costo estimado", "right")}
+          ${th("Ahorro vs. base", "right")}
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:auto;padding:0.3cm 0;font-size:7.5pt;color:${GR};line-height:1.5;">
+      Costo estimado sobre el volumen de firmas de cada escalón${showIva ? ", sin IVA" : ""} (no incluye certificados, el fee de implementación por única vez, el abono de soporte / SLA ni el descuento por condiciones comerciales). Escala de referencia, sujeta a la vigencia indicada en la portada.
+    </div>
+  </div>
+  ${foot(pageN || 4)}
+</div>`;
+}
+
 function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, langApi) {
 	const inp = deal.inputs || {};
 	const res = deal.resumen || {};
 	const proy = inp.proyeccion || {};
+	// Volumen (modelo nuevo): escalonado estándar por firmas absolutas.
+	if (proy.mode === "firmas") return s3VolumenEscalonado(deal, clientName, currency, tc, pageN);
 	// Wording de facturación alineado a la slide comercial: con API, certificado →
 	// validación de identidad y firma → documento firmado (solo presentación).
 	const certN = langApi ? "validación de identidad" : "certificado";

@@ -314,6 +314,49 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				</p>
 			</CollapsibleSection>
 
+			{/* ── Volumen · escalonado estándar de crecimiento ── */}
+			<CollapsibleSection
+				title="Volumen · Escalonado estándar de crecimiento"
+				subtitle="Escala fija de precios por cantidad de firmas que va, por defecto, en toda propuesta de Volumen. Da referencia y equidad entre clientes; el vendedor puede ajustarla por propuesta puntual. El precio por firma sale del precio base menos el descuento del escalón."
+			>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Desde (firmas)</TableHead>
+							<TableHead>Descuento %</TableHead>
+							<TableHead className="text-right">Precio / firma</TableHead>
+							<TableHead className="text-right">Markup</TableHead>
+							<TableHead></TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.volumenProyeccion || []).map(function (step, idx) {
+							function upd(field, val) {
+								const next = draft.volumenProyeccion.map(function (s, i) { return i === idx ? Object.assign({}, s, { [field]: val }) : s; });
+								updDraft({ volumenProyeccion: next });
+							}
+							const desc = Math.min(100, Math.max(0, Number(step.descuento) || 0)) / 100;
+							const pFirma = (Number(volBase.firma) || 0) * (1 - desc);
+							const mFirma = markupOf(pFirma, cvFirma);
+							const viable = mFirma == null || mFirma >= markupMin;
+							return (
+								<TableRow key={idx} className={viable ? "" : "bg-destructive/5"}>
+									<TableCell><NumCell value={step.firmas} decimals={0} onChange={function (v) { upd("firmas", v); }} /></TableCell>
+									<TableCell><NumCell value={step.descuento} decimals={0} onChange={function (v) { upd("descuento", v); }} /></TableCell>
+									<TableCell className="text-right tabular-nums font-semibold">{pFirma.toFixed(4)}</TableCell>
+									<TableCell className={cn("text-right tabular-nums font-semibold", mFirma == null ? "" : (mFirma >= markupMin ? "text-[var(--success)]" : "text-destructive"))}>{mFirma == null ? "—" : mFirma.toFixed(2) + "x"}</TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("volumenProyeccion", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar escalón" onClick={function () { addRow("volumenProyeccion", { firmas: 0, descuento: 0 }); }} />
+				<p className="text-[11px] text-muted-foreground mt-3">
+					Cada escalón es un umbral absoluto de firmas con su descuento sobre el precio base de la firma. Amplialo con varios tramos para cubrir un espectro de volumen: cada cliente ve el mismo escalonado y encuentra el tramo que se adecúa a su necesidad. Una fila en rojo vende la firma por debajo del markup mínimo.
+				</p>
+			</CollapsibleSection>
+
 			<CollapsibleSection title="4 · IDC · API · Fee de implementación">
 				<Table>
 					<TableHeader>

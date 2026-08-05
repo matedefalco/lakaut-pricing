@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { DISTRIBUTOR_TIERS, B2B2C_SEGMENTS, B2B2C_FIRMAS_INCLUIDAS, B2B2C_MARKUP_MIN, B2B2C_API_TIERS, VOLUMEN_BASE, VOLUMEN_SEGMENTS, SLA_PLANS, COMMERCIAL_LEVERS, ABONO_DESCUENTO_PCT } from "../data/channels";
+import { DISTRIBUTOR_TIERS, B2B2C_SEGMENTS, B2B2C_FIRMAS_INCLUIDAS, B2B2C_MARKUP_MIN, B2B2C_API_TIERS, VOLUMEN_BASE, VOLUMEN_SEGMENTS, VOLUMEN_PROYECCION, SLA_PLANS, COMMERCIAL_LEVERS, ABONO_DESCUENTO_PCT } from "../data/channels";
 import { loadConfig, saveConfig, subscribeConfig } from "../lib/supabase";
 
 const ChannelConfigContext = createContext(null);
@@ -14,6 +14,8 @@ const DEFAULT_CHANNEL_CONFIG = {
 	// Escala de descuentos del canal Volumen (certificados y firmas sueltos).
 	volumenBase: VOLUMEN_BASE,
 	volumenSegments: VOLUMEN_SEGMENTS,
+	// Escalonado estándar de crecimiento (firmas absolutas → descuento) para Volumen.
+	volumenProyeccion: VOLUMEN_PROYECCION,
 	slaPlans: SLA_PLANS,
 	commercialLevers: COMMERCIAL_LEVERS,
 	abonoDescuentoPct: ABONO_DESCUENTO_PCT,
@@ -135,6 +137,23 @@ function normalizeChannelConfig(raw) {
 				};
 			})
 			: VOLUMEN_SEGMENTS;
+	}
+
+	// Escalonado estándar de Volumen: normaliza a { firmas, descuento } válidos y
+	// ordenado por volumen. Si no hay nada cargado, usa el default.
+	if (!Array.isArray(merged.volumenProyeccion) || merged.volumenProyeccion.length === 0) {
+		merged.volumenProyeccion = VOLUMEN_PROYECCION;
+	} else {
+		merged.volumenProyeccion = merged.volumenProyeccion
+			.map(function (s) {
+				return {
+					firmas: Math.max(0, Math.round(Number(s.firmas) || 0)),
+					descuento: Math.min(100, Math.max(0, Number(s.descuento) || 0)),
+				};
+			})
+			.filter(function (s) { return s.firmas > 0; })
+			.sort(function (a, b) { return a.firmas - b.firmas; });
+		if (merged.volumenProyeccion.length === 0) merged.volumenProyeccion = VOLUMEN_PROYECCION;
 	}
 
 	// Campos del modelo anterior que ya no se leen. Se descartan al normalizar para

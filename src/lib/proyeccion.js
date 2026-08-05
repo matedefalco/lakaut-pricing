@@ -27,6 +27,51 @@ export const DEFAULT_PROYECCION_STEPS = [
 	{ pct: 50, descuento: 15 },
 ];
 
+// ── Escalonado estándar de Volumen (firmas absolutas) ────────────────────────
+// A diferencia de la proyección relativa (arriba), este escalonado es una escala
+// FIJA de precios por cantidad absoluta de firmas: el mismo para toda propuesta de
+// Volumen. Cada escalón trae su umbral de firmas y su descuento sobre el precio base
+// de la firma, así el precio por firma de cada escalón es idéntico en toda cotización
+// (da referencia y equidad entre clientes). No depende del volumen de la cotización.
+//   steps           = [{ firmas, descuento }]  (descuento en puntos %)
+//   precioFirmaBase = precio de lista base de la firma (VOLUMEN_BASE.firma)
+//   volumenActual   = firmas de la cotización en curso (para marcar el tramo actual)
+// Devuelve filas { firmas, descuento, precioFirma, costo, costoAlBase, ahorroMonto,
+//   ahorroPct, actual } ordenadas por volumen.
+export function buildEscalonadoFirmas(steps, precioFirmaBase, volumenActual) {
+	const p0 = Math.max(0, Number(precioFirmaBase) || 0);
+	const vol = Math.max(0, Number(volumenActual) || 0);
+	const sorted = (Array.isArray(steps) ? steps : [])
+		.map(function (s) {
+			return {
+				firmas: Math.max(0, Math.round(Number(s.firmas) || 0)),
+				descuento: Math.min(100, Math.max(0, Number(s.descuento) || 0)),
+			};
+		})
+		.filter(function (s) { return s.firmas > 0; })
+		.sort(function (a, b) { return a.firmas - b.firmas; });
+	// Tramo actual: el mayor escalón cuyo umbral el volumen ya alcanza.
+	let actualIdx = -1;
+	for (let i = 0; i < sorted.length; i++) { if (vol >= sorted[i].firmas) actualIdx = i; }
+	return sorted.map(function (s, i) {
+		const d = s.descuento / 100;
+		const precioFirma = p0 * (1 - d);
+		const costo = s.firmas * precioFirma;
+		const costoAlBase = s.firmas * p0;
+		const ahorroMonto = costoAlBase - costo;
+		return {
+			firmas: s.firmas,
+			descuento: s.descuento,
+			precioFirma: precioFirma,
+			costo: costo,
+			costoAlBase: costoAlBase,
+			ahorroMonto: ahorroMonto,
+			ahorroPct: costoAlBase > 0 ? ahorroMonto / costoAlBase : 0,
+			actual: i === actualIdx,
+		};
+	});
+}
+
 // Escala el volumen del escalón según el driver. `k` es el factor de crecimiento.
 // En modo manual, si el escalón no trae un valor cargado, cae al crecimiento
 // proporcional (k) para que la fila arranque con un número sensato y editable.
