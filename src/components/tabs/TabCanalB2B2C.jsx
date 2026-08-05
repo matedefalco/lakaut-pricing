@@ -517,7 +517,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 		notifyQuoteSaved(toast, {
 			clientName: client?.name,
-			onExport: function () { onExport && onExport(savedDeal, client); },
+			onExport: function () { onExport && onExport(savedDeal, client, exportCurrency); },
 			onGoHistorial: function () { onGoHistorial && onGoHistorial(savedDeal.id); },
 		});
 	}
