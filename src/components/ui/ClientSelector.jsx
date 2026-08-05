@@ -36,6 +36,7 @@ export function ClientSelector({ channel, clients, onCreate, onSetTipo, value, o
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [creating, setCreating] = useState(false);
+	const [newName, setNewName] = useState("");
 	// Tipo sugerido según el canal desde el que se crea el cliente: en el canal de
 	// distribuidores el cliente es, por definición, un distribuidor. El vendedor lo
 	// puede cambiar antes de crearlo. Define el TIPO del ID de cotización (ver cotId).
