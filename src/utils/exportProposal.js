@@ -137,6 +137,24 @@ function condTermsText(descCond) {
 	return descCond.items.map(function (it) { return it.optionLabel + " (−" + it.discount + "%)"; }).join(" · ");
 }
 
+// Apartado "condiciones que podés aprovechar" (modelo ofrecido): lista las palancas
+// como incentivos que el cliente puede tomar, SIN restarse del total. Lee el mismo
+// snapshot inputs.descCond.items. Devuelve "" si no hay condiciones ofrecidas.
+function condOfrecidasHtml(descCond) {
+	if (!descCond || !Array.isArray(descCond.items) || !descCond.items.length) return "";
+	const rows = descCond.items.map(function (it) {
+		return `<div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:8pt;">
+      <span style="color:${GR};">${it.optionLabel}</span>
+      <span style="color:${B};font-weight:700;white-space:nowrap;">−${it.discount}%</span>
+    </div>`;
+	}).join("");
+	return `<div style="border:1px dashed ${GRL};border-radius:12px;padding:0.3cm 0.4cm;margin-top:0.2cm;">
+    <div style="font-size:7pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.2cm;">Condiciones que podés aprovechar</div>
+    <div style="display:flex;flex-direction:column;gap:0.12cm;">${rows}</div>
+    <div style="font-size:6.5pt;color:${GR};margin-top:0.2cm;line-height:1.3;">Beneficios sujetos a cumplir la condición indicada. No están incluidos en el total de esta propuesta.</div>
+  </div>`;
+}
+
 // Barra inferior "cómo se paga": mes 1 → abono mensual, con el total de referencia
 // para toda la vigencia del certificado. Solo se usa cuando el abono está activo.
 function scheduleBar({ mes1Value, abonoValue, totalValue, totalNote }) {
@@ -394,11 +412,17 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	const lista = res.facturacionLista || 0;
 	const neto = res.netoLakaut || 0;
 	const desc = lista - neto;
-	// Desglose del descuento: nivel + condiciones comerciales (snapshot del deal).
+	// Modelo "ofrecido": en deals nuevos las condiciones NO se restan del total (se
+	// listan aparte). En los del modelo anterior se seguían restando, así que solo
+	// esos arman la línea de descuento por condiciones.
+	const condOfrecida = !!inp.condOfrecidas;
+	// Desglose del descuento: nivel + (solo modelo viejo) condiciones comerciales.
 	const descNivel = res.descNivelMonto != null ? res.descNivelMonto : (tierRecord ? lista * tierRecord.descuento : desc);
-	const descCondMontoV = res.descCondMonto || 0;
-	const condPctV = res.descCondPct != null ? Math.round(res.descCondPct * 100) : 0;
+	const descCondMontoV = condOfrecida ? 0 : (res.descCondMonto || 0);
+	const condPctV = condOfrecida ? 0 : (res.descCondPct != null ? Math.round(res.descCondPct * 100) : 0);
 	const condTerms = condTermsText(inp.descCond);
+	// Apartado de condiciones ofrecidas (solo modelo nuevo con condiciones cargadas).
+	const condOfrecidasBox = condOfrecida ? condOfrecidasHtml(inp.descCond) : "";
 
 	// desglose totales
 	const totalPacks = packRows.reduce((s,r) => s + r.qty, 0);
@@ -445,7 +469,9 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
         ${conNivel
 					? `Adquirís el volumen contratado con el nivel <strong style="color:${DK};">${res.tier}</strong>${condPctV > 0 ? " y un descuento adicional por tus condiciones comerciales" : ""}.`
-					: "Adquirís el volumen contratado con un descuento especial por tus condiciones comerciales."}
+					: (condPctV > 0
+						? "Adquirís el volumen contratado con un descuento especial por tus condiciones comerciales."
+						: "Adquirís el volumen contratado a precio de lista.")}
       </div>
       <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
       <div style="display:flex;flex-direction:column;gap:0.14cm;border-top:1px solid ${GRL};margin-top:0.1cm;padding-top:0.14cm;">
@@ -464,6 +490,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 				{ label: "Precio de lista", value: fm(lista, currency, tc) },
 				{ label: "Descuento total", value: "−" + fm(desc, currency, tc) },
 			])}
+      ${condOfrecidasBox}
     `,
 	});
 
@@ -494,7 +521,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	}) : "";
 
 	return commercialSlide({
-		kicker: conNivel ? "Modelo comercial · packs con descuento por nivel" : "Modelo comercial · packs con descuento especial",
+		kicker: conNivel ? "Modelo comercial · packs con descuento por nivel" : (condPctV > 0 ? "Modelo comercial · packs con descuento especial" : "Modelo comercial · packs a precio de lista"),
 		title: "Tu propuesta a medida",
 		// El Borrador v5 condiciona el nivel al cumplimiento efectivo de los compromisos
 		// asumidos, así que la propuesta lo dice en lugar de dejarlo implícito.
@@ -604,10 +631,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
 	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic;
 	const servicioNeto = servicioBruto - bonifMonto;
-	const descCondPct = (inp.descCond && inp.descCond.pct) || 0;
+	// Modelo "ofrecido": en deals nuevos las condiciones no se restan del subtotal (se
+	// listan aparte). Los deals del modelo anterior las siguen restando.
+	const condOfrecida = !!inp.condOfrecidas;
+	const descCondPct = condOfrecida ? 0 : ((inp.descCond && inp.descCond.pct) || 0);
 	const descCondMonto = servicioNeto * descCondPct;
 	const condPctV = Math.round(descCondPct * 100);
 	const condTerms = condTermsText(inp.descCond);
+	const condOfrecidasBox = condOfrecida ? condOfrecidasHtml(inp.descCond) : "";
 	const subtotal = servicioNeto - descCondMonto + slaMesVal + feeVal;
 	// Con API: el certificado se factura como consumo del servicio de validación
 	// de identidad y la firma como documento firmado (ver comentario arriba).
@@ -715,6 +746,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 				note: showIva ? "IVA 21% incluido" : null,
 			})}
       ${miniStats(false, stats)}
+      ${condOfrecidasBox}
     `,
 	});
 

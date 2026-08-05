@@ -49,7 +49,12 @@ function summaryCols(channel, fMoney) {
 				label: "Descuento",
 				get: function (q) {
 					if (q.resumen.tier) return <TierBadge tier={q.resumen.tier} size="sm" />;
-					if (packsConDescuento(q)) return <span className="text-[var(--warning)]">excepción −{Math.round((q.resumen.descTotal || 0) * 100)}%</span>;
+					if (packsConDescuento(q)) {
+						const dt = Math.round((q.resumen.descTotal || 0) * 100);
+						// Modelo nuevo: la excepción puede no bajar el total (condiciones ofrecidas
+						// aparte), así que solo se muestra el % cuando efectivamente descuenta.
+						return <span className="text-[var(--warning)]">excepción{dt > 0 ? " −" + dt + "%" : ""}</span>;
+					}
 					return <span className="text-muted-foreground">a lista</span>;
 				},
 			},

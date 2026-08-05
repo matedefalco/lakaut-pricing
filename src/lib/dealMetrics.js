@@ -80,6 +80,10 @@ export function dealUnitPrice(d) {
 // Packs: usa el descuento total ya guardado (0 = precio de lista).
 export function dealDiscountPct(d) {
 	const r = d.resumen || {};
+	// Modelo "ofrecido": en deals nuevos las condiciones comerciales no bajan el
+	// precio (se ofrecen aparte), así que no cuentan como descuento efectivo. En los
+	// deals del modelo anterior sí se restaban, y se siguen leyendo así.
+	const condOfrecidas = !!(d.inputs && d.inputs.condOfrecidas);
 	if (isUnit(d.channel)) {
 		const listaIDC = num(r.precioIDCLista);
 		if (listaIDC > 0) {
@@ -87,11 +91,11 @@ export function dealDiscountPct(d) {
 			const firmas = r.firmasExtra != null ? num(r.firmasExtra) : num(r.firmasTotales || r.firmasTotal);
 			const listaFirma = num(r.precioFirmaExtraLista) || num(r.precioFirmaExtra);
 			const listRev = idc * listaIDC + firmas * listaFirma;
-			const cond = num(r.descCondPct);
+			const cond = condOfrecidas ? 0 : num(r.descCondPct);
 			const realRev = (idc * num(r.precioIDC) + firmas * num(r.precioFirmaExtra || r.precioFirma)) * (1 - cond);
 			return listRev > 0 ? 1 - realRev / listRev : 0;
 		}
-		const seg = num(r.segmentoDescuento), cond = num(r.descCondPct);
+		const seg = num(r.segmentoDescuento), cond = condOfrecidas ? 0 : num(r.descCondPct);
 		return 1 - (1 - seg) * (1 - cond);
 	}
 	if (isPacks(d.channel)) return num(r.descTotal); // 0 = precio de lista, sin descuento

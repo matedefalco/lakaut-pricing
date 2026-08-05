@@ -40,8 +40,8 @@ export function CommercialLevers({ levers, value, onChange }) {
 
 			<div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
 				<span className="text-xs font-medium text-muted-foreground flex items-center">
-					Descuento por condiciones
-					<InfoTooltip text="Suma de las 3 palancas, con tope. Se aplica sobre el subtotal de servicio, además del precio por volumen." />
+					Condiciones ofrecidas
+					<InfoTooltip text="Suma de las 3 palancas, con tope. Se ofrecen al cliente como incentivos en la propuesta; no se descuentan del total cotizado." />
 				</span>
 				<span className="text-sm font-semibold tabular-nums">
 					−{(resolved.cappedPts).toFixed(0)}%

@@ -282,13 +282,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const bonifMonto = firmasBonif * precioFirmaExtraEff;
 	const revServicioNeto = revServicioBruto - bonifMonto;
 
-	// Descuento por condiciones comerciales (además del precio por segmento). Aplica
-	// sobre el subtotal de servicio (IDC + firmas extra, ya neto de la bonificación),
-	// no sobre el fee ni el SLA ni el abono. Snapshot en el deal.
+	// Condiciones comerciales (time-to-cash, duración, velocidad): se OFRECEN al
+	// cliente como incentivos en la propuesta, pero NO se contemplan en el total. El
+	// precio por segmento y la bonificación de firmas sí lo definen; las condiciones
+	// se listan aparte. Snapshot en el deal para armar el apartado "ofrecido".
 	const leverRes = resolveLevers(commercialLevers, levers);
-	const descCondPct = leverRes.pct;
-	const descCondMonto = revServicioNeto * descCondPct;
-	const revServicio = revServicioNeto - descCondMonto;
+	const condOfrecidaPct = leverRes.cappedPts;
+	const hayCondOfrecidas = condOfrecidaPct > 0 && leverRes.items.length > 0;
+	const revServicio = revServicioNeto;
 
 	const feeAplicado = conApi ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
@@ -366,7 +367,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
 		overrideActive ? "precio ajustado" : "precio de tabla",
 		firmasBonif > 0 ? firmasBonif.toLocaleString("es-AR") + " firmas bonificadas" : null,
-		descCondPct > 0 ? "−" + leverRes.cappedPts + "% condiciones" : null,
+		hayCondOfrecidas ? leverRes.cappedPts + "% condiciones ofrecidas" : null,
 		abono ? "con abono mensual" : "sin abono",
 	].filter(Boolean).join(" · ");
 
@@ -430,10 +431,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				// Firmas bonificadas: solo viaja al deal cuando hay bonificación.
 				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif } : {}),
 				...(conApi ? { fee, slaId, slaBonificado } : {}),
-				// Palancas de descuento: selección + snapshot resuelto (estable ante
-				// cambios posteriores de la config de tramos).
+				// Palancas de condiciones: selección + snapshot resuelto (estable ante
+				// cambios posteriores de la config). Modelo "ofrecido": se listan como
+				// incentivos en la propuesta pero no bajan el total. El flag distingue
+				// estos deals de los del modelo anterior (donde sí se restaban).
 				levers,
-				descCond: { pct: descCondPct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items },
+				condOfrecidas: true,
+				...(hayCondOfrecidas ? { descCond: { pct: leverRes.pct, cappedPts: leverRes.cappedPts, cap: leverRes.cap, rawPct: leverRes.rawPct, capped: leverRes.capped, items: leverRes.items } } : {}),
 				mesesVinculacion,
 				casosDeUso, abono,
 				...(abono ? { abonoDescuentoPct: Number(abonoDescPct) || 0 } : {}),
@@ -477,7 +481,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
 				precioFirmaExtraLista: segPrice.precioFirmaExtra,
 				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
-				descCondPct, descCondMonto, revServicioBruto,
+				// Las condiciones ya no bajan el total; se guarda el % ofrecido como dato
+				// informativo (reportes lo ignoran para el descuento efectivo).
+				revServicioBruto,
+				...(hayCondOfrecidas ? { condOfrecidaPct } : {}),
 				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif, firmasCobradas, bonifMonto } : {}),
 				margen, margenPct, markup, costoTotal,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
@@ -600,10 +607,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						</div>
 					)}
 
-					{/* Condiciones comerciales */}
+					{/* Condiciones comerciales. Las palancas ya no se restan del total: se
+					    ofrecen aparte (bloque debajo del total). */}
 					<div>
 						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney2} /></>} accent="success" valueClass="text-[var(--success)]" />}
-						{descCondPct > 0 && <ResultRow label={"Descuento por condiciones (−" + leverRes.cappedPts + "%)"} value={<>−<AnimatedNumber value={descCondMonto} format={fMoney2} /></>} accent="destructive" valueClass="text-destructive" />}
 						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney2} /> : "incluido"} />}
 						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney2} />} />}
 						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney2} />/mes</>} accent="success" />}
@@ -614,6 +621,25 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conApi ? "Total mes 1" : "Total"}</span>
 						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney2} /></span>
 					</div>
+
+					{/* Condiciones comerciales OFRECIDAS: incentivos que el cliente puede
+					    aprovechar, sin restarse del total cotizado. */}
+					{hayCondOfrecidas && (
+						<div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 space-y-1">
+							<div className="flex items-center justify-between">
+								<span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Condiciones que puede aprovechar</span>
+								<span className="text-[10px] text-muted-foreground">no afectan el total</span>
+							</div>
+							{leverRes.items.map(function (it) {
+								return (
+									<div key={it.key} className="flex items-center justify-between text-xs">
+										<span className="text-muted-foreground">{it.optionLabel}</span>
+										<span className="font-semibold tabular-nums text-primary">−{it.discount}%</span>
+									</div>
+								);
+							})}
+						</div>
+					)}
 
 					<p className="text-[10px] text-muted-foreground">
 						{esIDC
@@ -824,9 +850,11 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 				{conApi && <Separator />}
 
-				{/* Descuento por condiciones comerciales (además del precio por volumen) */}
+				{/* Condiciones comerciales OFRECIDAS: se listan en la propuesta como
+				    incentivos que el cliente puede aprovechar. No bajan el total. */}
 				<div className="flex flex-col gap-2">
-					<span className="text-sm font-medium">Descuento por condiciones</span>
+					<span className="text-sm font-medium">Condiciones comerciales que ofrecés</span>
+					<p className="text-[11px] text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
 					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
 				</div>
 
