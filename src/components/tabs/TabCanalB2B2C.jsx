@@ -122,6 +122,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	});
 
 	const conApi = integracion !== "sin_api";
+	// Terminología de integración por canal: IDC integra por API, Volumen por SDK.
+	const intgTerm = esIDC ? "API" : "SDK";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
 	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
 
@@ -409,7 +411,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 	// Resumen de estado de las condiciones comerciales (subtítulo del grupo).
 	const condResumen = [
-		conApi ? api.label : "sin integración API",
+		conApi ? api.label : "sin integración " + intgTerm,
 		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
 		overrideActive ? "precio ajustado" : "precio de tabla",
 		firmasBonif > 0 ? firmasBonif.toLocaleString("es-AR") + " firmas bonificadas" : null,
@@ -656,7 +658,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			<ResultHero
 				label={conApi ? "Total · mes 1" : "Total"}
 				value={hasVolume ? <AnimatedNumber value={revTotal} format={fMoney2} /> : "—"}
-				sub={hasVolume ? (conApi ? "Certificados + firmas + SLA · fee incluido" : "Certificados + firmas · sin integración API") : (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
+				sub={hasVolume ? (conApi ? "Certificados + firmas + SLA · fee incluido" : "Certificados + firmas · sin integración " + intgTerm) : (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
 				empty={!hasVolume}
 				pill={hasVolume ? <StatusPill tone={markupAccent(markup, markupMin)}>Markup {fMarkup(markup)} · {markupWord(markup, markupMin)}</StatusPill> : null}
 			/>
@@ -853,7 +855,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
 					<div className="flex gap-1 flex-wrap">
 						{[
-							{ id: "api", label: "Con integración API", sub: "fee de implementación + SLA" },
+							{ id: "api", label: "Con integración " + intgTerm, sub: "fee de implementación + SLA" },
 							{ id: "sin_api", label: "Sin integración", sub: "solo volumen solicitado" },
 						].map(function (m) {
 							const active = integracion === m.id;
@@ -865,7 +867,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							);
 						})}
 					</div>
-					{!conApi && <p className="text-[11px] text-muted-foreground">Sin integración API: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
+					{!conApi && <p className="text-[11px] text-muted-foreground">Sin integración {intgTerm}: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
 				</div>
 
 				<Separator />

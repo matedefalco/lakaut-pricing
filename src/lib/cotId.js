@@ -2,11 +2,23 @@
 // Formato: COT-[TIPO]-[NNNN]-v[N]
 //   COT   → prefijo fijo.
 //   TIPO  → código del tipo de cliente (atributo del cliente): DIS / DIR / PAR.
+//           Excepción: el canal Volumen usa siempre "SDK" (integra por SDK), sin
+//           importar el tipo del cliente.
 //   NNNN  → correlativo global de 4 dígitos, único por cotización, compartido
 //           entre versiones. Se asigna al crear y no se reutiliza.
 //   v[N]  → número de versión; arranca en v1 y sube con cada revisión.
 // La versión vigente es siempre la de v más alto; las anteriores quedan como
 // historial. Ver también [[modelo-canales-borrador-v5]].
+
+import { isVolumen } from "@/data/channelMeta";
+
+// Código de tipo que se muestra en el ID. Volumen manda "SDK" por canal; el resto
+// usa el tipo del cliente. Se resuelve por canal para que las cotizaciones ya
+// guardadas (con el tipo del cliente en el snapshot) también muestren SDK.
+export function cotTipo(channel, storedTipo, fallbackTipo) {
+	if (isVolumen(channel)) return "SDK";
+	return storedTipo || fallbackTipo || DEFAULT_TIPO;
+}
 
 export const TIPOS = [
 	{ code: "DIR", label: "Cliente directo / integrador" },
@@ -27,9 +39,9 @@ export function padCotNumber(n) {
 // Arma el ID visible. `fallbackTipo` (ej. el tipo vivo del cliente) se usa solo
 // si el snapshot guardado en el deal no tiene tipo. Devuelve null si no hay
 // correlativo asignado todavía (cotización sin guardar).
-export function formatCotId(cot, fallbackTipo) {
+export function formatCotId(cot, fallbackTipo, channel) {
 	if (!cot || cot.number == null) return null;
-	const tipo = cot.tipo || fallbackTipo || DEFAULT_TIPO;
+	const tipo = cotTipo(channel, cot.tipo, fallbackTipo);
 	return "COT-" + tipo + "-" + padCotNumber(cot.number) + "-v" + (cot.version || 1);
 }
 

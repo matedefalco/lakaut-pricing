@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase, loadConfig, saveConfig } from "./supabase";
 import { maxCotNumber, maxCotVersion } from "./cotId";
+import { isVolumen } from "@/data/channelMeta";
 
 const COT_COUNTER_KEY = "cot_last_number";
 
@@ -23,11 +24,13 @@ async function nextCotNumber() {
 // desde el cliente (`clientTipo`) si viene.
 async function resolveCot(deal, existing, clientTipo) {
 	const prevCot = (deal.inputs && deal.inputs.cot) || (existing && existing.inputs && existing.inputs.cot) || null;
+	// Volumen fuerza el código "SDK" (integra por SDK), sin importar el tipo del cliente.
+	const volTipo = isVolumen(deal.channel) ? "SDK" : null;
 	if (prevCot && prevCot.number != null) {
-		return { number: prevCot.number, version: prevCot.version || 1, tipo: clientTipo || prevCot.tipo || null };
+		return { number: prevCot.number, version: prevCot.version || 1, tipo: volTipo || clientTipo || prevCot.tipo || null };
 	}
 	const number = await nextCotNumber();
-	return { number: number, version: 1, tipo: clientTipo || null };
+	return { number: number, version: 1, tipo: volTipo || clientTipo || null };
 }
 
 function normalize(deal) {
@@ -134,7 +137,7 @@ export function useDeals() {
 		const baseCot = (deal.inputs && deal.inputs.cot) || null;
 		const number = baseCot && baseCot.number != null ? baseCot.number : await nextCotNumber();
 		const version = maxCotVersion(deals, number) + 1;
-		const tipo = clientTipo || (baseCot && baseCot.tipo) || null;
+		const tipo = isVolumen(deal.channel) ? "SDK" : (clientTipo || (baseCot && baseCot.tipo) || null);
 		const newId = Date.now().toString(36);
 		const nextResumen = Object.assign({}, deal.resumen);
 		delete nextResumen.status;

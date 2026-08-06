@@ -319,7 +319,7 @@ function s1Cover(clientName, fecha, sinApi, listaPura, cotId, currency, tc, tcMe
 }
 
 // ─── SLIDE 2: INTEGRACIÓN DE FIRMA DIGITAL ────────────────────────────────────
-function s2Integracion(clientName) {
+function s2Integracion(clientName, intgTerm) {
 	const feats = [
 		{ icon: SVG.zap(B,16),    title: "Habilitación sin fricción",    desc: "Firma con validez legal plena, lista para operar a escala." },
 		{ icon: SVG.check(B,16),  title: "Onboarding 100% remoto",       desc: "Alta del usuario desde cualquier lugar, sin trámites presenciales." },
@@ -341,7 +341,7 @@ function s2Integracion(clientName) {
     <div style="width:42%;background:${B};border-radius:12px;padding:0.75cm;display:flex;flex-direction:column;overflow:hidden;">
       <div style="font-size:7pt;font-weight:700;color:${BLT};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.4cm;">Cómo se integra</div>
       <div style="display:flex;flex-direction:column;gap:0.3cm;margin-bottom:0.6cm;">
-        ${["Firma con validez legal plena (Ley 25.506)", `Integración vía API en los flujos de ${clientName}`, "Recibos, contratos y documentos legales en cualquier proceso"].map(t =>
+        ${["Firma con validez legal plena (Ley 25.506)", `Integración vía ${intgTerm} en los flujos de ${clientName}`, "Recibos, contratos y documentos legales en cualquier proceso"].map(t =>
 			`<div style="display:flex;align-items:flex-start;gap:0.28cm;">
             <div style="width:6px;height:6px;border-radius:50%;background:${BLT};margin-top:4px;flex-shrink:0;"></div>
             <span style="font-size:9pt;color:rgba(255,255,255,0.85);line-height:1.45;">${t}</span>
@@ -783,7 +783,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		totalNote: "No se abona por adelantado: se paga mes a mes durante la vigencia.",
 	}) : "";
 
-	const subtitleParts = [sinApi ? "Cotización de volumen directo, sin integración API" : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
+	const subtitleParts = [sinApi ? `Cotización de volumen directo, sin integración ${esIDC ? "API" : "SDK"}` : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
 	if (showIva) subtitleParts.push("precios en pesos argentinos, IVA discriminado al 21%");
 	// El descuento del segmento ya viene aplicado en el precio unitario, así que se
 	// nombra como condición alcanzada y no como una línea aparte (sería doble conteo).
@@ -1136,7 +1136,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 	const clientName = (client?.name) || deal.clientName || (deal.clients?.name) || "Cliente";
 	// ID de cotización (COT-TIPO-NNNN-vN) para la portada. El tipo sale del snapshot
 	// guardado en el deal; si falta, del tipo vivo del cliente. Ver [[cotId]].
-	const cotId = formatCotId(deal.inputs?.cot, client?.tipo);
+	const cotId = formatCotId(deal.inputs?.cot, client?.tipo, deal.channel);
 	// Título del documento = nombre por defecto del PDF al imprimir. Se antepone el ID
 	// de cotización para que el archivo salga como "COT-DIR-0012-v1 · Propuesta Cliente".
 	const docTitle = (cotId ? cotId + " · " : "") + "Propuesta " + clientName;
@@ -1182,7 +1182,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 </head>
 <body>
 ${s1Cover(clientName, deal.fecha, noApi, listaPura, cotId, currency, tc, tcMeta)}
-${noApi ? "" : s2Integracion(clientName)}
+${noApi ? "" : s2Integracion(clientName, isIDC(deal.channel) ? "API" : "SDK")}
 ${s3}
 ${proySlide}
 ${s4Pasos(clientName, noApi, pasosPage)}

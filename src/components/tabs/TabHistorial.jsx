@@ -330,7 +330,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 				{q.clientName || "(sin nombre)"}
 				{isUnit(q.channel) && (
 					<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
-						{q.inputs?.integracion === "sin_api" ? "sin API" : "API"}
+						{(q.inputs?.integracion === "sin_api" ? "sin " : "") + (isVolumen(q.channel) ? "SDK" : "API")}
 					</Badge>
 				)}
 			</TableCell>
@@ -339,7 +339,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	function idCell(q) {
 		return (
 			<TableCell className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
-				{formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo) || "—"}
+				{formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel) || "—"}
 			</TableCell>
 		);
 	}
