@@ -277,21 +277,12 @@ function tcRefNote(tc, tcMeta) {
 }
 
 function s1Cover(clientName, fecha, sinApi, listaPura, cotId, currency, tc, tcMeta) {
-	const middleBadge = listaPura
-		? { text: "Contratación directa", icon: SVG.check("rgba(255,255,255,0.85)", 11) }
-		: sinApi
-			? { text: "Emisión a escala",  icon: SVG.zap(   "rgba(255,255,255,0.85)", 11) }
-			: { text: "Firma embebida",    icon: SVG.code(  "rgba(255,255,255,0.85)", 11) };
 	const badges = [
-		{ text: "100% Remoto",        icon: SVG.check( "rgba(255,255,255,0.85)", 11) },
-		middleBadge,
-		{ text: "Validez legal plena", icon: SVG.shield("rgba(255,255,255,0.85)", 11) },
+		{ text: "Validez legal plena",     icon: SVG.shield("rgba(255,255,255,0.85)", 11) },
+		{ text: "Certificación licenciada", icon: SVG.check( "rgba(255,255,255,0.85)", 11) },
+		{ text: "Firma digital",           icon: SVG.zap(   "rgba(255,255,255,0.85)", 11) },
 	];
-	const subtitle = listaPura
-		? "Firma digital con validez legal,<br>contratada de forma directa y 100% remota."
-		: sinApi
-			? "Firma digital con validez legal,<br>emitida por volumen y 100% remota."
-			: "Integración de firma digital con validez legal,<br>embebida en tu flujo y 100% remota.";
+	const subtitle = "Firma digital con validez legal<br>para toda tu operación.";
 	return `<div class="slide" style="background:${B};">
   <!-- decorative circles -->
   <div style="position:absolute;top:-5cm;right:-2.5cm;width:16cm;height:16cm;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
