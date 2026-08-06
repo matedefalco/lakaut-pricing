@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { getB2B2CSegment, getVolumenSegment, facturacionAtBase, segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
@@ -98,6 +98,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const [showBonif, setShowBonif] = useState(false);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
+	// Id de la versión creada en esta sesión de edición: mientras se siga trabajando
+	// sobre ella, los guardados la pisan en vez de crear más versiones. Ver saveQuote.
+	const sessionVersionId = useRef(null);
 	const [flash, setFlash] = useState(false);
 	const [saved, setSaved] = useState(null); // { deal, client } tras guardar
 	// Ajuste de precios personalizado (por componente): cada campo que se complete
@@ -260,6 +263,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setOverridePrecioFirma(i.overridePrecioFirma != null ? String(i.overridePrecioFirma) : "");
 		setShowOverrides(legacyCert != null || i.overridePrecioFirma != null);
 		setEditingId(pendingEdit.id);
+		// Cotización recién cargada del listado: el próximo guardado crea una versión
+		// nueva (no pisa la que se abrió). Ver saveQuote.
+		sessionVersionId.current = null;
 		setSaved(null);
 		setLoadToken(function (n) { return n + 1; });
 		onConsumeEdit && onConsumeEdit();
@@ -553,7 +559,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				precioIDC, precioIDCLista: segPrice.precioIDC,
 				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
 				precioFirmaExtraLista: segPrice.precioFirmaExtra,
-				revTotal, revMesTotal: revSinFee, revAnual: revSinFee * 12 + feeAplicado,
+				revTotal, revMesTotal: revSinFee,
+				// Año 1: en IDC el volumen es mensual recurrente (× 12 + fee único). En
+				// Volumen es una COMPRA ÚNICA (revTotal, mes 1) y, si hay abono, se suman
+				// los meses 2-12 de reposición de la bolsa de firmas (11 meses, mismo
+				// criterio que Packs). No se multiplica el volumen × 12.
+				revAnual: esIDC ? revSinFee * 12 + feeAplicado : revTotal + (abono ? revAbonoMes * 11 : 0),
 				// Las condiciones ya no bajan el total; se guarda el % ofrecido como dato
 				// informativo (reportes lo ignoran para el descuento efectivo).
 				revServicioBruto,
@@ -578,10 +589,25 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		const deal = buildDeal(editingId || Date.now().toString(36), prev ? prev.fecha : now);
 		if (prev?.resumen?.status) deal.resumen.status = prev.resumen.status;
 
-		// El deal normalizado que vuelve de save() ya trae el bloque cot (correlativo,
-		// versión, tipo), que el export usa para el ID en la portada.
-		const norm = await dealsApi.save(deal, client?.id || null, client?.tipo || null);
-		const savedDeal = norm || deal;
+		// Versionado automático: guardar sobre una cotización ya guardada (cargada del
+		// listado) crea una versión nueva (v+1) y deja la anterior como historial. Los
+		// guardados posteriores DENTRO de la misma sesión pisan esa versión nueva (no
+		// generan v+2, v+3…). Una cotización nueva se guarda como v1 y se sigue pisando.
+		const persisted = !!(prev && prev.inputs && prev.inputs.cot && prev.inputs.cot.number != null);
+		const bump = persisted && editingId !== sessionVersionId.current;
+
+		let savedDeal;
+		if (bump) {
+			const dealForVersion = { ...deal, inputs: { ...deal.inputs, cot: prev.inputs.cot } };
+			const norm = await dealsApi.newVersion(dealForVersion, client?.id || null, client?.tipo || null);
+			savedDeal = norm || dealForVersion;
+		} else {
+			// El deal normalizado que vuelve de save() ya trae el bloque cot (correlativo,
+			// versión, tipo), que el export usa para el ID en la portada.
+			const norm = await dealsApi.save(deal, client?.id || null, client?.tipo || null);
+			savedDeal = norm || deal;
+		}
+		sessionVersionId.current = savedDeal.id;
 
 		setEditingId(savedDeal.id);
 		setFlash(true);

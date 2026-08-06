@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useModels } from "@/context/ModelsContext";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
@@ -73,6 +73,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 	const [firmasAdic, setFirmasAdic] = useState(0);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
+	// Id de la versión creada en esta sesión de edición: mientras se siga trabajando
+	// sobre ella, los guardados la pisan en vez de crear más versiones. Ver saveQuote.
+	const sessionVersionId = useRef(null);
 	const [flash, setFlash] = useState(false);
 	const [saved, setSaved] = useState(null);
 	// En Web el descuento es una excepción que el vendedor habilita a mano; en
@@ -122,6 +125,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setEditingId(pendingEdit.id);
+		// Cotización recién cargada del listado: el próximo guardado crea una versión
+		// nueva (no pisa la que se abrió). Ver saveQuote.
+		sessionVersionId.current = null;
 		setSaved(null);
 		setLoadToken(function (n) { return n + 1; });
 		onConsumeEdit && onConsumeEdit();
@@ -291,10 +297,25 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 		const deal = buildDeal(editingId || Date.now().toString(36), prev ? prev.fecha : now);
 		if (prev?.resumen?.status) deal.resumen.status = prev.resumen.status;
 
-		// El deal normalizado que vuelve de save() ya trae el bloque cot (correlativo,
-		// versión, tipo), que el export usa para el ID en la portada.
-		const norm = await dealsApi.save(deal, client?.id || null, client?.tipo || null);
-		const savedDeal = norm || deal;
+		// Versionado automático: guardar sobre una cotización ya guardada (cargada del
+		// listado) crea una versión nueva (v+1) y deja la anterior como historial. Los
+		// guardados posteriores DENTRO de la misma sesión pisan esa versión nueva (no
+		// generan v+2, v+3…). Una cotización nueva se guarda como v1 y se sigue pisando.
+		const persisted = !!(prev && prev.inputs && prev.inputs.cot && prev.inputs.cot.number != null);
+		const bump = persisted && editingId !== sessionVersionId.current;
+
+		let savedDeal;
+		if (bump) {
+			const dealForVersion = { ...deal, inputs: { ...deal.inputs, cot: prev.inputs.cot } };
+			const norm = await dealsApi.newVersion(dealForVersion, client?.id || null, client?.tipo || null);
+			savedDeal = norm || dealForVersion;
+		} else {
+			// El deal normalizado que vuelve de save() ya trae el bloque cot (correlativo,
+			// versión, tipo), que el export usa para el ID en la portada.
+			const norm = await dealsApi.save(deal, client?.id || null, client?.tipo || null);
+			savedDeal = norm || deal;
+		}
+		sessionVersionId.current = savedDeal.id;
 
 		setEditingId(savedDeal.id);
 		setFlash(true);

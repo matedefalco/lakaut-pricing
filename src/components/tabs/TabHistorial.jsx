@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { channelShort, resolveChannel, isPacks, isUnit, packsConDescuento } from "@/data/channelMeta";
+import { channelShort, resolveChannel, isPacks, isUnit, isVolumen, packsConDescuento } from "@/data/channelMeta";
 import { dealRevenue } from "@/lib/dealMetrics";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
@@ -62,6 +62,17 @@ function summaryCols(channel, fMoney) {
 			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotal || 0).toLocaleString("es-AR"); } },
 			{ label: "Precio de lista", get: function (q) { return fMoney(q.resumen.facturacionLista || 0); } },
 			{ label: "Neto", sortKey: "monto", get: function (q) { return fMoney(q.resumen.netoLakaut != null ? q.resumen.netoLakaut : (q.resumen.facturacionLista || 0)); } },
+			{ label: "Margen", sortKey: "margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
+		];
+	}
+	// Volumen: compra única de certs/firmas (no recurrente). Sin columnas "/mes" y el
+	// certificado es "Certs", no "IDC". El total es el revenue año 1 homogéneo.
+	if (isVolumen(channel)) {
+		return [
+			{ label: "Segmento", get: function (q) { return q.resumen.segmento ? <TierBadge tier={q.resumen.segmento} size="sm" /> : "—"; } },
+			{ label: "Certs", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
+			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotales || q.resumen.firmasMes || 0).toLocaleString("es-AR"); } },
+			{ label: "Total año 1", sortKey: "monto", get: function (q) { return fMoney(dealRevenue(q)); } },
 			{ label: "Margen", sortKey: "margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
 		];
 	}
@@ -363,10 +374,21 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	function fechaCell(q) {
 		return <TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>;
 	}
-	// Volumen genérico para la vista unificada: certs en Packs, IDC en Volumen/IDC.
+	// Volumen genérico para la vista unificada: certs en Packs, IDC en el canal IDC,
+	// y certs/firmas sueltas en Volumen (donde `idcMensuales` guarda los certificados
+	// y una cotización puede ser de firmas sueltas sin certificados).
 	function volumenText(q) {
-		if (isPacks(q.channel)) return (q.resumen?.certsComprados || q.resumen?.certsActivos || 0).toLocaleString("es-AR") + " certs";
-		return (q.resumen?.idcMensuales || 0).toLocaleString("es-AR") + " IDC";
+		const r = q.resumen || {};
+		if (isPacks(q.channel)) return (r.certsComprados || r.certsActivos || 0).toLocaleString("es-AR") + " certs";
+		if (isVolumen(q.channel)) {
+			const certs = r.idcMensuales || 0;
+			const firmas = r.firmasTotales || r.firmasTotal || r.firmasMes || 0;
+			const parts = [];
+			if (certs > 0) parts.push(certs.toLocaleString("es-AR") + " certs");
+			if (firmas > 0) parts.push(firmas.toLocaleString("es-AR") + " firmas");
+			return parts.length ? parts.join(" · ") : "—";
+		}
+		return (r.idcMensuales || 0).toLocaleString("es-AR") + " IDC";
 	}
 
 	return (
@@ -521,7 +543,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								)}
 								{openFilter === "idc" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Volumen de IDC (canal Volumen)</span>
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">IDC / certificados (canales IDC y Volumen)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={idcMin} onChange={function (e) { setIdcMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>

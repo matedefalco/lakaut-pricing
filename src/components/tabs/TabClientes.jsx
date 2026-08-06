@@ -9,6 +9,7 @@ import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { getDistributorTier } from "@/lib/tiers";
 import { channelShort, channelEmoji, resolveChannel, isPacks, isUnit, isVolumen } from "@/data/channelMeta";
+import { dealRevenue } from "@/lib/dealMetrics";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -90,7 +91,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 		let revenue = 0;
 		let confirmedRevenue = 0;
 		clientDeals.forEach(function (d) {
-			const rev = d.resumen?.revMesTotal || d.resumen?.netoLakaut || 0;
+			// Revenue año 1 homogéneo entre canales (fuente única, ver dealRevenue).
+			const rev = dealRevenue(d);
 			revenue += rev;
 			if (dealStatus(d) === "confirmada") confirmedRevenue += rev;
 		});
@@ -103,7 +105,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 		let totalRevenue = 0;
 		let confirmedRevenue = 0;
 		deals.forEach(function (d) {
-			const rev = d.resumen?.revMesTotal || d.resumen?.revAnual || d.resumen?.netoLakaut || 0;
+			const rev = dealRevenue(d);
 			totalRevenue += rev;
 			if (dealStatus(d) === "confirmada") confirmedRevenue += rev;
 		});
@@ -119,7 +121,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	function clientRevenue(clientId) {
 		let rev = 0;
 		deals.filter(function (d) { return d.client_id === clientId; }).forEach(function (d) {
-			rev += d.resumen?.revMesTotal || d.resumen?.revAnual || d.resumen?.netoLakaut || 0;
+			rev += dealRevenue(d);
 		});
 		return rev;
 	}
@@ -267,7 +269,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 								</TableHeader>
 								<TableBody>
 									{clientDeals.map(function (d) {
-										const rev = d.resumen?.revMesTotal || d.resumen?.revAnual || d.resumen?.netoLakaut || 0;
+										const rev = dealRevenue(d);
 										return (
 											<TableRow key={d.id}>
 												<TableCell className="text-sm tabular-nums">{fDate(d.fecha)}</TableCell>

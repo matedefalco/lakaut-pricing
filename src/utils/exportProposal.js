@@ -647,9 +647,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		...(hayJuridicos ? [
 			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcJuridicos * precioIDC },
 			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcFisicos * precioIDC }] : []),
-		] : [
+		] : idc > 0 ? [
 			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
-		]),
+		] : []),
 		// Firmas que exceden el cupo del bundle: se atribuyen al tipo de certificado que
 		// las genera. Las que entran en el cupo no llevan línea de cargo (ya están en el
 		// precio de la IDC) y se muestran como parte de lo incluido, más abajo.
@@ -676,14 +676,21 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const abonoVigenciaTotal = abonoActivo ? subtotal + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
 
 	const chips = [
-		chip(SVG.idcard(B, 15), langApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : (esIDC ? `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)` : `<strong>${idc.toLocaleString("es-AR")}</strong> certificados`)),
-		chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`),
-		...(hayJuridicos ? [
-			chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
+		// Volumen de solo firmas sueltas (sin certificados): los chips describen las
+		// firmas, no identidades/certificados que no se cotizan.
+		...(idc > 0 ? [
+			chip(SVG.idcard(B, 15), langApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : (esIDC ? `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)` : `<strong>${idc.toLocaleString("es-AR")}</strong> certificados`)),
+			chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`),
+			...(hayJuridicos ? [
+				chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
+			] : [
+				chip(SVG.checkSquare(B, 15), cupo != null
+					? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. por identidad`
+					: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`),
+			]),
 		] : [
-			chip(SVG.checkSquare(B, 15), cupo != null
-				? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. por identidad`
-				: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`),
+			chip(SVG.idcard(B, 15), `<strong>${firmasSueltas.toLocaleString("es-AR")}</strong> ${firmasSueltas === 1 ? firmaSing : firmaPlur}`),
+			chip(SVG.shield(B, 15), "sin certificado asociado"),
 		]),
 		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
 	];
@@ -721,7 +728,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const certJurWord = langApi ? "consumos de validación · persona jurídica" : "certificados jurídicos";
 	const certFisWord = langApi ? "consumos de validación · persona física" : "certificados físicos";
 	const verboAct = langApi ? "Contratás" : "Comprás";
-	const activacionTxt = hayJuridicos
+	const activacionTxt = idc <= 0
+		? `Comprás un volumen de ${firmasSueltas.toLocaleString("es-AR")} ${firmasSueltas === 1 ? firmaSing : firmaPlur}, sin certificados asociados.`
+		: hayJuridicos
 		? `${verboAct} ${unidadArt} ${idc.toLocaleString("es-AR")} ${unidadPl}: ${[
 				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} ${certJurWord} (${firmaWord(fPorCertJur)} c/u)` : null,
 				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${certFisWord} (${firmaWord(fPorCertFis)} c/u)` : null,

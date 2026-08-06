@@ -1,4 +1,4 @@
-import { isPacks, isUnit, resolveChannel } from "@/data/channelMeta";
+import { isPacks, isUnit, isVolumen, resolveChannel } from "@/data/channelMeta";
 import { dealStatus } from "@/lib/dealStatus";
 
 // ─── Métricas de cotizaciones ─────────────────────────────────────────────────
@@ -22,7 +22,15 @@ function num(x) { return typeof x === "number" && isFinite(x) ? x : 0; }
 export function dealRevenue(d) {
 	const r = d.resumen || {};
 	if (isPacks(d.channel)) return r.facturacionAnio1 || r.netoLakaut || r.facturacionLista || 0;
-	if (isUnit(d.channel)) return r.revAnual || (r.revMesTotal || 0) * 12 || 0;
+	// Volumen: COMPRA ÚNICA. Año 1 = total (mes 1) + reposición por abono (meses 2-12,
+	// 11 meses) si hay. Se recalcula desde los componentes del resumen para que las
+	// cotizaciones guardadas con el modelo mensual anterior (revAnual = revMesTotal×12)
+	// también queden bien sin migrar la base. No se multiplica el volumen × 12.
+	if (isVolumen(d.channel)) {
+		const base = r.revTotal != null ? num(r.revTotal) : num(r.revMesTotal);
+		return base + (r.revAbonoMes ? num(r.revAbonoMes) * 11 : 0);
+	}
+	if (isUnit(d.channel)) return r.revAnual || (r.revMesTotal || 0) * 12 || 0; // IDC: mensual recurrente
 	return 0;
 }
 
