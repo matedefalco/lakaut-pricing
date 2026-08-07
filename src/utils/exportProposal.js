@@ -642,6 +642,15 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const certLblGen = langApi ? "Consumos de validación de identidad" : "Certificados";
 	const firmaLblJur = langApi ? "Documentos firmados · persona jurídica" : "Firmas de certificados jurídicos";
 	const firmaLblFis = langApi ? "Documentos firmados · persona física" : "Firmas de certificados físicos";
+	// Nota de cupo: cuando parte de las firmas de la identidad entran en el cupo
+	// incluido, el cliente ve que "tiene N firmas" aunque solo se facturen las que lo
+	// exceden. Ej: jurídica con 35 firmas y cupo 3 → factura 32, pero 3 quedan sin cargo.
+	const firmaLineNota = (incl, fact) => {
+		const enCupo = incl - fact;
+		if (cupo == null || enCupo <= 0) return "";
+		const inclW = langApi ? "incluidos" : "incluidas";
+		return `<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">De ${incl.toLocaleString("es-AR")} ${firmaPlur}, ${enCupo.toLocaleString("es-AR")} qued${enCupo === 1 ? "a" : "an"} ${inclW} sin cargo (cupo de ${cupo} por identidad).</span>`;
+	};
 	const items = [
 		// Certificados: se desglosan por tipo solo cuando hay jurídicos en el mix.
 		...(hayJuridicos ? [
@@ -654,10 +663,10 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		// las genera. Las que entran en el cupo no llevan línea de cargo (ya están en el
 		// precio de la IDC) y se muestran como parte de lo incluido, más abajo.
 		...(hayJuridicos ? [
-			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclJuridica }] : []),
-			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasInclFisica }] : []),
+			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaFmt})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica }] : []),
+			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaFmt})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasIncl }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})${firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl }] : []),
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
 		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasSueltas }] : []),
@@ -673,7 +682,11 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// Descuento del abono: snapshot de la cotización; fallback al legacy 35% para deals viejos.
 	const abonoPct = inp.abonoDescuentoPct != null ? inp.abonoDescuentoPct / 100 : DESCUENTO_ABONO;
 	const precioAbonoUnit = precioFirmaAdicN * (1 - abonoPct);
-	const abonoVigenciaTotal = abonoActivo ? subtotal + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
+	// Total acumulado de referencia: es el gasto recurrente del servicio a lo largo de
+	// la vigencia, así que excluye el fee de implementación (pago único de activación).
+	// El fee igual se cobra en el mes 1 (pago inicial), pero no forma parte del costo
+	// mes a mes que esta cifra busca proyectar.
+	const abonoVigenciaTotal = abonoActivo ? (subtotal - feeVal) + abonoMensual * (ABONO_VIGENCIA_MESES - 1) : 0;
 
 	const chips = [
 		// Volumen de solo firmas sueltas (sin certificados): los chips describen las
@@ -780,7 +793,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		mes1Value: showIva ? fmGross(subtotal, currency, tc) : fm(subtotal, currency, tc),
 		abonoValue: showIva ? fmGross(abonoMensual, currency, tc) : fm(abonoMensual, currency, tc),
 		totalValue: showIva ? fmGross(abonoVigenciaTotal, currency, tc) : fm(abonoVigenciaTotal, currency, tc),
-		totalNote: "No se abona por adelantado: se paga mes a mes durante la vigencia.",
+		totalNote: feeVal > 0
+			? "No incluye el fee de implementación (pago único). No se abona por adelantado: se paga mes a mes durante la vigencia."
+			: "No se abona por adelantado: se paga mes a mes durante la vigencia.",
 	}) : "";
 
 	const subtitleParts = [sinApi ? `Cotización de volumen directo, sin integración ${esIDC ? "API" : "SDK"}` : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
