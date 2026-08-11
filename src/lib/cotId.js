@@ -1,11 +1,12 @@
 // ─── Convención de IDs de cotización ────────────────────────────────────────
-// Formato: COT-[TIPO]-[NNNN]-v[N]
+// Formato: COT-[NNNN]-[TIPO]-v[N]
 //   COT   → prefijo fijo.
+//   NNNN  → correlativo global de 4 dígitos, único por cotización, compartido
+//           entre versiones. Se asigna al crear y no se reutiliza. Va primero
+//           para poder buscar una cotización por su número.
 //   TIPO  → código del tipo de cliente (atributo del cliente): DIS / DIR / PAR.
 //           Excepción: el canal Volumen usa siempre "SDK" (integra por SDK), sin
 //           importar el tipo del cliente.
-//   NNNN  → correlativo global de 4 dígitos, único por cotización, compartido
-//           entre versiones. Se asigna al crear y no se reutiliza.
 //   v[N]  → número de versión; arranca en v1 y sube con cada revisión.
 // La versión vigente es siempre la de v más alto; las anteriores quedan como
 // historial. Ver también [[modelo-canales-borrador-v5]].
@@ -42,7 +43,7 @@ export function padCotNumber(n) {
 export function formatCotId(cot, fallbackTipo, channel) {
 	if (!cot || cot.number == null) return null;
 	const tipo = cotTipo(channel, cot.tipo, fallbackTipo);
-	return "COT-" + tipo + "-" + padCotNumber(cot.number) + "-v" + (cot.version || 1);
+	return "COT-" + padCotNumber(cot.number) + "-" + tipo + "-v" + (cot.version || 1);
 }
 
 // Mayor correlativo usado entre una lista de deals (cada uno con inputs.cot.number).

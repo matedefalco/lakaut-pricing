@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { dealStatus } from "@/lib/dealStatus";
-import { CHANNELS, channelMeta, isPacks, isUnit, isVolumen } from "@/data/channelMeta";
+import { CHANNELS, channelMeta, isPacks, isUnit, isVolumenLike } from "@/data/channelMeta";
 import { dealRevenue } from "@/lib/dealMetrics";
 
 function fDate(iso) {
@@ -20,9 +20,9 @@ function fDate(iso) {
 function dealValue(deal, fMoney) {
 	const r = deal.resumen || {};
 	if (isPacks(deal.channel)) return r.netoLakaut != null ? fMoney(r.netoLakaut) : (r.facturacionLista != null ? fMoney(r.facturacionLista) : "—");
-	// Volumen: compra única (fuente única, recalcula el año 1 sin arrastrar el ×12 de
-	// las cotizaciones guardadas con el modelo mensual anterior).
-	if (isVolumen(deal.channel)) return fMoney(dealRevenue(deal));
+	// Volumen y Distribuidores-Volumen: compra única (fuente única, recalcula el año 1
+	// sin arrastrar el ×12 de las cotizaciones guardadas con el modelo mensual anterior).
+	if (isVolumenLike(deal.channel)) return fMoney(dealRevenue(deal));
 	if (isUnit(deal.channel)) return r.revAnual != null ? fMoney(r.revAnual) : (r.revMesTotal != null ? fMoney(r.revMesTotal) : "—");
 	return "—";
 }

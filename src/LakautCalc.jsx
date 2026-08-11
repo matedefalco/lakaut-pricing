@@ -70,7 +70,9 @@ const NAV_GROUPS = [
 // Canales que se pueden cotizar desde "Nueva cotización".
 const QUOTABLE = [
 	{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
-	{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
+	// Distribuidores abre en su modalidad por defecto (Volumen); el toggle del canal
+	// permite pasar a packs sin salir de la pantalla.
+	{ key: "distribuidores_vol", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores_vol.desc },
 	{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
 	{ key: "volumen", label: CHANNELS.volumen.label, desc: CHANNELS.volumen.desc },
 ];
@@ -143,6 +145,41 @@ function NuevaCotizacionButton({ onPick }) {
 }
 
 
+// Selector de modalidad del canal Distribuidores. Los dos modos (Volumen y Packs)
+// conviven bajo la misma entrada del nav; el vendedor elige por cotización. Volumen
+// es la modalidad por defecto (certificados y firmas sueltos con nivel del socio).
+function DistribModeSwitch({ mode, onChange }) {
+	const accent = CHANNELS.distribuidores.color;
+	const opts = [
+		{ id: "volumen", label: "Volumen", sub: "certificados y firmas sueltos" },
+		{ id: "packs", label: "Packs", sub: "lista con descuento por nivel" },
+	];
+	return (
+		<div className="glass-strong shadow-float" style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 14, border: "1px solid var(--glass-border)" }}>
+			{opts.map(function (o) {
+				const active = mode === o.id;
+				return (
+					<button
+						key={o.id}
+						onClick={function () { onChange(o.id); }}
+						className="transition-all duration-150"
+						style={{
+							display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1,
+							padding: "7px 14px", borderRadius: 11, border: "none", cursor: "pointer",
+							background: active ? accent : "transparent",
+							color: active ? WHITE : GRAY,
+						}}
+					>
+						<span style={Object.assign({}, os(12.5, 700, active ? WHITE : BLACK))}>{o.label}</span>
+						<span style={Object.assign({}, os(10, 400, active ? "rgba(255,255,255,0.85)" : GRAY))}>{o.sub}</span>
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+
 function LakautCalcInner() {
 	const { models } = useModels();
 	const { channelConfig, update: updateChannelConfig } = useChannelConfig();
@@ -181,23 +218,39 @@ function LakautCalcInner() {
 	const [historialHighlight, setHistorialHighlight] = useState(null);
 	// Nonce por canal: al pedir "nueva cotización" se incrementa y fuerza el
 	// remonte del componente (key) para arrancar con un lienzo en blanco.
-	const [quoteNonce, setQuoteNonce] = useState({ web: 0, distribuidores: 0, b2b2c: 0, volumen: 0 });
+	const [quoteNonce, setQuoteNonce] = useState({ web: 0, distribuidores: 0, distribuidores_vol: 0, b2b2c: 0, volumen: 0 });
+	// Modalidad activa del canal Distribuidores: "volumen" (certificados y firmas
+	// sueltos, la modalidad por defecto) o "packs" (lista con descuento). Los dos
+	// modos conviven bajo la misma entrada del nav y son ids de canal distintos.
+	const [distribMode, setDistribMode] = useState("volumen");
 
 	function navTo(key) {
 		setActiveNavItem(key);
 	}
 
+	// Los dos modos de Distribuidores viven bajo la misma entrada del nav
+	// ("distribuidores"). Este mapa traduce el id de canal a esa entrada.
+	function navKeyForChannel(channel) {
+		return channel === "distribuidores_vol" ? "distribuidores" : channel;
+	}
+
 	// Abre una cotización guardada en su cotizador. `resolveChannel` cubre los ids de
-	// canal históricos (ver CHANNEL_ALIASES en channelMeta).
+	// canal históricos (ver CHANNEL_ALIASES en channelMeta). En Distribuidores además
+	// selecciona la modalidad (packs vs volumen) según el canal del deal.
 	function editQuote(deal) {
 		setPendingEdit(deal);
-		navTo(resolveChannel(deal.channel));
+		const ch = resolveChannel(deal.channel);
+		if (ch === "distribuidores_vol") setDistribMode("volumen");
+		else if (ch === "distribuidores") setDistribMode("packs");
+		navTo(navKeyForChannel(ch));
 	}
 
 	function newQuote(channel) {
 		setPendingEdit(null);
 		setQuoteNonce(function (prev) { return Object.assign({}, prev, { [channel]: (prev[channel] || 0) + 1 }); });
-		navTo(channel);
+		if (channel === "distribuidores_vol") setDistribMode("volumen");
+		else if (channel === "distribuidores") setDistribMode("packs");
+		navTo(navKeyForChannel(channel));
 	}
 
 	function goHistorial(dealId) {
@@ -351,7 +404,14 @@ function LakautCalcInner() {
 
 					{/* ── COTIZAR ── */}
 					{activeNavItem === "web" && <TabCanalPacks channel="web" key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-					{activeNavItem === "distribuidores" && <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "distribuidores" && (
+						<div className="space-y-4">
+							<DistribModeSwitch mode={distribMode} onChange={setDistribMode} />
+							{distribMode === "packs"
+								? <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
+								: <TabCanalB2B2C channel="distribuidores_vol" key={"distribuidores_vol-" + quoteNonce.distribuidores_vol} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores_vol" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+						</div>
+					)}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
 					{activeNavItem === "b2b2c" && <TabCanalB2B2C channel="b2b2c" key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "volumen" && <TabCanalB2B2C channel="volumen" key={"volumen-" + quoteNonce.volumen} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNewQuote={function () { newQuote("volumen"); }} pendingEdit={pendingEdit && pendingEdit.channel === "volumen" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}

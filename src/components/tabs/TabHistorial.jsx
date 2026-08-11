@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { channelShort, resolveChannel, isPacks, isUnit, isVolumen, packsConDescuento } from "@/data/channelMeta";
+import { channelShort, resolveChannel, isPacks, isUnit, isVolumenLike, isDistribVol, packsConDescuento } from "@/data/channelMeta";
 import { dealRevenue } from "@/lib/dealMetrics";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
@@ -65,11 +65,12 @@ function summaryCols(channel, fMoney) {
 			{ label: "Margen", sortKey: "margen", get: function (q) { return Math.round((q.resumen.margenPct || 0) * 100) + "%"; } },
 		];
 	}
-	// Volumen: compra única de certs/firmas (no recurrente). Sin columnas "/mes" y el
-	// certificado es "Certs", no "IDC". El total es el revenue año 1 homogéneo.
-	if (isVolumen(channel)) {
+	// Volumen y Distribuidores-Volumen: compra única de certs/firmas (no recurrente).
+	// Sin columnas "/mes" y el certificado es "Certs", no "IDC". El total es el revenue
+	// año 1 homogéneo. En Distribuidores-Volumen la primera columna es el nivel del socio.
+	if (isVolumenLike(channel)) {
 		return [
-			{ label: "Segmento", get: function (q) { return q.resumen.segmento ? <TierBadge tier={q.resumen.segmento} size="sm" /> : "—"; } },
+			{ label: isDistribVol(channel) ? "Nivel" : "Segmento", get: function (q) { return q.resumen.segmento ? <TierBadge tier={q.resumen.segmento} size="sm" /> : "—"; } },
 			{ label: "Certs", get: function (q) { return (q.resumen.idcMensuales || 0).toLocaleString("es-AR"); } },
 			{ label: "Firmas", get: function (q) { return (q.resumen.firmasTotales || q.resumen.firmasMes || 0).toLocaleString("es-AR"); } },
 			{ label: "Total año 1", sortKey: "monto", get: function (q) { return fMoney(dealRevenue(q)); } },
@@ -218,7 +219,14 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			if (selectedChannels.size > 0 && !selectedChannels.has(resolveChannel(q.channel))) return false;
 			if (selectedStatuses.size > 0 && !selectedStatuses.has(dealStatus(q))) return false;
 			if (month !== "all" && q.fecha.slice(0, 7) !== month) return false;
-			if (search && !(q.clientName || "").toLowerCase().includes(search.toLowerCase())) return false;
+			if (search) {
+				// Matchea por nombre de cliente, por el ID completo (COT-0008-SDK-v1) y
+				// por el número suelto (padded y sin padding), para buscar por N° de cotización.
+				const cotStr = formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel) || "";
+				const num = q.inputs?.cot?.number != null ? String(q.inputs.cot.number) : "";
+				const hay = (q.clientName || "") + " " + cotStr + " " + num;
+				if (!hay.toLowerCase().includes(search.toLowerCase())) return false;
+			}
 			if (isPacks(q.channel)) {
 				const certs = q.resumen.certsComprados || q.resumen.certsActivos || 0;
 				if (certsMin !== "" && certs < Number(certsMin)) return false;
@@ -231,7 +239,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			}
 			return true;
 		});
-	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax]);
+	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax, clientsById]);
 
 	// ── Orden ──
 	// Comparador con soporte de números y acentos (es). Cuando el criterio empata,
@@ -330,7 +338,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 				{q.clientName || "(sin nombre)"}
 				{isUnit(q.channel) && (
 					<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
-						{(q.inputs?.integracion === "sin_api" ? "sin " : "") + (isVolumen(q.channel) ? "SDK" : "API")}
+						{(q.inputs?.integracion === "sin_api" ? "sin " : "") + (isVolumenLike(q.channel) ? "SDK" : "API")}
 					</Badge>
 				)}
 			</TableCell>
@@ -380,7 +388,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	function volumenText(q) {
 		const r = q.resumen || {};
 		if (isPacks(q.channel)) return (r.certsComprados || r.certsActivos || 0).toLocaleString("es-AR") + " certs";
-		if (isVolumen(q.channel)) {
+		if (isVolumenLike(q.channel)) {
 			const certs = r.idcMensuales || 0;
 			const firmas = r.firmasTotales || r.firmasTotal || r.firmasMes || 0;
 			const parts = [];
@@ -527,8 +535,8 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								)}
 								{openFilter === "cliente" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Buscar por nombre</span>
-										<Input className="max-w-xs h-8 bg-background text-sm" placeholder="Nombre del cliente…" value={search} onChange={function (e) { setSearch(e.target.value); }} autoFocus />
+										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Buscar por cliente o N° de cotización</span>
+										<Input className="max-w-xs h-8 bg-background text-sm" placeholder="Nombre o N° (ej. 8, COT-0008…)" value={search} onChange={function (e) { setSearch(e.target.value); }} autoFocus />
 									</div>
 								)}
 								{openFilter === "certs" && (

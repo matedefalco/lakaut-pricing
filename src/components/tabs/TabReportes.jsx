@@ -131,6 +131,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 		{ key: "volumen", label: channelShort("volumen"), block: price.volumen },
 		{ key: "web", label: channelShort("web"), block: price.web },
 		{ key: "distribuidores", label: channelShort("distribuidores"), block: price.distribuidores },
+		{ key: "distribuidores_vol", label: channelShort("distribuidores_vol"), block: price.distribuidores_vol },
 	].filter(function (c) { return c.block.n > 0; });
 
 	const hasData = deals.length > 0;

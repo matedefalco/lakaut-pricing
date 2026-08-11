@@ -182,6 +182,32 @@ export const VOLUMEN_SEGMENTS = [
 	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.40 },
 ];
 
+// ── Canal E · Distribuidores e Integradores (modalidad Volumen) ───────────────
+// Réplica del canal Volumen (certificados y firmas sueltos, con el mismo precio
+// base VOLUMEN_BASE y el mismo cálculo por elemento) pero con los NIVELES
+// característicos del canal de distribuidores (Azul→Platinum) como segmento, en
+// lugar de los tramos por compromiso de Volumen. El nivel se asigna igual que en
+// Distribuidores-packs: el MAYOR entre los certificados activos declarados del
+// socio y su compromiso anual en USD (ver getDistributorTier), no el volumen de la
+// cotización en curso.
+//
+// A diferencia de DISTRIBUTOR_TIERS (descuento 10%–50% sobre la LISTA WEB, que tiene
+// margen amplio), acá el descuento se aplica sobre la base por unidad (cert 0,65 /
+// firma 0,50), que está cerca del costo. Por eso la escala es más conservadora: un
+// 50% dejaría el certificado (costo ≈ 0,375) por debajo del piso de rentabilidad.
+// Los descuentos se toparon para que el certificado no baje del markup mínimo del
+// canal por elemento (B2B2C_MARKUP_MIN = 1,20x → precio mínimo 0,45, ~31% de
+// descuento máximo sobre 0,65). El guardarraíl del cotizador bloquea igual guardar y
+// exportar si el markup mezclado no cierra, así que la escala es el techo prudente y
+// el piso es duro.
+export const DISTRIBUIDOR_VOL_TIERS = [
+	{ id: "azul", label: "Azul", certsMin: 0, certsMax: 100, descuento: 0.05, compromisoMin: 0, compromisoMax: 10000 },
+	{ id: "bronce", label: "Bronce", certsMin: 101, certsMax: 500, descuento: 0.10, compromisoMin: 10001, compromisoMax: 25000 },
+	{ id: "plata", label: "Plata", certsMin: 501, certsMax: 2500, descuento: 0.15, compromisoMin: 25001, compromisoMax: 50000 },
+	{ id: "oro", label: "Oro", certsMin: 2501, certsMax: 10000, descuento: 0.22, compromisoMin: 50001, compromisoMax: 250000 },
+	{ id: "platinum", label: "Platinum", certsMin: 10001, certsMax: null, descuento: 0.28, compromisoMin: 250001, compromisoMax: null },
+];
+
 // ── Escalonado de crecimiento · Volumen ──────────────────────────────────────
 // Escala ESTÁNDAR de precios por volumen de firmas que se adjunta a las propuestas
 // de Volumen: un escalonado fijo, el mismo para todas las cotizaciones, para tener

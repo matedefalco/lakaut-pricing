@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { DISTRIBUTOR_TIERS, B2B2C_SEGMENTS, B2B2C_FIRMAS_INCLUIDAS, B2B2C_MARKUP_MIN, B2B2C_API_TIERS, VOLUMEN_BASE, VOLUMEN_SEGMENTS, VOLUMEN_PROYECCION, SLA_PLANS, COMMERCIAL_LEVERS, ABONO_DESCUENTO_PCT } from "../data/channels";
+import { DISTRIBUTOR_TIERS, DISTRIBUIDOR_VOL_TIERS, B2B2C_SEGMENTS, B2B2C_FIRMAS_INCLUIDAS, B2B2C_MARKUP_MIN, B2B2C_API_TIERS, VOLUMEN_BASE, VOLUMEN_SEGMENTS, VOLUMEN_PROYECCION, SLA_PLANS, COMMERCIAL_LEVERS, ABONO_DESCUENTO_PCT } from "../data/channels";
 import { loadConfig, saveConfig, subscribeConfig } from "../lib/supabase";
 
 const ChannelConfigContext = createContext(null);
@@ -7,6 +7,10 @@ const STORAGE_KEY = "lakaut_channelConfig";
 
 const DEFAULT_CHANNEL_CONFIG = {
 	distributorTiers: DISTRIBUTOR_TIERS,
+	// Niveles del canal Distribuidores en modalidad Volumen (descuento sobre el precio
+	// base por elemento, con escala prudente por el piso de margen). Mismos umbrales de
+	// asignación que distributorTiers, otra columna de descuentos.
+	distribuidorVolTiers: DISTRIBUIDOR_VOL_TIERS,
 	// Escala de precios del canal IDC (bundle por IDC mensuales).
 	b2b2cSegments: B2B2C_SEGMENTS,
 	b2b2cMarkupMin: B2B2C_MARKUP_MIN,
@@ -154,6 +158,13 @@ function normalizeChannelConfig(raw) {
 			.filter(function (s) { return s.firmas > 0; })
 			.sort(function (a, b) { return a.firmas - b.firmas; });
 		if (merged.volumenProyeccion.length === 0) merged.volumenProyeccion = VOLUMEN_PROYECCION;
+	}
+
+	// Niveles de Distribuidores-Volumen: si la config guardada no los trae (config
+	// anterior a este canal), se cae al default. No se derivan de distributorTiers
+	// porque su columna de descuentos es distinta (prudente por el piso de margen).
+	if (!Array.isArray(merged.distribuidorVolTiers) || merged.distribuidorVolTiers.length === 0) {
+		merged.distribuidorVolTiers = DISTRIBUIDOR_VOL_TIERS;
 	}
 
 	// Campos del modelo anterior que ya no se leen. Se descartan al normalizar para

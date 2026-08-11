@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
 import { getDistributorTier } from "@/lib/tiers";
-import { channelShort, channelEmoji, resolveChannel, isPacks, isUnit, isVolumen } from "@/data/channelMeta";
+import { channelShort, channelEmoji, resolveChannel, isPacks, isUnit, isVolumenLike } from "@/data/channelMeta";
 import { dealRevenue } from "@/lib/dealMetrics";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
@@ -261,7 +261,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 										<TableHead>Canal</TableHead>
 										<TableHead>Resumen</TableHead>
 										<TableHead>Estado</TableHead>
-										{isUnit(selected.channel) && <TableHead className="text-right">{isVolumen(selected.channel) ? "Certs" : "IDC"}</TableHead>}
+										{isUnit(selected.channel) && <TableHead className="text-right">{isVolumenLike(selected.channel) ? "Certs" : "IDC"}</TableHead>}
 										{isPacks(selected.channel) && <TableHead className="text-right">Certs</TableHead>}
 										<TableHead className="text-right">Revenue</TableHead>
 										<TableHead></TableHead>

@@ -69,6 +69,26 @@ export const CHANNELS = {
 		gradient: "linear-gradient(135deg, #f8f5ff 0%, #ebe3fe 100%)",
 		glow: "rgba(124, 58, 237, 0.22)",
 	},
+	// Distribuidores e integradores cotizado por elemento (certificados y firmas
+	// sueltos), la modalidad "Volumen" del canal. Comparte la identidad visual de
+	// Distribuidores (es el mismo negocio) y convive con el modo packs bajo la misma
+	// entrada del nav; se distingue por un id propio para que toda la lógica que
+	// decide packs vs unidad siga apoyándose en el id de canal.
+	distribuidores_vol: {
+		id: "distribuidores_vol",
+		label: "Distribuidores",
+		shortLabel: "Distrib. Vol",
+		full: "Distribuidores e integradores · volumen",
+		desc: "Socios que revenden acceso a la infraestructura de confianza, cotizado por certificados y firmas sueltos. El nivel (Azul→Platinum) sale de la base instalada y el compromiso anual del socio, y aplica un descuento sobre el precio por elemento.",
+		badgeVariant: "default",
+		emoji: "🤝",
+		Icon: Handshake,
+		color: "#0891b2",
+		colorSoft: "#ecfaff",
+		colorFg: "#0e7490",
+		gradient: "linear-gradient(135deg, #f2fbff 0%, #dff4fd 100%)",
+		glow: "rgba(8, 145, 178, 0.22)",
+	},
 	volumen: {
 		id: "volumen",
 		label: "Volumen",
@@ -94,8 +114,8 @@ export const PACK_CHANNELS = ["web", "distribuidores"];
 
 // Canales que se cotizan por certificados y firmas (no por packs). Comparten el
 // cotizador, parametrizado por canal: IDC vende un bundle con cupo de firmas,
-// Volumen vende los elementos sueltos.
-export const UNIT_CHANNELS = ["b2b2c", "volumen"];
+// Volumen y Distribuidores-Volumen venden los elementos sueltos.
+export const UNIT_CHANNELS = ["b2b2c", "volumen", "distribuidores_vol"];
 
 // Red de seguridad para el canal unificado de julio: las cotizaciones guardadas
 // como "packs" se migraron a web/distribuidores en la DB, pero un registro que
@@ -143,6 +163,16 @@ export function isDistribuidores(id) { return resolveChannel(id) === "distribuid
 export function isUnit(id) { return UNIT_CHANNELS.indexOf(resolveChannel(id)) !== -1; }
 export function isIDC(id) { return resolveChannel(id) === "b2b2c"; }
 export function isVolumen(id) { return resolveChannel(id) === "volumen"; }
+// Distribuidores e integradores en modalidad Volumen: canal propio, pero cotiza y se
+// lee exactamente igual que Volumen (certs y firmas sueltos), salvo cómo se asigna el
+// segmento (nivel del socio) y su escala de descuentos.
+export function isDistribVol(id) { return resolveChannel(id) === "distribuidores_vol"; }
+// Canales "tipo Volumen": venden certificados y firmas sueltos con un descuento sobre
+// el precio base por elemento (Volumen y Distribuidores-Volumen). Es la distinción que
+// le importa a la lectura de números y al display: comparten revenue (compra única),
+// terminología (SDK) y desglose por elemento. Se diferencian solo en el origen del
+// segmento. No incluye IDC, que vende un bundle con cupo y precio por tramo.
+export function isVolumenLike(id) { return isVolumen(id) || isDistribVol(id); }
 
 // ¿Esta cotización de packs lleva descuentos comerciales (nivel, condiciones,
 // abono)? En Distribuidores es la regla del canal y siempre aplica. En Web el

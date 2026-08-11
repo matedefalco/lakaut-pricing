@@ -179,6 +179,55 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distributorTiers", { id: genId("tier"), label: "Nuevo nivel", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null }); }} />
 			</CollapsibleSection>
 
+			{/* ── 1b · Distribuidores · Volumen · Niveles y descuentos ── */}
+			<CollapsibleSection
+				title="1b · Distribuidores-Volumen · Niveles y descuentos"
+				subtitle={"Modalidad Volumen del canal: el descuento del nivel se aplica sobre el precio base por elemento (cert USD " + (Number(volBase.cert) || 0).toFixed(4) + " / firma USD " + (Number(volBase.firma) || 0).toFixed(4) + "). El nivel se asigna igual que en Packs (mayor entre certificados activos y compromiso anual). El precio del certificado no puede bajar del markup mínimo de " + markupMin.toFixed(2) + "x."}
+			>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead className="w-[130px]">Se ve así</TableHead>
+							<TableHead>Nivel</TableHead>
+							<TableHead>Label</TableHead>
+							<TableHead className={thNum}>Certs mín.</TableHead>
+							<TableHead className={thNum}>Certs máx.</TableHead>
+							<TableHead className={thNum}>Descuento %</TableHead>
+							<TableHead className={thNum}>Compromiso mín. (USD)</TableHead>
+							<TableHead className={thNum}>Compromiso máx. (USD)</TableHead>
+							<TableHead className={thNum}>Precio cert · markup</TableHead>
+							<TableHead className="w-10" />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.distribuidorVolTiers || []).map(function (tier, idx) {
+							function upd(field, val) {
+								const next = draft.distribuidorVolTiers.map(function (t, i) { return i === idx ? Object.assign({}, t, { [field]: val }) : t; });
+								updDraft({ distribuidorVolTiers: next });
+							}
+							const precioCert = (Number(volBase.cert) || 0) * (1 - (Number(tier.descuento) || 0));
+							const m = markupOf(precioCert, cvCert);
+							const ok = m == null || m >= markupMin;
+							return (
+								<TableRow key={tier.id || idx}>
+									<TableCell><TierBadge tier={tier} tiers={draft.distribuidorVolTiers} size="sm" /></TableCell>
+									<TableCell><TextCell value={tier.id} onChange={function (v) { upd("id", v); }} className="w-20" /></TableCell>
+									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-24" /></TableCell>
+									<TableCell><NumCell value={tier.certsMin} decimals={0} onChange={function (v) { upd("certsMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.certsMax} decimals={0} onChange={function (v) { upd("certsMax", v); }} /></TableCell>
+									<TableCell><NumCell value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
+									<TableCell><NumCell value={tier.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>
+									<TableCell className={"text-right tabular-nums text-xs " + (ok ? "text-muted-foreground" : "text-destructive font-semibold")}>{"USD " + precioCert.toFixed(4) + " · " + fMarkupTxt(precioCert, cvCert)}</TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("distribuidorVolTiers", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distribuidorVolTiers", { id: genId("dvtier"), label: "Nuevo nivel", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null }); }} />
+			</CollapsibleSection>
+
 			{/* ── 2 · Volumen · escala de precios por IDC ── */}
 			<CollapsibleSection
 				title="2 · IDC · Escala de precios por IDC"

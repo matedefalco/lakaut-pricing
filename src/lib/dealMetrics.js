@@ -1,4 +1,4 @@
-import { isPacks, isUnit, isVolumen, resolveChannel } from "@/data/channelMeta";
+import { isPacks, isUnit, isVolumenLike, resolveChannel } from "@/data/channelMeta";
 import { dealStatus } from "@/lib/dealStatus";
 
 // ─── Métricas de cotizaciones ─────────────────────────────────────────────────
@@ -26,7 +26,7 @@ export function dealRevenue(d) {
 	// 11 meses) si hay. Se recalcula desde los componentes del resumen para que las
 	// cotizaciones guardadas con el modelo mensual anterior (revAnual = revMesTotal×12)
 	// también queden bien sin migrar la base. No se multiplica el volumen × 12.
-	if (isVolumen(d.channel)) {
+	if (isVolumenLike(d.channel)) {
 		const base = r.revTotal != null ? num(r.revTotal) : num(r.revMesTotal);
 		return base + (r.revAbonoMes ? num(r.revAbonoMes) * 11 : 0);
 	}
@@ -222,7 +222,7 @@ function conversionByPrice(deals) {
 // canal: los tres se leen por separado porque su unidad y su política de precios son
 // distintas.
 export function computePriceMetrics(deals) {
-	const byChannel = { web: [], distribuidores: [], b2b2c: [], volumen: [] };
+	const byChannel = { web: [], distribuidores: [], distribuidores_vol: [], b2b2c: [], volumen: [] };
 	deals.forEach(function (d) {
 		const up = dealUnitPrice(d);
 		if (!up || !byChannel[up.channel]) return;
@@ -243,6 +243,7 @@ export function computePriceMetrics(deals) {
 	return {
 		web: channelBlock(byChannel.web),
 		distribuidores: channelBlock(byChannel.distribuidores),
+		distribuidores_vol: channelBlock(byChannel.distribuidores_vol),
 		b2b2c: channelBlock(byChannel.b2b2c),
 		volumen: channelBlock(byChannel.volumen),
 	};
