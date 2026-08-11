@@ -225,11 +225,11 @@ export function TabCanalB2B2CPrecios({ costs }) {
 				</CardContent>
 			</Card>
 
-			{/* ── Integración API ────────────────────────────────────── */}
+			{/* ── Integración SDK ────────────────────────────────────── */}
 			<Card>
 				<CardContent>
 					<div className="mb-3">
-						<div className="text-sm font-semibold">Integración API · Fee de implementación</div>
+						<div className="text-sm font-semibold">Integración SDK · Fee de implementación</div>
 						<p className="text-xs text-muted-foreground mt-0.5">Cargo único al inicio del contrato. Los rangos son orientativos; el valor puntual se define en la Cotizadora.</p>
 					</div>
 					<Table>

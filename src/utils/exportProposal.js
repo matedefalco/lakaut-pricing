@@ -263,7 +263,7 @@ function iconBox(svg, bg, size) {
 }
 
 // ─── SLIDE 1: COVER ───────────────────────────────────────────────────────────
-// `sinApi` engloba las propuestas sin integración (volumen sin API y packs);
+// `sinApi` engloba las propuestas sin integración (volumen sin SDK y packs);
 // `listaPura` afina el copy para la venta directa por tarjeta, sin descuento.
 // Nota de tipo de cambio de referencia para propuestas en USD: da contexto al
 // cliente sobre qué dólar y de qué fecha se tomó, sin comprometer la facturación.
@@ -536,7 +536,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const esIDC = isIDC(deal.channel);
 	// Terminología de facturación. El lenguaje de "servicio de validación de identidad"
 	// (el certificado como consumo de validación, la firma como documento firmado) es
-	// la propuesta de valor EXCLUSIVA del canal IDC con integración API. Volumen vende
+	// la propuesta de valor EXCLUSIVA del canal IDC con integración SDK. Volumen vende
 	// certificados y firmas sueltos, así que siempre usa la nomenclatura llana aunque
 	// tome la modalidad con fee/SLA. `langApi` gobierna sólo el texto, no el cálculo.
 	const langApi = conApi && esIDC;
@@ -548,7 +548,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
 	const apiTiers = (channelConfig && channelConfig.b2b2cApiTiers) || [];
 	const slaPlans = (channelConfig && channelConfig.slaPlans) || [];
-	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "API Standard" };
+	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "SDK Standard" };
 	const sla = slaPlans.find(s => s.id === inp.slaId) || slaPlans[0] || { label: "Standard", precioMes: 0, desc: "" };
 
 	// precioIDC es un valor unitario chico (ej. USD 0.65): se formatea aparte de fm/fmGross para no perder los decimales.
@@ -635,7 +635,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const condTerms = condTermsText(inp.descCond);
 	const condOfrecidasBox = condOfrecida ? condOfrecidasHtml(inp.descCond) : "";
 	const subtotal = servicioNeto - descCondMonto + slaMesVal + feeVal;
-	// Con API: el certificado se factura como consumo del servicio de validación
+	// Con integración SDK: el certificado se factura como consumo del servicio de validación
 	// de identidad y la firma como documento firmado (ver comentario arriba).
 	const certLbl = langApi ? "Consumos de validación · persona jurídica" : "Certificados jurídicos";
 	const certLblFis = langApi ? "Consumos de validación · persona física" : "Certificados físicos";
@@ -734,8 +734,8 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
 
 	const firmaWord = (n) => `${n} ${n === 1 ? firmaSing : firmaPlur}`;
-	// El nombre de la unidad: "validaciones de identidad" (IDC con API), "identidades"
-	// (IDC sin API) o "certificados" (Volumen).
+	// El nombre de la unidad: "validaciones de identidad" (IDC con SDK), "identidades"
+	// (IDC sin SDK) o "certificados" (Volumen).
 	const unidadPl = langApi ? "validaciones de identidad" : (esIDC ? "identidades" : "certificados");
 	const unidadArt = esIDC ? "las" : "los"; // identidades/validaciones → las; certificados → los
 	const certJurWord = langApi ? "consumos de validación · persona jurídica" : "certificados jurídicos";
@@ -798,16 +798,16 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 			: "No se abona por adelantado: se paga mes a mes durante la vigencia.",
 	}) : "";
 
-	const subtitleParts = [sinApi ? `Cotización de volumen directo, sin integración ${esIDC ? "API" : "SDK"}` : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
+	const subtitleParts = [sinApi ? `Cotización de volumen directo, sin integración SDK` : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
 	if (showIva) subtitleParts.push("precios en pesos argentinos, IVA discriminado al 21%");
 	// El descuento del segmento ya viene aplicado en el precio unitario, así que se
 	// nombra como condición alcanzada y no como una línea aparte (sería doble conteo).
 	if ((res.segmentoDescuento || 0) > 0) subtitleParts.push(`descuento por volumen del ${Math.round(res.segmentoDescuento * 100)}% ya aplicado`);
 
-	// Con API, aclaración de facturación al pie: el consumo se cobra aunque la
-	// validación resulte inválida, y la firma se cobra por cada documento firmado.
+	// Con integración SDK, aclaración de facturación al pie: el consumo se cobra aunque
+	// la validación resulte inválida, y la firma se cobra por cada documento firmado.
 	const footnote = langApi
-		? `<strong style="color:${DK};">Consumo del servicio de validación de identidad:</strong> se factura cada llamada a la API, aunque la validación resulte inválida — el servicio se ejecuta igual. &nbsp;·&nbsp; <strong style="color:${DK};">Documento firmado:</strong> se factura por cada documento firmado; si en una misma operación se firman varios documentos, se cobra cada uno.`
+		? `<strong style="color:${DK};">Consumo del servicio de validación de identidad:</strong> se factura cada validación de identidad, aunque resulte inválida — el servicio se ejecuta igual. &nbsp;·&nbsp; <strong style="color:${DK};">Documento firmado:</strong> se factura por cada documento firmado; si en una misma operación se firman varios documentos, se cobra cada uno.`
 		: "";
 
 	// Segmento alcanzado: el cliente cae en un solo segmento por su compromiso, y su
@@ -817,7 +817,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const segDescPts = res.segmentoDescuento != null ? Math.round(res.segmentoDescuento * 100) : 0;
 	const segKicker = segNombre
 		? `Segmento ${segNombre}${segDescPts > 0 ? ` · ${segDescPts}% por volumen` : ""}`
-		: (langApi ? "Modelo comercial · consumo por API" : "Modelo comercial · volumen");
+		: (langApi ? "Modelo comercial · consumo por validación de identidad" : "Modelo comercial · volumen");
 
 	return commercialSlide({
 		kicker: segKicker,
@@ -901,7 +901,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, langApi) {
 	const proy = inp.proyeccion || {};
 	// Volumen (modelo nuevo): escalonado estándar por firmas absolutas.
 	if (proy.mode === "firmas") return s3VolumenEscalonado(deal, clientName, currency, tc, pageN);
-	// Wording de facturación alineado a la slide comercial: con API, certificado →
+	// Wording de facturación alineado a la slide comercial: con integración SDK, certificado →
 	// validación de identidad y firma → documento firmado (solo presentación).
 	const certN = langApi ? "validación de identidad" : "certificado";
 	const certNpl = langApi ? "validaciones de identidad" : "certificados";
@@ -1163,7 +1163,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 	const sinApiB2B2C = isUnit(deal.channel) && deal.inputs?.integracion === "sin_api";
 	// Ningún Packs lleva slide de integración ni lenguaje técnico (fee, SLA,
 	// kick-off): se compran packs cerrados, con o sin descuento. Eso es exclusivo
-	// de Volumen con API.
+	// de Volumen con SDK.
 	const noApi = sinApiB2B2C || packs;
 
 	// Slide de proyección de crecimiento: solo B2B2C, con la proyección activa y
@@ -1183,8 +1183,8 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 		: isUnit(deal.channel)
 			? s3B2B2C(deal, clientName, currency, tc, channelConfig, s3Page)
 			: s3Dist(deal, clientName, currency, tc, channelConfig, models);
-	// Sólo IDC con API usa el lenguaje de validación/documento firmado; Volumen (aunque
-	// tome la modalidad con API) mantiene "certificado"/"firma" en la proyección.
+	// Sólo IDC con SDK usa el lenguaje de validación/documento firmado; Volumen (aunque
+	// tome la modalidad con SDK) mantiene "certificado"/"firma" en la proyección.
 	const proyLangApi = isIDC(deal.channel) && deal.inputs?.integracion !== "sin_api";
 	const proySlide = hasProy ? s3B2B2CProyeccion(deal, clientName, currency, tc, proyPage, proyLangApi) : "";
 
@@ -1197,7 +1197,7 @@ function buildHTML(deal, client, currency, tc, channelConfig, models, tcMeta) {
 </head>
 <body>
 ${s1Cover(clientName, deal.fecha, noApi, listaPura, cotId, currency, tc, tcMeta)}
-${noApi ? "" : s2Integracion(clientName, isIDC(deal.channel) ? "API" : "SDK")}
+${noApi ? "" : s2Integracion(clientName, "SDK")}
 ${s3}
 ${proySlide}
 ${s4Pasos(clientName, noApi, pasosPage)}

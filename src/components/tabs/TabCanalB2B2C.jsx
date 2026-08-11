@@ -144,8 +144,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	});
 
 	const conApi = integracion !== "sin_api";
-	// Terminología de integración por canal: IDC integra por API, Volumen por SDK.
-	const intgTerm = esIDC ? "API" : "SDK";
+	// La integración es siempre por SDK (Lakaut no expone una API de integración).
+	const intgTerm = "SDK";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
 	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
 
@@ -1191,7 +1191,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				{/* Ajuste de precios personalizado (por componente) */}
 				<div className="flex flex-col gap-3">
 					<label className="flex items-center gap-2.5 cursor-pointer select-none">
-						<input type="checkbox" checked={showOverrides} onChange={function (e) { setShowOverrides(e.target.checked); }} className="rounded" />
+						<input type="checkbox" checked={showOverrides} onChange={function (e) { setShowOverrides(e.target.checked); if (!e.target.checked) { setOverridePrecioCert(""); setOverridePrecioFirma(""); } }} className="rounded" />
 						<span className="text-sm font-medium">Ajuste de precios personalizado</span>
 						{overrideActive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
 					</label>
@@ -1408,7 +1408,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			</FieldGroup>
 
 			{/* ── Referencia ── */}
-			<CollapsibleSection title="Referencia · precios por segmento, API y SLA" subtitle="Tabla completa del modelo de volumen (Borrador v5).">
+			<CollapsibleSection title="Referencia · precios por segmento, SDK y SLA" subtitle="Tabla completa del modelo de volumen (Borrador v5).">
 				<TabCanalB2B2CPrecios costs={costs} />
 			</CollapsibleSection>
 		</QuoteLayout>

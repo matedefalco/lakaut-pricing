@@ -338,7 +338,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 				{q.clientName || "(sin nombre)"}
 				{isUnit(q.channel) && (
 					<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
-						{(q.inputs?.integracion === "sin_api" ? "sin " : "") + (isVolumenLike(q.channel) ? "SDK" : "API")}
+						{(q.inputs?.integracion === "sin_api" ? "sin " : "") + "SDK"}
 					</Badge>
 				)}
 			</TableCell>

@@ -229,10 +229,12 @@ export const VOLUMEN_PROYECCION = [
 ];
 
 // Fee de implementación (única vez). Default = punto medio del rango, editable.
+// La integración es por SDK (no API). Los ids se conservan (standard/professional/
+// enterprise) porque viajan en cotizaciones y configs guardadas; solo cambia el label.
 export const B2B2C_API_TIERS = [
-	{ id: "standard", label: "API Standard", feeMin: 1500, feeMax: 5000, feeDefault: 3250 },
-	{ id: "professional", label: "API Professional", feeMin: 5000, feeMax: 25000, feeDefault: 15000 },
-	{ id: "enterprise", label: "API Enterprise", feeMin: 25000, feeMax: 50000, feeDefault: 37500 },
+	{ id: "standard", label: "SDK Standard", feeMin: 1500, feeMax: 5000, feeDefault: 3250 },
+	{ id: "professional", label: "SDK Professional", feeMin: 5000, feeMax: 25000, feeDefault: 15000 },
+	{ id: "enterprise", label: "SDK Enterprise", feeMin: 25000, feeMax: 50000, feeDefault: 37500 },
 ];
 
 // ── Palancas de descuento comercial ──────────────────────────────────────────

@@ -294,7 +294,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				</p>
 			</CollapsibleSection>
 
-			{/* ── 3 · API Tiers B2B2C ── */}
+			{/* ── 3 · SDK Tiers B2B2C ── */}
 			{/* ── 3 · Volumen · precio base + escala de descuento ── */}
 			<CollapsibleSection
 				title="3 · Volumen · Precio base y segmentos por compromiso"
@@ -406,7 +406,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				</p>
 			</CollapsibleSection>
 
-			<CollapsibleSection title="4 · IDC · API · Fee de implementación">
+			<CollapsibleSection title="4 · IDC · SDK · Fee de implementación">
 				<Table>
 					<TableHeader>
 						<TableRow>
@@ -435,7 +435,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar API tier" onClick={function () { addRow("b2b2cApiTiers", { id: genId("api"), label: "Nuevo API tier", feeMin: 0, feeMax: 0, feeDefault: 0 }); }} />
+				<AddRowButton label="Agregar SDK tier" onClick={function () { addRow("b2b2cApiTiers", { id: genId("sdk"), label: "Nuevo SDK tier", feeMin: 0, feeMax: 0, feeDefault: 0 }); }} />
 			</CollapsibleSection>
 
 			{/* ── 4 · Planes SLA ── */}

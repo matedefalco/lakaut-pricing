@@ -160,6 +160,18 @@ function normalizeChannelConfig(raw) {
 		if (merged.volumenProyeccion.length === 0) merged.volumenProyeccion = VOLUMEN_PROYECCION;
 	}
 
+	// Terminología: la integración pasó de "API" a "SDK". Reescribe los labels guardados
+	// que todavía digan "API …" para que la config existente muestre SDK sin recargar el
+	// default (que borraría precios/fees editados). Solo toca el texto visible; los ids y
+	// los fees quedan igual, así las cotizaciones guardadas siguen resolviendo su tier.
+	if (Array.isArray(merged.b2b2cApiTiers)) {
+		merged.b2b2cApiTiers = merged.b2b2cApiTiers.map(function (t) {
+			return t && typeof t.label === "string" && t.label.indexOf("API") !== -1
+				? Object.assign({}, t, { label: t.label.replace(/API/g, "SDK") })
+				: t;
+		});
+	}
+
 	// Niveles de Distribuidores-Volumen: si la config guardada no los trae (config
 	// anterior a este canal), se cae al default. No se derivan de distributorTiers
 	// porque su columna de descuentos es distinta (prudente por el piso de margen).

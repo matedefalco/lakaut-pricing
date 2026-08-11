@@ -174,7 +174,7 @@ export const DEFAULT_MODELS = [
 			"Firmas digitales ilimitadas",
 			"Sello de competencia incluido",
 			"Certificados y admins a medida",
-			"Integración API",
+			"Integración SDK",
 			"SLA dedicado",
 			"Soporte 24x7",
 		],
