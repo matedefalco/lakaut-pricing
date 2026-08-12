@@ -88,6 +88,21 @@ export const WEB_PRODUCTS = [
 	},
 ];
 
+// ── Firma adicional del canal Web · escala por volumen ────────────────────────
+// Precio por firma adicional del sitio ("Agregá más firmas a tu cuenta", pago
+// único): a mayor cantidad, menor el precio por unidad. Reemplaza el precio plano
+// por plan que traían los modelos. Es la MISMA escala para todos los planes y está
+// en ARS (moneda del catálogo); el cotizador la convierte a USD con el TC porque el
+// resto del cálculo del canal es USD-native. El precio de un tramo aplica desde su
+// umbral de firmas hacia arriba; por debajo del primer tramo se usa el primero.
+// Distribuidores-packs descuenta sobre esta lista, así que hereda la escala.
+export const WEB_FIRMA_EXTRA_TIERS = [
+	{ firmas: 10, precioARS: 1493 },
+	{ firmas: 20, precioARS: 1344 },
+	{ firmas: 50, precioARS: 1195 },
+	{ firmas: 100, precioARS: 1045 },
+];
+
 // ── Canal B · Distribuidores e Integradores ────────────────────────────────────
 // Descuento sobre la lista web. El nivel es el MAYOR que resulte entre dos
 // variables DECLARADAS del socio, no del volumen de la cotización en curso:

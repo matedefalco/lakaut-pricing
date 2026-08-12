@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { DISTRIBUTOR_TIERS, DISTRIBUIDOR_VOL_TIERS, B2B2C_SEGMENTS, B2B2C_FIRMAS_INCLUIDAS, B2B2C_MARKUP_MIN, B2B2C_API_TIERS, VOLUMEN_BASE, VOLUMEN_SEGMENTS, VOLUMEN_PROYECCION, SLA_PLANS, COMMERCIAL_LEVERS, ABONO_DESCUENTO_PCT } from "../data/channels";
+import { DISTRIBUTOR_TIERS, DISTRIBUIDOR_VOL_TIERS, WEB_FIRMA_EXTRA_TIERS, B2B2C_SEGMENTS, B2B2C_FIRMAS_INCLUIDAS, B2B2C_MARKUP_MIN, B2B2C_API_TIERS, VOLUMEN_BASE, VOLUMEN_SEGMENTS, VOLUMEN_PROYECCION, SLA_PLANS, COMMERCIAL_LEVERS, ABONO_DESCUENTO_PCT } from "../data/channels";
 import { loadConfig, saveConfig, subscribeConfig } from "../lib/supabase";
 
 const ChannelConfigContext = createContext(null);
@@ -15,6 +15,9 @@ const DEFAULT_CHANNEL_CONFIG = {
 	b2b2cSegments: B2B2C_SEGMENTS,
 	b2b2cMarkupMin: B2B2C_MARKUP_MIN,
 	b2b2cApiTiers: B2B2C_API_TIERS,
+	// Escala por volumen del precio de firma adicional del canal Web (ARS). Los
+	// canales de packs (Web y Distribuidores) la usan en vez del precio por plan.
+	webFirmaExtraTiers: WEB_FIRMA_EXTRA_TIERS,
 	// Escala de descuentos del canal Volumen (certificados y firmas sueltos).
 	volumenBase: VOLUMEN_BASE,
 	volumenSegments: VOLUMEN_SEGMENTS,
@@ -170,6 +173,20 @@ function normalizeChannelConfig(raw) {
 				? Object.assign({}, t, { label: t.label.replace(/API/g, "SDK") })
 				: t;
 		});
+	}
+
+	// Escala por volumen de la firma adicional del canal Web: normaliza a
+	// { firmas, precioARS } válidos y ordenados por volumen. Sin nada cargado → default.
+	if (!Array.isArray(merged.webFirmaExtraTiers) || merged.webFirmaExtraTiers.length === 0) {
+		merged.webFirmaExtraTiers = WEB_FIRMA_EXTRA_TIERS;
+	} else {
+		merged.webFirmaExtraTiers = merged.webFirmaExtraTiers
+			.map(function (t) {
+				return { firmas: Math.max(0, Math.round(Number(t.firmas) || 0)), precioARS: Math.max(0, Number(t.precioARS) || 0) };
+			})
+			.filter(function (t) { return t.firmas > 0 && t.precioARS > 0; })
+			.sort(function (a, b) { return a.firmas - b.firmas; });
+		if (merged.webFirmaExtraTiers.length === 0) merged.webFirmaExtraTiers = WEB_FIRMA_EXTRA_TIERS;
 	}
 
 	// Niveles de Distribuidores-Volumen: si la config guardada no los trae (config

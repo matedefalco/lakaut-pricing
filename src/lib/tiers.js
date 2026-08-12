@@ -88,6 +88,21 @@ export function facturacionAtBase(certs, firmas, base) {
 	return (Math.max(0, Number(certs) || 0) * bc) + (Math.max(0, Number(firmas) || 0) * bf);
 }
 
+// ── Firma adicional del canal Web · escala por volumen ──
+// Precio por firma adicional (en ARS) según la cantidad comprada: devuelve el precio
+// del tramo más alto cuyo umbral de firmas no supera la cantidad. Por debajo del
+// primer tramo usa el primero (es el precio del bundle más chico del catálogo).
+// `tiers` = [{ firmas, precioARS }] ordenado ascendente por firmas. Sin tramos → null.
+export function webFirmaExtraUnitARS(qty, tiers) {
+	if (!Array.isArray(tiers) || tiers.length === 0) return null;
+	const n = Math.max(0, Number(qty) || 0);
+	let price = Number(tiers[0].precioARS) || 0;
+	tiers.forEach(function (t) {
+		if (n >= (Number(t.firmas) || 0)) price = Number(t.precioARS) || price;
+	});
+	return price;
+}
+
 // ── Rentabilidad de los canales por elemento ──
 // El guardarraíl del canal se mide como MARKUP (precio ÷ costo), que es la métrica
 // de la columna "MARGEN" del Borrador v5: los 74% de Start Up son 0,65 ÷ 0,3741.

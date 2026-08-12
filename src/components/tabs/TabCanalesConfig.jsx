@@ -228,6 +228,38 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distribuidorVolTiers", { id: genId("dvtier"), label: "Nuevo nivel", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null }); }} />
 			</CollapsibleSection>
 
+			{/* ── 1c · Web · Firma adicional por volumen ── */}
+			<CollapsibleSection
+				title="1c · Web · Firma adicional (escala por volumen)"
+				subtitle="Precio por firma adicional del catálogo web, en ARS: a mayor cantidad comprada, menor el precio por unidad. Reemplaza el precio plano por plan. El precio de un tramo aplica desde su umbral de firmas hacia arriba. Distribuidores-packs descuenta sobre esta lista."
+			>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead className={thNum}>Desde (firmas)</TableHead>
+							<TableHead className={thNum}>Precio por firma (ARS)</TableHead>
+							<TableHead className="w-10" />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{(draft.webFirmaExtraTiers || []).map(function (step, idx) {
+							function upd(field, val) {
+								const next = draft.webFirmaExtraTiers.map(function (s, i) { return i === idx ? Object.assign({}, s, { [field]: val }) : s; });
+								updDraft({ webFirmaExtraTiers: next });
+							}
+							return (
+								<TableRow key={idx}>
+									<TableCell><NumCell value={step.firmas} decimals={0} onChange={function (v) { upd("firmas", v); }} /></TableCell>
+									<TableCell><NumCell value={step.precioARS} decimals={0} onChange={function (v) { upd("precioARS", v); }} /></TableCell>
+									<TableCell><DeleteRowButton onClick={function () { removeRow("webFirmaExtraTiers", idx); }} /></TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+				<AddRowButton label="Agregar tramo" onClick={function () { addRow("webFirmaExtraTiers", { firmas: 0, precioARS: 0 }); }} />
+			</CollapsibleSection>
+
 			{/* ── 2 · Volumen · escala de precios por IDC ── */}
 			<CollapsibleSection
 				title="2 · IDC · Escala de precios por IDC"

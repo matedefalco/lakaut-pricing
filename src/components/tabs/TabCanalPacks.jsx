@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useModels } from "@/context/ModelsContext";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
-import { getDistributorTier, distributorTierDriver } from "@/lib/tiers";
+import { getDistributorTier, distributorTierDriver, webFirmaExtraUnitARS } from "@/lib/tiers";
 import { dealStatus } from "@/lib/dealStatus";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
@@ -50,6 +50,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 	const models = allModels.filter(function (m) { return m.activo !== false; });
 	const { channelConfig } = useChannelConfig();
 	const distributorTiers = channelConfig.distributorTiers;
+	// Escala por volumen del precio de firma adicional (ARS). Misma para Web y
+	// Distribuidores; sobre ella, Distribuidores aplica su descuento de nivel.
+	const webFirmaExtraTiers = channelConfig.webFirmaExtraTiers;
 	const commercialLevers = channelConfig.commercialLevers;
 	const { fMoney, fMoney2 } = makeMoney(currency, tc);
 	const { toast } = useToast();
@@ -152,11 +155,18 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 			}
 			items.push({ id: p.id, label: p.label, segment: p.segment, qty: q, certs: q * (p.certs || 1), firmas: p.ilimitadas ? null : q * (p.firmas || 0), ilimitadas: !!p.ilimitadas, subtotal: q * p.priceUSD });
 		});
-		const precioFirmaAdic = totalQtyWithPrice > 0 ? weightedFirmaPrice / totalQtyWithPrice : 0;
-		const firmasTotal = firmasIncl + Math.max(0, Number(firmasAdic) || 0);
-		facturacionLista += Math.max(0, Number(firmasAdic) || 0) * precioFirmaAdic;
-		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas, precioFirmaAdic, items };
-	}, [models, qtys, firmasAdic]);
+		const qAdic = Math.max(0, Number(firmasAdic) || 0);
+		// Precio por firma adicional: sale de la escala por volumen del catálogo web (ARS,
+		// la misma para todos los planes) según la cantidad comprada. Se convierte a USD
+		// con el TC porque el cálculo del canal es USD-native. Si no hay escala cargada,
+		// cae al precio ponderado por plan que traen los modelos.
+		const precioFirmaAdicModelo = totalQtyWithPrice > 0 ? weightedFirmaPrice / totalQtyWithPrice : 0;
+		const precioFirmaAdicARS = webFirmaExtraUnitARS(qAdic, webFirmaExtraTiers);
+		const precioFirmaAdic = (precioFirmaAdicARS != null && tc > 0) ? precioFirmaAdicARS / tc : precioFirmaAdicModelo;
+		const firmasTotal = firmasIncl + qAdic;
+		facturacionLista += qAdic * precioFirmaAdic;
+		return { facturacionLista, certsTotal, firmasIncl, firmasTotal, ilimitadasUsadas, precioFirmaAdic, precioFirmaAdicARS, items };
+	}, [models, qtys, firmasAdic, webFirmaExtraTiers, tc]);
 
 	// Descuento del abono configurable (default de la config, editable por cotización).
 	const descAbono = Math.min(1, Math.max(0, Number(abonoDescPct) || 0) / 100);
@@ -552,7 +562,18 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 				<Separator />
 
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<NumberField label="Firmas adicionales" value={firmasAdic} onChange={setFirmasAdic} min={0} />
+					<NumberField label="Firmas adicionales" value={firmasAdic} onChange={setFirmasAdic} min={0}
+						note={(function () {
+							const q = Math.max(0, Number(firmasAdic) || 0);
+							if (!Array.isArray(webFirmaExtraTiers) || webFirmaExtraTiers.length === 0 || !(tc > 0)) return "precio por firma según el plan";
+							if (q <= 0) return "Escala por volumen: " + webFirmaExtraTiers.map(function (t) { return t.firmas + "→" + fMoney(t.precioARS / tc); }).join(" · ");
+							const next = webFirmaExtraTiers.find(function (t) { return t.firmas > q; });
+							const unidad = fMoney(calc.precioFirmaAdic) + " c/u";
+							return next
+								? unidad + " · con " + (next.firmas - q).toLocaleString("es-AR") + " firmas más baja a " + fMoney(next.precioARS / tc)
+								: unidad + " · mejor precio de la escala";
+						}())}
+					/>
 				</div>
 			</FieldGroup>
 
