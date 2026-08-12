@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal } from "lucide-react";
+import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut } from "lucide-react";
 import { useDolarTC, DOLAR_SOURCES } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { BLUE, GRAY, BLACK, WHITE, os } from "./theme/tokens";
@@ -9,6 +9,7 @@ import { exportProposal } from "./utils/exportProposal";
 import { ModelsProvider, useModels } from "./context/ModelsContext";
 import { useDeals } from "./lib/useDeals";
 import { useClients } from "./lib/useClients";
+import { useAuth } from "./lib/useAuth";
 import { DiscountProvider } from "./context/DiscountContext";
 import { ChannelConfigProvider, useChannelConfig } from "./context/ChannelConfigContext";
 import { ToastProvider } from "./components/ui/Toaster";
@@ -210,6 +211,7 @@ function LakautCalcInner() {
 		};
 	});
 
+	const { signOut } = useAuth();
 	const [activeNavItem, setActiveNavItem] = useState("inicio");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [pendingEdit, setPendingEdit] = useState(null);
@@ -391,6 +393,9 @@ function LakautCalcInner() {
 					<div style={Object.assign({}, os(11, 400, GRAY), { opacity: 0.7 })}>
 						{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
 					</div>
+					<button onClick={signOut} className="transition-colors hover:text-foreground" style={{ background: "none", border: "none", cursor: "pointer", color: GRAY, padding: "4px 6px", borderRadius: 6, display: "flex", alignItems: "center", gap: 5 }} title="Cerrar sesión">
+						<LogOut size={15} />
+					</button>
 				</div>
 
 				{/* Content area · el scroll lo maneja el documento (no este div): así el
