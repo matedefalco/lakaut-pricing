@@ -1,7 +1,44 @@
 import { useState, useMemo } from "react";
-import { Pencil, Trash2, Check, X, ExternalLink, ArrowLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Pencil, Trash2, Check, X, ExternalLink, ArrowLeft, ChevronRight, ChevronDown, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/Toaster";
+
+// Fila de un error de importación: motivo claro arriba y, plegado, el motivo
+// técnico crudo (el que devuelve Postgres/Supabase) por si hace falta debug.
+function ImportErrorRow({ err }) {
+	const [showTech, setShowTech] = useState(false);
+	return (
+		<li className="rounded-md border border-border/70 bg-background px-2.5 py-2">
+			<div className="flex items-baseline gap-2">
+				<span className="text-xs font-semibold text-foreground">{err.empresa || "(sin nombre)"}</span>
+				{err.empresa_id && <span className="text-[10px] tabular-nums text-muted-foreground opacity-70">{err.empresa_id}</span>}
+			</div>
+			<div className="mt-0.5 text-xs text-muted-foreground">{err.motivo || "No se pudo guardar el registro"}</div>
+			{err.motivo_tecnico && (
+				<div className="mt-1">
+					<button
+						onClick={function () { setShowTech(function (v) { return !v; }); }}
+						className="text-[10px] font-medium text-muted-foreground/80 hover:text-foreground transition-colors"
+					>
+						{showTech ? "Ocultar técnico" : "Detalle técnico"}
+					</button>
+					{showTech && (
+						<pre className="mt-1 whitespace-pre-wrap break-words rounded bg-muted/60 p-1.5 text-[10px] leading-snug text-muted-foreground">{err.motivo_tecnico}</pre>
+					)}
+				</div>
+			)}
+		</li>
+	);
+}
+
+function ImportErrorList({ errores }) {
+	if (!errores || !errores.length) return null;
+	return (
+		<ul className="space-y-1.5">
+			{errores.map(function (e, i) { return <ImportErrorRow key={i} err={e} />; })}
+		</ul>
+	);
+}
 import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -75,16 +112,23 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 		}
 		const nuevos = res.insertados || 0;
 		const act = (res.actualizados || 0) + (res.adoptados || 0);
+		const errores = res.errores || [];
+		// Reaparece el panel (si estaba oculto) y abre el detalle cuando hubo errores.
+		setImportPanelDismissed(false);
+		setImportPanelOpen(errores.length > 0);
 		const parts = [];
 		if (nuevos) parts.push(nuevos + " nuevo" + (nuevos !== 1 ? "s" : ""));
 		if (act) parts.push(act + " actualizado" + (act !== 1 ? "s" : ""));
 		toast({
-			variant: (res.errores && res.errores.length) ? "info" : "success",
+			variant: errores.length ? "info" : "success",
 			emoji: "📇",
 			title: "Sheet importado",
 			description: (parts.length ? parts.join(" · ") : "Sin cambios") +
-				((res.errores && res.errores.length) ? " · " + res.errores.length + " con error" : ""),
+				(errores.length ? " · " + errores.length + " con error" : ""),
 			duration: 7000,
+			expandable: errores.length
+				? { label: "Ver detalle (" + errores.length + ")", node: <ImportErrorList errores={errores} /> }
+				: null,
 		});
 	}
 
@@ -93,6 +137,10 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	const [selectedId, setSelectedId] = useState(null);
 	const [editingName, setEditingName] = useState(false);
 	const [nameInput, setNameInput] = useState("");
+	// Panel "Última importación": abierto = lista de errores desplegada;
+	// dismissed = ocultado por el usuario en esta sesión.
+	const [importPanelOpen, setImportPanelOpen] = useState(false);
+	const [importPanelDismissed, setImportPanelDismissed] = useState(false);
 
 	const clients = clientsApi?.clients || [];
 	const deals = dealsApi?.deals || [];
@@ -377,6 +425,65 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					</Button>
 				)}
 			/>
+
+			{/* Panel de la última importación del Sheet. Persiste entre recargas (se
+			    guarda en app_config) y muestra el detalle de las empresas que fallaron. */}
+			{clientsApi?.lastImport && !importPanelDismissed && (function () {
+				const li = clientsApi.lastImport;
+				const errores = li.errores || [];
+				const hasErr = errores.length > 0;
+				const nuevos = li.insertados || 0;
+				const act = (li.actualizados || 0) + (li.adoptados || 0);
+				const chips = [];
+				if (nuevos) chips.push(nuevos + " nuevo" + (nuevos !== 1 ? "s" : ""));
+				if (act) chips.push(act + " actualizado" + (act !== 1 ? "s" : ""));
+				if (li.omitidos) chips.push(li.omitidos + " omitido" + (li.omitidos !== 1 ? "s" : ""));
+				return (
+					<div className={cn(
+						"rounded-lg border px-3.5 py-3",
+						hasErr ? "border-warning/40 bg-warning/5" : "border-success/40 bg-success/5"
+					)}>
+						<div className="flex items-start gap-2.5">
+							{hasErr
+								? <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
+								: <CheckCircle2 className="size-4 shrink-0 text-success mt-0.5" />}
+							<div className="min-w-0 flex-1">
+								<div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+									<span className="text-sm font-semibold text-foreground">Última importación</span>
+									<span className="text-xs text-muted-foreground">{fDate(li.at)}</span>
+								</div>
+								<p className="mt-0.5 text-xs text-muted-foreground">
+									{chips.length ? chips.join(" · ") : "Sin cambios"}
+									{hasErr && <span className="text-warning font-medium"> · {errores.length} con error</span>}
+								</p>
+								{hasErr && (
+									<div className="mt-2">
+										<button
+											onClick={function () { setImportPanelOpen(function (v) { return !v; }); }}
+											className="flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors"
+										>
+											<ChevronDown className={cn("size-3.5 transition-transform", importPanelOpen && "rotate-180")} />
+											{importPanelOpen ? "Ocultar detalle" : "Ver qué empresas fallaron"}
+										</button>
+										{importPanelOpen && (
+											<div className="mt-2 max-h-72 overflow-y-auto pr-1">
+												<ImportErrorList errores={errores} />
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+							<button
+								onClick={function () { setImportPanelDismissed(true); }}
+								className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+								title="Ocultar"
+							>
+								<X className="size-4" />
+							</button>
+						</div>
+					</div>
+				);
+			})()}
 
 			{/* KPI summary */}
 			<div className="flex gap-3 flex-wrap">

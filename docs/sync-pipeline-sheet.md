@@ -119,6 +119,14 @@ columnas nuevas: `cuit` y `razon_social`. La función las toma automáticamente 
 existen (si no, intenta parsearlas del texto de la columna `notas`, donde hoy
 algunas filas ya las tienen como "Razón social: … / CUIT: …").
 
+### Si alguna empresa falla al importar
+
+El toast trae **"Ver detalle (N)"**, que despliega la lista de empresas que no se
+pudieron guardar, con el `empresa_id`, el nombre, un **motivo claro** y —plegado—
+el **detalle técnico**. El mismo detalle queda en el panel **"Última importación"**
+arriba de la pestaña Clientes (persiste entre recargas). La causa más común es un
+`empresa_id` repetido en el Sheet: cada fila tiene que tener uno único.
+
 ---
 
 ## Mapeos que aplica la importación

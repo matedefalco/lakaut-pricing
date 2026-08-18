@@ -6,12 +6,17 @@ import { supabase, loadConfig, saveConfig } from "./supabase";
 // (`client_tipos`). Así no requiere migración de esquema. Cada cliente devuelto
 // por el hook trae `.tipo` mergeado desde ese mapa.
 const TIPOS_KEY = "client_tipos";
+// Resumen de la última importación del Sheet (contadores + detalle de errores).
+// Se persiste para que el panel "Última importación" de la pestaña Clientes lo
+// muestre aunque recargues la página.
+const LAST_IMPORT_KEY = "last_pipeline_import";
 
 export function useClients() {
 	const [rows, setRows] = useState([]);
 	const [tipos, setTipos] = useState({});
 	const [loading, setLoading] = useState(true);
 	const [importing, setImporting] = useState(false);
+	const [lastImport, setLastImport] = useState(null);
 
 	const fetchClients = useCallback(function () {
 		return supabase.from("clients").select("*").order("name").then(function (res) {
@@ -24,11 +29,14 @@ export function useClients() {
 		Promise.all([
 			supabase.from("clients").select("*").order("name"),
 			loadConfig(TIPOS_KEY),
+			loadConfig(LAST_IMPORT_KEY),
 		]).then(function (res) {
 			const clientsRes = res[0];
 			const tiposVal = res[1];
+			const lastImportVal = res[2];
 			if (!clientsRes.error && clientsRes.data) setRows(clientsRes.data);
 			if (tiposVal && typeof tiposVal === "object") setTipos(tiposVal);
+			if (lastImportVal && typeof lastImportVal === "object") setLastImport(lastImportVal);
 			setLoading(false);
 		});
 	}, []);
@@ -122,6 +130,10 @@ export function useClients() {
 			}
 			if (data && data.error) return { error: data.error };
 			await fetchClients();
+			// Guardamos el resumen (con detalle de errores) para el panel de Clientes.
+			const summary = Object.assign({ at: new Date().toISOString() }, data);
+			setLastImport(summary);
+			saveConfig(LAST_IMPORT_KEY, summary);
 			return data || {};
 		} catch (e) {
 			return { error: e.message || String(e) };
@@ -130,5 +142,5 @@ export function useClients() {
 		}
 	}, [fetchClients]);
 
-	return { clients, loading, importing, create, update, remove, setTipo, importFromSheet, refetch: fetchClients };
+	return { clients, loading, importing, lastImport, create, update, remove, setTipo, importFromSheet, refetch: fetchClients };
 }

@@ -149,6 +149,32 @@ function toNumber(v: unknown): number | null {
 	return Number.isFinite(n) ? n : null;
 }
 
+// Traduce el error crudo de Postgres/Supabase a un motivo accionable en español.
+// El mensaje técnico igual viaja aparte (motivo_tecnico) para debug.
+function motivoLegible(msg: string): string {
+	const m = (msg || "").toLowerCase();
+	if (m.includes("duplicate key") || m.includes("unique constraint")) {
+		return "empresa_id duplicado en el Sheet (dos filas con el mismo LK-E-…)";
+	}
+	if (m.includes("null value") || m.includes("not-null") || m.includes("not null")) {
+		return "Faltan datos obligatorios en la fila";
+	}
+	if (m.includes("invalid input syntax") || m.includes("invalid text representation")) {
+		return "Un valor tiene formato inválido (ej. número o fecha mal cargados)";
+	}
+	if (m.includes("permission") || m.includes("row-level security") || m.includes("rls")) {
+		return "Permisos insuficientes para guardar el registro";
+	}
+	return "No se pudo guardar el registro";
+}
+
+interface ImportError {
+	empresa_id: string;
+	empresa: string;
+	motivo: string;
+	motivo_tecnico: string;
+}
+
 Deno.serve(async (req: Request) => {
 	if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 	if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -215,7 +241,7 @@ Deno.serve(async (req: Request) => {
 		const cell = (row: string[], i: number) => (i >= 0 && i < row.length ? String(row[i] ?? "").trim() : "");
 		const nowIso = new Date().toISOString();
 
-		const summary = { total: 0, insertados: 0, actualizados: 0, adoptados: 0, omitidos: 0, errores: [] as string[] };
+		const summary = { total: 0, insertados: 0, actualizados: 0, adoptados: 0, omitidos: 0, errores: [] as ImportError[] };
 
 		for (let r = 1; r < rows.length; r++) {
 			const row = rows[r];
@@ -275,7 +301,13 @@ Deno.serve(async (req: Request) => {
 					summary.insertados++;
 				}
 			} catch (e) {
-				summary.errores.push(`${empresaId} (${empresa}): ${(e as Error).message}`);
+				const msg = (e as Error).message || String(e);
+				summary.errores.push({
+					empresa_id: empresaId,
+					empresa: empresa,
+					motivo: motivoLegible(msg),
+					motivo_tecnico: msg,
+				});
 			}
 		}
 

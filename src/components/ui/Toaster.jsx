@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { Check, AlertCircle, Info, X, FileText, ArrowRight, Trophy } from "lucide-react";
+import { Check, AlertCircle, Info, X, FileText, ArrowRight, Trophy, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +122,9 @@ function ToastItem({ t, onDismiss }) {
 	const meta = VARIANT_META[t.variant] || VARIANT_META.success;
 	const Icon = meta.Icon;
 	const duration = t.duration == null ? 6000 : t.duration;
+	// Sección desplegable opcional: `t.expandable = { label, node }`. Al abrirla se
+	// pausa el temporizador para que no se cierre mientras se lee el detalle.
+	const [expanded, setExpanded] = useState(false);
 
 	// Temporizador con pausa on-hover: guardamos cuánto falta y reiniciamos el
 	// setTimeout al entrar/salir el mouse.
@@ -151,6 +154,14 @@ function ToastItem({ t, onDismiss }) {
 		return clearTimer;
 	}, [resume, clearTimer]);
 
+	function toggleExpand() {
+		setExpanded(function (v) {
+			const next = !v;
+			if (next) pause(); else resume();
+			return next;
+		});
+	}
+
 	function runAction(action) {
 		onDismiss(t.id);
 		if (action.onClick) action.onClick();
@@ -176,6 +187,22 @@ function ToastItem({ t, onDismiss }) {
 				<div className="min-w-0 flex-1">
 					{t.title && <p className="text-sm font-semibold text-foreground">{t.title}</p>}
 					{t.description && <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>}
+					{t.expandable && t.expandable.node && (
+						<div className="mt-2">
+							<button
+								onClick={toggleExpand}
+								className="flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors"
+							>
+								<ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
+								{expanded ? "Ocultar detalle" : (t.expandable.label || "Ver detalle")}
+							</button>
+							{expanded && (
+								<div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-border bg-background/60 p-2">
+									{t.expandable.node}
+								</div>
+							)}
+						</div>
+					)}
 					{t.actions && t.actions.length > 0 && (
 						<div className="mt-3 flex flex-wrap gap-2">
 							{t.actions.map(function (a, i) {
