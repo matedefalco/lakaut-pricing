@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
-import { Pencil, Trash2, Check, X, ExternalLink, ArrowLeft, ChevronRight } from "lucide-react";
+import { Pencil, Trash2, Check, X, ExternalLink, ArrowLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/Toaster";
 import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -60,6 +62,31 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	const { channelConfig } = useChannelConfig();
 	const distributorTiers = channelConfig.distributorTiers;
 	const { fMoney } = makeMoney(currency, tc);
+	const { toast } = useToast();
+
+	// Importa el master de empresas desde el Sheet "DB Empresas" (Sales Pipeline).
+	// Ver useClients.importFromSheet y docs/sync-pipeline-sheet.md.
+	async function importSheet() {
+		if (!clientsApi?.importFromSheet) return;
+		const res = await clientsApi.importFromSheet();
+		if (res && res.error) {
+			toast({ variant: "error", title: "No se pudo importar", description: res.error, duration: 9000 });
+			return;
+		}
+		const nuevos = res.insertados || 0;
+		const act = (res.actualizados || 0) + (res.adoptados || 0);
+		const parts = [];
+		if (nuevos) parts.push(nuevos + " nuevo" + (nuevos !== 1 ? "s" : ""));
+		if (act) parts.push(act + " actualizado" + (act !== 1 ? "s" : ""));
+		toast({
+			variant: (res.errores && res.errores.length) ? "info" : "success",
+			emoji: "📇",
+			title: "Sheet importado",
+			description: (parts.length ? parts.join(" · ") : "Sin cambios") +
+				((res.errores && res.errores.length) ? " · " + res.errores.length + " con error" : ""),
+			duration: 7000,
+		});
+	}
 
 	const [search, setSearch] = useState("");
 	const [channelFilter, setChannelFilter] = useState("all");
@@ -185,10 +212,20 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 								</div>
 							)}
 						</div>
-						<div className="flex items-center gap-2 pl-11">
+						<div className="flex flex-wrap items-center gap-2 pl-11">
 							<ChannelBadge channel={selected.channel} />
+							{selected.tipo && <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{selected.tipo}</span>}
+							{selected.etapa && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{selected.etapa}</span>}
+							{selected.industria && <span className="text-xs text-muted-foreground">{selected.industria}</span>}
 							<span className="text-xs text-muted-foreground">Desde {fDate(selected.created_at)}</span>
 						</div>
+						{(selected.razon_social || selected.cuit || selected.empresa_id) && (
+							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pl-11 text-xs text-muted-foreground">
+								{selected.razon_social && <span>Razón social: <span className="text-foreground">{selected.razon_social}</span></span>}
+								{selected.cuit && <span>CUIT: <span className="text-foreground tabular-nums">{selected.cuit}</span></span>}
+								{selected.empresa_id && <span className="tabular-nums opacity-70">{selected.empresa_id}</span>}
+							</div>
+						)}
 					</div>
 					<button onClick={function () { deleteClient(selected.id); }} className="text-muted-foreground hover:text-destructive transition-colors mt-8">
 						<Trash2 className="size-4" />
@@ -333,6 +370,12 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 			<PageHeader
 				title="Clientes"
 				description="Master de clientes con su historial de cotizaciones y revenue acumulado."
+				actions={clientsApi?.importFromSheet && (
+					<Button variant="outline" size="sm" onClick={importSheet} disabled={clientsApi.importing}>
+						<RefreshCw className={"size-4" + (clientsApi.importing ? " animate-spin" : "")} />
+						{clientsApi.importing ? "Importando…" : "Importar del Sheet"}
+					</Button>
+				)}
 			/>
 
 			{/* KPI summary */}

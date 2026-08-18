@@ -21,6 +21,7 @@ lerna-debug.log*
 # Variables de entorno (¡muy importante!)
 .env
 .env.local
+supabase/.env.local
 .env.development.local
 .env.test.local
 .env.production.local

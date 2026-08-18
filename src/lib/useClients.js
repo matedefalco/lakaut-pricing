@@ -11,6 +11,14 @@ export function useClients() {
 	const [rows, setRows] = useState([]);
 	const [tipos, setTipos] = useState({});
 	const [loading, setLoading] = useState(true);
+	const [importing, setImporting] = useState(false);
+
+	const fetchClients = useCallback(function () {
+		return supabase.from("clients").select("*").order("name").then(function (res) {
+			if (!res.error && res.data) setRows(res.data);
+			return res;
+		});
+	}, []);
 
 	useEffect(function () {
 		Promise.all([
@@ -25,9 +33,11 @@ export function useClients() {
 		});
 	}, []);
 
-	// Lista pública: filas + tipo mergeado.
+	// Lista pública: filas + tipo mergeado. El tipo vive ahora en la columna
+	// `clients.tipo` (lo completa la importación del Sheet); para clientes viejos
+	// creados a mano cae al mapa de config. La columna manda si está.
 	const clients = useMemo(function () {
-		return rows.map(function (c) { return Object.assign({}, c, { tipo: tipos[c.id] || null }); });
+		return rows.map(function (c) { return Object.assign({}, c, { tipo: c.tipo || tipos[c.id] || null }); });
 	}, [rows, tipos]);
 
 	const create = useCallback(async function (name, channel, tipo) {
@@ -93,5 +103,32 @@ export function useClients() {
 		}
 	}, []);
 
-	return { clients, loading, create, update, remove, setTipo };
+	// Dispara la Edge Function que lee el Sheet "DB Empresas" y hace upsert por
+	// empresa_id. Al terminar refresca la lista local. Devuelve el resumen
+	// { insertados, actualizados, adoptados, omitidos, errores } o un objeto con
+	// { error } si algo falló. Ver docs/sync-pipeline-sheet.md.
+	const importFromSheet = useCallback(async function () {
+		setImporting(true);
+		try {
+			const { data, error } = await supabase.functions.invoke("import-pipeline");
+			if (error) {
+				// El body de un error HTTP de la función trae el detalle en context.
+				let detail = error.message || "Error al importar";
+				try {
+					const body = await error.context?.json?.();
+					if (body?.error) detail = body.error;
+				} catch { /* body no-JSON: nos quedamos con el message */ }
+				return { error: detail };
+			}
+			if (data && data.error) return { error: data.error };
+			await fetchClients();
+			return data || {};
+		} catch (e) {
+			return { error: e.message || String(e) };
+		} finally {
+			setImporting(false);
+		}
+	}, [fetchClients]);
+
+	return { clients, loading, importing, create, update, remove, setTipo, importFromSheet, refetch: fetchClients };
 }

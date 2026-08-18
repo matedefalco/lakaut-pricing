@@ -1,0 +1,7 @@
+# Config de Supabase CLI. `project_id` lo setea `supabase link` con el ref de tu
+# proyecto; si ya tenés un config.toml propio, fusioná solo el bloque [functions].
+
+[functions.import-pipeline]
+# verify_jwt = true (default): solo un usuario autenticado en la cotizadora puede
+# disparar la importación. El JWT viaja en el header Authorization del invoke.
+verify_jwt = true
