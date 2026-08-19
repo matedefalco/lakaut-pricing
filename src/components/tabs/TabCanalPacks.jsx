@@ -298,11 +298,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 		const now = new Date().toISOString();
 		const prev = editingId ? dealsApi.deals.find(function (d) { return d.id === editingId; }) : null;
 
-		let client = selectedClient;
-		if (!client && clientsApi) {
-			client = await clientsApi.create("(sin nombre)", canal, esDistribuidor ? "DIS" : undefined);
-			setSelectedClient(client);
-		}
+		// El alta de clientes vive solo en el Sheet. Si no hay cliente elegido, la
+		// cotización se guarda sin cliente (client_id null); no se crea ninguno acá.
+		const client = selectedClient;
 
 		const deal = buildDeal(editingId || Date.now().toString(36), prev ? prev.fecha : now);
 		if (prev?.resumen?.status) deal.resumen.status = prev.resumen.status;
@@ -496,7 +494,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						Cliente
 						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 					</Label>
-					<ClientSelector channel={canal} clients={clientsApi?.clients || []} onCreate={clientsApi?.create} onSetTipo={clientsApi?.setTipo} value={selectedClient} onChange={setSelectedClient} />
+					<ClientSelector clients={clientsApi?.clients || []} value={selectedClient} onChange={setSelectedClient} />
 					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
 				</div>
 

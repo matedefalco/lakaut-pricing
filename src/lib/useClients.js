@@ -48,29 +48,8 @@ export function useClients() {
 		return rows.map(function (c) { return Object.assign({}, c, { tipo: c.tipo || tipos[c.id] || null }); });
 	}, [rows, tipos]);
 
-	const create = useCallback(async function (name, channel, tipo) {
-		const { data, error } = await supabase
-			.from("clients")
-			.insert({ name: name.trim(), channel, certs_activos: 0 })
-			.select()
-			.single();
-		if (!error && data) {
-			setRows(function (prev) {
-				return [...prev, data].sort(function (a, b) { return a.name.localeCompare(b.name); });
-			});
-			if (tipo) {
-				setTipos(function (prev) {
-					const next = Object.assign({}, prev, { [data.id]: tipo });
-					saveConfig(TIPOS_KEY, next);
-					return next;
-				});
-			}
-			// Devolvemos el cliente ya con su tipo para que el selector lo tenga al instante.
-			return Object.assign({}, data, { tipo: tipo || null });
-		}
-		console.error("useClients.create error:", error);
-		return null;
-	}, []);
+	// No hay `create`: el alta de clientes vive solo en el Sheet de pipeline y baja
+	// por importFromSheet(). La app no crea clientes. Ver docs/sync-pipeline-sheet.md.
 
 	const update = useCallback(async function (id, updates) {
 		const { data, error } = await supabase
@@ -142,5 +121,5 @@ export function useClients() {
 		}
 	}, [fetchClients]);
 
-	return { clients, loading, importing, lastImport, create, update, remove, setTipo, importFromSheet, refetch: fetchClients };
+	return { clients, loading, importing, lastImport, update, remove, setTipo, importFromSheet, refetch: fetchClients };
 }

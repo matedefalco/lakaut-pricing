@@ -545,7 +545,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 									{search || channelFilter !== "all" ? (
 										<EmptyState tone="filter" glyph="🔍" title="Ningún cliente coincide" description="Probá con otro nombre o quitá el filtro de canal." />
 									) : (
-										<EmptyState glyph="🤝" title="Todavía no hay clientes" description="Se crean solos cuando guardás una cotización a nombre de un cliente nuevo, o desde el selector de cliente en cualquier cotizador." />
+										<EmptyState glyph="🤝" title="Todavía no hay clientes" description="El master de clientes se llena desde el Sheet de pipeline. Cargá empresas en el Sheet y tocá 'Importar del Sheet' arriba." />
 									)}
 								</TableCell>
 							</TableRow>
