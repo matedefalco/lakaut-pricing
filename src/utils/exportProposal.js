@@ -13,7 +13,6 @@ const W   = "#FFFFFF";  // white
 const NG  = "#565961";  // numeric gray
 
 // ─── Términos y condiciones (footer de la propuesta) ────────────────────────────
-const TERMS_CAUCION = "La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.";
 const TERMS_RETENCIONES = "Lakaut S.A. reviste la condición de Agente de Retención y Percepción, por lo que las percepciones y/o retenciones impositivas que correspondan serán aplicadas en la facturación de acuerdo con la normativa vigente.";
 // Solo para propuestas en USD: los precios se comparten en dólares, pero la
 // facturación se emite en pesos al tipo de cambio del día. El TC que se muestra
@@ -193,8 +192,7 @@ function termsFooterLight(currency) {
 		? `<div style="margin-bottom:0.08cm;">${TERMS_FACTURACION_USD}</div>`
 		: "";
 	return `<div style="font-size:6.5pt;color:${GR};line-height:1.4;font-style:italic;">
-    ${facturacionUsd}<div style="margin-bottom:0.08cm;">${TERMS_CAUCION}</div>
-    <div>${TERMS_RETENCIONES}</div>
+    ${facturacionUsd}<div>${TERMS_RETENCIONES}</div>
   </div>`;
 }
 
