@@ -39,6 +39,25 @@ function ImportErrorList({ errores }) {
 		</ul>
 	);
 }
+
+// Próximo empresa_id libre a partir de los ya importados. Reusa el prefijo del
+// mayor (ej. "LK-E-2026-") y sigue el correlativo. Se usa para sugerir el id que
+// hay que ponerle en el Sheet a un cliente viejo sin sincronizar.
+function nextEmpresaSeq(clients) {
+	let prefix = "LK-E-2026-";
+	let width = 4;
+	let max = 0;
+	clients.forEach(function (c) {
+		const m = /^(.*?)(\d+)$/.exec(c.empresa_id || "");
+		if (m) {
+			prefix = m[1];
+			width = m[2].length;
+			const n = parseInt(m[2], 10);
+			if (n > max) max = n;
+		}
+	});
+	return function (offset) { return prefix + String(max + 1 + offset).padStart(width, "0"); };
+}
 import { makeMoney } from "@/utils/useMoney";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -141,6 +160,7 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	// dismissed = ocultado por el usuario en esta sesión.
 	const [importPanelOpen, setImportPanelOpen] = useState(false);
 	const [importPanelDismissed, setImportPanelDismissed] = useState(false);
+	const [unsyncedOpen, setUnsyncedOpen] = useState(false);
 
 	const clients = clientsApi?.clients || [];
 	const deals = dealsApi?.deals || [];
@@ -191,6 +211,22 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 			volumen: clients.filter(function (c) { return c.channel === "volumen"; }).length,
 		};
 		return { totalClients, totalDeals, totalRevenue, confirmedRevenue, byChannel };
+	}, [clients, deals]);
+
+	// Clientes viejos sin vincular al Sheet (sin empresa_id). Los que tienen
+	// cotizaciones van primero: son los que conviene cargar en el Sheet para que la
+	// próxima importación los adopte conservando su historial.
+	const unsynced = useMemo(function () {
+		const dealCountOf = function (id) { return deals.filter(function (d) { return d.client_id === id; }).length; };
+		const nextId = nextEmpresaSeq(clients);
+		return clients
+			.filter(function (c) { return !c.empresa_id; })
+			.map(function (c) { return { client: c, deals: dealCountOf(c.id) }; })
+			.sort(function (a, b) {
+				if (b.deals !== a.deals) return b.deals - a.deals;
+				return a.client.name.localeCompare(b.client.name);
+			})
+			.map(function (row, i) { return Object.assign({ empresaIdSugerido: nextId(i) }, row); });
 	}, [clients, deals]);
 
 	function clientRevenue(clientId) {
@@ -484,6 +520,54 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					</div>
 				);
 			})()}
+
+			{/* Clientes viejos sin vincular al Sheet. Para "los agrego al Sheet": se
+			    listan con un empresa_id sugerido para copiar en el Sheet; en la próxima
+			    importación se adoptan (conservando sus cotizaciones). */}
+			{unsynced.length > 0 && (
+				<div className="rounded-lg border border-border bg-muted/20 px-3.5 py-3">
+					<button
+						onClick={function () { setUnsyncedOpen(function (v) { return !v; }); }}
+						className="flex w-full items-center gap-2 text-left"
+					>
+						<ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", unsyncedOpen && "rotate-180")} />
+						<span className="text-sm font-semibold text-foreground">Sin sincronizar con el Sheet</span>
+						<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{unsynced.length}</span>
+						<span className="ml-auto text-[11px] text-muted-foreground">clientes que no vienen del Sheet</span>
+					</button>
+					{unsyncedOpen && (
+						<div className="mt-3 space-y-2">
+							<p className="text-xs text-muted-foreground">
+								Para vincularlos, cargá cada uno en el Sheet con el <span className="font-medium text-foreground">empresa_id sugerido</span> y volvé a tocar “Importar del Sheet”. Los que tienen cotizaciones se adoptan conservando su historial.
+							</p>
+							<div className="overflow-hidden rounded-md border border-border">
+								<Table>
+									<TableHeader>
+										<TableRow className="bg-muted/30">
+											<TableHead>Cliente</TableHead>
+											<TableHead className="text-right">Cotizaciones</TableHead>
+											<TableHead>Canal actual</TableHead>
+											<TableHead>empresa_id sugerido</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{unsynced.map(function (row) {
+											return (
+												<TableRow key={row.client.id}>
+													<TableCell className="text-sm font-medium">{row.client.name}</TableCell>
+													<TableCell className="text-right tabular-nums text-sm text-muted-foreground">{row.deals || "—"}</TableCell>
+													<TableCell><ChannelBadge channel={row.client.channel} size="sm" /></TableCell>
+													<TableCell className="tabular-nums text-sm text-foreground">{row.empresaIdSugerido}</TableCell>
+												</TableRow>
+											);
+										})}
+									</TableBody>
+								</Table>
+							</div>
+						</div>
+					)}
+				</div>
+			)}
 
 			{/* KPI summary */}
 			<div className="flex gap-3 flex-wrap">

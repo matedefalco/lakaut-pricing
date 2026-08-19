@@ -6,7 +6,7 @@ import { getDistributorTier, distributorTierDriver, webFirmaExtraUnitARS } from 
 import { dealStatus } from "@/lib/dealStatus";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
-import { CHANNELS } from "@/data/channelMeta";
+import { CHANNELS, resolveChannel, channelLabel } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +42,7 @@ function margWord(pct) { return pct >= 0.4 ? "saludable" : pct >= 0.15 ? "ajusta
 //   · distribuidores → el descuento es la regla del canal. El nivel sale de dos
 //                      variables declaradas del socio (certificados activos y
 //                      compromiso anual de facturación), no del volumen cotizado.
-export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
+export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, onNavChannel, pendingEdit, onConsumeEdit }) {
 	const canal = channel === "distribuidores" ? "distribuidores" : "web";
 	const esDistribuidor = canal === "distribuidores";
 	const meta = CHANNELS[canal];
@@ -496,6 +496,12 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 					</Label>
 					<ClientSelector clients={clientsApi?.clients || []} value={selectedClient} onChange={setSelectedClient} />
 					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
+					{selectedClient && selectedClient.channel && resolveChannel(selectedClient.channel) !== resolveChannel(canal) && (
+						<p className="text-[11px] text-[var(--warning)]">
+							Este cliente es del canal <span className="font-semibold">{channelLabel(selectedClient.channel)}</span>. Podés cotizarlo acá igual
+							{onNavChannel && <> o <button type="button" onClick={function () { onNavChannel(resolveChannel(selectedClient.channel)); }} className="font-semibold underline underline-offset-2 hover:opacity-80">cotizar en {channelLabel(selectedClient.channel)}</button></>}.
+						</p>
+					)}
 				</div>
 
 				<div className="flex flex-col gap-1.5">

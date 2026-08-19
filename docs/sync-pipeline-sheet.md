@@ -129,7 +129,20 @@ arriba de la pestaña Clientes (persiste entre recargas). La causa más común e
 
 ---
 
-## Mapeos que aplica la importación
+## Canal de cotización · columna `canal` (recomendada)
+
+Para que cada cliente respete su canal de cotización, agregá en el Sheet una
+columna **`canal`** con uno de estos valores: **Web**, **Distribuidores**,
+**B2B2C** (o "IDC") o **Volumen**. Es la autoridad del canal:
+
+| `canal` en el Sheet | Canal cotizadora | Tipo derivado |
+|---------------------|------------------|---------------|
+| Web / Integrador    | web              | DIR (o PAR si `tipo`=Partner) |
+| Distribuidores      | distribuidores   | DIS           |
+| B2B2C / IDC         | b2b2c            | DIR (o PAR)   |
+| Volumen             | volumen          | DIR — el ID de cotización igual muestra SDK |
+
+Si la celda `canal` está **vacía**, se cae al mapeo por la columna `tipo`:
 
 | Sheet (`tipo`)        | Tipo cotizadora | Canal por defecto |
 |-----------------------|-----------------|-------------------|
@@ -137,10 +150,20 @@ arriba de la pestaña Clientes (persiste entre recargas). La causa más común e
 | Partner               | PAR             | distribuidores    |
 | Cliente / Interno / — | DIR             | web               |
 
-- El **canal** solo se setea al insertar/adoptar. Si después lo ajustás a mano en
-  la cotizadora, una reimportación **no** lo pisa (el canal define pricing).
+- Cuando la columna `canal` trae un valor, **el Sheet manda** y la reimportación
+  actualiza el canal del cliente. Si la celda está vacía, no se pisa el canal
+  actual (por si lo ajustaste a mano).
+- Al cotizar, si elegís un cliente cuyo canal no es el de la pestaña, la app te
+  avisa (no te bloquea) y te ofrece **cotizar en el canal correcto**.
 - El resto de los campos del pipeline (etapa, industria, probabilidad, DRI, tag,
-  origen, notas) sí se refrescan en cada importación, porque el Sheet manda.
+  origen, notas) se refrescan en cada importación, porque el Sheet manda.
+
+### Clientes viejos sin sincronizar
+
+Los clientes cargados a mano antes de conectar el Sheet aparecen en la pestaña
+Clientes bajo **"Sin sincronizar con el Sheet"**, con un **empresa_id sugerido**.
+Cargalos en el Sheet con ese id (y su `canal`) para que la próxima importación los
+adopte conservando sus cotizaciones.
 
 ---
 

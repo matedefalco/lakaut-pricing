@@ -6,7 +6,7 @@ import { dealStatus } from "@/lib/dealStatus";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
 import { buildProyeccion, buildEscalonadoFirmas, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
-import { CHANNELS, isDistribVol } from "@/data/channelMeta";
+import { CHANNELS, isDistribVol, resolveChannel, channelLabel } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +43,7 @@ const SEG_FALLBACK = { precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 
 const MARKUP_MIN_FALLBACK = 1.2;
 const VOLUMEN_BASE_FALLBACK = { cert: 0.65, firma: 0.5 };
 
-export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, pendingEdit, onConsumeEdit }) {
+export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, onNavChannel, pendingEdit, onConsumeEdit }) {
 	// Los canales por elemento comparten este cotizador y se distinguen por la prop
 	// `channel`. La diferencia es qué se vende y cómo se le pone precio:
 	//   · b2b2c (IDC)         → un bundle por IDC mensual, con cupo de firmas incluidas.
@@ -907,6 +907,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					</Label>
 					<ClientSelector clients={clientsApi?.clients || []} value={selectedClient} onChange={setSelectedClient} />
 					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
+					{selectedClient && selectedClient.channel && resolveChannel(selectedClient.channel) !== resolveChannel(canal) && (
+						<p className="text-[11px] text-[var(--warning)]">
+							Este cliente es del canal <span className="font-semibold">{channelLabel(selectedClient.channel)}</span>. Podés cotizarlo acá igual
+							{onNavChannel && <> o <button type="button" onClick={function () { onNavChannel(resolveChannel(selectedClient.channel)); }} className="font-semibold underline underline-offset-2 hover:opacity-80">cotizar en {channelLabel(selectedClient.channel)}</button></>}.
+						</p>
+					)}
 				</div>
 
 				<div className="flex flex-col gap-1.5">

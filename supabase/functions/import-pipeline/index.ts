@@ -120,6 +120,27 @@ function mapChannel(pipelineTipo: string): string {
 	return "web";
 }
 
+// Canal de cotización explícito desde la columna `canal` del Sheet (autoridad).
+// Devuelve el código interno de la cotizadora o null si la celda está vacía/rara
+// (en ese caso se cae al mapeo por `tipo`, sin pisar un canal ya seteado).
+function channelFromCanal(canalRaw: string): string | null {
+	const c = (canalRaw || "").trim().toLowerCase();
+	if (!c) return null;
+	if (c.startsWith("distribu")) return "distribuidores";
+	if (c.startsWith("b2b2c") || c.includes("idc")) return "b2b2c";
+	if (c.startsWith("vol")) return "volumen";
+	if (c.startsWith("web") || c.startsWith("integ") || c.startsWith("direct")) return "web";
+	return null;
+}
+
+// Tipo de cliente (DIR/DIS/PAR) derivado del canal + el tipo del pipeline.
+// Distribuidores → DIS; el resto respeta Partner si viene, si no queda directo.
+// (Volumen igual muestra "SDK" en el ID de cotización por el canal, ver cotId.)
+function tipoDesdeCanal(channel: string, pipelineTipo: string): string {
+	if (channel === "distribuidores") return "DIS";
+	return mapTipo(pipelineTipo) === "PAR" ? "PAR" : "DIR";
+}
+
 function normalizeName(name: string): string {
 	return (name || "")
 		.toLowerCase()
@@ -213,6 +234,7 @@ Deno.serve(async (req: Request) => {
 			probabilidad: col("probabilidad"),
 			industria: col("industria"),
 			tipo: col("tipo"),
+			canal: col("canal"),               // opcional: canal de cotización (Web/Distribuidores/B2B2C/Volumen)
 			dri: col("dri"),
 			tag: col("tag"),
 			origen: col("origen"),
@@ -256,14 +278,19 @@ Deno.serve(async (req: Request) => {
 			const razonSocial = cell(row, idx.razonSocial) || parsed.razonSocial;
 			const cuit = cell(row, idx.cuit) || parsed.cuit;
 
+			// La columna `canal` manda; si está vacía, se deriva del `tipo` del pipeline.
+			const canalExplicito = channelFromCanal(cell(row, idx.canal));
+			const channel = canalExplicito || mapChannel(pipelineTipo);
+			const tipo = canalExplicito ? tipoDesdeCanal(channel, pipelineTipo) : mapTipo(pipelineTipo);
+
 			const record = {
 				empresa_id: empresaId,
 				name: empresa,
 				razon_social: razonSocial || null,
 				cuit: cuit || null,
-				tipo: mapTipo(pipelineTipo),
+				tipo: tipo,
 				tipo_pipeline: pipelineTipo || null,
-				channel: mapChannel(pipelineTipo),
+				channel: channel,
 				etapa: cell(row, idx.etapa) || null,
 				probabilidad: toNumber(row[idx.probabilidad]),
 				industria: cell(row, idx.industria) || null,
@@ -279,9 +306,10 @@ Deno.serve(async (req: Request) => {
 				const adopted = !existingById ? manualByName.get(normalizeName(empresa)) : null;
 
 				if (existingById) {
-					// Ya vinculado: actualizar. No pisamos `channel` para no romper un
-					// canal ajustado a mano; el resto de los datos del pipeline sí.
-					const { channel: _c, ...upd } = record;
+					// Ya vinculado: actualizar. El `canal` del Sheet manda solo cuando está
+					// puesto explícitamente en su columna; si esa celda está vacía no pisamos
+					// el canal actual (puede haberse ajustado a mano). El resto siempre se refresca.
+					const upd = canalExplicito ? record : (function () { const { channel: _c, ...rest } = record; return rest; })();
 					const { error } = await supabase.from("clients").update(upd).eq("id", existingById.id);
 					if (error) throw error;
 					summary.actualizados++;
