@@ -15,6 +15,11 @@ const NG  = "#565961";  // numeric gray
 // ─── Términos y condiciones (footer de la propuesta) ────────────────────────────
 const TERMS_CAUCION = "La modalidad de pago estará sujeta a la constitución de un seguro de caución a satisfacción de Lakaut S.A.";
 const TERMS_RETENCIONES = "Lakaut S.A. reviste la condición de Agente de Retención y Percepción, por lo que las percepciones y/o retenciones impositivas que correspondan serán aplicadas en la facturación de acuerdo con la normativa vigente.";
+// Solo para propuestas en USD: los precios se comparten en dólares, pero la
+// facturación se emite en pesos al tipo de cambio del día. El TC que se muestra
+// en la portada es orientativo; el de facturación es el oficial BNA vendedor del
+// día en que se emita la factura.
+const TERMS_FACTURACION_USD = "Los precios se expresan en dólares estadounidenses (USD) a título de referencia. La facturación se realizará en pesos argentinos, convertidos al tipo de cambio del dólar oficial del Banco de la Nación Argentina (BNA), tipo vendedor, vigente al día de facturación.";
 const VALIDEZ_DIAS = 15;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -183,9 +188,12 @@ function scheduleBar({ mes1Value, abonoValue, totalValue, totalNote }) {
 
 // `validUntil` es opcional: si viene, agrega la línea de vigencia de 15 días
 // al pie de términos (además de mostrarse arriba, junto a la fecha de emisión).
-function termsFooterLight() {
+function termsFooterLight(currency) {
+	const facturacionUsd = currency === "USD"
+		? `<div style="margin-bottom:0.08cm;">${TERMS_FACTURACION_USD}</div>`
+		: "";
 	return `<div style="font-size:6.5pt;color:${GR};line-height:1.4;font-style:italic;">
-    <div style="margin-bottom:0.08cm;">${TERMS_CAUCION}</div>
+    ${facturacionUsd}<div style="margin-bottom:0.08cm;">${TERMS_CAUCION}</div>
     <div>${TERMS_RETENCIONES}</div>
   </div>`;
 }
@@ -194,7 +202,7 @@ function termsFooterLight() {
 // chips, las tarjetas de momento (1 o 2), la barra de pago (si hay abono) y el
 // pie con términos + branding. La fecha de emisión/vencimiento vive únicamente
 // en la portada (slide 1) — acá no se repite.
-function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHtml, footnote, pageN }) {
+function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHtml, footnote, pageN, currency }) {
 	return `<div class="slide" style="background:${OW};">
   <div style="flex-shrink:0;padding:0.5cm 1cm 0;">
     <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.12cm;">${kicker}</div>
@@ -213,7 +221,7 @@ function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHt
 
   ${footnote ? `<div style="flex-shrink:0;padding:0.25cm 1cm 0;font-size:7pt;color:${GR};line-height:1.4;">${footnote}</div>` : ""}
 
-  <div style="flex-shrink:0;padding:0.28cm 1cm 0;">${termsFooterLight()}</div>
+  <div style="flex-shrink:0;padding:0.28cm 1cm 0;">${termsFooterLight(currency)}</div>
   ${foot(pageN)}
 </div>`;
 }
@@ -273,7 +281,7 @@ function tcRefNote(tc, tcMeta) {
 	const iso = (tcMeta && tcMeta.lastUpdated) ? tcMeta.lastUpdated : new Date().toISOString();
 	let d = "";
 	try { d = new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch (e) {}
-	return `Valores en USD · TC ref. ${src} ${val}${d ? ` al ${d}` : ""}`;
+	return `Valores en USD · TC ref. orientativo ${src} ${val}${d ? ` al ${d}` : ""} · se factura en pesos al oficial BNA del día`;
 }
 
 function s1Cover(clientName, fecha, sinApi, listaPura, cotId, currency, tc, tcMeta) {
@@ -524,6 +532,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 		cardsHtml: momento1 + momento2,
 		scheduleHtml: schedule,
 		pageN: 3,
+		currency,
 	});
 }
 
@@ -828,6 +837,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		scheduleHtml: schedule,
 		footnote,
 		pageN: pageN || 3,
+		currency,
 	});
 }
 
@@ -1064,6 +1074,7 @@ function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
 		cardsHtml: momento1,
 		scheduleHtml: "",
 		pageN: pageN || 2,
+		currency,
 	});
 }
 
