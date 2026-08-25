@@ -1,6 +1,6 @@
 import { buildProyeccion, buildEscalonadoFirmas } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
-import { isPacks, isUnit, isIDC, packsConDescuento } from "@/data/channelMeta";
+import { isPacks, isUnit, isIDC, isDistribVol, packsConDescuento } from "@/data/channelMeta";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -855,38 +855,50 @@ function s3VolumenEscalonado(deal, clientName, currency, tc, pageN) {
 	const firmasActual = Number(res.firmasTotales != null ? res.firmasTotales : res.firmasMes) || 0;
 	const rows = buildEscalonadoFirmas(proy.steps || [], precioFirmaBase, firmasActual);
 	const showIva = currency === "ARS";
+	// Distribuidores-Volumen: el escalonado se muestra como BANDAS de nivel (rango de
+	// firmas, costo al tope de la banda). Volumen: umbrales "desde X" con costo al umbral.
+	const dv = isDistribVol(deal.channel);
 	const fmU = (v) => currency === "ARS" ? "$ " + Math.round(v * tc).toLocaleString("es-AR") : "USD " + Number(v).toFixed(2);
 	const th = (txt, align) => `<th style="text-align:${align || "left"};font-size:7.5pt;font-weight:700;color:${GR};text-transform:uppercase;letter-spacing:0.6px;padding:0.3cm 0.5cm;border-bottom:1.5px solid ${GRL};white-space:nowrap;">${txt}</th>`;
 
 	const bodyRows = rows.map((r) => {
 		const rowBg = r.actual ? "#EEF0FD" : W;
 		const td = (html, align, extra) => `<td style="text-align:${align || "left"};font-size:9.5pt;color:${DK};padding:0.34cm 0.5cm;border-bottom:1px solid ${GRL};${extra || ""}">${html}</td>`;
-		const vol = `${r.firmas.toLocaleString("es-AR")} firmas${r.actual ? ` <span style="font-size:7.5pt;color:${B};font-weight:700;">· tu volumen</span>` : ""}`;
+		// En bandas (dv), el costo y el ahorro se miden al TOPE de la banda; la última
+		// banda queda abierta (sin tope) y muestra "—".
+		const topFirmas = dv ? r.firmasHasta : r.firmas;
+		const costoVal = dv ? (r.firmasHasta != null ? r.firmasHasta * r.precioFirma : null) : r.costo;
+		const ahorroVal = dv ? (r.firmasHasta != null ? r.firmasHasta * (precioFirmaBase - r.precioFirma) : 0) : r.ahorroMonto;
+		const volTxt = dv
+			? (r.firmasHasta != null ? `${r.firmas.toLocaleString("es-AR")}–${r.firmasHasta.toLocaleString("es-AR")} firmas` : `${r.firmas.toLocaleString("es-AR")}+ firmas`)
+			: `${r.firmas.toLocaleString("es-AR")} firmas`;
+		const actualTxt = dv ? "· tu nivel" : "· tu volumen";
+		const vol = `${volTxt}${r.actual ? ` <span style="font-size:7.5pt;color:${B};font-weight:700;">${actualTxt}</span>` : ""}`;
 		const desc = r.descuento > 0 ? `<span style="font-weight:700;color:${B};">−${r.descuento}%</span>` : `<span style="color:${GR};">—</span>`;
-		const ahorro = r.ahorroMonto > 0
-			? `<span style="font-weight:700;color:${B};">${fm(r.ahorroMonto, currency, tc)}</span> <span style="font-size:7.5pt;color:${GR};">(${(r.ahorroPct * 100).toFixed(0)}%)</span>`
+		const ahorro = ahorroVal > 0
+			? `<span style="font-weight:700;color:${B};">${fm(ahorroVal, currency, tc)}</span> <span style="font-size:7.5pt;color:${GR};">(${(r.ahorroPct * 100).toFixed(0)}%)</span>`
 			: `<span style="color:${GR};">—</span>`;
 		return `<tr style="background:${rowBg};">
       ${td(`<span style="font-weight:${r.actual ? 700 : 400};color:${r.actual ? B : DK};">${vol}</span>`)}
       ${td(desc, "right")}
       ${td(fmU(r.precioFirma), "right", "font-weight:600;")}
-      ${td(fm(r.costo, currency, tc), "right", `font-weight:700;color:${r.actual ? B : DK};`)}
+      ${td(costoVal != null ? fm(costoVal, currency, tc) : `<span style="color:${GR};">—</span>`, "right", `font-weight:700;color:${r.actual ? B : DK};`)}
       ${td(ahorro, "right")}
     </tr>`;
 	}).join("");
 
 	return `<div class="slide" style="background:${OW};">
   <div style="flex-shrink:0;padding:0.6cm 1cm 0.3cm;">
-    <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.1cm;">Escala de precios por volumen</div>
+    <div style="font-size:9pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.1cm;">${dv ? "Niveles por volumen" : "Escala de precios por volumen"}</div>
     <div style="font-size:21pt;font-weight:800;color:${DK};line-height:1.15;">Cuantas más firmas, mejor tu precio</div>
-    <div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">Escala fija de precios por cantidad de firmas. Elegí el volumen que se adecúa a tu necesidad: a mayor volumen, menor el precio por firma.</div>
+    <div style="font-size:8.5pt;color:${GR};margin-top:0.1cm;">${dv ? "Un nivel por banda de volumen de firmas. A mayor volumen, mayor el descuento sobre el precio por firma." : "Escala fija de precios por cantidad de firmas. Elegí el volumen que se adecúa a tu necesidad: a mayor volumen, menor el precio por firma."}</div>
   </div>
 
   <div style="flex:1;display:flex;flex-direction:column;padding:0.2cm 1cm 0;overflow:hidden;">
     <div style="background:${W};border:1px solid ${GRL};border-radius:14px;box-shadow:0 2px 10px rgba(48,65,213,0.06);overflow:hidden;">
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr>
-          ${th("Volumen de firmas")}
+          ${th(dv ? "Nivel · firmas" : "Volumen de firmas")}
           ${th("Descuento", "right")}
           ${th("Precio / firma", "right")}
           ${th("Costo estimado", "right")}
@@ -896,7 +908,7 @@ function s3VolumenEscalonado(deal, clientName, currency, tc, pageN) {
       </table>
     </div>
     <div style="margin-top:auto;padding:0.3cm 0;font-size:7.5pt;color:${GR};line-height:1.5;">
-      Costo estimado sobre el volumen de firmas de cada escalón${showIva ? ", sin IVA" : ""} (no incluye certificados, el fee de implementación por única vez, el abono de soporte / SLA ni el descuento por condiciones comerciales). Escala de referencia, sujeta a la vigencia indicada en la portada.
+      ${dv ? `Cada fila es un nivel: el rango es la banda de firmas y el costo estimado es el tope de la banda a su precio por firma${showIva ? ", sin IVA" : ""}` : `Costo estimado sobre el volumen de firmas de cada escalón${showIva ? ", sin IVA" : ""}`} (no incluye certificados, el fee de implementación por única vez, el abono de soporte / SLA ni el descuento por condiciones comerciales). Escala de referencia, sujeta a la vigencia indicada en la portada.
     </div>
   </div>
   ${foot(pageN || 4)}

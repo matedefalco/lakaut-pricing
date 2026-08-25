@@ -1340,7 +1340,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 													<TableCell className="text-muted-foreground text-xs tabular-nums">{r.idc.toLocaleString("es-AR")} cert{r.firmas > 0 ? " · " + r.firmas.toLocaleString("es-AR") + " firmas" : ""}</TableCell>
 													<TableCell className="text-right tabular-nums">{fMoney2(r.precioCert)}</TableCell>
 													<TableCell className="text-right tabular-nums">{fMoney2(r.precioFirma)}</TableCell>
-													<TableCell className="text-right tabular-nums font-semibold">{fMoney(r.costo)}</TableCell>
+													<TableCell className="text-right tabular-nums font-semibold">{esDistribVol ? (r.firmasHasta != null ? fMoney(r.firmasHasta * r.precioFirma) : "—") : fMoney(r.costo)}</TableCell>
 													<TableCell className="text-right tabular-nums text-[var(--success)]">{isBase ? "—" : fMoney(r.ahorroMonto) + " (" + (r.ahorroPct * 100).toFixed(0) + "%)"}</TableCell>
 												</TableRow>
 											);
@@ -1403,7 +1403,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Volumen de firmas</TableHead>
+										<TableHead>{esDistribVol ? "Nivel · firmas" : "Volumen de firmas"}</TableHead>
 										<TableHead className="text-right">Descuento</TableHead>
 										<TableHead className="text-right">/ firma</TableHead>
 										<TableHead className="text-right">Costo est.</TableHead>
@@ -1413,17 +1413,17 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 									{escalonadoRows.map(function (r, i) {
 										return (
 											<TableRow key={i} className={r.actual ? "bg-primary/5" : ""}>
-												<TableCell className="font-medium tabular-nums">{r.firmas.toLocaleString("es-AR")}{r.actual ? <span className="ml-1 text-[10px] text-primary font-semibold">tu volumen</span> : null}</TableCell>
+												<TableCell className="font-medium tabular-nums">{esDistribVol ? (r.firmasHasta != null ? r.firmas.toLocaleString("es-AR") + "–" + r.firmasHasta.toLocaleString("es-AR") : r.firmas.toLocaleString("es-AR") + "+") : r.firmas.toLocaleString("es-AR")}{r.actual ? <span className="ml-1 text-[10px] text-primary font-semibold">{esDistribVol ? "tu nivel" : "tu volumen"}</span> : null}</TableCell>
 												<TableCell className="text-right tabular-nums">{r.descuento > 0 ? "−" + r.descuento + "%" : "—"}</TableCell>
 												<TableCell className="text-right tabular-nums">{fMoney2(r.precioFirma)}</TableCell>
-												<TableCell className="text-right tabular-nums font-semibold">{fMoney(r.costo)}</TableCell>
+												<TableCell className="text-right tabular-nums font-semibold">{esDistribVol ? (r.firmasHasta != null ? fMoney(r.firmasHasta * r.precioFirma) : "—") : fMoney(r.costo)}</TableCell>
 											</TableRow>
 										);
 									})}
 								</TableBody>
 							</Table>
 						</div>
-						<p className="text-[10px] text-muted-foreground">{esDistribVol ? "Una fila por nivel: el descuento de cada fila es el del nivel (Azul a Platinum) para ese volumen de firmas. " : "Escala fija de precios por volumen de firmas (misma en toda propuesta). "}El costo estimado es el volumen de firmas de cada escalón a su precio, sin certificados, fee ni SLA. Se resalta el tramo que alcanza el volumen de esta cotización.</p>
+						<p className="text-[10px] text-muted-foreground">{esDistribVol ? "Una fila por nivel (Azul a Platinum): el rango es la banda de firmas y el costo estimado es el tope de la banda a su precio por firma, sin certificados, fee ni SLA. Se resalta el nivel que alcanza esta cotización (tu volumen exacto está arriba)." : "Escala fija de precios por volumen de firmas (misma en toda propuesta). El costo estimado es el volumen de firmas de cada escalón a su precio, sin certificados, fee ni SLA. Se resalta el tramo que alcanza el volumen de esta cotización."}</p>
 						</div>
 					))}
 				</div>

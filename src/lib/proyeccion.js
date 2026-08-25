@@ -59,8 +59,14 @@ export function buildEscalonadoFirmas(steps, precioFirmaBase, volumenActual) {
 		const costo = s.firmas * precioFirma;
 		const costoAlBase = s.firmas * p0;
 		const ahorroMonto = costoAlBase - costo;
+		// Tope de la banda: un escalón cubre desde su umbral hasta el umbral del
+		// siguiente menos uno; el último queda abierto (null). Sirve para mostrar el
+		// escalonado como BANDAS (ej. Distribuidores-Volumen, donde cada fila es un
+		// nivel Azul→Platinum) en lugar de umbrales sueltos.
+		const firmasHasta = i < sorted.length - 1 ? Math.max(s.firmas, sorted[i + 1].firmas - 1) : null;
 		return {
 			firmas: s.firmas,
+			firmasHasta: firmasHasta,
 			descuento: s.descuento,
 			precioFirma: precioFirma,
 			costo: costo,
