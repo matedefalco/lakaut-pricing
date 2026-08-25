@@ -45,6 +45,15 @@ function fmGross(v, currency, tc) {
 	if (currency !== "ARS") return fm(v, currency, tc);
 	return "$ " + (v * tc * (1 + IVA_RATE)).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
+// Igual que `fm` pero conserva 2 decimales en USD: es para precios UNITARIOS chicos
+// (firma, certificado), que con el redondeo a entero de `fm` aparecerían como "USD 0"
+// y darían a entender que son gratis. En ARS el unitario ya es un número grande
+// (× TC), así que se redondea a entero como el resto.
+function fm2(v, currency, tc) {
+	if (v == null || isNaN(v)) return "—";
+	if (currency === "ARS") return "$ " + Math.round(v * tc).toLocaleString("es-AR");
+	return "USD " + Number(v).toFixed(2);
+}
 function fd(iso) {
 	try { return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }); }
 	catch (e) { return ""; }
@@ -786,12 +795,12 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
       <div style="font-size:8.5pt;color:rgba(255,255,255,0.85);line-height:1.5;margin-bottom:0.2cm;">
         Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} se renueva cada mes, con un abono fijo y previsible.
       </div>
-      ${discountBadge(`${(abonoPct * 100).toFixed(0)}% de ahorro · ${fm(precioAbonoUnit, currency, tc)} en vez de ${fm(precioFirmaAdicN, currency, tc)} por ${firmaSing}`)}
+      ${discountBadge(`${(abonoPct * 100).toFixed(0)}% de ahorro · ${fm2(precioAbonoUnit, currency, tc)} en vez de ${fm2(precioFirmaAdicN, currency, tc)} por ${firmaSing}`)}
       ${bigPrice({
 				dark: true, perMes: true,
 				label: "Abono mensual",
 				value: showIva ? fmGross(abonoMensual, currency, tc) : fm(abonoMensual, currency, tc),
-				note: `${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} × ${fm(precioAbonoUnit, currency, tc)}${showIva ? ` · IVA 21% incluido (neto ${fm(abonoMensual, currency, tc)})` : ""}`,
+				note: `${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} × ${fm2(precioAbonoUnit, currency, tc)}${showIva ? ` · IVA 21% incluido (neto ${fm(abonoMensual, currency, tc)})` : ""}`,
 			})}
     `,
 	}) : "";
