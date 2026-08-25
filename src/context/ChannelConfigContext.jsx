@@ -189,11 +189,24 @@ function normalizeChannelConfig(raw) {
 		if (merged.webFirmaExtraTiers.length === 0) merged.webFirmaExtraTiers = WEB_FIRMA_EXTRA_TIERS;
 	}
 
-	// Niveles de Distribuidores-Volumen: si la config guardada no los trae (config
-	// anterior a este canal), se cae al default. No se derivan de distributorTiers
-	// porque su columna de descuentos es distinta (prudente por el piso de margen).
-	if (!Array.isArray(merged.distribuidorVolTiers) || merged.distribuidorVolTiers.length === 0) {
+	// Niveles de Distribuidores-Volumen: el modelo pasó de asignar por variables
+	// declaradas (certificados activos + compromiso anual) a asignar por el VOLUMEN REAL
+	// DE FIRMAS de la cotización, con rangos en `firmasMin`/`firmasMax`. Las configs
+	// guardadas con el modelo viejo traen tiers sin `firmasMin` (solo certsMin/compromiso)
+	// y una columna de descuentos distinta, así que se reemplazan por el default nuevo:
+	// los rangos y descuentos cambiaron de significado y no hay traducción 1:1. Sin nada
+	// cargado (config anterior a este canal), también se cae al default.
+	if (!Array.isArray(merged.distribuidorVolTiers) || merged.distribuidorVolTiers.length === 0
+		|| merged.distribuidorVolTiers.some(function (t) { return !t || t.firmasMin == null; })) {
 		merged.distribuidorVolTiers = DISTRIBUIDOR_VOL_TIERS;
+	}
+
+	// Descuento del abono mensual: el default bajó de 10% a 3% para que el beneficio de
+	// la recurrencia quede por debajo del beneficio por volumen. Las configs que todavía
+	// tienen el default viejo (10) se llevan al nuevo; un valor customizado distinto se
+	// respeta. Sin valor cargado, toma el default vigente.
+	if (merged.abonoDescuentoPct == null || merged.abonoDescuentoPct === 10) {
+		merged.abonoDescuentoPct = ABONO_DESCUENTO_PCT;
 	}
 
 	// Campos del modelo anterior que ya no se leen. Se descartan al normalizar para

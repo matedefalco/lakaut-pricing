@@ -35,6 +35,21 @@ export function distributorTierDriver(certsActivos, compromisoAnualUSD, tiers) {
 	return "ambos";
 }
 
+// ── Distribuidores · modalidad Volumen ──
+// A diferencia de los packs (arriba), acá el nivel del socio sale del VOLUMEN REAL DE
+// FIRMAS de la cotización en curso (firmas por certificado + firmas sueltas), no de
+// variables declaradas aparte: la comercialización es a escala y el beneficio se
+// otorga por el volumen efectivo. `tiers` viene de channelConfig.distribuidorVolTiers,
+// con rangos en cantidad de firmas (firmasMin/firmasMax). El compromiso anual en USD
+// se deriva de la cotización y ya no interviene en la asignación del nivel.
+export function getDistributorVolTier(firmasTotales, tiers) {
+	if (!tiers || tiers.length === 0) return null;
+	const n = Math.max(0, Number(firmasTotales) || 0);
+	return tiers.find(function (t) {
+		return n >= (Number(t.firmasMin) || 0) && (t.firmasMax == null || n <= t.firmasMax);
+	}) || tiers[0];
+}
+
 // ── Volumen (B2B2C) ──
 // UN SOLO segmento por cliente, asignado por el volumen de IDC MENSUALES. Cada
 // segmento trae su propio precio por IDC (escala de precios del Borrador v5, 0,65 a

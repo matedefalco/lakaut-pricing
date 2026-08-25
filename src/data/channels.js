@@ -200,11 +200,14 @@ export const VOLUMEN_SEGMENTS = [
 // ── Canal E · Distribuidores e Integradores (modalidad Volumen) ───────────────
 // Réplica del canal Volumen (certificados y firmas sueltos, con el mismo precio
 // base VOLUMEN_BASE y el mismo cálculo por elemento) pero con los NIVELES
-// característicos del canal de distribuidores (Azul→Platinum) como segmento, en
-// lugar de los tramos por compromiso de Volumen. El nivel se asigna igual que en
-// Distribuidores-packs: el MAYOR entre los certificados activos declarados del
-// socio y su compromiso anual en USD (ver getDistributorTier), no el volumen de la
-// cotización en curso.
+// característicos del canal de distribuidores (Azul→Platinum) como segmento.
+//
+// El nivel lo asigna el VOLUMEN REAL DE FIRMAS de la cotización en curso (firmas por
+// certificado + firmas sueltas), no una variable declarada aparte: la comercialización
+// es a escala, así que el beneficio se otorga por el volumen que efectivamente se pone
+// sobre la mesa. Los rangos van en cantidad de firmas. El compromiso anual en USD ya no
+// se ingresa a mano ni asigna el nivel: se deriva de la cotización (volumen × precio
+// cotizado × 12) y viaja a la propuesta como el compromiso declarado del socio.
 //
 // A diferencia de DISTRIBUTOR_TIERS (descuento 10%–50% sobre la LISTA WEB, que tiene
 // margen amplio), acá el descuento se aplica sobre la base por unidad (cert 0,65 /
@@ -214,13 +217,16 @@ export const VOLUMEN_SEGMENTS = [
 // canal por elemento (B2B2C_MARKUP_MIN = 1,20x → precio mínimo 0,45, ~31% de
 // descuento máximo sobre 0,65). El guardarraíl del cotizador bloquea igual guardar y
 // exportar si el markup mezclado no cierra, así que la escala es el techo prudente y
-// el piso es duro.
+// el piso es duro. La escala prioriza el VOLUMEN por sobre la recurrencia: el abono
+// mensual (ABONO_DESCUENTO_PCT) otorga un beneficio menor que el salto de nivel.
+//   - firmasMin/firmasMax: rango de firmas de la cotización; null = sin tope.
+//   - descuento: % sobre el precio base del certificado y de la firma por igual.
 export const DISTRIBUIDOR_VOL_TIERS = [
-	{ id: "azul", label: "Azul", certsMin: 0, certsMax: 100, descuento: 0.05, compromisoMin: 0, compromisoMax: 10000 },
-	{ id: "bronce", label: "Bronce", certsMin: 101, certsMax: 500, descuento: 0.10, compromisoMin: 10001, compromisoMax: 25000 },
-	{ id: "plata", label: "Plata", certsMin: 501, certsMax: 2500, descuento: 0.15, compromisoMin: 25001, compromisoMax: 50000 },
-	{ id: "oro", label: "Oro", certsMin: 2501, certsMax: 10000, descuento: 0.22, compromisoMin: 50001, compromisoMax: 250000 },
-	{ id: "platinum", label: "Platinum", certsMin: 10001, certsMax: null, descuento: 0.28, compromisoMin: 250001, compromisoMax: null },
+	{ id: "azul", label: "Azul", firmasMin: 1, firmasMax: 1000, descuento: 0.03 },
+	{ id: "bronce", label: "Bronce", firmasMin: 1001, firmasMax: 5000, descuento: 0.08 },
+	{ id: "plata", label: "Plata", firmasMin: 5001, firmasMax: 10000, descuento: 0.15 },
+	{ id: "oro", label: "Oro", firmasMin: 10001, firmasMax: 50000, descuento: 0.22 },
+	{ id: "platinum", label: "Platinum", firmasMin: 50001, firmasMax: null, descuento: 0.30 },
 ];
 
 // ── Escalonado de crecimiento · Volumen ──────────────────────────────────────
@@ -265,8 +271,10 @@ export const B2B2C_API_TIERS = [
 // palanca es la opción con 0% (precio base; el vendedor sube desde ahí).
 // Descuento del abono mensual (reposición de la bolsa de firmas). Valor por
 // defecto en puntos %; se puede sobrescribir manualmente en cada cotización.
-// Aplica a Volumen y Distribuidores.
-export const ABONO_DESCUENTO_PCT = 10;
+// Aplica a Volumen y Distribuidores. Se mantiene BAJO a propósito: el beneficio
+// principal lo otorga el volumen (nivel/segmento), no el simple compromiso de un
+// abono mensual, así que la recurrencia suma poco por encima del precio de volumen.
+export const ABONO_DESCUENTO_PCT = 3;
 
 // Cada opción es { id, value (número), discount (puntos %) }. El texto visible se
 // deriva del número según la palanca (ver src/lib/commercialLevers.js): la opción
