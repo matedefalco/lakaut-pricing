@@ -1,6 +1,7 @@
 import { buildProyeccion, buildEscalonadoFirmas } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
 import { isPacks, isUnit, isIDC, isDistribVol, packsConDescuento } from "@/data/channelMeta";
+import { resolveDescLiquidacion } from "@/lib/descLiquidacion";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -765,6 +766,17 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${certFisWord} (${firmaWord(fPorCertFis)} c/u)` : null,
 			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `, ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total` : ""}.`
 		: `${verboAct} ${unidadArt} ${idc.toLocaleString("es-AR")} ${unidadPl}: cada ${esIDC ? "una con su" : "uno con su"} ${langApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`}${esIDC ? " de activación" : ""} (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total${cupo != null && firmasEnCupo > 0 ? `, ${firmasEnCupo.toLocaleString("es-AR")} sin cargo` : ""})` : ""}.`;
+	// Forma de liquidación del descuento de nivel (solo Volumen/Distribuidores-Vol).
+	// El neto no cambia; la cláusula describe cómo se entrega el descuento (rebate /
+	// firmas a fin de año, pago anticipado o seguro de caución). Ver [[descLiquidacion]].
+	const dl = inp.descLiquidacion;
+	const descNivelMonto = Number(res.descNivelMonto) || 0;
+	let descLiqClause = "";
+	if (!esIDC && dl && (dl.forma === "A" || dl.forma === "B")) {
+		const rLiq = resolveDescLiquidacion(dl, { descNivel: descNivelMonto, neto: servicioNeto, precioFirma: precioFirmaAdicN, cvFirma: 0 });
+		descLiqClause = rLiq.clausula(function (v) { return showIva ? fmGross(v, currency, tc) : fm(v, currency, tc); });
+	}
+
 	const momento1 = momentoCard({
 		dark: false,
 		kicker: "Momento 1 · mes 1",
@@ -783,6 +795,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 			})}
       ${miniStats(false, stats)}
       ${condOfrecidasBox}
+      ${descLiqClause ? `<div style="margin-top:0.2cm;font-size:8pt;color:${GR};line-height:1.45;border-top:1px solid ${GRL};padding-top:0.18cm;"><strong style="color:${DK};">Forma de pago del descuento.</strong> ${descLiqClause}</div>` : ""}
     `,
 	});
 

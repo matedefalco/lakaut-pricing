@@ -71,8 +71,7 @@ const NAV_GROUPS = [
 // Canales que se pueden cotizar desde "Nueva cotización".
 const QUOTABLE = [
 	{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
-	// Distribuidores abre en su modalidad por defecto (Volumen); el toggle del canal
-	// permite pasar a packs sin salir de la pantalla.
+	// Distribuidores cotiza siempre por Volumen (la modalidad packs se descartó).
 	{ key: "distribuidores_vol", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores_vol.desc },
 	{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
 	{ key: "volumen", label: CHANNELS.volumen.label, desc: CHANNELS.volumen.desc },
@@ -141,41 +140,6 @@ function NuevaCotizacionButton({ onPick }) {
 					})}
 				</div>
 			)}
-		</div>
-	);
-}
-
-
-// Selector de modalidad del canal Distribuidores. Los dos modos (Volumen y Packs)
-// conviven bajo la misma entrada del nav; el vendedor elige por cotización. Volumen
-// es la modalidad por defecto (certificados y firmas sueltos con nivel del socio).
-function DistribModeSwitch({ mode, onChange }) {
-	const accent = CHANNELS.distribuidores.color;
-	const opts = [
-		{ id: "volumen", label: "Volumen", sub: "certificados y firmas sueltos" },
-		{ id: "packs", label: "Packs", sub: "lista con descuento por nivel" },
-	];
-	return (
-		<div className="glass-strong shadow-float" style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 14, border: "1px solid var(--glass-border)" }}>
-			{opts.map(function (o) {
-				const active = mode === o.id;
-				return (
-					<button
-						key={o.id}
-						onClick={function () { onChange(o.id); }}
-						className="transition-all duration-150"
-						style={{
-							display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1,
-							padding: "7px 14px", borderRadius: 11, border: "none", cursor: "pointer",
-							background: active ? accent : "transparent",
-							color: active ? WHITE : GRAY,
-						}}
-					>
-						<span style={Object.assign({}, os(12.5, 700, active ? WHITE : BLACK))}>{o.label}</span>
-						<span style={Object.assign({}, os(10, 400, active ? "rgba(255,255,255,0.85)" : GRAY))}>{o.sub}</span>
-					</button>
-				);
-			})}
 		</div>
 	);
 }
@@ -410,12 +374,13 @@ function LakautCalcInner() {
 					{/* ── COTIZAR ── */}
 					{activeNavItem === "web" && <TabCanalPacks channel="web" key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "distribuidores" && (
-						<div className="space-y-4">
-							<DistribModeSwitch mode={distribMode} onChange={setDistribMode} />
-							{distribMode === "packs"
-								? <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
-								: <TabCanalB2B2C channel="distribuidores_vol" key={"distribuidores_vol-" + quoteNonce.distribuidores_vol} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores_vol" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-						</div>
+						// La modalidad packs (lista con descuento por nivel) se descartó del canal
+						// (ago 2026): Distribuidores cotiza siempre por Volumen. El branch de packs
+						// se conserva SOLO para abrir cotizaciones ya guardadas en ese canal
+						// (editQuote pone distribMode="packs"); no hay forma de crear nuevas.
+						distribMode === "packs"
+							? <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
+							: <TabCanalB2B2C channel="distribuidores_vol" key={"distribuidores_vol-" + quoteNonce.distribuidores_vol} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores_vol" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
 					)}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
 					{activeNavItem === "b2b2c" && <TabCanalB2B2C channel="b2b2c" key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}

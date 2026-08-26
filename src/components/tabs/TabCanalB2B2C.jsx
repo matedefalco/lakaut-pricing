@@ -16,6 +16,7 @@ import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CommercialLevers } from "@/components/ui/CommercialLevers";
 import { resolveLevers, defaultLeverSelection, leverValue } from "@/lib/commercialLevers";
+import { DESC_FORMAS, resolveDescLiquidacion } from "@/lib/descLiquidacion";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
@@ -118,6 +119,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// cantidad de IDC; solo descuenta su importe del subtotal.
 	const [firmasBonificadas, setFirmasBonificadas] = useState("");
 	const [showBonif, setShowBonif] = useState(false);
+	// Forma de liquidación del descuento de nivel (solo Volumen y Distribuidores-Volumen).
+	// Nivel 1 = Forma A (precio full, beneficio a fin de año) o B (pago anticipado); el
+	// sub se guarda por forma para no perderlo al alternar. Default = B1 (pago anticipado
+	// con descuento aplicado), que reproduce el comportamiento actual del canal.
+	const [descForma, setDescForma] = useState("B");
+	const [descSubA, setDescSubA] = useState("rebate");
+	const [descSubB, setDescSubB] = useState("anticipado");
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	// Base instalada del socio (solo Distribuidores-Volumen): certificados de sus
@@ -268,6 +276,16 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setFirmasBonificadas(i.firmasBonificadas != null ? String(i.firmasBonificadas) : "");
 		setShowBonif(i.firmasBonificadas != null);
+		// Forma de liquidación del descuento. Deals sin el dato (o de IDC) caen al
+		// default B1, que es el comportamiento histórico del canal.
+		const dl = i.descLiquidacion;
+		if (dl && (dl.forma === "A" || dl.forma === "B")) {
+			setDescForma(dl.forma);
+			if (dl.forma === "A") setDescSubA(dl.sub === "firmas" ? "firmas" : "rebate");
+			else setDescSubB(dl.sub === "caucion" ? "caucion" : "anticipado");
+		} else {
+			setDescForma("B"); setDescSubA("rebate"); setDescSubB("anticipado");
+		}
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
 		setAbonoDescPct(i.abonoDescuentoPct != null ? i.abonoDescuentoPct : (channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK));
@@ -393,12 +411,32 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// compromiso de facturación del socio.
 	const compromisoAnualAuto = esDistribVol ? Math.max(0, revServicio * 12) : 0;
 
-	const feeAplicado = conApi ? Math.max(0, Number(fee) || 0) : 0;
+	// Fee de implementación · gate por nivel (Distribuidores-Volumen). El fee solo se
+	// ofrece en los niveles de entrada (Azul y Bronce): los socios más grandes
+	// (Plata→Platinum) entran sin fee de implementación. En IDC y Volumen no hay
+	// restricción por nivel, así que el fee sigue disponible con la integración.
+	const feePermitido = !esDistribVol || seg.id === "azul" || seg.id === "bronce";
+	const feeAplicado = conApi && feePermitido ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
 	const revSinFee = revServicio + slaMes;
 	const revTotal = revSinFee + feeAplicado;
 
-	const margen = revServicio - costoTotal;
+	// ── Liquidación del descuento de nivel (solo Volumen y Distribuidores-Volumen) ──
+	// El descuento de nivel se mide sobre el servicio a precio de lista base (sin el
+	// descuento del segmento). El neto que se cobra sigue siendo revServicio; la forma
+	// elegida define cómo se liquida ese descuento (ver [[descLiquidacion]]).
+	const mostrarFormas = !esIDC;
+	const revServicioLista = mostrarFormas ? (idc * (Number(volumenBase.cert) || 0) + firmasExtra * (Number(volumenBase.firma) || 0)) : 0;
+	const descNivelMonto = mostrarFormas ? segDesc * revServicioLista : 0;
+	const descSub = descForma === "A" ? descSubA : descSubB;
+	const descLiq = resolveDescLiquidacion(
+		{ forma: descForma, sub: descSub },
+		{ descNivel: descNivelMonto, neto: revServicio, precioFirma: precioFirmaExtraEff, cvFirma: cvFirma }
+	);
+	// Forma A2: las firmas bonificadas al cierre tienen costo variable que baja el margen.
+	const costoFormaA2 = mostrarFormas && descLiq.forma === "A" && descLiq.sub === "firmas" ? descLiq.costoFirmasCierre : 0;
+
+	const margen = revServicio - costoTotal - costoFormaA2;
 	const margenPct = revServicio > 0 ? margen / revServicio : 0;
 	// Markup del deal: es la métrica del guardarraíl y la que se compara contra la
 	// columna de margen del Borrador v5.
@@ -486,6 +524,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		conApi ? (slaBonificado ? "SLA bonificado" : sla.label) : null,
 		overrideActive ? "precio ajustado" : "precio de tabla",
 		firmasBonif > 0 ? firmasBonif.toLocaleString("es-AR") + " firmas bonificadas" : null,
+		mostrarFormas && descNivelMonto > 0 ? descLiq.label : null,
 		hayCondOfrecidas ? leverRes.cappedPts + "% condiciones ofrecidas" : null,
 		abono ? "con abono mensual" : "sin abono",
 	].filter(Boolean).join(" · ");
@@ -573,7 +612,11 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				precioFirmaAdic: precioFirmaExtraEff,
 				// Firmas bonificadas: solo viaja al deal cuando hay bonificación.
 				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif } : {}),
-				...(conApi ? { fee, slaId, slaBonificado } : {}),
+				// Forma de liquidación del descuento de nivel (solo Volumen/Distribuidores-Vol).
+				...(mostrarFormas ? { descLiquidacion: { forma: descForma, sub: descSub } } : {}),
+				// El fee solo viaja al deal cuando el nivel lo permite (Azul/Bronce en
+				// Distribuidores-Volumen); si no, la propuesta lo lee como 0.
+				...(conApi ? { slaId, slaBonificado, ...(feePermitido ? { fee } : {}) } : {}),
 				// Palancas de condiciones: selección + snapshot resuelto (estable ante
 				// cambios posteriores de la config). Modelo "ofrecido": se listan como
 				// incentivos en la propuesta pero no bajan el total. El flag distingue
@@ -650,6 +693,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				revServicioBruto,
 				...(hayCondOfrecidas ? { condOfrecidaPct } : {}),
 				...(firmasBonif > 0 ? { firmasBonificadas: firmasBonif, firmasCobradas, bonifMonto } : {}),
+				// Liquidación del descuento de nivel: snapshot para propuesta y reportes. El
+				// neto (revTotal/revAnual) no cambia; se guardan las cifras del cash flow.
+				...(mostrarFormas && descNivelMonto > 0 ? {
+					descLiquidacion: descLiq.id,
+					descNivelMonto: descNivelMonto,
+					descLiqCargoAnioFull: descLiq.cargoAnioFull,
+					...(descLiq.firmasCierre > 0 ? { descLiqFirmasCierre: descLiq.firmasCierre, descLiqCostoFirmasCierre: descLiq.costoFirmasCierre } : {}),
+				} : {}),
 				margen, margenPct, markup, costoTotal,
 				...(abono ? { revAbonoMes, revAbonoAnual } : {}),
 			},
@@ -812,6 +863,44 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney2} /></span>
 					</div>
 
+					{/* Liquidación del descuento de nivel: cómo se entrega el descuento
+					    (mismo neto, distinto cash flow). Solo Volumen/Distribuidores-Vol. */}
+					{mostrarFormas && descNivelMonto > 0 && (
+						<div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 space-y-1">
+							<div className="flex items-center justify-between">
+								<span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Liquidación del descuento</span>
+								<span className="text-[10px] text-muted-foreground">{descLiq.label}</span>
+							</div>
+							{descLiq.esFull ? (
+								<>
+									<div className="flex items-center justify-between text-xs">
+										<span className="text-muted-foreground">Se factura durante el año (precio lista)</span>
+										<span className="font-semibold tabular-nums">{fMoney2(descLiq.cargoAnioFull)}</span>
+									</div>
+									<div className="flex items-center justify-between text-xs">
+										<span className="text-muted-foreground">{descLiq.sub === "firmas" ? "Bonificación a fin de año (" + descLiq.firmasCierre.toLocaleString("es-AR") + " firmas)" : "Descuento acreditado a fin de año"}</span>
+										<span className="font-semibold tabular-nums text-[var(--success)]">−{fMoney2(descNivelMonto)}</span>
+									</div>
+									{descLiq.sub === "firmas" && descLiq.costoFirmasCierre > 0 && (
+										<div className="flex items-center justify-between text-xs">
+											<span className="text-muted-foreground">Costo de las firmas bonificadas (margen)</span>
+											<span className="font-semibold tabular-nums text-destructive">−{fMoney2(descLiq.costoFirmasCierre)}</span>
+										</div>
+									)}
+								</>
+							) : (
+								<div className="flex items-center justify-between text-xs">
+									<span className="text-muted-foreground">{descLiq.sub === "anticipado" ? "Pago anual anticipado (descuento aplicado)" : "Con seguro de caución ejecutable"}</span>
+									<span className="font-semibold tabular-nums">{fMoney2(revServicio)}</span>
+								</div>
+							)}
+							<div className="flex items-center justify-between text-xs border-t border-primary/20 pt-1">
+								<span className="text-muted-foreground">Neto (mismo en todas las formas)</span>
+								<span className="font-semibold tabular-nums text-primary">{fMoney2(revServicio)}</span>
+							</div>
+						</div>
+					)}
+
 					{/* Condiciones comerciales OFRECIDAS: incentivos que el cliente puede
 					    aprovechar, sin restarse del total cotizado. */}
 					{hayCondOfrecidas && (
@@ -888,6 +977,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{firmasBonif > 0 && <ResultRow label={<>Bonificación de firmas<InfoTooltip text={firmasBonif.toLocaleString("es-AR") + " firmas bonificadas × " + fMoney2(precioFirmaExtraEff) + " = " + fMoney(bonifMonto) + " que no se facturan. Su costo variable se paga igual."} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(bonifMonto)}</span>} />}
 					<ResultRow label={<>Costo certificados<InfoTooltip text={idc.toLocaleString("es-AR") + " certificados × " + fMoney2(cvCert) + " de costo variable c/u = " + fMoney(costoCert)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoCert)}</span>} />
 					<ResultRow label={<>Costo firmas<InfoTooltip text={firmasTotales.toLocaleString("es-AR") + (esIDC ? " firmas emitidas (cupo incluido) × " : " firmas × ") + fMoney2(cvFirma) + " de costo variable c/u = " + fMoney(costoFirmas)} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoFirmas)}</span>} />
+					{costoFormaA2 > 0 && <ResultRow label={<>Firmas bonificadas a fin de año<InfoTooltip text={descLiq.firmasCierre.toLocaleString("es-AR") + " firmas (equivalentes al descuento de nivel de " + fMoney(descNivelMonto) + ") × " + fMoney2(cvFirma) + " de costo variable = " + fMoney(costoFormaA2) + ". Se entregan sin cargo al cierre, su costo baja el margen."} /></>} value={<span className="tabular-nums text-destructive">−{fMoney(costoFormaA2)}</span>} />}
 					{esIDC && <ResultRow label={<>Costo del bundle por IDC<InfoTooltip text={"Certificado (" + fMoney2(cvCert) + ") + " + cupo + " firma" + (cupo === 1 ? "" : "s") + " del cupo (" + fMoney2(cvFirma) + " c/u) = " + fMoney2(costoBundle) + ". Precio mínimo viable a " + markupMin.toFixed(2) + "x: " + fMoney2(precioMinSeg) + "."} /></>} value={<span className="tabular-nums">{fMoney2(costoBundle)}</span>} />}
 				</div>
 			</div>
@@ -1052,7 +1142,18 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			<FieldGroup step={3} channel={canal} done={hasVolume} title="Condiciones comerciales" subtitle={condResumen}>
 				{conApi && (
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+						{feePermitido
+							? <NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+							: (
+								<div className="flex flex-col gap-1.5">
+									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Fee de implementación</Label>
+									<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+										<span className="font-semibold tabular-nums">sin fee</span>
+										<span className="ml-2 text-[11px] text-muted-foreground truncate">nivel {segLabel}</span>
+									</div>
+									<span className="text-[11px] text-muted-foreground">El fee de implementación solo aplica a los niveles Azul y Bronce.</span>
+								</div>
+							)}
 						<div className="flex flex-col gap-1.5">
 							<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
 								options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
@@ -1078,6 +1179,50 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				</div>
 
 				<Separator />
+
+				{/* Forma de liquidación del descuento de nivel (solo Volumen y Distribuidores-
+				    Volumen). El neto no cambia entre formas; cambia el cash flow y, en A2, el
+				    margen (firmas bonificadas con costo). No aplica a IDC (escala de precios). */}
+				{mostrarFormas && (
+					<>
+						<div className="flex flex-col gap-2.5">
+							<span className="text-sm font-medium">Forma de liquidación del descuento</span>
+							<p className="text-[11px] text-muted-foreground">
+								{descNivelMonto > 0
+									? "Define cómo se entrega el descuento de nivel de " + fMoney(descNivelMonto) + ". El neto es el mismo; cambia el cash flow."
+									: "En este nivel no hay descuento que liquidar (0%). La forma elegida solo fija la condición de pago en la propuesta."}
+							</p>
+							<div className="flex gap-1 flex-wrap">
+								{DESC_FORMAS.map(function (f) {
+									const active = descForma === f.id;
+									return (
+										<button key={f.id} type="button" onClick={function () { setDescForma(f.id); }} className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>
+											<span className="font-medium">{f.label}</span>
+										</button>
+									);
+								})}
+							</div>
+							<div className="flex gap-1 flex-wrap">
+								{(DESC_FORMAS.find(function (f) { return f.id === descForma; }) || DESC_FORMAS[0]).subs.map(function (s) {
+									const active = descSub === s.id;
+									return (
+										<button key={s.id} type="button" onClick={function () { if (descForma === "A") setDescSubA(s.id); else setDescSubB(s.id); }} className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary/15 text-primary ring-1 ring-primary/40" : "bg-muted text-muted-foreground hover:text-foreground")} title={s.desc}>
+											<span className="font-medium">{s.label}</span>
+										</button>
+									);
+								})}
+							</div>
+							{hasVolume && descNivelMonto > 0 && (
+								<p className="text-[11px] text-muted-foreground">
+									{descLiq.esFull
+										? "Se factura " + fMoney(descLiq.cargoAnioFull) + " a precio de lista durante el año" + (descLiq.sub === "firmas" ? "; al cierre se bonifican " + descLiq.firmasCierre.toLocaleString("es-AR") + " firmas (costo " + fMoney(descLiq.costoFirmasCierre) + ", baja el margen)." : "; al cierre se acredita " + fMoney(descLiq.rebate) + ".")
+										: (descSub === "anticipado" ? "Se cobra " + fMoney(revServicio) + " anticipado, con el descuento ya aplicado." : "Precio neto " + fMoney(revServicio) + " con seguro de caución ejecutable (solo cláusula en la propuesta).")}
+								</p>
+							)}
+						</div>
+						<Separator />
+					</>
+				)}
 
 				{/* Bonificación de firmas (opcional): parte de las firmas facturables no se
 				    cobra. No toca el volumen ni el segmento, solo el subtotal a facturar. */}
