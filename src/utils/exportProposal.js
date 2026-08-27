@@ -772,7 +772,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const dl = inp.descLiquidacion;
 	const descNivelMonto = Number(res.descNivelMonto) || 0;
 	let descLiqClause = "";
-	if (!esIDC && dl && (dl.forma === "A" || dl.forma === "B")) {
+	if (!esIDC && dl && (dl.forma === "A" || dl.forma === "B" || dl.forma === "C")) {
 		const rLiq = resolveDescLiquidacion(dl, { descNivel: descNivelMonto, neto: servicioNeto, precioFirma: precioFirmaAdicN, cvFirma: 0 });
 		descLiqClause = rLiq.clausula(function (v) { return showIva ? fmGross(v, currency, tc) : fm(v, currency, tc); });
 	}

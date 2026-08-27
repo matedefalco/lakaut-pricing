@@ -16,7 +16,7 @@ import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CommercialLevers } from "@/components/ui/CommercialLevers";
 import { resolveLevers, defaultLeverSelection, leverValue } from "@/lib/commercialLevers";
-import { DESC_FORMAS, resolveDescLiquidacion } from "@/lib/descLiquidacion";
+import { DESC_OPCIONES, DESC_GRUPOS, DESC_OPCION_DEFAULT, descOpcion, descOpcionId, resolveDescLiquidacion } from "@/lib/descLiquidacion";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
@@ -120,12 +120,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const [firmasBonificadas, setFirmasBonificadas] = useState("");
 	const [showBonif, setShowBonif] = useState(false);
 	// Forma de liquidación del descuento de nivel (solo Volumen y Distribuidores-Volumen).
-	// Nivel 1 = Forma A (precio full, beneficio a fin de año) o B (pago anticipado); el
-	// sub se guarda por forma para no perderlo al alternar. Default = B1 (pago anticipado
-	// con descuento aplicado), que reproduce el comportamiento actual del canal.
-	const [descForma, setDescForma] = useState("B");
-	const [descSubA, setDescSubA] = useState("rebate");
-	const [descSubB, setDescSubB] = useState("anticipado");
+	// Se elige de una lista plana de opciones (ver [[descLiquidacion]]); se guarda el id
+	// plano y al persistir/exportar se traduce al modelo { forma, sub }. Default = B1
+	// (pago anticipado con descuento aplicado), el comportamiento histórico del canal.
+	const [descOpcionSel, setDescOpcionSel] = useState(DESC_OPCION_DEFAULT);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	// Base instalada del socio (solo Distribuidores-Volumen): certificados de sus
@@ -279,12 +277,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		// Forma de liquidación del descuento. Deals sin el dato (o de IDC) caen al
 		// default B1, que es el comportamiento histórico del canal.
 		const dl = i.descLiquidacion;
-		if (dl && (dl.forma === "A" || dl.forma === "B")) {
-			setDescForma(dl.forma);
-			if (dl.forma === "A") setDescSubA(dl.sub === "firmas" ? "firmas" : "rebate");
-			else setDescSubB(dl.sub === "caucion" ? "caucion" : "anticipado");
+		if (dl && (dl.forma === "A" || dl.forma === "B" || dl.forma === "C")) {
+			setDescOpcionSel(descOpcionId(dl.forma, dl.sub));
 		} else {
-			setDescForma("B"); setDescSubA("rebate"); setDescSubB("anticipado");
+			setDescOpcionSel(DESC_OPCION_DEFAULT);
 		}
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
@@ -428,7 +424,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const mostrarFormas = !esIDC;
 	const revServicioLista = mostrarFormas ? (idc * (Number(volumenBase.cert) || 0) + firmasExtra * (Number(volumenBase.firma) || 0)) : 0;
 	const descNivelMonto = mostrarFormas ? segDesc * revServicioLista : 0;
-	const descSub = descForma === "A" ? descSubA : descSubB;
+	const descOpcionActiva = descOpcion(descOpcionSel);
+	const descForma = descOpcionActiva.forma;
+	const descSub = descOpcionActiva.sub;
 	const descLiq = resolveDescLiquidacion(
 		{ forma: descForma, sub: descSub },
 		{ descNivel: descNivelMonto, neto: revServicio, precioFirma: precioFirmaExtraEff, cvFirma: cvFirma }
@@ -1189,26 +1187,29 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							<span className="text-sm font-medium">Forma de liquidación del descuento</span>
 							<p className="text-[11px] text-muted-foreground">
 								{descNivelMonto > 0
-									? "Define cómo se entrega el descuento de nivel de " + fMoney(descNivelMonto) + ". El neto es el mismo; cambia el cash flow."
-									: "En este nivel no hay descuento que liquidar (0%). La forma elegida solo fija la condición de pago en la propuesta."}
+									? "Elegí cómo se entrega el descuento de nivel de " + fMoney(descNivelMonto) + ". El neto es el mismo en todas; cambia el cash flow y el compromiso que se le pide al cliente."
+									: "En este nivel no hay descuento que liquidar (0%). La opción elegida solo fija la condición de pago en la propuesta."}
 							</p>
-							<div className="flex gap-1 flex-wrap">
-								{DESC_FORMAS.map(function (f) {
-									const active = descForma === f.id;
+							<div className="flex flex-col gap-2.5">
+								{DESC_GRUPOS.map(function (grupo) {
+									const opciones = DESC_OPCIONES.filter(function (o) { return o.grupo === grupo; });
+									if (!opciones.length) return null;
 									return (
-										<button key={f.id} type="button" onClick={function () { setDescForma(f.id); }} className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>
-											<span className="font-medium">{f.label}</span>
-										</button>
-									);
-								})}
-							</div>
-							<div className="flex gap-1 flex-wrap">
-								{(DESC_FORMAS.find(function (f) { return f.id === descForma; }) || DESC_FORMAS[0]).subs.map(function (s) {
-									const active = descSub === s.id;
-									return (
-										<button key={s.id} type="button" onClick={function () { if (descForma === "A") setDescSubA(s.id); else setDescSubB(s.id); }} className={"px-3 py-1.5 rounded-md text-xs transition-colors text-left " + (active ? "bg-primary/15 text-primary ring-1 ring-primary/40" : "bg-muted text-muted-foreground hover:text-foreground")} title={s.desc}>
-											<span className="font-medium">{s.label}</span>
-										</button>
+										<div key={grupo} className="flex flex-col gap-1">
+											<span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">{grupo}</span>
+											{opciones.map(function (o) {
+												const active = descOpcionSel === o.id;
+												return (
+													<button key={o.id} type="button" onClick={function () { setDescOpcionSel(o.id); }} className={"flex items-start gap-2.5 px-3 py-2 rounded-md text-left border transition-colors " + (active ? "bg-primary/10 border-primary/50 ring-1 ring-primary/30" : "bg-muted/40 border-transparent hover:bg-muted")}>
+														<span className={"mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors " + (active ? "border-primary bg-primary" : "border-muted-foreground/40")} />
+														<span className="flex flex-col gap-0.5">
+															<span className={"text-xs font-medium " + (active ? "text-primary" : "text-foreground")}>{o.label}</span>
+															<span className="text-[11px] text-muted-foreground leading-snug">{o.desc}</span>
+														</span>
+													</button>
+												);
+											})}
+										</div>
 									);
 								})}
 							</div>
@@ -1216,7 +1217,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								<p className="text-[11px] text-muted-foreground">
 									{descLiq.esFull
 										? "Se factura " + fMoney(descLiq.cargoAnioFull) + " a precio de lista durante el año" + (descLiq.sub === "firmas" ? "; al cierre se bonifican " + descLiq.firmasCierre.toLocaleString("es-AR") + " firmas (costo " + fMoney(descLiq.costoFirmasCierre) + ", baja el margen)." : "; al cierre se acredita " + fMoney(descLiq.rebate) + ".")
-										: (descSub === "anticipado" ? "Se cobra " + fMoney(revServicio) + " anticipado, con el descuento ya aplicado." : "Precio neto " + fMoney(revServicio) + " con seguro de caución ejecutable (solo cláusula en la propuesta).")}
+										: descForma === "C"
+											? "Se factura " + fMoney(revServicio) + " con el descuento ya aplicado, en cada período y sin compromiso de permanencia anual."
+											: (descSub === "anticipado" ? "Se cobra " + fMoney(revServicio) + " anticipado, con el descuento ya aplicado." : "Precio neto " + fMoney(revServicio) + " con seguro de caución ejecutable (solo cláusula en la propuesta).")}
 								</p>
 							)}
 						</div>
