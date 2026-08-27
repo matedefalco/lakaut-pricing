@@ -191,10 +191,10 @@ export const VOLUMEN_BASE = { cert: 0.65, firma: 0.50 };
 // descontado) es lo que rompe la circularidad precio↔segmento.
 export const VOLUMEN_SEGMENTS = [
 	{ id: "startup", label: "Start Up", compromisoMin: 0, compromisoMax: 25000, descuento: 0 },
-	{ id: "growth", label: "Growth", compromisoMin: 25001, compromisoMax: 125000, descuento: 0.10 },
-	{ id: "pyme", label: "PyME", compromisoMin: 125001, compromisoMax: 500000, descuento: 0.20 },
-	{ id: "empresa", label: "Empresa", compromisoMin: 500001, compromisoMax: 1500000, descuento: 0.30 },
-	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.40 },
+	{ id: "growth", label: "Growth", compromisoMin: 25001, compromisoMax: 125000, descuento: 0.05 },
+	{ id: "pyme", label: "PyME", compromisoMin: 125001, compromisoMax: 500000, descuento: 0.10 },
+	{ id: "empresa", label: "Empresa", compromisoMin: 500001, compromisoMax: 1500000, descuento: 0.15 },
+	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.20 },
 ];
 
 // ── Canal E · Distribuidores e Integradores (modalidad Volumen) ───────────────

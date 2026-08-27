@@ -285,3 +285,45 @@
      percepción), así que al imprimir hay que aplanarlo explícitamente. */
   .app-bg, .app-bg[data-section] { background: white !important; }
 }
+
+/* ─── Documentación del modelo comercial (TabDocumentacion) ─────────────────── */
+.doc-wrap {
+	max-width: 62rem;
+	margin: 0 auto;
+	padding: 0.5rem 0.25rem 4rem;
+	color: var(--foreground);
+	line-height: 1.6;
+	font-size: 0.95rem;
+}
+.doc-h { font-weight: 700; line-height: 1.25; color: var(--foreground); }
+.doc-h1 { font-size: 1.8rem; margin: 0.5rem 0 1rem; }
+.doc-h2 { font-size: 1.35rem; margin: 2rem 0 0.75rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--border); }
+.doc-h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
+.doc-h4 { font-size: 1rem; margin: 1rem 0 0.4rem; color: var(--muted-foreground); }
+.doc-p { margin: 0.6rem 0; }
+.doc-hr { border: 0; border-top: 1px solid var(--border); margin: 1.75rem 0; }
+.doc-list { margin: 0.6rem 0; padding-left: 1.4rem; list-style: none; }
+.doc-list li { position: relative; margin: 0.3rem 0; }
+.doc-list li::before { content: "→"; position: absolute; left: -1.4rem; color: var(--primary); font-weight: 600; }
+.doc-quote {
+	margin: 1rem 0;
+	padding: 0.75rem 1rem;
+	border-left: 3px solid var(--primary);
+	background: var(--muted);
+	border-radius: var(--radius-sm);
+	color: var(--muted-foreground);
+	font-size: 0.9rem;
+}
+.doc-code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.85em;
+	background: var(--muted);
+	padding: 0.1em 0.4em;
+	border-radius: var(--radius-sm);
+}
+.doc-table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.doc-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.doc-table th, .doc-table td { padding: 0.55rem 0.85rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.doc-table th { background: var(--muted); font-weight: 600; color: var(--foreground); position: sticky; top: 0; }
+.doc-table tbody tr:last-child td { border-bottom: 0; }
+.doc-table tbody tr:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); }

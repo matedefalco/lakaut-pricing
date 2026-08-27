@@ -48,3 +48,5 @@ supabase/.env.local
 # Coverage de tests
 coverage
 *.lcov
+# Backups del catálogo (push-models.mjs)
+scripts/_backup-*.json

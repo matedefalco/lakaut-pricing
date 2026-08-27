@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut } from "lucide-react";
+import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen } from "lucide-react";
 import { useDolarTC, DOLAR_SOURCES } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { BLUE, GRAY, BLACK, WHITE, os } from "./theme/tokens";
@@ -25,6 +25,7 @@ import { TabHistorial } from "./components/tabs/TabHistorial";
 import { TabClientes } from "./components/tabs/TabClientes";
 import { TabInicio } from "./components/tabs/TabInicio";
 import { TabReportes } from "./components/tabs/TabReportes";
+import { TabDocumentacion } from "./components/tabs/TabDocumentacion";
 
 
 // ── Estructura de navegación · agrupada por tarea del usuario ──────────────────
@@ -64,6 +65,7 @@ const NAV_GROUPS = [
 			{ key: "cfg-modelos", label: "Modelos y packs", Icon: Boxes },
 			{ key: "cfg-precios", label: "Precios por canal", Icon: BadgeDollarSign },
 			{ key: "cfg-general", label: "General · tipo de cambio", Icon: SlidersHorizontal },
+			{ key: "docs", label: "Documentación", Icon: BookOpen },
 		],
 	},
 ];
@@ -97,6 +99,7 @@ const SECTION_BY_ITEM = {
 	"cfg-modelos": "config",
 	"cfg-precios": "config",
 	"cfg-general": "config",
+	docs: "config",
 };
 
 
@@ -400,6 +403,7 @@ function LakautCalcInner() {
 					{activeNavItem === "cfg-costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 					{activeNavItem === "cfg-precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} costs={costs} />}
 					{activeNavItem === "cfg-modelos" && <TabGuardados selectedId={selectedModelId} onSelect={function (id) { setSelectedModelId(id); }} currency={currency} tc={tc} />}
+					{activeNavItem === "docs" && <TabDocumentacion />}
 				</div>
 			</div>
 		</div>
