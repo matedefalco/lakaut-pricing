@@ -10,6 +10,15 @@
 → La **fuente viva** de los números es la config de Supabase (`app_config`: keys `channelConfig`, `models`, `tcConfig`), que es lo que edita la pantalla de Config de la app. El generador la lee y aplica el mismo normalize que la app (`src/lib/channelConfigNormalize.js`), así la doc reproduce exactamente lo que el cotizador usa.
 → `src/data/channels.js` son solo **defaults / fallback**. Editarlos NO cambia lo que usa la app en producción hasta que se cargue vía la interfaz (que persiste en Supabase). Por eso la doc puede mostrar valores distintos a los del código: muestra lo vivo.
 
+### Dos vistas de la doc, una sola fuente de tablas
+
+Las tablas se arman con builders compartidos en **`src/lib/pricingDocSections.js`** (`buildDocBlocks` + `applyDocBlocks`), que consumen tanto el generador Node como la app:
+
+→ **Archivo `docs/modelo-comercial.md`**: lo escribe `gen-pricing-docs.mjs` leyendo Supabase. Para lectores externos (GitHub, el equipo). Se actualiza al correr `npm run docs:pricing`.
+→ **Sección Documentación en la app** (`TabDocumentacion.jsx`): la PROSA sale del `.md` (importado con `?raw`), pero las TABLAS se arman **en vivo** desde el context (`channelConfig` + `models` + `tc`). Un cambio hecho en la interfaz de Config se refleja en la doc in-app **al instante**, sin regenerar ni redeployar.
+
+Si tocás los builders de tablas, cambian ambas vistas a la vez.
+
 ### Regla al tocar pricing
 
 Cuando edites cualquier fuente de pricing (`src/data/channels.js`, `src/lib/channelConfigNormalize.js`, `src/data/defaultModels.js`), **regenerá la doc**:

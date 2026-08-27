@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-08-27 17:07 · **Fuente:** Supabase (config viva) · **Commit:** `3dbcdb3`
+> **Última actualización:** 2026-08-27 17:18 · **Fuente:** Supabase (config viva) · **Commit:** `2b0af31`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -13,7 +13,8 @@ Documentación viva de la estructura comercial de la cotizadora. Las tablas num�
 ## Cómo leer y mantener esta doc
 
 → **Fuente de verdad de los números:** la config viva en Supabase (`app_config`), que es lo que edita la pantalla de Config de la app y lo que persiste el código. El generador (`scripts/gen-pricing-docs.mjs`) la lee, aplica el mismo normalize que la app y reescribe las tablas.
-→ **Regenerar:** `npm run docs:pricing`. Se corre solo cuando cambia algo de pricing (un hook se lo recuerda a Claude Code), pero también podés correrlo a mano cuando editás precios desde la interfaz.
+→ **Vista in-app:** la sección Documentación dentro de la cotizadora arma estas tablas **en vivo** desde la config actual, así que un cambio hecho en la interfaz de Config se ve al instante. Este archivo (para GitHub / equipo) se actualiza al regenerar.
+→ **Regenerar el archivo:** `npm run docs:pricing`. Se corre solo cuando cambia algo de pricing (un hook se lo recuerda a Claude Code), pero también podés correrlo a mano cuando editás precios desde la interfaz.
 → **Editar:** la prosa entre bloques se edita libremente. Las tablas dentro de `<!-- AUTO:* -->` se pisan en cada regeneración, no las toques a mano.
 
 ---

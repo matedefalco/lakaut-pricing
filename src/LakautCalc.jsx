@@ -403,7 +403,7 @@ function LakautCalcInner() {
 					{activeNavItem === "cfg-costos" && <TabConfig costConfig={costConfig} setCostConfig={setCostConfig} channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} />}
 					{activeNavItem === "cfg-precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} costs={costs} />}
 					{activeNavItem === "cfg-modelos" && <TabGuardados selectedId={selectedModelId} onSelect={function (id) { setSelectedModelId(id); }} currency={currency} tc={tc} />}
-					{activeNavItem === "docs" && <TabDocumentacion />}
+					{activeNavItem === "docs" && <TabDocumentacion tc={tc} />}
 				</div>
 			</div>
 		</div>

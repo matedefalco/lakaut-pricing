@@ -1,10 +1,15 @@
 import { useMemo } from "react";
 import docMd from "../../../docs/modelo-comercial.md?raw";
+import { buildDocBlocks, applyDocBlocks } from "../../lib/pricingDocSections";
+import { useChannelConfig } from "../../context/ChannelConfigContext";
+import { useModels } from "../../context/ModelsContext";
 
 // ─── Documentación del modelo comercial dentro de la app ──────────────────────
-// Renderiza docs/modelo-comercial.md (importada como texto crudo con ?raw). La doc la
-// genera scripts/gen-pricing-docs.mjs desde la config viva de Supabase, así que esta
-// pantalla muestra siempre el modelo comercial vigente sin duplicar los números.
+// La PROSA sale de docs/modelo-comercial.md (importada como texto crudo con ?raw). Las
+// TABLAS se arman EN VIVO desde la config que la app ya tiene en memoria (channelConfig
+// + models + tc), con los mismos builders que usa el generador del .md. Así, cuando se
+// edita un precio o descuento desde la interfaz de Config (que actualiza el context),
+// esta pantalla lo refleja al instante, sin regenerar ni redeployar nada.
 //
 // Renderer de markdown propio (sin dependencias): cubre el subconjunto que usa la doc
 // —headings, tablas GFM, bold, `code`, blockquote, listas (→ y -), hr y párrafos—.
@@ -93,8 +98,22 @@ function parseMarkdown(md) {
 	return blocks;
 }
 
-export function TabDocumentacion() {
-	const blocks = useMemo(function () { return parseMarkdown(docMd); }, []);
+export function TabDocumentacion({ tc }) {
+	const { channelConfig } = useChannelConfig();
+	const { models } = useModels();
+
+	const blocks = useMemo(function () {
+		// Meta en vivo: deja claro que los números salen de la config actual de la app.
+		const fecha = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+		const meta = [
+			`> **Datos en vivo** desde la configuración de la app · ${fecha}.`,
+			">",
+			"> Las tablas se arman con los valores vigentes en Configuración. Un cambio de precio o descuento hecho en la interfaz se refleja acá al instante.",
+		].join("\n");
+		const auto = Object.assign({ meta }, buildDocBlocks({ channelConfig, models, tc }));
+		const liveDoc = applyDocBlocks(docMd, auto);
+		return parseMarkdown(liveDoc);
+	}, [channelConfig, models, tc]);
 
 	return (
 		<div className="doc-wrap">
