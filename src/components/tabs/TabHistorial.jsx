@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
-import { Pencil, Trash2, Download, FileText, ChevronDown, X, CopyPlus } from "lucide-react";
-import { formatCotId } from "@/lib/cotId";
+import { useMemo, useState, useEffect, Fragment } from "react";
+import { Pencil, Trash2, Download, FileText, ChevronDown, ChevronRight, X, CopyPlus } from "lucide-react";
+import { formatCotId, maxCotVersion } from "@/lib/cotId";
 import { exportProposal } from "@/utils/exportProposal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -39,6 +39,13 @@ const FILTER_DEFS = [
 	{ key: "certs", label: "Certs cotizados" },
 	{ key: "idc", label: "IDC" },
 ];
+
+// Clave de agrupación de una cotización: el correlativo (compartido entre versiones).
+// Los deals legacy sin número quedan como grupo propio, keyed por su id.
+function groupKeyOf(q) {
+	const n = q && q.inputs && q.inputs.cot && q.inputs.cot.number;
+	return n != null ? "n:" + n : "id:" + q.id;
+}
 
 function summaryCols(channel, fMoney) {
 	if (isPacks(channel)) {
@@ -95,9 +102,28 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	// Al llegar desde el toast de "cotización guardada": scroll a esa fila y flash
 	// de resaltado por unos segundos.
 	const [flashId, setFlashId] = useState(null);
+	// Grupos (por número de cotización) expandidos para ver sus versiones anteriores.
+	const [expanded, setExpanded] = useState(function () { return new Set(); });
+	function toggleExpand(key) {
+		setExpanded(function (prev) {
+			const next = new Set(prev);
+			if (next.has(key)) next.delete(key); else next.add(key);
+			return next;
+		});
+	}
 	useEffect(function () {
 		if (!highlightId) return;
 		setFlashId(highlightId);
+		// Si el deal resaltado es una versión anterior (no la última de su grupo),
+		// expandir el grupo para que sea visible bajo la fila colapsada.
+		const deal = (dealsApi?.deals || []).find(function (d) { return d.id === highlightId; });
+		if (deal) {
+			const num = deal.inputs?.cot?.number;
+			const myV = deal.inputs?.cot?.version || 1;
+			if (num != null && myV < maxCotVersion(dealsApi.deals, num)) {
+				setExpanded(function (prev) { const n = new Set(prev); n.add(groupKeyOf(deal)); return n; });
+			}
+		}
 		const raf = requestAnimationFrame(function () {
 			const el = document.querySelector('[data-deal-id="' + highlightId + '"]');
 			if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -214,31 +240,35 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 
 	const hasActiveFilters = FILTER_DEFS.some(function (f) { return isActive(f.key); });
 
-	const filtered = useMemo(function () {
-		return quotes.filter(function (q) {
-			if (selectedChannels.size > 0 && !selectedChannels.has(resolveChannel(q.channel))) return false;
-			if (selectedStatuses.size > 0 && !selectedStatuses.has(dealStatus(q))) return false;
-			if (month !== "all" && q.fecha.slice(0, 7) !== month) return false;
+	// Set de ids de versiones que pasan el filtro individualmente. Un grupo (número de
+	// cotización) se muestra si CUALQUIER versión está acá (requisito elegido).
+	const matchedIds = useMemo(function () {
+		const set = new Set();
+		quotes.forEach(function (q) {
+			if (selectedChannels.size > 0 && !selectedChannels.has(resolveChannel(q.channel))) return;
+			if (selectedStatuses.size > 0 && !selectedStatuses.has(dealStatus(q))) return;
+			if (month !== "all" && q.fecha.slice(0, 7) !== month) return;
 			if (search) {
 				// Matchea por nombre de cliente, por el ID completo (COT-0008-SDK-v1) y
 				// por el número suelto (padded y sin padding), para buscar por N° de cotización.
 				const cotStr = formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel) || "";
 				const num = q.inputs?.cot?.number != null ? String(q.inputs.cot.number) : "";
 				const hay = (q.clientName || "") + " " + cotStr + " " + num;
-				if (!hay.toLowerCase().includes(search.toLowerCase())) return false;
+				if (!hay.toLowerCase().includes(search.toLowerCase())) return;
 			}
 			if (isPacks(q.channel)) {
 				const certs = q.resumen.certsComprados || q.resumen.certsActivos || 0;
-				if (certsMin !== "" && certs < Number(certsMin)) return false;
-				if (certsMax !== "" && certs > Number(certsMax)) return false;
+				if (certsMin !== "" && certs < Number(certsMin)) return;
+				if (certsMax !== "" && certs > Number(certsMax)) return;
 			}
 			if (isUnit(q.channel)) {
 				const idc = q.resumen.idcMensuales || 0;
-				if (idcMin !== "" && idc < Number(idcMin)) return false;
-				if (idcMax !== "" && idc > Number(idcMax)) return false;
+				if (idcMin !== "" && idc < Number(idcMin)) return;
+				if (idcMax !== "" && idc > Number(idcMax)) return;
 			}
-			return true;
+			set.add(q.id);
 		});
+		return set;
 	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax, clientsById]);
 
 	// ── Orden ──
@@ -253,10 +283,36 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		setSortKey(k);
 	}
 
-	const sortedFiltered = useMemo(function () {
+	// Agrupa TODAS las versiones por número de cotización. El grupo se incluye si
+	// alguna versión matchea el filtro; adentro se listan todas, la última primero.
+	const groups = useMemo(function () {
+		const map = new Map();
+		quotes.forEach(function (q) {
+			const k = groupKeyOf(q);
+			if (!map.has(k)) map.set(k, []);
+			map.get(k).push(q);
+		});
+		const arr = [];
+		map.forEach(function (versions, key) {
+			if (!versions.some(function (v) { return matchedIds.has(v.id); })) return;
+			const sorted = versions.slice().sort(function (a, b) {
+				const va = (a.inputs && a.inputs.cot && a.inputs.cot.version) || 1;
+				const vb = (b.inputs && b.inputs.cot && b.inputs.cot.version) || 1;
+				if (vb !== va) return vb - va;
+				return collator.compare(b.fecha || "", a.fecha || "");
+			});
+			const num = sorted[0].inputs && sorted[0].inputs.cot ? sorted[0].inputs.cot.number : null;
+			arr.push({ key: key, number: num != null ? num : null, versions: sorted, latest: sorted[0] });
+		});
+		return arr;
+	}, [quotes, matchedIds, collator]);
+
+	// Orden de los grupos por su ÚLTIMA versión (la priorizada).
+	const sortedGroups = useMemo(function () {
 		const dir = sortDir === "asc" ? 1 : -1;
-		const arr = filtered.slice();
-		arr.sort(function (a, b) {
+		const arr = groups.slice();
+		arr.sort(function (ga, gb) {
+			const a = ga.latest, b = gb.latest;
 			let r = 0;
 			if (sortKey === "cliente") r = collator.compare(a.clientName || "", b.clientName || "");
 			else if (sortKey === "canal") r = collator.compare(channelShort(a.channel), channelShort(b.channel));
@@ -267,22 +323,26 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			return r * dir;
 		});
 		return arr;
-	}, [filtered, sortKey, sortDir, collator]);
+	}, [groups, sortKey, sortDir, collator]);
 
-	const groups = useMemo(function () {
+	// Grupos por canal vigente (de la última versión), para la vista "Por canal".
+	const groupsByChannel = useMemo(function () {
 		const byCh = {};
-		sortedFiltered.forEach(function (q) { const ch = resolveChannel(q.channel); (byCh[ch] = byCh[ch] || []).push(q); });
+		sortedGroups.forEach(function (g) { const ch = resolveChannel(g.latest.channel); (byCh[ch] = byCh[ch] || []).push(g); });
 		return byCh;
-	}, [sortedFiltered]);
+	}, [sortedGroups]);
 
 	function exportCsv() {
 		const lines = [];
-		Object.keys(groups).forEach(function (ch) {
+		Object.keys(groupsByChannel).forEach(function (ch) {
 			const cols = summaryCols(ch, fMoney);
 			lines.push((CHANNELS[ch] ? CHANNELS[ch].label : ch).toUpperCase());
-			lines.push(["fecha", "cliente", "estado"].concat(cols.map(function (c) { return c.label; })).join(","));
-			groups[ch].forEach(function (q) {
-				lines.push([q.fecha.slice(0, 10), '"' + (q.clientName || "").replace(/"/g, '""') + '"', DEAL_STATUS_META[dealStatus(q)].label].concat(cols.map(function (c) { return '"' + String(c.get(q)).replace(/"/g, '""') + '"'; })).join(","));
+			lines.push(["fecha", "cliente", "cotización", "versiones", "estado"].concat(cols.map(function (c) { return c.label; })).join(","));
+			// Una fila por cotización (su última versión), como en el listado agrupado.
+			groupsByChannel[ch].forEach(function (g) {
+				const q = g.latest;
+				const cotStr = formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel) || "";
+				lines.push([q.fecha.slice(0, 10), '"' + (q.clientName || "").replace(/"/g, '""') + '"', cotStr, g.versions.length, DEAL_STATUS_META[dealStatus(q)].label].concat(cols.map(function (c) { return '"' + String(c.get(q)).replace(/"/g, '""') + '"'; })).join(","));
 			});
 			lines.push("");
 		});
@@ -308,7 +368,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	}
 
 	// Orden fijo de las cards (como la nav), solo los canales con cotizaciones.
-	const orderedChannels = Object.keys(CHANNELS).filter(function (ch) { return groups[ch] && groups[ch].length; });
+	const orderedChannels = Object.keys(CHANNELS).filter(function (ch) { return groupsByChannel[ch] && groupsByChannel[ch].length; });
 
 	// Encabezado de columna ordenable: clic ordena por su clave; segundo clic invierte.
 	function SortHeader(props) {
@@ -344,10 +404,29 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			</TableCell>
 		);
 	}
-	function idCell(q) {
+	// Celda "Cotización" de la fila de un grupo: el ID de la última versión + un toggle
+	// (chevron) que despliega las versiones anteriores cuando hay más de una. En las
+	// sub-filas de versión se pasa group=null (sin toggle; el ID ya trae su vN).
+	function cotCell(q, group) {
+		const idStr = formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel) || "—";
+		const multi = !!group && group.versions.length > 1;
+		const open = !!group && expanded.has(group.key);
 		return (
 			<TableCell className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
-				{formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel) || "—"}
+				<div className="flex items-center gap-1.5">
+					{multi ? (
+						<button
+							type="button"
+							onClick={function () { toggleExpand(group.key); }}
+							title={open ? "Ocultar versiones" : "Ver " + group.versions.length + " versiones"}
+							className="inline-flex items-center justify-center size-4 rounded hover:bg-muted hover:text-foreground cursor-pointer"
+						>
+							<ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
+						</button>
+					) : <span className="inline-block size-4" />}
+					<span>{idStr}</span>
+					{multi && <Badge variant="outline" className="text-[10px] px-1 py-0 font-normal">{group.versions.length} v</Badge>}
+				</div>
 			</TableCell>
 		);
 	}
@@ -405,7 +484,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 				title="Cotizaciones"
 				description="Todas las cotizaciones guardadas, sincronizadas para el equipo."
 				actions={
-					<Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+					<Button variant="outline" size="sm" onClick={exportCsv} disabled={sortedGroups.length === 0}>
 						<Download /> Exportar CSV
 					</Button>
 				}
@@ -565,7 +644,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 
 					<Separator />
 					<div className="flex items-center justify-between gap-3">
-						<Badge variant="outline" className="h-6 px-2 text-xs">{filtered.length} {filtered.length === 1 ? "cotización" : "cotizaciones"}</Badge>
+						<Badge variant="outline" className="h-6 px-2 text-xs">{sortedGroups.length} {sortedGroups.length === 1 ? "cotización" : "cotizaciones"}</Badge>
 						{/* Toggle de vista: lista única ordenable vs agrupada por canal. */}
 						<div className="inline-flex rounded-md border border-border bg-background p-0.5">
 							{[{ k: "unificada", label: "Unificada" }, { k: "agrupada", label: "Por canal" }].map(function (opt) {
@@ -591,7 +670,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 
 			{dealsApi?.loading ? (
 				<p className="text-sm text-muted-foreground">Cargando historial…</p>
-			) : filtered.length === 0 ? (
+			) : sortedGroups.length === 0 ? (
 				<Card><CardContent className="p-0">
 					{quotes.length === 0 ? (
 						<EmptyState
@@ -627,19 +706,38 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{sortedFiltered.map(function (q) {
+								{sortedGroups.map(function (g) {
+									const q = g.latest;
+									const open = expanded.has(g.key);
 									return (
-										<TableRow key={q.id} data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
-											<TableCell><ChannelBadge channel={resolveChannel(q.channel)} /></TableCell>
-											{fechaCell(q)}
-											{clientCell(q)}
-											{idCell(q)}
-											{statusCell(q)}
-											<TableCell className="text-right tabular-nums text-muted-foreground">{volumenText(q)}</TableCell>
-											<TableCell className="text-right tabular-nums font-medium">{fMoney(dealRevenue(q))}</TableCell>
-											<TableCell className="text-right tabular-nums">{Math.round(((q.resumen && q.resumen.margenPct) || 0) * 100) + "%"}</TableCell>
-											{actionsCell(q)}
-										</TableRow>
+										<Fragment key={g.key}>
+											<TableRow data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
+												<TableCell><ChannelBadge channel={resolveChannel(q.channel)} /></TableCell>
+												{fechaCell(q)}
+												{clientCell(q)}
+												{cotCell(q, g)}
+												{statusCell(q)}
+												<TableCell className="text-right tabular-nums text-muted-foreground">{volumenText(q)}</TableCell>
+												<TableCell className="text-right tabular-nums font-medium">{fMoney(dealRevenue(q))}</TableCell>
+												<TableCell className="text-right tabular-nums">{Math.round(((q.resumen && q.resumen.margenPct) || 0) * 100) + "%"}</TableCell>
+												{actionsCell(q)}
+											</TableRow>
+											{open && g.versions.slice(1).map(function (v) {
+												return (
+													<TableRow key={v.id} data-deal-id={v.id} className={cn("bg-muted/20 transition-colors", flashId === v.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
+														<TableCell />
+														{fechaCell(v)}
+														<TableCell className="pl-6 text-muted-foreground">↳</TableCell>
+														{cotCell(v, null)}
+														{statusCell(v)}
+														<TableCell className="text-right tabular-nums text-muted-foreground">{volumenText(v)}</TableCell>
+														<TableCell className="text-right tabular-nums text-muted-foreground">{fMoney(dealRevenue(v))}</TableCell>
+														<TableCell className="text-right tabular-nums text-muted-foreground">{Math.round(((v.resumen && v.resumen.margenPct) || 0) * 100) + "%"}</TableCell>
+														{actionsCell(v)}
+													</TableRow>
+												);
+											})}
+										</Fragment>
 									);
 								})}
 							</TableBody>
@@ -655,7 +753,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 							<CardHeader>
 								<CardTitle className="flex items-center gap-2 text-base">
 									<ChannelBadge channel={ch} />
-									<span className="text-sm font-normal text-muted-foreground">{groups[ch].length} {groups[ch].length === 1 ? "cotización" : "cotizaciones"}</span>
+									<span className="text-sm font-normal text-muted-foreground">{groupsByChannel[ch].length} {groupsByChannel[ch].length === 1 ? "cotización" : "cotizaciones"}</span>
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
@@ -673,16 +771,32 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{groups[ch].map(function (q) {
+										{groupsByChannel[ch].map(function (g) {
+											const q = g.latest;
+											const open = expanded.has(g.key);
 											return (
-												<TableRow key={q.id} data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
-													{fechaCell(q)}
-													{clientCell(q)}
-													{idCell(q)}
-													{statusCell(q)}
-													{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
-													{actionsCell(q)}
-												</TableRow>
+												<Fragment key={g.key}>
+													<TableRow data-deal-id={q.id} className={cn("transition-colors", flashId === q.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
+														{fechaCell(q)}
+														{clientCell(q)}
+														{cotCell(q, g)}
+														{statusCell(q)}
+														{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums">{c.get(q)}</TableCell>; })}
+														{actionsCell(q)}
+													</TableRow>
+													{open && g.versions.slice(1).map(function (v) {
+														return (
+															<TableRow key={v.id} data-deal-id={v.id} className={cn("bg-muted/20 transition-colors", flashId === v.id && "bg-success/15 ring-2 ring-[var(--success)]/60")}>
+																{fechaCell(v)}
+																<TableCell className="pl-6 text-muted-foreground">↳</TableCell>
+																{cotCell(v, null)}
+																{statusCell(v)}
+																{cols.map(function (c) { return <TableCell key={c.label} className="text-right tabular-nums text-muted-foreground">{c.get(v)}</TableCell>; })}
+																{actionsCell(v)}
+															</TableRow>
+														);
+													})}
+												</Fragment>
 											);
 										})}
 									</TableBody>
