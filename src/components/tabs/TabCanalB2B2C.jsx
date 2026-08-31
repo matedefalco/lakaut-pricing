@@ -136,10 +136,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// facturación del contrato (× meses de vinculación); "unico" mide solo la compra
 	// puntual (× 1). No cambia los totales, solo el eje de facturación del nivel.
 	const [modalidadFact, setModalidadFact] = useState("anual"); // "anual" | "unico"
-	// Compromiso anual de facturación declarado por el socio (solo Distribuidores-Volumen),
-	// en USD. Es lo ÚNICO que asigna el nivel. Vacío o 0 = sin compromiso → 0% de descuento
-	// (firma a precio base). Es un dato declarado de la relación, no del volumen cotizado.
-	const [compromisoAnual, setCompromisoAnual] = useState("");
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	// Base instalada del socio (solo Distribuidores-Volumen): certificados de sus
@@ -213,8 +209,11 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const facturacionAtList = facturacionAtBase(idc, firmasTotales, baseCanal);
 
 	const certsActivosNum = certsHistoricos + idc;
-	// Compromiso anual declarado (Distribuidores-Volumen): lo único que asigna el nivel.
-	const compromisoAnualNum = Math.max(0, Number(compromisoAnual) || 0);
+	// Compromiso anual (Distribuidores-Volumen): se DERIVA de la cotización = servicio a
+	// precio de lista base × 12 (cantidad mensual cotizada × precio × 12). Se mide a precio
+	// base para no morder la cola precio↔nivel. No es un input manual. Asigna el nivel; el
+	// descuento se aplica solo si la forma de pago es "con compromiso anual" (ver aplicaDescNivel).
+	const compromisoAnualNum = esDistribVol ? Math.round(facturacionAtList * 12) : 0;
 
 	// Ventana de tiempo del eje de facturación: "anual" anualiza la facturación (× meses de
 	// vinculación); "unico" mide solo la compra puntual (× 1). El toggle Consumo único /
@@ -256,7 +255,17 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			? b2b2cSegmentDriver(idc, idcFacturacionRef, b2b2cSegments)
 			: volumenSegmentDriver(firmasTotales, facturacionNivel, volumenSegments);
 	const segLabel = seg.label || "—";
-	const segDesc = esIDC ? 0 : Math.min(1, Math.max(0, Number(seg.descuento) || 0));
+	// Forma de liquidación elegida. En Distribuidores-Volumen, "Sin compromiso anual"
+	// (forma C) NO aplica el descuento de nivel: la firma va a precio base. Las formas
+	// "Con compromiso anual" (A/B) sí lo aplican. En Volumen se aplica siempre.
+	const descFormaSel = descOpcion(descOpcionSel).forma;
+	const aplicaDescNivel = !esDistribVol || descFormaSel !== "C";
+	// Distribuidores-Volumen con compromiso anual efectivo (forma A/B): muestra el
+	// compromiso y aplica el descuento del nivel.
+	const distribConCompromiso = esDistribVol && aplicaDescNivel;
+	// Descuento EFECTIVO del nivel: el del tramo alcanzado, o 0 si no se aplica (forma C
+	// en Distribuidores-Volumen). IDC no usa descuento.
+	const segDesc = esIDC ? 0 : (aplicaDescNivel ? Math.min(1, Math.max(0, Number(seg.descuento) || 0)) : 0);
 	// Precios de lista del segmento. En IDC vienen del propio tramo; en Volumen y
 	// Distribuidores-Volumen se derivan del precio base del canal menos el descuento
 	// (en Distribuidores el certificado ya es 0, así que solo la firma tiene precio).
@@ -309,11 +318,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			setFirmasPorCertJuridico(i.firmasInclJuridicaPorIDC || 0);
 		}
 		setFirmasSueltas(i.firmasSueltas != null ? String(i.firmasSueltas) : "");
-		// Compromiso anual declarado (Distribuidores-Volumen): asigna el nivel, se restaura
-		// del deal. Deals del modelo anterior lo guardaban derivado (× 12); se restaura igual
-		// como valor declarado editable. La base instalada no se guarda (se recalcula desde
-		// las cotizaciones confirmadas del cliente).
-		setCompromisoAnual(i.compromisoAnual != null ? String(i.compromisoAnual) : "");
+		// El compromiso anual (Distribuidores-Volumen) se DERIVA de la cotización (servicio a
+		// lista × 12) al recalcular; no se carga a mano. La base instalada tampoco se guarda
+		// (se recalcula desde las cotizaciones confirmadas del cliente).
 		// Modalidad de facturación del nivel: deals viejos (sin el dato) caen a "anual",
 		// que reproduce el comportamiento del canal desde que existe el eje de facturación.
 		setModalidadFact(i.modalidadFacturacion === "unico" ? "unico" : "anual");
@@ -455,11 +462,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// facturación. Sin compromiso (0) el socio queda sin nivel (0% de descuento).
 	const compromisoAnualAuto = esDistribVol ? compromisoAnualNum : 0;
 
-	// Fee de implementación · gate por nivel (Distribuidores-Volumen). El fee solo se
-	// ofrece en los niveles de entrada (Azul y Bronce): los socios más grandes
-	// (Plata→Platinum) entran sin fee de implementación. En IDC y Volumen no hay
-	// restricción por nivel, así que el fee sigue disponible con la integración.
-	const feePermitido = !esDistribVol || seg.id === "azul" || seg.id === "bronce";
+	// Fee de implementación: siempre configurable manualmente en todos los canales, más
+	// allá de los lineamientos generales. No hay gate por nivel; el vendedor lo fija (o lo
+	// deja en 0) según el caso.
+	const feePermitido = true;
 	const feeAplicado = conApi && feePermitido ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
 	const revSinFee = revServicio + slaMes;
@@ -517,10 +523,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			const precioNext = segmentPricing(nextSeg, SEG_FALLBACK).precioIDC;
 			segHint = "Con " + faltan.toLocaleString("es-AR") + " IDC más entra en " + nextSeg.label + " · " + fMoney2(precioNext) + " por IDC.";
 		} else if (esDistribVol) {
-			// El nivel sube por el compromiso anual declarado.
+			// El nivel sube por el compromiso anual (derivado del volumen × 12).
 			const compFaltan = Math.max(0, (Number(nextSeg.compromisoMin) || 0) - compromisoAnualNum);
 			const descNext = Math.round((Number(nextSeg.descuento) || 0) * 100);
-			segHint = "Con " + fMoney(compFaltan) + " más de compromiso anual pasa a " + nextSeg.label + " · " + descNext + "% de descuento sobre la firma.";
+			segHint = distribConCompromiso
+				? "Con " + fMoney(compFaltan) + " más de compromiso anual pasa a " + nextSeg.label + " · " + descNext + "% de descuento sobre la firma."
+				: "Elegí forma de pago \"Con compromiso anual\" para aplicar el descuento del nivel. Con este volumen alcanzarías " + seg.label + ".";
 		} else {
 			// Volumen: el segmento sube por el eje más cercano, firmas o compromiso.
 			const firmasFaltan = Math.max(0, (Number(nextSeg.firmasMin) || 0) - firmasTotales);
@@ -532,8 +540,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		}
 	} else if (hasVolume) {
 		segHint = esDistribVol
-			? (compromisoAnualNum <= 0
-				? "Sin compromiso anual declarado: firma a precio base (0% de descuento). Declará un compromiso para acceder a un nivel."
+			? (!distribConCompromiso
+				? "Sin compromiso anual (forma de pago): firma a precio base, 0% de descuento. Con este volumen alcanzarías " + seg.label + "."
 				: "Es el nivel más alto.")
 			: "Es el segmento de mayor volumen.";
 	}
@@ -835,7 +843,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<InfoTooltip text={esIDC
 						? "Un certificado es físico o jurídico; cuestan y cotizan igual. Cada IDC incluye un cupo de firmas sin cargo y las que lo excedan se facturan por unidad. El segmento sale de la cantidad de IDC mensuales y define el precio unitario."
 						: esDistribVol
-							? "El certificado va siempre bonificado; solo se cobra la firma, con precio base USD 1,00. El nivel del socio (Azul→Platinum) lo asigna únicamente el compromiso anual de facturación que declara, y ese nivel define el descuento sobre la firma. Sin compromiso anual, la firma va a precio base (0% de descuento)."
+							? "El certificado va siempre bonificado; solo se cobra la firma, con precio base USD 1,00. El nivel del socio (Azul→Platinum) sale del compromiso anual de facturación, que se calcula del volumen cotizado (servicio × 12), y define el descuento sobre la firma. El descuento se aplica con forma de pago \"Con compromiso anual\"; con \"Sin compromiso anual\", la firma va a precio base."
 							: "Certificados y firmas se cotizan como items independientes: se cargan las cantidades a mano, sin cupo de firmas incluidas. El segmento sale del compromiso del contrato en USD y aplica el mismo descuento sobre los dos precios de lista."} />
 				</>
 			}
@@ -867,7 +875,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						? (esIDC
 							? idc.toLocaleString("es-AR") + " IDC/mes · " + fMoney2(precioIDC) + " por IDC · " + cupo + " firma" + (cupo === 1 ? "" : "s") + " incluidas"
 							: esDistribVol
-								? (compromisoAnualNum > 0 ? "compromiso " + fMoney(compromisoAnualNum) : "sin compromiso") + " · cert bonificado · " + fMoney2(precioFirmaExtraEff) + "/firma"
+								? (distribConCompromiso ? "compromiso " + fMoney(compromisoAnualNum) : "sin compromiso anual") + " · cert bonificado · " + fMoney2(precioFirmaExtraEff) + "/firma"
 								: "compromiso " + fMoney(compromiso) + " · " + fMoney2(precioIDC) + "/cert · " + fMoney2(precioFirmaExtraEff) + "/firma")
 						: null}
 					empty={!hasVolume}
@@ -988,7 +996,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{esIDC
 							? "Cada IDC incluye " + cupo + " firma" + (cupo === 1 ? "" : "s") + ". Firma sobre el cupo: " + fMoney2(precioFirmaExtraEff) + " c/u" + (overridePrecioFirma !== "" ? " · manual" : " · segmento") + "."
 							: esDistribVol
-								? "Certificado bonificado y firma " + fMoney2(precioFirmaExtraEff) + " por unidad" + (overrideActive ? " · precio ajustado a mano" : compromisoAnualNum > 0 ? " · nivel " + segLabel : " · sin compromiso, precio base") + "."
+								? "Certificado bonificado y firma " + fMoney2(precioFirmaExtraEff) + " por unidad" + (overrideActive ? " · precio ajustado a mano" : distribConCompromiso ? " · nivel " + segLabel : " · sin compromiso anual, precio base") + "."
 								: "Certificado " + fMoney2(precioIDC) + " y firma " + fMoney2(precioFirmaExtraEff) + ", cada uno por unidad" + (overrideActive ? " · precio ajustado a mano" : " · segmento " + segLabel) + "."}
 					</p>
 
@@ -1171,7 +1179,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Precio por IDC" : "Precio por certificado"}</Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioIDC) : "—"}</span>
-							<span className="ml-2 text-[11px] text-muted-foreground truncate">{hasVolume ? (esDistribVol ? (compromisoAnualNum > 0 ? "nivel " + segLabel : "bonificado") : "segmento " + segLabel) + (overridePrecioCert !== "" ? " · manual" : "") : (esIDC ? "según el volumen de IDC" : esDistribVol ? "certificado bonificado" : "según el compromiso")}</span>
+							<span className="ml-2 text-[11px] text-muted-foreground truncate">{hasVolume ? (esDistribVol ? (distribConCompromiso ? "nivel " + segLabel : "bonificado") : "segmento " + segLabel) + (overridePrecioCert !== "" ? " · manual" : "") : (esIDC ? "según el volumen de IDC" : esDistribVol ? "certificado bonificado" : "según el compromiso")}</span>
 						</div>
 						<span className="text-[11px] text-muted-foreground">{esIDC ? "Escala por volumen mensual de IDC." : esDistribVol ? "El certificado va siempre bonificado (USD 0)." : "Precio base menos el descuento del segmento."}</span>
 					</div>
@@ -1335,7 +1343,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{esIDC
 							? "El segmento es el MAYOR entre dos ejes: el volumen mensual de IDC del paso 2 y la facturación de la ventana medida a precio Start Up (referencia que evita la circularidad precio↔segmento). Lo que llegue al segmento más grande, manda."
 							: esDistribVol
-								? "El nivel (Azul→Platinum) lo asigna únicamente el compromiso anual de facturación que declara el socio. A más compromiso, mayor descuento sobre la firma (el certificado ya va bonificado). Sin compromiso anual, la firma queda a precio base, sin descuento."
+								? "El nivel (Azul→Platinum) sale del compromiso anual de facturación, que se calcula del volumen cotizado (servicio a precio base × 12). A mayor compromiso, mayor descuento sobre la firma (el certificado va bonificado). El descuento se aplica solo si la forma de pago es \"Con compromiso anual\"; con \"Sin compromiso anual\" la firma va a precio base."
 								: "El segmento es el MAYOR entre dos ejes de esta cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (compromiso del contrato). Lo que llegue al segmento más alto, manda."}
 					</p>
 					{/* Modalidad de facturación (IDC y Volumen): windowea el eje de facturación.
@@ -1359,20 +1367,19 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{esDistribVol ? (
 						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso anual de facturación</Label>
-								<div className="relative flex items-center">
-									<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
-									<Input type="number" min={0} value={compromisoAnual} onChange={function (e) { setCompromisoAnual(e.target.value); }} placeholder="0" className="tabular-nums pl-11" />
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso anual de facturación <span className="normal-case tracking-normal font-normal">(calculado)</span></Label>
+								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
+									<span className="font-semibold tabular-nums">{hasVolume ? fMoney(compromisoAnualNum) : "—"}</span>
 								</div>
-								<span className="text-[11px] text-muted-foreground">Lo que el socio se compromete a facturar por año. Asigna el nivel. Vacío o 0 = sin nivel (0% de descuento).</span>
+								<span className="text-[11px] text-muted-foreground">Servicio mensual cotizado a precio base × 12. Asigna el nivel. El descuento se aplica solo con forma de pago "Con compromiso anual".</span>
 							</div>
 							<div className="flex flex-col gap-1.5">
 								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Nivel alcanzado</Label>
 								<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
-									{compromisoAnualNum > 0 ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null} /> : <span className="text-sm text-muted-foreground/60">sin nivel</span>}
-									<span className="text-[11px] text-muted-foreground truncate">{compromisoAnualNum > 0 ? "por compromiso " + fMoney(compromisoAnualNum) : "declará un compromiso"}</span>
+									{hasVolume ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={distribConCompromiso ? "−" + Math.round(segDesc * 100) + "%" : "sin desc."} /> : <span className="text-sm text-muted-foreground/60">—</span>}
+									<span className="text-[11px] text-muted-foreground truncate">{!hasVolume ? "cargá volumen" : distribConCompromiso ? "por compromiso " + fMoney(compromisoAnualNum) : "sin compromiso anual (forma de pago)"}</span>
 								</div>
-								<span className="text-[11px] text-muted-foreground">Descuento sobre el precio de la firma.</span>
+								<span className="text-[11px] text-muted-foreground">{distribConCompromiso ? "Descuento sobre el precio de la firma." : "Sin compromiso anual: firma a precio base."}</span>
 							</div>
 							<div className="flex flex-col gap-1.5">
 								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos <span className="normal-case tracking-normal font-normal">(informativo)</span></Label>
@@ -1685,6 +1692,37 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					))}
 				</div>
 			</FieldGroup>
+
+			{/* ── Matriz de niveles (solo Distribuidores-Volumen) ── */}
+			{esDistribVol && (
+				<CollapsibleSection title="Matriz de niveles" subtitle="Niveles del canal. El nivel lo asigna el compromiso anual de facturación; los certificados activos son informativos. El nivel de esta cotización se resalta.">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Nivel</TableHead>
+								<TableHead className="text-right">Certificados activos</TableHead>
+								<TableHead className="text-right">Descuento firma</TableHead>
+								<TableHead className="text-right">Compromiso anual (USD)</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{segmentList.map(function (t) {
+								const act = hasVolume && distribConCompromiso && t.id === seg.id;
+								const certsMin = Number(t.certsMin) || 0;
+								const cMin = Number(t.compromisoMin) || 0;
+								return (
+									<TableRow key={t.id} className={act ? "bg-accent" : ""}>
+										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={segmentList} size="sm" />{act && <span className="text-[10px] font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>
+										<TableCell className="text-right tabular-nums">{certsMin.toLocaleString("es-AR")}{t.certsMax == null ? "+" : "–" + (Number(t.certsMax) || 0).toLocaleString("es-AR")}</TableCell>
+										<TableCell className="text-right tabular-nums font-semibold">{Math.round((Number(t.descuento) || 0) * 100)}%</TableCell>
+										<TableCell className="text-right tabular-nums">{cMin === 0 && t.compromisoMax != null ? "hasta " + fMoney(Number(t.compromisoMax) || 0) : fMoney(cMin) + (t.compromisoMax == null ? "+" : "–" + fMoney(Number(t.compromisoMax) || 0))}</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</CollapsibleSection>
+			)}
 
 			{/* ── Referencia ── */}
 			<CollapsibleSection title="Referencia · precios por segmento, SDK y SLA" subtitle="Tabla completa del modelo de volumen (Borrador v5).">

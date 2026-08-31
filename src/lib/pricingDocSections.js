@@ -63,7 +63,7 @@ function secDistribuidoresVol(tiers, base) {
 		`| ${t.label} | ${rangeUSD(t.compromisoMin, t.compromisoMax)} | ${pct(t.descuento)} | USD ${usd((Number(base.firma) || 0) * (1 - (Number(t.descuento) || 0)))} | ${rangeCant(t.certsMin, t.certsMax)} |`
 	);
 	return [
-		`Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD ${usd(base.cert)}); solo se cobran las firmas, con un precio base de **USD ${usd(base.firma)}** por firma. El nivel (Azul→Platinum) lo asigna únicamente el **compromiso anual de facturación** declarado por el socio, que define el descuento sobre la firma. **Sin compromiso anual el descuento es 0%**: la firma se cotiza a USD ${usd(base.firma)} full. Los certificados activos son informativos (no asignan el nivel).`,
+		`Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD ${usd(base.cert)}); solo se cobran las firmas, con un precio base de **USD ${usd(base.firma)}** por firma. El nivel (Azul→Platinum) lo asigna el **compromiso anual de facturación**, que se calcula del volumen cotizado (servicio mensual a precio base × 12), y define el descuento sobre la firma. El descuento se aplica solo con forma de pago **"Con compromiso anual"**; con **"Sin compromiso anual"** la firma va a precio base (USD ${usd(base.firma)}). Los certificados activos son informativos (no asignan el nivel).`,
 		"",
 		"| Nivel | Compromiso anual (USD) | Descuento firma | Firma resultante | Certificados activos (informativo) |",
 		"|---|---|---|---|---|",

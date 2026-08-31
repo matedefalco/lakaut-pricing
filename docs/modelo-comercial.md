@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-08-31 18:42 · **Fuente:** Supabase (config viva) · **Commit:** `531b431`
+> **Última actualización:** 2026-08-31 19:44 · **Fuente:** Supabase (config viva) · **Commit:** `1021dda`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -26,7 +26,7 @@ La estructura se separa en canales según **quién paga, cómo se cotiza y qué 
 | Canal | Unidad de venta | Cómo se cotiza | Ingreso |
 |---|---|---|---|
 | **Web** | Pack cerrado | Precio de lista, autoservicio | Único |
-| **Distribuidores** | Firma suelta (certificado bonificado) | Descuento por nivel según compromiso anual declarado | Único |
+| **Distribuidores** | Firma suelta (certificado bonificado) | Descuento por nivel según compromiso anual (volumen × 12), aplicado con forma de pago anual | Único |
 | **IDC (B2B2C)** | IDC (bundle identidad + firma) | Precio por segmento de volumen | Recurrente mensual |
 | **Volumen** | Certificado y firma sueltos | Descuento por compromiso | Único |
 
@@ -54,10 +54,10 @@ TC de referencia usado para derivar ARS: **$1.530** por USD.
 
 ## 2. Distribuidores e integradores
 
-Socios que revenden el acceso a la infraestructura o la integran en su plataforma. Cotizan **por elementos sueltos**: el **certificado va siempre bonificado** y solo se cobran las firmas, a un precio base de USD 1,00. El descuento sobre la firma sale del **nivel del socio**, que lo asigna únicamente su **compromiso anual de facturación declarado** (sin compromiso, la firma va a precio base). La modalidad packs (descuento sobre lista web) se descontinuó.
+Socios que revenden el acceso a la infraestructura o la integran en su plataforma. Cotizan **por elementos sueltos**: el **certificado va siempre bonificado** y solo se cobran las firmas, a un precio base de USD 1,00. El descuento sobre la firma sale del **nivel**, que lo asigna el **compromiso anual de facturación** (calculado del volumen cotizado × 12). El descuento se aplica con forma de pago "Con compromiso anual"; con "Sin compromiso anual" la firma va a precio base. La modalidad packs (descuento sobre lista web) se descontinuó.
 
 <!-- AUTO:distribuidores-vol:start -->
-Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD 0,00); solo se cobran las firmas, con un precio base de **USD 1,00** por firma. El nivel (Azul→Platinum) lo asigna únicamente el **compromiso anual de facturación** declarado por el socio, que define el descuento sobre la firma. **Sin compromiso anual el descuento es 0%**: la firma se cotiza a USD 1,00 full. Los certificados activos son informativos (no asignan el nivel).
+Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD 0,00); solo se cobran las firmas, con un precio base de **USD 1,00** por firma. El nivel (Azul→Platinum) lo asigna el **compromiso anual de facturación**, que se calcula del volumen cotizado (servicio mensual a precio base × 12), y define el descuento sobre la firma. El descuento se aplica solo con forma de pago **"Con compromiso anual"**; con **"Sin compromiso anual"** la firma va a precio base (USD 1,00). Los certificados activos son informativos (no asignan el nivel).
 
 | Nivel | Compromiso anual (USD) | Descuento firma | Firma resultante | Certificados activos (informativo) |
 |---|---|---|---|---|
@@ -184,5 +184,5 @@ Descuento del abono mensual (reposición de bolsa de firmas): **3%**. Se mantien
 Notas sobre por qué algunos números difieren del documento estratégico original (Borrador v5), para quien compare ambos:
 
 → **Precios IDC.** El Borrador v5 fijaba 0,65 → 0,45 por IDC, pero esa columna calculaba el margen contra el costo del certificado solo, ignorando que la IDC incluye 3 firmas. Con el costo real del bundle (~USD 0,77), varios segmentos vendían por debajo del costo. La escala se reconstruyó fijando el piso en 1,20x el costo y subiendo el resto en la misma proporción del documento.
-→ **Distribuidores (elementos sueltos).** El certificado va siempre bonificado (precio 0): el socio no paga por el certificado, solo por las firmas, con base USD 1,00. El nivel (y su descuento sobre la firma) lo asigna únicamente el compromiso anual de facturación declarado por el socio, con los rangos y descuentos de la matriz comercial (Azul 10% → Platinum 50%); sin compromiso, la firma va a precio base. El costo variable del certificado se paga igual y entra al markup del deal. La antigua modalidad packs (descuento sobre la lista web) se descontinuó.
+→ **Distribuidores (elementos sueltos).** El certificado va siempre bonificado (precio 0): el socio no paga por el certificado, solo por las firmas, con base USD 1,00. El nivel (y su descuento sobre la firma) lo asigna el compromiso anual de facturación, calculado del volumen cotizado (servicio a precio base × 12), con los rangos y descuentos de la matriz comercial (Azul 10% → Platinum 50%). El descuento se aplica solo cuando la forma de pago es "Con compromiso anual" (pago anticipado, caución, rebate o bonificación en firmas); con "Sin compromiso anual" la firma va a precio base. El fee de implementación es configurable manualmente en todos los niveles. El costo variable del certificado se paga igual y entra al markup del deal. La antigua modalidad packs (descuento sobre la lista web) se descontinuó.
 → **Canal Volumen y formas de liquidación A/B.** No están en el Borrador v5; son construcciones posteriores del cotizador.
