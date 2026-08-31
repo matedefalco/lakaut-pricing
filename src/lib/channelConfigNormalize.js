@@ -7,6 +7,7 @@
 import {
 	DISTRIBUTOR_TIERS,
 	DISTRIBUIDOR_VOL_TIERS,
+	DISTRIBUIDOR_VOL_BASE,
 	WEB_FIRMA_EXTRA_TIERS,
 	B2B2C_SEGMENTS,
 	B2B2C_FIRMAS_INCLUIDAS,
@@ -26,6 +27,9 @@ export const DEFAULT_CHANNEL_CONFIG = {
 	// base por elemento, con escala prudente por el piso de margen). Mismos umbrales de
 	// asignación que distributorTiers, otra columna de descuentos.
 	distribuidorVolTiers: DISTRIBUIDOR_VOL_TIERS,
+	// Precio base propio del canal Distribuidores-Volumen (cert bonificado = 0, firma
+	// USD 1,00). No comparte VOLUMEN_BASE: el descuento del nivel pega sobre la firma.
+	distribuidorVolBase: DISTRIBUIDOR_VOL_BASE,
 	// Escala de precios del canal IDC (bundle por IDC mensuales).
 	b2b2cSegments: B2B2C_SEGMENTS,
 	b2b2cMarkupMin: B2B2C_MARKUP_MIN,
@@ -204,25 +208,22 @@ export function normalizeChannelConfig(raw) {
 		if (merged.webFirmaExtraTiers.length === 0) merged.webFirmaExtraTiers = WEB_FIRMA_EXTRA_TIERS;
 	}
 
-	// Niveles de Distribuidores-Volumen: el modelo pasó de asignar por variables
-	// declaradas (certificados activos + compromiso anual) a asignar por el VOLUMEN REAL
-	// DE FIRMAS de la cotización, con rangos en `firmasMin`/`firmasMax`. Las configs
-	// guardadas con el modelo viejo traen tiers sin `firmasMin` (solo certsMin/compromiso)
-	// y una columna de descuentos distinta, así que se reemplazan por el default nuevo:
-	// los rangos y descuentos cambiaron de significado y no hay traducción 1:1. Sin nada
-	// cargado (config anterior a este canal), también se cae al default.
+	// Niveles de Distribuidores-Volumen: el modelo pasó a asignar el nivel ÚNICAMENTE por
+	// el COMPROMISO ANUAL declarado (rangos en `compromisoMin`/`compromisoMax`), con la
+	// escala de descuentos de la matriz comercial (10%–50% sobre la firma; el cert va
+	// bonificado). Las configs guardadas con el modelo anterior (nivel por firmas +
+	// facturación de la cotización, otra columna de descuentos) traen tiers sin
+	// `compromisoMin`, así que se reemplazan por el default nuevo: los rangos y descuentos
+	// cambiaron de significado y no hay traducción 1:1. Sin nada cargado, también al default.
 	if (!Array.isArray(merged.distribuidorVolTiers) || merged.distribuidorVolTiers.length === 0
-		|| merged.distribuidorVolTiers.some(function (t) { return !t || t.firmasMin == null; })) {
+		|| merged.distribuidorVolTiers.some(function (t) { return !t || t.compromisoMin == null; })) {
 		merged.distribuidorVolTiers = DISTRIBUIDOR_VOL_TIERS;
-	} else if (merged.distribuidorVolTiers.some(function (t) { return t.facturacionMin == null; })) {
-		// Configs guardadas cuando el nivel salía SOLO de las firmas: traen los rangos de
-		// firmas pero no el eje de facturación (facturacionMin/Max). Se backfillea desde el
-		// default por posición, respetando los rangos de firmas y descuentos ya cargados.
-		merged.distribuidorVolTiers = merged.distribuidorVolTiers.map(function (t, i) {
-			if (t.facturacionMin != null) return t;
-			const def = DISTRIBUIDOR_VOL_TIERS[i] || DISTRIBUIDOR_VOL_TIERS[DISTRIBUIDOR_VOL_TIERS.length - 1] || {};
-			return Object.assign({}, t, { facturacionMin: def.facturacionMin != null ? def.facturacionMin : 0, facturacionMax: def.facturacionMax !== undefined ? def.facturacionMax : null });
-		});
+	}
+
+	// Precio base propio del canal Distribuidores-Volumen. Si la config no lo trae (era
+	// compartido con volumenBase antes de la separación), se cae al default (cert 0 / firma 1).
+	if (!merged.distribuidorVolBase || merged.distribuidorVolBase.firma == null) {
+		merged.distribuidorVolBase = DISTRIBUIDOR_VOL_BASE;
 	}
 
 	// Segundo eje de segmentación (facturación en IDC, firmas en Volumen): las configs

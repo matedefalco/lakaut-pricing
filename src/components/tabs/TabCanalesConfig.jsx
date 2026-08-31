@@ -71,6 +71,12 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 	function updVolBase(field, val) {
 		updDraft({ volumenBase: Object.assign({}, volBase, { [field]: val }) });
 	}
+	// Precio base propio del canal Distribuidores-Volumen: cert bonificado (0) y firma
+	// con su precio base. El descuento de cada nivel se aplica sobre la firma.
+	const distribVolBase = draft.distribuidorVolBase || { cert: 0, firma: 1 };
+	function updDistribVolBase(field, val) {
+		updDraft({ distribuidorVolBase: Object.assign({}, distribVolBase, { [field]: val }) });
+	}
 	function fMarkupTxt(precio, cv) {
 		const m = markupOf(precio, cv);
 		return m == null ? "—" : m.toFixed(2) + "x";
@@ -137,20 +143,32 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			{/* ── 1b · Distribuidores · Volumen · Niveles y descuentos ── */}
 			<CollapsibleSection
 				title="1b · Distribuidores-Volumen · Niveles y descuentos"
-				subtitle={"Modalidad Volumen del canal: el descuento del nivel se aplica sobre el precio base por elemento (cert USD " + (Number(volBase.cert) || 0).toFixed(4) + " / firma USD " + (Number(volBase.firma) || 0).toFixed(4) + "). El nivel es el MAYOR entre dos ejes de cada cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (rangos abajo). La modalidad Consumo único / Anual del cotizador define si la facturación se mide sobre un período o se anualiza. El precio del certificado no puede bajar del markup mínimo de " + markupMin.toFixed(2) + "x."}
+				subtitle={"El certificado va siempre bonificado (precio USD " + (Number(distribVolBase.cert) || 0).toFixed(4) + "); solo se cobra la firma, con precio base USD " + (Number(distribVolBase.firma) || 0).toFixed(4) + ". El nivel lo asigna ÚNICAMENTE el compromiso anual declarado del socio (rangos abajo), que define el descuento sobre la firma. Sin compromiso anual el descuento es 0%. Los certificados activos son informativos. El precio de la firma no puede bajar del markup mínimo de " + markupMin.toFixed(2) + "x."}
 			>
+				<div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ maxWidth: 420 }}>
+					<div className="flex flex-col gap-1">
+						<span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Precio base certificado (USD)</span>
+						<NumCell value={distribVolBase.cert} decimals={4} onChange={function (v) { updDistribVolBase("cert", v); }} />
+						<span className="text-[10px] text-muted-foreground">Bonificado: dejar en 0.</span>
+					</div>
+					<div className="flex flex-col gap-1">
+						<span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Precio base firma (USD)</span>
+						<NumCell value={distribVolBase.firma} decimals={4} onChange={function (v) { updDistribVolBase("firma", v); }} />
+						<span className="text-[10px] text-muted-foreground">Precio sin compromiso anual (0% de descuento).</span>
+					</div>
+				</div>
 				<Table>
 					<TableHeader>
 						<TableRow>
 							<TableHead className="w-[130px]">Se ve así</TableHead>
 							<TableHead>Nivel</TableHead>
 							<TableHead>Label</TableHead>
-							<TableHead className={thNum}>Firmas mín.</TableHead>
-							<TableHead className={thNum}>Firmas máx.</TableHead>
-							<TableHead className={thNum}>Fact. mín. USD</TableHead>
-							<TableHead className={thNum}>Fact. máx. USD</TableHead>
+							<TableHead className={thNum}>Comp. mín. USD</TableHead>
+							<TableHead className={thNum}>Comp. máx. USD</TableHead>
 							<TableHead className={thNum}>Descuento %</TableHead>
-							<TableHead className={thNum}>Precio cert · markup</TableHead>
+							<TableHead className={thNum}>Certs mín. (info)</TableHead>
+							<TableHead className={thNum}>Certs máx. (info)</TableHead>
+							<TableHead className={thNum}>Precio firma · markup</TableHead>
 							<TableHead className="w-10" />
 						</TableRow>
 					</TableHeader>
@@ -160,27 +178,27 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 								const next = draft.distribuidorVolTiers.map(function (t, i) { return i === idx ? Object.assign({}, t, { [field]: val }) : t; });
 								updDraft({ distribuidorVolTiers: next });
 							}
-							const precioCert = (Number(volBase.cert) || 0) * (1 - (Number(tier.descuento) || 0));
-							const m = markupOf(precioCert, cvCert);
+							const precioFirma = (Number(distribVolBase.firma) || 0) * (1 - (Number(tier.descuento) || 0));
+							const m = markupOf(precioFirma, cvFirma);
 							const ok = m == null || m >= markupMin;
 							return (
 								<TableRow key={tier.id || idx}>
 									<TableCell><TierBadge tier={tier} tiers={draft.distribuidorVolTiers} size="sm" /></TableCell>
 									<TableCell><TextCell value={tier.id} onChange={function (v) { upd("id", v); }} className="w-20" /></TableCell>
 									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-24" /></TableCell>
-									<TableCell><NumCell value={tier.firmasMin} decimals={0} onChange={function (v) { upd("firmasMin", v); }} /></TableCell>
-									<TableCell><NumCell value={tier.firmasMax} decimals={0} onChange={function (v) { upd("firmasMax", v); }} /></TableCell>
-									<TableCell><NumCell value={tier.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
-									<TableCell><NumCell value={tier.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>
 									<TableCell><NumCell value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
-									<TableCell className={"text-right tabular-nums text-xs " + (ok ? "text-muted-foreground" : "text-destructive font-semibold")}>{"USD " + precioCert.toFixed(4) + " · " + fMarkupTxt(precioCert, cvCert)}</TableCell>
+									<TableCell><NumCell value={tier.certsMin} decimals={0} onChange={function (v) { upd("certsMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.certsMax} decimals={0} onChange={function (v) { upd("certsMax", v); }} /></TableCell>
+									<TableCell className={"text-right tabular-nums text-xs " + (ok ? "text-muted-foreground" : "text-destructive font-semibold")}>{"USD " + precioFirma.toFixed(4) + " · " + fMarkupTxt(precioFirma, cvFirma)}</TableCell>
 									<TableCell><DeleteRowButton onClick={function () { removeRow("distribuidorVolTiers", idx); }} /></TableCell>
 								</TableRow>
 							);
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distribuidorVolTiers", { id: genId("dvtier"), label: "Nuevo nivel", firmasMin: 0, firmasMax: null, facturacionMin: 0, facturacionMax: null, descuento: 0 }); }} />
+				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distribuidorVolTiers", { id: genId("dvtier"), label: "Nuevo nivel", descuento: 0, compromisoMin: 0, compromisoMax: null, certsMin: 0, certsMax: null, firmasMin: 0, firmasMax: null }); }} />
 			</CollapsibleSection>
 
 			{/* ── 1c · Web · Firma adicional por volumen ── */}

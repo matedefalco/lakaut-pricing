@@ -41,7 +41,9 @@ function closestPack(certs, packs) {
 
 function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, costs) {
 	const { b2b2cSegments, distribuidorVolTiers } = channelConfig;
-	const volBase = channelConfig.volumenBase || { cert: 0.65, firma: 0.50 };
+	// Precio base propio del canal Distribuidores-Volumen: certificado bonificado (0),
+	// firma USD 1,00. No comparte volumenBase.
+	const volBase = channelConfig.distribuidorVolBase || { cert: 0, firma: 1 };
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
@@ -75,12 +77,13 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	const margenWeb = netoWeb - cvTotal;
 
 	// ── Distribuidores (modalidad Volumen) ─────────────────────────────────
-	// Los distribuidores cotizan por elementos sueltos al precio base por unidad (no
-	// sobre la lista web). El nivel es el mayor entre el volumen de firmas y la
-	// facturación a lista de esos elementos; se asume que el volumen comparado ES su
-	// cartera. La modalidad packs (descuento sobre lista web) se descontinuó.
+	// Los distribuidores cotizan por elementos sueltos: el certificado va bonificado
+	// (base 0) y solo se cobran las firmas (base USD 1,00). El nivel lo asigna el
+	// compromiso anual declarado; para la comparación se usa la facturación a lista del
+	// volumen comparado como proxy de ese compromiso (se asume que ese volumen ES su
+	// cartera anual). La modalidad packs (descuento sobre lista web) se descontinuó.
 	const facturacionDistribLista = certs * (Number(volBase.cert) || 0) + firmasTotal * (Number(volBase.firma) || 0);
-	const tier = getDistributorVolTier(firmasTotal, facturacionDistribLista, distribuidorVolTiers) || (distribuidorVolTiers && distribuidorVolTiers[0]) || { label: "—", descuento: 0 };
+	const tier = getDistributorVolTier(facturacionDistribLista, distribuidorVolTiers) || (distribuidorVolTiers && distribuidorVolTiers[0]) || { label: "—", descuento: 0 };
 	const distribDesc = Math.min(1, Math.max(0, Number(tier.descuento) || 0));
 	const precioCertDistrib = (Number(volBase.cert) || 0) * (1 - distribDesc);
 	const precioFirmaDistrib = (Number(volBase.firma) || 0) * (1 - distribDesc);

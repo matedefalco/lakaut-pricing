@@ -60,13 +60,13 @@ function secWeb(models, tc) {
 
 function secDistribuidoresVol(tiers, base) {
 	const rows = tiers.map((t) =>
-		`| ${t.label} | ${pct(t.descuento)} | ${rangeCant(t.firmasMin, t.firmasMax, "firmas")} | ${rangeUSD(t.facturacionMin, t.facturacionMax)} |`
+		`| ${t.label} | ${rangeUSD(t.compromisoMin, t.compromisoMax)} | ${pct(t.descuento)} | USD ${usd((Number(base.firma) || 0) * (1 - (Number(t.descuento) || 0)))} | ${rangeCant(t.certsMin, t.certsMax)} |`
 	);
 	return [
-		`Certificados y firmas sueltos (base cert USD ${usd(base.cert)} / firma USD ${usd(base.firma)}): el único modo en que cotizan los distribuidores. El nivel es el **mayor** entre dos ejes de la cotización: el **volumen real de firmas** y la **facturación a lista** de la ventana contemplada. La modalidad de la cotización (Consumo único / Anual) define si la facturación se mide sobre un período o se anualiza (× meses de vinculación). La escala de descuentos es conservadora porque pega sobre el precio por elemento, que está cerca del costo.`,
+		`Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD ${usd(base.cert)}); solo se cobran las firmas, con un precio base de **USD ${usd(base.firma)}** por firma. El nivel (Azul→Platinum) lo asigna únicamente el **compromiso anual de facturación** declarado por el socio, que define el descuento sobre la firma. **Sin compromiso anual el descuento es 0%**: la firma se cotiza a USD ${usd(base.firma)} full. Los certificados activos son informativos (no asignan el nivel).`,
 		"",
-		"| Nivel | Descuento sobre base | Rango de firmas | Facturación de la ventana |",
-		"|---|---|---|---|",
+		"| Nivel | Compromiso anual (USD) | Descuento firma | Firma resultante | Certificados activos (informativo) |",
+		"|---|---|---|---|---|",
 		...rows,
 	].join("\n");
 }
@@ -166,7 +166,7 @@ export function buildDocBlocks({ channelConfig, models, tc }) {
 	const base = cfg.volumenBase || VOLUMEN_BASE;
 	return {
 		web: secWeb(models || [], tc),
-		"distribuidores-vol": secDistribuidoresVol(cfg.distribuidorVolTiers || [], base),
+		"distribuidores-vol": secDistribuidoresVol(cfg.distribuidorVolTiers || [], cfg.distribuidorVolBase || { cert: 0, firma: 1 }),
 		idc: secIDC(cfg.b2b2cSegments || [], cfg.b2b2cMarkupMin),
 		volumen: secVolumen(base, cfg.volumenSegments || []),
 		proyeccion: secProyeccion(cfg.volumenProyeccion || [], base),

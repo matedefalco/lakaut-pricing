@@ -36,39 +36,19 @@ export function distributorTierDriver(certsActivos, compromisoAnualUSD, tiers) {
 }
 
 // ── Distribuidores · modalidad Volumen ──
-// A diferencia de los packs (arriba, que miran variables declaradas de la relación),
-// acá los dos ejes salen de la cotización en curso, pero se combinan con la misma
-// mecánica: el nivel es el MAYOR que resulte entre
-//   · el VOLUMEN REAL DE FIRMAS (firmas por certificado + firmas sueltas) → firmasMin/firmasMax, y
-//   · la FACTURACIÓN de la ventana contemplada a precio de lista → facturacionMin/facturacionMax.
-// La comercialización es a escala y el beneficio se otorga por lo que efectivamente se
-// pone sobre la mesa, medido por el eje que más lejos llegue. `tiers` viene de
-// channelConfig.distribuidorVolTiers. `facturacion` es la facturación ya windoweada por
-// la modalidad (consumo único → esa compra; anual → anualizada); el llamador la calcula.
-export function getDistributorVolTier(firmasTotales, facturacion, tiers) {
-	if (!tiers || tiers.length === 0) return null;
-	function byFirmas(n) {
-		return tiers.find(function (t) { return n >= (Number(t.firmasMin) || 0) && (t.firmasMax == null || n <= t.firmasMax); }) || tiers[0];
-	}
-	function byFacturacion(usd) {
-		return tiers.find(function (t) { return usd >= (Number(t.facturacionMin) || 0) && (t.facturacionMax == null || usd <= t.facturacionMax); }) || tiers[0];
-	}
-	const a = byFirmas(Math.max(0, Number(firmasTotales) || 0));
-	const b = byFacturacion(Math.max(0, Number(facturacion) || 0));
-	return tiers.indexOf(a) >= tiers.indexOf(b) ? a : b;
-}
-
-// Cuál de los dos ejes asignó el nivel de la modalidad Volumen. Sirve para explicarlo
-// en la interfaz y en la propuesta (por qué el socio cae en ese nivel).
-export function distributorVolTierDriver(firmasTotales, facturacion, tiers) {
-	if (!tiers || tiers.length === 0) return null;
-	const porFirmas = getDistributorVolTier(firmasTotales, 0, tiers);
-	const porFacturacion = getDistributorVolTier(0, facturacion, tiers);
-	const iFirmas = tiers.indexOf(porFirmas);
-	const iFact = tiers.indexOf(porFacturacion);
-	if (iFact > iFirmas) return "facturacion";
-	if (iFirmas > iFact) return "firmas";
-	return "ambos";
+// El nivel (Azul→Platinum) lo asigna ÚNICAMENTE el COMPROMISO ANUAL de facturación
+// declarado por el socio, en USD, con los rangos de `compromisoMin/compromisoMax`. Es
+// un dato DECLARADO de la relación comercial, no del volumen de la cotización en curso.
+// Sin compromiso (0 o vacío) NO hay nivel: la firma se cotiza al precio base full, sin
+// descuento, así que devuelve null y el llamador aplica 0%. `tiers` viene de
+// channelConfig.distribuidorVolTiers.
+export function getDistributorVolTier(compromisoAnualUSD, tiers) {
+	if (!Array.isArray(tiers) || tiers.length === 0) return null;
+	const usd = Math.max(0, Number(compromisoAnualUSD) || 0);
+	if (usd <= 0) return null; // sin compromiso anual → sin nivel → 0% de descuento
+	return tiers.find(function (t) {
+		return usd >= (Number(t.compromisoMin) || 0) && (t.compromisoMax == null || usd <= t.compromisoMax);
+	}) || tiers[0];
 }
 
 // ── Volumen (B2B2C) ──

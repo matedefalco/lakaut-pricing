@@ -208,44 +208,37 @@ export const VOLUMEN_SEGMENTS = [
 ];
 
 // ── Canal E · Distribuidores e Integradores (modalidad Volumen) ───────────────
-// Réplica del canal Volumen (certificados y firmas sueltos, con el mismo precio
-// base VOLUMEN_BASE y el mismo cálculo por elemento) pero con los NIVELES
-// característicos del canal de distribuidores (Azul→Platinum) como segmento.
+// Certificados y firmas sueltos, con el cálculo por elemento del canal Volumen pero
+// una POLÍTICA DE PRECIOS propia (no comparte VOLUMEN_BASE):
+//   · El CERTIFICADO va siempre bonificado (precio 0): el socio no paga por el
+//     certificado, solo por las firmas. Su costo variable se paga igual y entra al
+//     markup del deal.
+//   · La FIRMA parte de un precio base de USD 1,00 (≈ ARS 1.490 a un dólar de 1.490).
+// Por eso la base propia es DISTRIBUIDOR_VOL_BASE = { cert: 0, firma: 1 }.
 //
-// El nivel es el MAYOR que resulte entre DOS ejes de la cotización en curso, igual
-// mecánica que los packs (getDistributorTier) pero medida sobre la cotización:
-//   · VOLUMEN REAL DE FIRMAS (firmas por certificado + firmas sueltas) → firmasMin/firmasMax.
-//   · FACTURACIÓN de la ventana de tiempo contemplada, a precio de LISTA → facturacionMin/facturacionMax.
-// Lo que caiga en el nivel más alto, manda. Así un distribuidor con pocas firmas pero
-// mucha facturación (muchos certificados, o una compra grande de una) entra por el eje
-// de facturación, y uno con firmas masivas a bajo ticket entra por el eje de volumen.
+// El nivel (Azul→Platinum) lo asigna ÚNICAMENTE el COMPROMISO ANUAL DE FACTURACIÓN
+// declarado por el socio (USD), con los rangos y descuentos de la matriz comercial
+// (la "foto"): a más compromiso, mayor descuento sobre el precio de la firma. Es un
+// dato DECLARADO de la relación, no del volumen de la cotización en curso.
 //
-// La FACTURACIÓN se mide según la modalidad de la cotización (toggle Consumo único /
-// Anual): en consumo único es la facturación de esa compra puntual (× 1 mes); en anual
-// se anualiza (× meses de vinculación). Usar siempre el precio BASE (nunca el ya
-// descontado) rompe la circularidad precio↔nivel. Los umbrales de facturación reusan la
-// misma escala de compromiso que los packs (DISTRIBUTOR_TIERS.compromiso), para que un
-// socio que factura USD 50.000/año sea Plata en las dos modalidades de distribuidores.
+// Sin compromiso anual (0) no hay nivel: la firma se cotiza al precio base full, sin
+// descuento (ver getDistributorVolTier, que devuelve null cuando el compromiso es 0).
 //
-// A diferencia de DISTRIBUTOR_TIERS (descuento 10%–50% sobre la LISTA WEB, que tiene
-// margen amplio), acá el descuento se aplica sobre la base por unidad (cert 0,65 /
-// firma 0,50), que está cerca del costo. Por eso la escala de DESCUENTOS es más
-// conservadora: un 50% dejaría el certificado (costo ≈ 0,375) por debajo del piso de
-// rentabilidad. Los descuentos se toparon para que el certificado no baje del markup
-// mínimo del canal por elemento (B2B2C_MARKUP_MIN = 1,20x → precio mínimo 0,45, ~31% de
-// descuento máximo sobre 0,65). El guardarraíl del cotizador bloquea igual guardar y
-// exportar si el markup mezclado no cierra, así que la escala es el techo prudente y
-// el piso es duro. La escala prioriza el VOLUMEN por sobre la recurrencia: el abono
-// mensual (ABONO_DESCUENTO_PCT) otorga un beneficio menor que el salto de nivel.
-//   - firmasMin/firmasMax: rango de firmas de la cotización; null = sin tope.
-//   - facturacionMin/facturacionMax: rango de facturación (USD a lista) de la ventana; null = sin tope.
-//   - descuento: % sobre el precio base del certificado y de la firma por igual.
+//   - compromisoMin/compromisoMax: rango del compromiso anual en USD que ASIGNA el
+//     nivel; null en máx = sin tope.
+//   - descuento: % sobre el precio base de la FIRMA (el certificado ya es gratis).
+//   - certsMin/certsMax: cantidad de certificados activos del socio. Es INFORMATIVO
+//     (aparece en la matriz de referencia); no asigna el nivel.
+//   - firmasMin/firmasMax: rango de firmas del nivel. No asigna el nivel; se conserva
+//     para derivar el escalonado de crecimiento de la propuesta (una fila por nivel).
+export const DISTRIBUIDOR_VOL_BASE = { cert: 0, firma: 1 };
+
 export const DISTRIBUIDOR_VOL_TIERS = [
-	{ id: "azul", label: "Azul", firmasMin: 1, firmasMax: 1000, facturacionMin: 0, facturacionMax: 10000, descuento: 0.03 },
-	{ id: "bronce", label: "Bronce", firmasMin: 1001, firmasMax: 5000, facturacionMin: 10001, facturacionMax: 25000, descuento: 0.08 },
-	{ id: "plata", label: "Plata", firmasMin: 5001, firmasMax: 10000, facturacionMin: 25001, facturacionMax: 50000, descuento: 0.15 },
-	{ id: "oro", label: "Oro", firmasMin: 10001, firmasMax: 50000, facturacionMin: 50001, facturacionMax: 250000, descuento: 0.22 },
-	{ id: "platinum", label: "Platinum", firmasMin: 50001, firmasMax: null, facturacionMin: 250001, facturacionMax: null, descuento: 0.30 },
+	{ id: "azul", label: "Azul", descuento: 0.10, compromisoMin: 0, compromisoMax: 10000, certsMin: 0, certsMax: 100, firmasMin: 1, firmasMax: 1000 },
+	{ id: "bronce", label: "Bronce", descuento: 0.15, compromisoMin: 10001, compromisoMax: 25000, certsMin: 101, certsMax: 500, firmasMin: 1001, firmasMax: 5000 },
+	{ id: "plata", label: "Plata", descuento: 0.25, compromisoMin: 25001, compromisoMax: 50000, certsMin: 501, certsMax: 2500, firmasMin: 5001, firmasMax: 10000 },
+	{ id: "oro", label: "Oro", descuento: 0.40, compromisoMin: 50001, compromisoMax: 250000, certsMin: 2501, certsMax: 10000, firmasMin: 10001, firmasMax: 50000 },
+	{ id: "platinum", label: "Platinum", descuento: 0.50, compromisoMin: 250001, compromisoMax: null, certsMin: 10001, certsMax: null, firmasMin: 50001, firmasMax: null },
 ];
 
 // ── Escalonado de crecimiento · Volumen ──────────────────────────────────────
