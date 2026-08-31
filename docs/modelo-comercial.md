@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-08-27 17:18 · **Fuente:** Supabase (config viva) · **Commit:** `2b0af31`
+> **Última actualización:** 2026-08-27 18:57 · **Fuente:** Supabase (config viva) · **Commit:** `730dc66`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -26,7 +26,7 @@ La estructura se separa en canales según **quién paga, cómo se cotiza y qué 
 | Canal | Unidad de venta | Cómo se cotiza | Ingreso |
 |---|---|---|---|
 | **Web** | Pack cerrado | Precio de lista, autoservicio | Único |
-| **Distribuidores** | Certificados/firmas o packs | Descuento por nivel | Único |
+| **Distribuidores** | Certificado y firma sueltos | Descuento por nivel (mayor entre volumen y facturación) | Único |
 | **IDC (B2B2C)** | IDC (bundle identidad + firma) | Precio por segmento de volumen | Recurrente mensual |
 | **Volumen** | Certificado y firma sueltos | Descuento por compromiso | Único |
 
@@ -54,34 +54,18 @@ TC de referencia usado para derivar ARS: **$1.535** por USD.
 
 ## 2. Distribuidores e integradores
 
-Socios que revenden el acceso a la infraestructura o la integran en su plataforma. Hay **dos modalidades** de cotización según el caso.
-
-### 2.1 Modalidad packs (descuento sobre lista web)
-
-<!-- AUTO:distribuidores:start -->
-El nivel se asigna por el **mayor** que resulte entre dos variables declaradas del socio: certificados activos que Lakaut le administra, y compromiso anual de facturación en USD. El descuento aplica sobre la **lista web** (packs).
-
-| Nivel | Descuento sobre lista | Certificados activos | Compromiso anual |
-|---|---|---|---|
-| Azul | 10% | hasta 100 | hasta USD 10.000 |
-| Bronce | 15% | 101 – 500 | USD 10.001 – 25.000 |
-| Plata | 25% | 501 – 2.500 | USD 25.001 – 50.000 |
-| Oro | 40% | 2.501 – 10.000 | USD 50.001 – 250.000 |
-| Platinum | 50% | 10.001+ | +USD 250.001 |
-<!-- AUTO:distribuidores:end -->
-
-### 2.2 Modalidad volumen (elementos sueltos)
+Socios que revenden el acceso a la infraestructura o la integran en su plataforma. Cotizan **siempre por elementos sueltos** (certificados y firmas), con un descuento por nivel. La modalidad packs (descuento sobre lista web) se descontinuó: hoy los distribuidores solo consumen por volumen.
 
 <!-- AUTO:distribuidores-vol:start -->
-Misma mecánica de elementos sueltos que el canal Volumen (base cert USD 0,65 / firma USD 0,50), pero el nivel lo asigna el **volumen real de firmas** de la cotización. Escala más conservadora que la de packs porque el descuento pega sobre el precio por elemento, que está cerca del costo.
+Certificados y firmas sueltos (base cert USD 0,65 / firma USD 0,50): el único modo en que cotizan los distribuidores. El nivel es el **mayor** entre dos ejes de la cotización: el **volumen real de firmas** y la **facturación a lista** de la ventana contemplada. La modalidad de la cotización (Consumo único / Anual) define si la facturación se mide sobre un período o se anualiza (× meses de vinculación). La escala de descuentos es conservadora porque pega sobre el precio por elemento, que está cerca del costo.
 
-| Nivel | Descuento sobre base | Rango de firmas |
-|---|---|---|
-| Azul | 2% | 1 – 1.000 firmas |
-| Bronce | 3% | 1.001 – 5.000 firmas |
-| Plata | 5% | 5.001 – 10.000 firmas |
-| Oro | 10% | 10.001 – 50.000 firmas |
-| Platinum | 15% | 50.001+ firmas |
+| Nivel | Descuento sobre base | Rango de firmas | Facturación de la ventana |
+|---|---|---|---|
+| Azul | 2% | 1 – 1.000 firmas | hasta USD 10.000 |
+| Bronce | 3% | 1.001 – 5.000 firmas | USD 10.001 – 25.000 |
+| Plata | 5% | 5.001 – 10.000 firmas | USD 25.001 – 50.000 |
+| Oro | 10% | 10.001 – 50.000 firmas | USD 50.001 – 250.000 |
+| Platinum | 15% | 50.001+ firmas | +USD 250.001 |
 <!-- AUTO:distribuidores-vol:end -->
 
 ---
@@ -91,15 +75,15 @@ Misma mecánica de elementos sueltos que el canal Volumen (base cert USD 0,65 / 
 Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Único canal con **ingreso recurrente mensual**.
 
 <!-- AUTO:idc:start -->
-Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento sale de la cantidad de IDC mensuales.
+Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la cantidad de IDC mensuales y la **facturación** de la ventana medida a precio de referencia Start Up (evita la circularidad precio↔segmento), windoweada por la modalidad Consumo único / Anual.
 
-| Segmento | Rango (IDC/mes) | Precio IDC/mes | Firmas incluidas | Firma extra |
-|---|---|---|---|---|
-| Start Up | hasta 10.000 IDC | USD 1,3438 | 3 | USD 0,50 |
-| Growth | 10.001 – 50.000 IDC | USD 1,2404 | 3 | USD 0,50 |
-| PyME | 50.001 – 200.000 IDC | USD 1,137 | 3 | USD 0,50 |
-| Empresa | 200.001 – 600.000 IDC | USD 1,0337 | 3 | USD 0,50 |
-| Plataforma | 600.001+ IDC | USD 0,9303 | 3 | USD 0,50 |
+| Segmento | Rango (IDC/mes) | Facturación de la ventana | Precio IDC/mes | Firmas incluidas | Firma extra |
+|---|---|---|---|---|---|
+| Start Up | hasta 10.000 IDC | hasta USD 160.000 | USD 1,3438 | 3 | USD 0,50 |
+| Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 1,2404 | 3 | USD 0,50 |
+| PyME | 50.001 – 200.000 IDC | USD 800.001 – 3.200.000 | USD 1,137 | 3 | USD 0,50 |
+| Empresa | 200.001 – 600.000 IDC | USD 3.200.001 – 9.600.000 | USD 1,0337 | 3 | USD 0,50 |
+| Plataforma | 600.001+ IDC | +USD 9.600.001 | USD 0,9303 | 3 | USD 0,50 |
 
 Guardarraíl de rentabilidad: markup mínimo **1,20x** sobre el costo variable del bundle. Bajo ese piso el cotizador bloquea guardar y exportar.
 <!-- AUTO:idc:end -->
@@ -123,15 +107,15 @@ Fee de implementación por SDK (pago único, bonificable a discreción comercial
 Se cargan las cantidades a mano y cada elemento tiene su precio, sin bundle ni cupo. Para clientes que saben exactamente cuántos certificados y firmas necesitan. Compra única, con descuento por compromiso del contrato.
 
 <!-- AUTO:volumen:start -->
-Certificados y firmas como items independientes, sin bundle. Precio base: **cert USD 0,65 / firma USD 0,50**. El segmento lo define el **compromiso total del contrato en USD** (a precio de lista), y aplica el mismo descuento sobre cert y firma.
+Certificados y firmas como items independientes, sin bundle. Precio base: **cert USD 0,65 / firma USD 0,50**. El segmento es el **mayor** entre dos ejes de la cotización: el **volumen real de firmas** y el **compromiso** del contrato en USD a precio de lista, windoweado por la modalidad Consumo único / Anual. Aplica el mismo descuento sobre cert y firma.
 
-| Segmento | Compromiso anual (USD) | Descuento |
-|---|---|---|
-| Start Up | hasta USD 25.000 | 0% |
-| Growth | USD 25.001 – 125.000 | 5% |
-| PyME | USD 125.001 – 500.000 | 10% |
-| Empresa | USD 500.001 – 1.500.000 | 15% |
-| Plataforma | +USD 1.500.001 | 20% |
+| Segmento | Rango de firmas | Compromiso de la ventana (USD) | Descuento |
+|---|---|---|---|
+| Start Up | hasta 5.000 firmas | hasta USD 25.000 | 0% |
+| Growth | 5.001 – 25.000 firmas | USD 25.001 – 125.000 | 5% |
+| PyME | 25.001 – 100.000 firmas | USD 125.001 – 500.000 | 10% |
+| Empresa | 100.001 – 300.000 firmas | USD 500.001 – 1.500.000 | 15% |
+| Plataforma | 300.001+ firmas | +USD 1.500.001 | 20% |
 <!-- AUTO:volumen:end -->
 
 ### Escalonado de referencia por volumen
@@ -200,5 +184,5 @@ Descuento del abono mensual (reposición de bolsa de firmas): **3%**. Se mantien
 Notas sobre por qué algunos números difieren del documento estratégico original (Borrador v5), para quien compare ambos:
 
 → **Precios IDC.** El Borrador v5 fijaba 0,65 → 0,45 por IDC, pero esa columna calculaba el margen contra el costo del certificado solo, ignorando que la IDC incluye 3 firmas. Con el costo real del bundle (~USD 0,77), varios segmentos vendían por debajo del costo. La escala se reconstruyó fijando el piso en 1,20x el costo y subiendo el resto en la misma proporción del documento.
-→ **Distribuidores, modalidad volumen.** El descuento es más conservador que el de packs porque pega sobre el precio por elemento (cert 0,65 / firma 0,50), que está cerca del costo. Un 50% dejaría el certificado por debajo del piso de rentabilidad.
+→ **Distribuidores (elementos sueltos).** El descuento es conservador porque pega sobre el precio por elemento (cert 0,65 / firma 0,50), que está cerca del costo. Un 50% dejaría el certificado por debajo del piso de rentabilidad. La antigua modalidad packs (descuento sobre la lista web) se descontinuó.
 → **Canal Volumen y formas de liquidación A/B.** No están en el Borrador v5; son construcciones posteriores del cotizador.

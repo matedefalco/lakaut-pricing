@@ -214,6 +214,34 @@ export function normalizeChannelConfig(raw) {
 	if (!Array.isArray(merged.distribuidorVolTiers) || merged.distribuidorVolTiers.length === 0
 		|| merged.distribuidorVolTiers.some(function (t) { return !t || t.firmasMin == null; })) {
 		merged.distribuidorVolTiers = DISTRIBUIDOR_VOL_TIERS;
+	} else if (merged.distribuidorVolTiers.some(function (t) { return t.facturacionMin == null; })) {
+		// Configs guardadas cuando el nivel salía SOLO de las firmas: traen los rangos de
+		// firmas pero no el eje de facturación (facturacionMin/Max). Se backfillea desde el
+		// default por posición, respetando los rangos de firmas y descuentos ya cargados.
+		merged.distribuidorVolTiers = merged.distribuidorVolTiers.map(function (t, i) {
+			if (t.facturacionMin != null) return t;
+			const def = DISTRIBUIDOR_VOL_TIERS[i] || DISTRIBUIDOR_VOL_TIERS[DISTRIBUIDOR_VOL_TIERS.length - 1] || {};
+			return Object.assign({}, t, { facturacionMin: def.facturacionMin != null ? def.facturacionMin : 0, facturacionMax: def.facturacionMax !== undefined ? def.facturacionMax : null });
+		});
+	}
+
+	// Segundo eje de segmentación (facturación en IDC, firmas en Volumen): las configs
+	// guardadas antes de que el segmento fuera el MAYOR entre dos ejes traen solo el eje
+	// original. Se backfillea el eje faltante desde el default por posición, sin tocar el
+	// resto de la fila. Ver getB2B2CSegment / getVolumenSegment.
+	if (Array.isArray(merged.b2b2cSegments) && merged.b2b2cSegments.some(function (s) { return s && s.facturacionMin == null; })) {
+		merged.b2b2cSegments = merged.b2b2cSegments.map(function (s, i) {
+			if (!s || s.facturacionMin != null) return s;
+			const def = B2B2C_SEGMENTS[i] || B2B2C_SEGMENTS[B2B2C_SEGMENTS.length - 1] || {};
+			return Object.assign({}, s, { facturacionMin: def.facturacionMin != null ? def.facturacionMin : 0, facturacionMax: def.facturacionMax !== undefined ? def.facturacionMax : null });
+		});
+	}
+	if (Array.isArray(merged.volumenSegments) && merged.volumenSegments.some(function (s) { return s && s.firmasMin == null; })) {
+		merged.volumenSegments = merged.volumenSegments.map(function (s, i) {
+			if (!s || s.firmasMin != null) return s;
+			const def = VOLUMEN_SEGMENTS[i] || VOLUMEN_SEGMENTS[VOLUMEN_SEGMENTS.length - 1] || {};
+			return Object.assign({}, s, { firmasMin: def.firmasMin != null ? def.firmasMin : 0, firmasMax: def.firmasMax !== undefined ? def.firmasMax : null });
+		});
 	}
 
 	// Descuento del abono mensual: el default bajó de 10% a 3% para que el beneficio de

@@ -134,55 +134,10 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				actions={<Button onClick={handleSave} disabled={!isDirty}>Guardar cambios</Button>}
 			/>
 
-			{/* ── 1 · Niveles de descuento de Packs ── */}
-			<CollapsibleSection
-				defaultOpen
-				title="1 · Packs · Niveles y descuentos"
-				subtitle="El nivel se asigna por el mayor entre certificados activos y compromiso anual de facturación (USD)."
-			>
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead className="w-[130px]">Se ve así</TableHead>
-							<TableHead>Nivel</TableHead>
-							<TableHead>Label</TableHead>
-							<TableHead className={thNum}>Certs mín.</TableHead>
-							<TableHead className={thNum}>Certs máx.</TableHead>
-							<TableHead className={thNum}>Descuento %</TableHead>
-							<TableHead className={thNum}>Compromiso mín. (USD)</TableHead>
-							<TableHead className={thNum}>Compromiso máx. (USD)</TableHead>
-							<TableHead className="w-10" />
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{(draft.distributorTiers || []).map(function (tier, idx) {
-							function upd(field, val) {
-								const next = draft.distributorTiers.map(function (t, i) { return i === idx ? Object.assign({}, t, { [field]: val }) : t; });
-								updDraft({ distributorTiers: next });
-							}
-							return (
-								<TableRow key={tier.id || idx}>
-									<TableCell><TierBadge tier={tier} tiers={draft.distributorTiers} size="sm" /></TableCell>
-									<TableCell><TextCell value={tier.id} onChange={function (v) { upd("id", v); }} className="w-20" /></TableCell>
-									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-24" /></TableCell>
-									<TableCell><NumCell value={tier.certsMin} decimals={0} onChange={function (v) { upd("certsMin", v); }} /></TableCell>
-									<TableCell><NumCell value={tier.certsMax} decimals={0} onChange={function (v) { upd("certsMax", v); }} /></TableCell>
-									<TableCell><NumCell value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
-									<TableCell><NumCell value={tier.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
-									<TableCell><NumCell value={tier.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>
-									<TableCell><DeleteRowButton onClick={function () { removeRow("distributorTiers", idx); }} /></TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
-				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distributorTiers", { id: genId("tier"), label: "Nuevo nivel", certsMin: 0, certsMax: null, descuento: 0, compromisoMin: 0, compromisoMax: null }); }} />
-			</CollapsibleSection>
-
 			{/* ── 1b · Distribuidores · Volumen · Niveles y descuentos ── */}
 			<CollapsibleSection
 				title="1b · Distribuidores-Volumen · Niveles y descuentos"
-				subtitle={"Modalidad Volumen del canal: el descuento del nivel se aplica sobre el precio base por elemento (cert USD " + (Number(volBase.cert) || 0).toFixed(4) + " / firma USD " + (Number(volBase.firma) || 0).toFixed(4) + "). El nivel se asigna por el VOLUMEN REAL DE FIRMAS de cada cotización (rangos abajo). El compromiso anual en USD se deriva de la cotización y no asigna el nivel. El precio del certificado no puede bajar del markup mínimo de " + markupMin.toFixed(2) + "x."}
+				subtitle={"Modalidad Volumen del canal: el descuento del nivel se aplica sobre el precio base por elemento (cert USD " + (Number(volBase.cert) || 0).toFixed(4) + " / firma USD " + (Number(volBase.firma) || 0).toFixed(4) + "). El nivel es el MAYOR entre dos ejes de cada cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (rangos abajo). La modalidad Consumo único / Anual del cotizador define si la facturación se mide sobre un período o se anualiza. El precio del certificado no puede bajar del markup mínimo de " + markupMin.toFixed(2) + "x."}
 			>
 				<Table>
 					<TableHeader>
@@ -192,6 +147,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 							<TableHead>Label</TableHead>
 							<TableHead className={thNum}>Firmas mín.</TableHead>
 							<TableHead className={thNum}>Firmas máx.</TableHead>
+							<TableHead className={thNum}>Fact. mín. USD</TableHead>
+							<TableHead className={thNum}>Fact. máx. USD</TableHead>
 							<TableHead className={thNum}>Descuento %</TableHead>
 							<TableHead className={thNum}>Precio cert · markup</TableHead>
 							<TableHead className="w-10" />
@@ -213,6 +170,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 									<TableCell><TextCell value={tier.label} onChange={function (v) { upd("label", v); }} className="w-24" /></TableCell>
 									<TableCell><NumCell value={tier.firmasMin} decimals={0} onChange={function (v) { upd("firmasMin", v); }} /></TableCell>
 									<TableCell><NumCell value={tier.firmasMax} decimals={0} onChange={function (v) { upd("firmasMax", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
+									<TableCell><NumCell value={tier.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></TableCell>
 									<TableCell><NumCell value={Math.round((tier.descuento || 0) * 100)} decimals={0} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
 									<TableCell className={"text-right tabular-nums text-xs " + (ok ? "text-muted-foreground" : "text-destructive font-semibold")}>{"USD " + precioCert.toFixed(4) + " · " + fMarkupTxt(precioCert, cvCert)}</TableCell>
 									<TableCell><DeleteRowButton onClick={function () { removeRow("distribuidorVolTiers", idx); }} /></TableCell>
@@ -221,7 +180,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distribuidorVolTiers", { id: genId("dvtier"), label: "Nuevo nivel", firmasMin: 0, firmasMax: null, descuento: 0 }); }} />
+				<AddRowButton label="Agregar nivel" onClick={function () { addRow("distribuidorVolTiers", { id: genId("dvtier"), label: "Nuevo nivel", firmasMin: 0, firmasMax: null, facturacionMin: 0, facturacionMax: null, descuento: 0 }); }} />
 			</CollapsibleSection>
 
 			{/* ── 1c · Web · Firma adicional por volumen ── */}
@@ -259,7 +218,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			{/* ── 2 · Volumen · escala de precios por IDC ── */}
 			<CollapsibleSection
 				title="2 · IDC · Escala de precios por IDC"
-				subtitle={"Cada segmento tiene su precio por IDC según el volumen mensual, más un cupo de firmas incluidas en ese precio. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
+				subtitle={"El segmento es el MAYOR entre el volumen mensual de IDC y la facturación de la ventana medida a precio Start Up (rangos abajo). Cada segmento tiene su precio por IDC, más un cupo de firmas incluidas. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
 			>
 				<div className="mb-5 flex flex-wrap gap-6">
 					<div className="w-52">
@@ -276,6 +235,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 							<TableHead>Segmento</TableHead>
 							<TableHead className={thNum}>IDC mín. / mes</TableHead>
 							<TableHead className={thNum}>IDC máx. / mes</TableHead>
+							<TableHead className={thNum}>Fact. mín. USD</TableHead>
+							<TableHead className={thNum}>Fact. máx. USD</TableHead>
 							<TableHead className={thNum}>Precio IDC</TableHead>
 							<TableHead className={thNum}>Firmas incl.</TableHead>
 							<TableHead className={thNum}>Firma s/ cupo</TableHead>
@@ -302,6 +263,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 									<TableCell><TextCell value={seg.label} onChange={function (v) { upd("label", v); }} className="w-32" /></TableCell>
 									<TableCell><NumCell value={seg.idcMin} decimals={0} onChange={function (v) { upd("idcMin", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.idcMax} decimals={0} onChange={function (v) { upd("idcMax", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.firmasIncluidas} decimals={0} onChange={function (v) { upd("firmasIncluidas", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.precioFirmaExtra} decimals={4} onChange={function (v) { upd("precioFirmaExtra", v); }} /></TableCell>
@@ -316,7 +279,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, precioIDC: 0, firmasIncluidas: 4, precioFirmaExtra: 0.5 }); }} />
+				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, firmasIncluidas: 4, precioFirmaExtra: 0.5 }); }} />
 				<p className="text-[11px] text-muted-foreground mt-3">
 					El segmento sale del volumen mensual de IDC. <strong>CV bundle</strong> es el costo de lo que se entrega por el precio de la IDC (certificado + las firmas del cupo) y <strong>Mín. viable</strong> el precio más bajo que cumple el markup mínimo: si una fila queda en rojo, ninguna cotización de ese segmento se va a poder guardar. Se resuelve subiendo el precio o bajando el cupo.
 				</p>
@@ -326,7 +289,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			{/* ── 3 · Volumen · precio base + escala de descuento ── */}
 			<CollapsibleSection
 				title="3 · Volumen · Precio base y segmentos por compromiso"
-				subtitle={"Un precio de lista para el certificado y otro para la firma; el segmento aplica el mismo % de descuento sobre ambos. El segmento sale del compromiso del contrato en USD. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
+				subtitle={"Un precio de lista para el certificado y otro para la firma; el segmento aplica el mismo % de descuento sobre ambos. El segmento es el MAYOR entre el volumen real de firmas y el compromiso del contrato en USD (rangos abajo), windoweado por la modalidad Consumo único / Anual. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
 			>
 				<div className="mb-5 flex flex-wrap gap-6">
 					<div className="w-44">
@@ -346,6 +309,10 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						<TableRow>
 							<TableHead className="w-[140px]">Se ve así</TableHead>
 							<TableHead>Segmento</TableHead>
+							<TableHead className={thNum}>Firmas mín.</TableHead>
+							<TableHead className={thNum}>Firmas máx.</TableHead>
+							<TableHead className={thNum}>Comprom. mín. USD</TableHead>
+							<TableHead className={thNum}>Comprom. máx. USD</TableHead>
 							<TableHead className={thNum}>Descuento %</TableHead>
 							<TableHead className={thNum}>Precio cert</TableHead>
 							<TableHead className={thNum}>Markup cert</TableHead>
@@ -370,6 +337,8 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 								<TableRow key={seg.id || idx} className={viable ? "" : "bg-destructive/5"}>
 									<TableCell><TierBadge tier={seg} tiers={draft.volumenSegments} size="sm" /></TableCell>
 									<TableCell><TextCell value={seg.label} onChange={function (v) { upd("label", v); }} className="w-32" /></TableCell>
+									<TableCell><NumCell value={seg.firmasMin} decimals={0} onChange={function (v) { upd("firmasMin", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.firmasMax} decimals={0} onChange={function (v) { upd("firmasMax", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.compromisoMin} decimals={0} onChange={function (v) { upd("compromisoMin", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.compromisoMax} decimals={0} onChange={function (v) { upd("compromisoMax", v); }} /></TableCell>
 									<TableCell><NumCell value={Math.round(desc * 1000) / 10} decimals={1} onChange={function (v) { upd("descuento", (v || 0) / 100); }} /></TableCell>
@@ -383,7 +352,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar segmento" onClick={function () { addRow("volumenSegments", { id: genId("vseg"), label: "Nuevo segmento", compromisoMin: 0, compromisoMax: null, descuento: 0 }); }} />
+				<AddRowButton label="Agregar segmento" onClick={function () { addRow("volumenSegments", { id: genId("vseg"), label: "Nuevo segmento", firmasMin: 0, firmasMax: null, compromisoMin: 0, compromisoMax: null, descuento: 0 }); }} />
 				<p className="text-[11px] text-muted-foreground mt-3">
 					El compromiso se mide a precio de lista (certificados × base cert + firmas × base firma) por los meses de vinculación. Los precios y markups de cada fila son calculados: se editan el precio base y el descuento. Una fila en rojo vende algún elemento por debajo del markup mínimo.
 				</p>

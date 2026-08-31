@@ -151,12 +151,17 @@ export const DISTRIBUTOR_TIERS = [
 // que el documento (Plataforma paga 69% de Start Up, igual que 0,45 vs 0,65). El
 // resultado reproduce casi exacto la columna MARGEN del doc leída como markup:
 // 1,73x / 1,60x / 1,47x / 1,33x / 1,20x, contra el 74/60/47/34/20% que ahí figura.
+// Segundo eje (facturacionMin/Max): el segmento también se puede alcanzar por la
+// FACTURACIÓN de la ventana medida a precio de referencia Start Up (ver getB2B2CSegment).
+// Se toma el MAYOR entre el segmento por IDC/mes y el segmento por facturación. Los
+// umbrales default salen de anualizar el tope de IDC/mes de cada segmento al precio
+// Start Up (idcMax × 1,3438 × 12), redondeados; son editables en Config.
 export const B2B2C_SEGMENTS = [
-	{ id: "startup", label: "Start Up", idcMin: 0, idcMax: 10000, precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "growth", label: "Growth", idcMin: 10001, idcMax: 50000, precioIDC: 1.2404, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "pyme", label: "PyME", idcMin: 50001, idcMax: 200000, precioIDC: 1.1370, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "empresa", label: "Empresa", idcMin: 200001, idcMax: 600000, precioIDC: 1.0337, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "plataforma", label: "Plataforma", idcMin: 600001, idcMax: null, precioIDC: 0.9303, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "startup", label: "Start Up", idcMin: 0, idcMax: 10000, facturacionMin: 0, facturacionMax: 160000, precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "growth", label: "Growth", idcMin: 10001, idcMax: 50000, facturacionMin: 160001, facturacionMax: 800000, precioIDC: 1.2404, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "pyme", label: "PyME", idcMin: 50001, idcMax: 200000, facturacionMin: 800001, facturacionMax: 3200000, precioIDC: 1.1370, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "empresa", label: "Empresa", idcMin: 200001, idcMax: 600000, facturacionMin: 3200001, facturacionMax: 9600000, precioIDC: 1.0337, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "plataforma", label: "Plataforma", idcMin: 600001, idcMax: null, facturacionMin: 9600001, facturacionMax: null, precioIDC: 0.9303, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
 ];
 
 // Cupo de firmas por IDC: la firma inicial que requiere la institución más las de
@@ -189,12 +194,17 @@ export const VOLUMEN_BASE = { cert: 0.65, firma: 0.50 };
 // con muchas firmas y muchos certificados con pocas firmas caen en el mismo segmento
 // si representan el mismo negocio. Usar siempre el precio BASE (nunca el ya
 // descontado) es lo que rompe la circularidad precio↔segmento.
+// El segmento es el MAYOR entre dos ejes (misma mecánica que distribuidores, ver
+// getVolumenSegment): el VOLUMEN REAL DE FIRMAS de la cotización (firmasMin/Max) y la
+// FACTURACIÓN/compromiso del contrato en USD a lista, windoweada por la modalidad
+// consumo único / anual (compromisoMin/Max). Los umbrales de firmas son un default
+// editable en Config, calibrado grueso sobre la economía por elemento del canal.
 export const VOLUMEN_SEGMENTS = [
-	{ id: "startup", label: "Start Up", compromisoMin: 0, compromisoMax: 25000, descuento: 0 },
-	{ id: "growth", label: "Growth", compromisoMin: 25001, compromisoMax: 125000, descuento: 0.05 },
-	{ id: "pyme", label: "PyME", compromisoMin: 125001, compromisoMax: 500000, descuento: 0.10 },
-	{ id: "empresa", label: "Empresa", compromisoMin: 500001, compromisoMax: 1500000, descuento: 0.15 },
-	{ id: "plataforma", label: "Plataforma", compromisoMin: 1500001, compromisoMax: null, descuento: 0.20 },
+	{ id: "startup", label: "Start Up", firmasMin: 0, firmasMax: 5000, compromisoMin: 0, compromisoMax: 25000, descuento: 0 },
+	{ id: "growth", label: "Growth", firmasMin: 5001, firmasMax: 25000, compromisoMin: 25001, compromisoMax: 125000, descuento: 0.05 },
+	{ id: "pyme", label: "PyME", firmasMin: 25001, firmasMax: 100000, compromisoMin: 125001, compromisoMax: 500000, descuento: 0.10 },
+	{ id: "empresa", label: "Empresa", firmasMin: 100001, firmasMax: 300000, compromisoMin: 500001, compromisoMax: 1500000, descuento: 0.15 },
+	{ id: "plataforma", label: "Plataforma", firmasMin: 300001, firmasMax: null, compromisoMin: 1500001, compromisoMax: null, descuento: 0.20 },
 ];
 
 // ── Canal E · Distribuidores e Integradores (modalidad Volumen) ───────────────
@@ -202,31 +212,40 @@ export const VOLUMEN_SEGMENTS = [
 // base VOLUMEN_BASE y el mismo cálculo por elemento) pero con los NIVELES
 // característicos del canal de distribuidores (Azul→Platinum) como segmento.
 //
-// El nivel lo asigna el VOLUMEN REAL DE FIRMAS de la cotización en curso (firmas por
-// certificado + firmas sueltas), no una variable declarada aparte: la comercialización
-// es a escala, así que el beneficio se otorga por el volumen que efectivamente se pone
-// sobre la mesa. Los rangos van en cantidad de firmas. El compromiso anual en USD ya no
-// se ingresa a mano ni asigna el nivel: se deriva de la cotización (volumen × precio
-// cotizado × 12) y viaja a la propuesta como el compromiso declarado del socio.
+// El nivel es el MAYOR que resulte entre DOS ejes de la cotización en curso, igual
+// mecánica que los packs (getDistributorTier) pero medida sobre la cotización:
+//   · VOLUMEN REAL DE FIRMAS (firmas por certificado + firmas sueltas) → firmasMin/firmasMax.
+//   · FACTURACIÓN de la ventana de tiempo contemplada, a precio de LISTA → facturacionMin/facturacionMax.
+// Lo que caiga en el nivel más alto, manda. Así un distribuidor con pocas firmas pero
+// mucha facturación (muchos certificados, o una compra grande de una) entra por el eje
+// de facturación, y uno con firmas masivas a bajo ticket entra por el eje de volumen.
+//
+// La FACTURACIÓN se mide según la modalidad de la cotización (toggle Consumo único /
+// Anual): en consumo único es la facturación de esa compra puntual (× 1 mes); en anual
+// se anualiza (× meses de vinculación). Usar siempre el precio BASE (nunca el ya
+// descontado) rompe la circularidad precio↔nivel. Los umbrales de facturación reusan la
+// misma escala de compromiso que los packs (DISTRIBUTOR_TIERS.compromiso), para que un
+// socio que factura USD 50.000/año sea Plata en las dos modalidades de distribuidores.
 //
 // A diferencia de DISTRIBUTOR_TIERS (descuento 10%–50% sobre la LISTA WEB, que tiene
 // margen amplio), acá el descuento se aplica sobre la base por unidad (cert 0,65 /
-// firma 0,50), que está cerca del costo. Por eso la escala es más conservadora: un
-// 50% dejaría el certificado (costo ≈ 0,375) por debajo del piso de rentabilidad.
-// Los descuentos se toparon para que el certificado no baje del markup mínimo del
-// canal por elemento (B2B2C_MARKUP_MIN = 1,20x → precio mínimo 0,45, ~31% de
+// firma 0,50), que está cerca del costo. Por eso la escala de DESCUENTOS es más
+// conservadora: un 50% dejaría el certificado (costo ≈ 0,375) por debajo del piso de
+// rentabilidad. Los descuentos se toparon para que el certificado no baje del markup
+// mínimo del canal por elemento (B2B2C_MARKUP_MIN = 1,20x → precio mínimo 0,45, ~31% de
 // descuento máximo sobre 0,65). El guardarraíl del cotizador bloquea igual guardar y
 // exportar si el markup mezclado no cierra, así que la escala es el techo prudente y
 // el piso es duro. La escala prioriza el VOLUMEN por sobre la recurrencia: el abono
 // mensual (ABONO_DESCUENTO_PCT) otorga un beneficio menor que el salto de nivel.
 //   - firmasMin/firmasMax: rango de firmas de la cotización; null = sin tope.
+//   - facturacionMin/facturacionMax: rango de facturación (USD a lista) de la ventana; null = sin tope.
 //   - descuento: % sobre el precio base del certificado y de la firma por igual.
 export const DISTRIBUIDOR_VOL_TIERS = [
-	{ id: "azul", label: "Azul", firmasMin: 1, firmasMax: 1000, descuento: 0.03 },
-	{ id: "bronce", label: "Bronce", firmasMin: 1001, firmasMax: 5000, descuento: 0.08 },
-	{ id: "plata", label: "Plata", firmasMin: 5001, firmasMax: 10000, descuento: 0.15 },
-	{ id: "oro", label: "Oro", firmasMin: 10001, firmasMax: 50000, descuento: 0.22 },
-	{ id: "platinum", label: "Platinum", firmasMin: 50001, firmasMax: null, descuento: 0.30 },
+	{ id: "azul", label: "Azul", firmasMin: 1, firmasMax: 1000, facturacionMin: 0, facturacionMax: 10000, descuento: 0.03 },
+	{ id: "bronce", label: "Bronce", firmasMin: 1001, firmasMax: 5000, facturacionMin: 10001, facturacionMax: 25000, descuento: 0.08 },
+	{ id: "plata", label: "Plata", firmasMin: 5001, firmasMax: 10000, facturacionMin: 25001, facturacionMax: 50000, descuento: 0.15 },
+	{ id: "oro", label: "Oro", firmasMin: 10001, firmasMax: 50000, facturacionMin: 50001, facturacionMax: 250000, descuento: 0.22 },
+	{ id: "platinum", label: "Platinum", firmasMin: 50001, firmasMax: null, facturacionMin: 250001, facturacionMax: null, descuento: 0.30 },
 ];
 
 // ── Escalonado de crecimiento · Volumen ──────────────────────────────────────

@@ -10,7 +10,7 @@ import { NumberField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { CHANNELS as CHANNEL_IDENTITY } from "@/data/channelMeta";
-import { getB2B2CSegment, segmentPricing, getDistributorTier } from "@/lib/tiers";
+import { getB2B2CSegment, segmentPricing, getDistributorVolTier } from "@/lib/tiers";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from "recharts";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -40,7 +40,8 @@ function closestPack(certs, packs) {
 }
 
 function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, costs) {
-	const { b2b2cSegments, distributorTiers } = channelConfig;
+	const { b2b2cSegments, distribuidorVolTiers } = channelConfig;
+	const volBase = channelConfig.volumenBase || { cert: 0.65, firma: 0.50 };
 	const cvCert = costs.cvCertBase;
 	const cvFirma = costs.cvFirmaBase;
 
@@ -51,7 +52,7 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	// El segmento sale del volumen de IDC y trae su propio precio unitario. Las firmas
 	// que entran en el cupo del bundle no generan ingreso propio; solo las que lo
 	// exceden se facturan por unidad.
-	const seg = getB2B2CSegment(certs, b2b2cSegments) || {};
+	const seg = getB2B2CSegment(certs, 0, b2b2cSegments) || {};
 	const segPrice = segmentPricing(seg, { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
 	const firmasExtraB2 = certs * Math.max(0, firmasPorCert - segPrice.firmasIncluidas);
 	const revB2 = certs * segPrice.precioIDC + firmasExtraB2 * segPrice.precioFirmaExtra;
@@ -63,22 +64,28 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	const segDesc = facturacionB2Lista > 0 ? Math.max(0, 1 - revB2 / facturacionB2Lista) : 0;
 	const margenB2 = revB2 - cvTotal;
 
-	// ── Distribuidores / Web ──────────────────────────────────────────────
+	// ── Web ────────────────────────────────────────────────────────────────
 	const activePacks = packs.filter(function (p) { return p.activo !== false && p.priceUSD > 0 && (p.certs || 0) > 0; });
 	const refPack = activePacks.find(function (p) { return p.id === refPackId; }) || closestPack(certs, activePacks);
 
 	const precioCertLista = refPack ? refPack.priceUSD / refPack.certs : 0;
 	const facturacionLista = certs * precioCertLista;
 
-	// En la comparación no hay un socio con base instalada declarada: se asume que el
-	// volumen comparado ES su cartera y su facturación anual, que es la lectura útil
-	// para responder "cuánto rinde este volumen por cada canal".
-	const tier = getDistributorTier(certs, facturacionLista, distributorTiers);
-	const netoDistrib = facturacionLista * (1 - tier.descuento);
-	const margenDistrib = netoDistrib - cvTotal;
-
 	const netoWeb = facturacionLista;
 	const margenWeb = netoWeb - cvTotal;
+
+	// ── Distribuidores (modalidad Volumen) ─────────────────────────────────
+	// Los distribuidores cotizan por elementos sueltos al precio base por unidad (no
+	// sobre la lista web). El nivel es el mayor entre el volumen de firmas y la
+	// facturación a lista de esos elementos; se asume que el volumen comparado ES su
+	// cartera. La modalidad packs (descuento sobre lista web) se descontinuó.
+	const facturacionDistribLista = certs * (Number(volBase.cert) || 0) + firmasTotal * (Number(volBase.firma) || 0);
+	const tier = getDistributorVolTier(firmasTotal, facturacionDistribLista, distribuidorVolTiers) || (distribuidorVolTiers && distribuidorVolTiers[0]) || { label: "—", descuento: 0 };
+	const distribDesc = Math.min(1, Math.max(0, Number(tier.descuento) || 0));
+	const precioCertDistrib = (Number(volBase.cert) || 0) * (1 - distribDesc);
+	const precioFirmaDistrib = (Number(volBase.firma) || 0) * (1 - distribDesc);
+	const netoDistrib = facturacionDistribLista * (1 - distribDesc);
+	const margenDistrib = netoDistrib - cvTotal;
 
 	return {
 		refPack,
@@ -96,11 +103,11 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 			segOrTier:      seg.label,
 		},
 		distribuidores: {
-			precioPorCert:  precioCertLista,
-			precioPorFirma: firmasPorCert > 0 ? precioCertLista / firmasPorCert : null,
-			revLista:       facturacionLista,
+			precioPorCert:  precioCertDistrib,
+			precioPorFirma: precioFirmaDistrib,
+			revLista:       facturacionDistribLista,
 			revenueNeto:    netoDistrib,
-			descuento:      tier.descuento,
+			descuento:      distribDesc,
 			cvTotal,
 			margen:         margenDistrib,
 			margenPct:      netoDistrib > 0 ? margenDistrib / netoDistrib : 0,

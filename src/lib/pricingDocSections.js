@@ -58,41 +58,28 @@ function secWeb(models, tc) {
 	].join("\n");
 }
 
-function secDistribuidores(tiers) {
-	const rows = tiers.map((t) =>
-		`| ${t.label} | ${pct(t.descuento)} | ${rangeCant(t.certsMin, t.certsMax)} | ${rangeUSD(t.compromisoMin, t.compromisoMax)} |`
-	);
-	return [
-		"El nivel se asigna por el **mayor** que resulte entre dos variables declaradas del socio: certificados activos que Lakaut le administra, y compromiso anual de facturación en USD. El descuento aplica sobre la **lista web** (packs).",
-		"",
-		"| Nivel | Descuento sobre lista | Certificados activos | Compromiso anual |",
-		"|---|---|---|---|",
-		...rows,
-	].join("\n");
-}
-
 function secDistribuidoresVol(tiers, base) {
 	const rows = tiers.map((t) =>
-		`| ${t.label} | ${pct(t.descuento)} | ${rangeCant(t.firmasMin, t.firmasMax, "firmas")} |`
+		`| ${t.label} | ${pct(t.descuento)} | ${rangeCant(t.firmasMin, t.firmasMax, "firmas")} | ${rangeUSD(t.facturacionMin, t.facturacionMax)} |`
 	);
 	return [
-		`Misma mecánica de elementos sueltos que el canal Volumen (base cert USD ${usd(base.cert)} / firma USD ${usd(base.firma)}), pero el nivel lo asigna el **volumen real de firmas** de la cotización. Escala más conservadora que la de packs porque el descuento pega sobre el precio por elemento, que está cerca del costo.`,
+		`Certificados y firmas sueltos (base cert USD ${usd(base.cert)} / firma USD ${usd(base.firma)}): el único modo en que cotizan los distribuidores. El nivel es el **mayor** entre dos ejes de la cotización: el **volumen real de firmas** y la **facturación a lista** de la ventana contemplada. La modalidad de la cotización (Consumo único / Anual) define si la facturación se mide sobre un período o se anualiza (× meses de vinculación). La escala de descuentos es conservadora porque pega sobre el precio por elemento, que está cerca del costo.`,
 		"",
-		"| Nivel | Descuento sobre base | Rango de firmas |",
-		"|---|---|---|",
+		"| Nivel | Descuento sobre base | Rango de firmas | Facturación de la ventana |",
+		"|---|---|---|---|",
 		...rows,
 	].join("\n");
 }
 
 function secIDC(segments, markupMin) {
 	const rows = segments.map((s) =>
-		`| ${s.label} | ${rangeCant(s.idcMin, s.idcMax, "IDC")} | USD ${usd(s.precioIDC)} | ${num(s.firmasIncluidas)} | USD ${usd(s.precioFirmaExtra)} |`
+		`| ${s.label} | ${rangeCant(s.idcMin, s.idcMax, "IDC")} | ${rangeUSD(s.facturacionMin, s.facturacionMax)} | USD ${usd(s.precioIDC)} | ${num(s.firmasIncluidas)} | USD ${usd(s.precioFirmaExtra)} |`
 	);
 	return [
-		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento sale de la cantidad de IDC mensuales.",
+		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la cantidad de IDC mensuales y la **facturación** de la ventana medida a precio de referencia Start Up (evita la circularidad precio↔segmento), windoweada por la modalidad Consumo único / Anual.",
 		"",
-		"| Segmento | Rango (IDC/mes) | Precio IDC/mes | Firmas incluidas | Firma extra |",
-		"|---|---|---|---|---|",
+		"| Segmento | Rango (IDC/mes) | Facturación de la ventana | Precio IDC/mes | Firmas incluidas | Firma extra |",
+		"|---|---|---|---|---|---|",
 		...rows,
 		"",
 		`Guardarraíl de rentabilidad: markup mínimo **${usd(markupMin, 2, 2)}x** sobre el costo variable del bundle. Bajo ese piso el cotizador bloquea guardar y exportar.`,
@@ -101,13 +88,13 @@ function secIDC(segments, markupMin) {
 
 function secVolumen(base, segments) {
 	const rows = segments.map((s) =>
-		`| ${s.label} | ${rangeUSD(s.compromisoMin, s.compromisoMax)} | ${pct(s.descuento)} |`
+		`| ${s.label} | ${rangeCant(s.firmasMin, s.firmasMax, "firmas")} | ${rangeUSD(s.compromisoMin, s.compromisoMax)} | ${pct(s.descuento)} |`
 	);
 	return [
-		`Certificados y firmas como items independientes, sin bundle. Precio base: **cert USD ${usd(base.cert)} / firma USD ${usd(base.firma)}**. El segmento lo define el **compromiso total del contrato en USD** (a precio de lista), y aplica el mismo descuento sobre cert y firma.`,
+		`Certificados y firmas como items independientes, sin bundle. Precio base: **cert USD ${usd(base.cert)} / firma USD ${usd(base.firma)}**. El segmento es el **mayor** entre dos ejes de la cotización: el **volumen real de firmas** y el **compromiso** del contrato en USD a precio de lista, windoweado por la modalidad Consumo único / Anual. Aplica el mismo descuento sobre cert y firma.`,
 		"",
-		"| Segmento | Compromiso anual (USD) | Descuento |",
-		"|---|---|---|",
+		"| Segmento | Rango de firmas | Compromiso de la ventana (USD) | Descuento |",
+		"|---|---|---|---|",
 		...rows,
 	].join("\n");
 }
@@ -179,7 +166,6 @@ export function buildDocBlocks({ channelConfig, models, tc }) {
 	const base = cfg.volumenBase || VOLUMEN_BASE;
 	return {
 		web: secWeb(models || [], tc),
-		distribuidores: secDistribuidores(cfg.distributorTiers || []),
 		"distribuidores-vol": secDistribuidoresVol(cfg.distribuidorVolTiers || [], base),
 		idc: secIDC(cfg.b2b2cSegments || [], cfg.b2b2cMarkupMin),
 		volumen: secVolumen(base, cfg.volumenSegments || []),
