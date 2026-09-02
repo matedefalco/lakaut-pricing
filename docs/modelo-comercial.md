@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-08-31 19:44 · **Fuente:** Supabase (config viva) · **Commit:** `1021dda`
+> **Última actualización:** 2026-09-02 14:48 · **Fuente:** Supabase (config viva) · **Commit:** `5c19b74`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -26,7 +26,7 @@ La estructura se separa en canales según **quién paga, cómo se cotiza y qué 
 | Canal | Unidad de venta | Cómo se cotiza | Ingreso |
 |---|---|---|---|
 | **Web** | Pack cerrado | Precio de lista, autoservicio | Único |
-| **Distribuidores** | Firma suelta (certificado bonificado) | Descuento por nivel según compromiso anual (volumen × 12), aplicado con forma de pago anual | Único |
+| **Distribuidores** | Firma suelta (certificado bonificado) | Descuento por nivel, el mayor entre facturación (× 12 con compromiso anual, × 1 sin) y certificados activos | Único |
 | **IDC (B2B2C)** | IDC (bundle identidad + firma) | Precio por segmento de volumen | Recurrente mensual |
 | **Volumen** | Certificado y firma sueltos | Descuento por compromiso | Único |
 
@@ -40,32 +40,32 @@ Autoservicio desde el sitio, sin intermediación. Es el **precio de lista**, la 
 | Pack | Segmento | Firmas | Certificados | Precio (USD) | Precio (ARS aprox.) |
 |---|---|---|---|---|---|
 | Cero | Persona | 5 | 1 | gratis | $0 |
-| Smart | Persona | 50 | 1 | USD 40,2 | $61.506 |
-| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $180.907 |
-| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $99.680 |
-| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $239.216 |
-| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $527.284 |
+| Smart | Persona | 50 | 1 | USD 40,2 | $61.707 |
+| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $181.498 |
+| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.005 |
+| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $239.997 |
+| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $529.007 |
 | Integración API | Empresa | ilimitadas | — | a consultar | — |
 
-TC de referencia usado para derivar ARS: **$1.530** por USD.
+TC de referencia usado para derivar ARS: **$1.535** por USD.
 <!-- AUTO:web:end -->
 
 ---
 
 ## 2. Distribuidores e integradores
 
-Socios que revenden el acceso a la infraestructura o la integran en su plataforma. Cotizan **por elementos sueltos**: el **certificado va siempre bonificado** y solo se cobran las firmas, a un precio base de USD 1,00. El descuento sobre la firma sale del **nivel**, que lo asigna el **compromiso anual de facturación** (calculado del volumen cotizado × 12). El descuento se aplica con forma de pago "Con compromiso anual"; con "Sin compromiso anual" la firma va a precio base. La modalidad packs (descuento sobre lista web) se descontinuó.
+Socios que revenden el acceso a la infraestructura o la integran en su plataforma. Cotizan **por elementos sueltos**: el **certificado va siempre bonificado** y solo se cobran las firmas, a un precio base de USD 1,00. El descuento sobre la firma sale del **nivel**, que se alcanza por el **mayor** entre dos ejes: la **facturación** a precio base (× 12 con forma de pago "Con compromiso anual", × 1 mensual sin compromiso) y los **certificados activos** del socio (que cuentan solo con compromiso anual). El descuento del nivel se aplica en ambas condiciones: diferido con compromiso anual, o directo en factura sin compromiso. La modalidad packs (descuento sobre lista web) se descontinuó.
 
 <!-- AUTO:distribuidores-vol:start -->
-Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD 0,00); solo se cobran las firmas, con un precio base de **USD 1,00** por firma. El nivel (Azul→Platinum) lo asigna el **compromiso anual de facturación**, que se calcula del volumen cotizado (servicio mensual a precio base × 12), y define el descuento sobre la firma. El descuento se aplica solo con forma de pago **"Con compromiso anual"**; con **"Sin compromiso anual"** la firma va a precio base (USD 1,00). Los certificados activos son informativos (no asignan el nivel).
+Certificados y firmas sueltos: el único modo en que cotizan los distribuidores. El **certificado va siempre bonificado** (precio USD 0,00); solo se cobran las firmas, con un precio base de **USD 1,00** por firma. El nivel (Azul→Platinum) se alcanza por el **mayor** entre dos ejes: la **facturación** a precio base (con forma de pago **"Con compromiso anual"** se anualiza el servicio mensual × 12; **"Sin compromiso anual"** mide el período mensual × 1) y los **certificados activos** del socio (base instalada + los de la cotización en curso), que cuentan **solo con compromiso anual**. El descuento del nivel se aplica en ambas condiciones: diferido con compromiso anual (rebate / anticipado / caución / firmas) o **directo en factura** sin compromiso.
 
-| Nivel | Compromiso anual (USD) | Descuento firma | Firma resultante | Certificados activos (informativo) |
+| Nivel | Facturación (USD) | Certificados activos | Descuento firma | Firma resultante |
 |---|---|---|---|---|
-| Azul | hasta USD 10.000 | 10% | USD 0,90 | hasta 100 |
-| Bronce | USD 10.001 – 25.000 | 15% | USD 0,85 | 101 – 500 |
-| Plata | USD 25.001 – 50.000 | 25% | USD 0,75 | 501 – 2.500 |
-| Oro | USD 50.001 – 250.000 | 40% | USD 0,60 | 2.501 – 10.000 |
-| Platinum | +USD 250.001 | 50% | USD 0,50 | 10.001+ |
+| Azul | hasta USD 10.000 | hasta 100 | 10% | USD 0,90 |
+| Bronce | USD 10.001 – 25.000 | 101 – 500 | 15% | USD 0,85 |
+| Plata | USD 25.001 – 50.000 | 501 – 2.500 | 25% | USD 0,75 |
+| Oro | USD 50.001 – 250.000 | 2.501 – 10.000 | 40% | USD 0,60 |
+| Platinum | +USD 250.001 | 10.001+ | 50% | USD 0,50 |
 <!-- AUTO:distribuidores-vol:end -->
 
 ---

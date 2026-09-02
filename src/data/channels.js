@@ -216,19 +216,22 @@ export const VOLUMEN_SEGMENTS = [
 //   · La FIRMA parte de un precio base de USD 1,00 (≈ ARS 1.490 a un dólar de 1.490).
 // Por eso la base propia es DISTRIBUIDOR_VOL_BASE = { cert: 0, firma: 1 }.
 //
-// El nivel (Azul→Platinum) lo asigna ÚNICAMENTE el COMPROMISO ANUAL DE FACTURACIÓN
-// declarado por el socio (USD), con los rangos y descuentos de la matriz comercial
-// (la "foto"): a más compromiso, mayor descuento sobre el precio de la firma. Es un
-// dato DECLARADO de la relación, no del volumen de la cotización en curso.
+// El nivel (Azul→Platinum) se alcanza por el MAYOR entre dos ejes, con los rangos y
+// descuentos de la matriz comercial (la "foto"): a mayor nivel, mayor descuento sobre el
+// precio de la firma. Los ejes dependen de la condición comercial (forma de pago):
+//   · FACTURACIÓN a precio base, windoweada por la condición: × 12 con compromiso anual
+//     (formas A/B), × 1 (mensual) sin compromiso (forma C) → compromisoMin/compromisoMax.
+//   · CERTIFICADOS ACTIVOS del socio (base instalada + los de la cotización en curso), que
+//     cuentan SOLO con compromiso anual → certsMin/certsMax.
 //
-// Sin compromiso anual (0) no hay nivel: la firma se cotiza al precio base full, sin
-// descuento (ver getDistributorVolTier, que devuelve null cuando el compromiso es 0).
+// El descuento del nivel se aplica en ambas condiciones: diferido con compromiso anual, o
+// directo en cada factura sin compromiso (ver getDistributorVolTier).
 //
-//   - compromisoMin/compromisoMax: rango del compromiso anual en USD que ASIGNA el
-//     nivel; null en máx = sin tope.
+//   - compromisoMin/compromisoMax: rango de facturación (USD) que asigna el nivel; null en
+//     máx = sin tope.
 //   - descuento: % sobre el precio base de la FIRMA (el certificado ya es gratis).
-//   - certsMin/certsMax: cantidad de certificados activos del socio. Es INFORMATIVO
-//     (aparece en la matriz de referencia); no asigna el nivel.
+//   - certsMin/certsMax: rango de certificados activos que asigna el nivel (solo con
+//     compromiso anual); null en máx = sin tope.
 //   - firmasMin/firmasMax: rango de firmas del nivel. No asigna el nivel; se conserva
 //     para derivar el escalonado de crecimiento de la propuesta (una fila por nivel).
 export const DISTRIBUIDOR_VOL_BASE = { cert: 0, firma: 1 };

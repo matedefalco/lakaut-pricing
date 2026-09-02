@@ -83,7 +83,9 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	// volumen comparado como proxy de ese compromiso (se asume que ese volumen ES su
 	// cartera anual). La modalidad packs (descuento sobre lista web) se descontinuó.
 	const facturacionDistribLista = certs * (Number(volBase.cert) || 0) + firmasTotal * (Number(volBase.firma) || 0);
-	const tier = getDistributorVolTier(facturacionDistribLista, distribuidorVolTiers) || (distribuidorVolTiers && distribuidorVolTiers[0]) || { label: "—", descuento: 0 };
+	// Comparación: nivel por facturación del volumen comparado (sin certificados activos ni
+	// windowing, que dependen de la cotización real y de la condición comercial elegida).
+	const tier = getDistributorVolTier(facturacionDistribLista, 0, false, distribuidorVolTiers) || (distribuidorVolTiers && distribuidorVolTiers[0]) || { label: "—", descuento: 0 };
 	const distribDesc = Math.min(1, Math.max(0, Number(tier.descuento) || 0));
 	const precioCertDistrib = (Number(volBase.cert) || 0) * (1 - distribDesc);
 	const precioFirmaDistrib = (Number(volBase.firma) || 0) * (1 - distribDesc);

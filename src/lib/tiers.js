@@ -36,19 +36,43 @@ export function distributorTierDriver(certsActivos, compromisoAnualUSD, tiers) {
 }
 
 // ── Distribuidores · modalidad Volumen ──
-// El nivel (Azul→Platinum) lo asigna ÚNICAMENTE el COMPROMISO ANUAL de facturación
-// declarado por el socio, en USD, con los rangos de `compromisoMin/compromisoMax`. Es
-// un dato DECLARADO de la relación comercial, no del volumen de la cotización en curso.
-// Sin compromiso (0 o vacío) NO hay nivel: la firma se cotiza al precio base full, sin
-// descuento, así que devuelve null y el llamador aplica 0%. `tiers` viene de
-// channelConfig.distribuidorVolTiers.
-export function getDistributorVolTier(compromisoAnualUSD, tiers) {
+// El nivel (Azul→Platinum) se alcanza por el MAYOR entre dos ejes, según la condición
+// comercial (forma de pago) elegida:
+//   · FACTURACIÓN a precio base (antes del descuento), que el llamador windowea: × 12
+//     con compromiso anual (formas A/B), × 1 (mensual) sin compromiso (forma C).
+//     → compromisoMin/compromisoMax.
+//   · CERTIFICADOS ACTIVOS que Lakaut le administra al socio (base instalada + los de la
+//     cotización en curso) → certsMin/certsMax. SOLO cuentan cuando hay compromiso
+//     anual; sin compromiso el nivel lo da únicamente la facturación mensual.
+// El descuento del nivel se aplica en ambas condiciones (con compromiso se liquida por
+// pago anticipado/caución/rebate/firmas; sin compromiso, como descuento directo en cada
+// factura). `tiers` viene de channelConfig.distribuidorVolTiers.
+export function getDistributorVolTier(facturacion, certsActivos, conCompromiso, tiers) {
 	if (!Array.isArray(tiers) || tiers.length === 0) return null;
-	const usd = Math.max(0, Number(compromisoAnualUSD) || 0);
-	if (usd <= 0) return null; // sin compromiso anual → sin nivel → 0% de descuento
-	return tiers.find(function (t) {
-		return usd >= (Number(t.compromisoMin) || 0) && (t.compromisoMax == null || usd <= t.compromisoMax);
-	}) || tiers[0];
+	function byFacturacion(usd) {
+		return tiers.find(function (t) { return usd >= (Number(t.compromisoMin) || 0) && (t.compromisoMax == null || usd <= t.compromisoMax); }) || tiers[0];
+	}
+	function byCerts(n) {
+		return tiers.find(function (t) { return n >= (Number(t.certsMin) || 0) && (t.certsMax == null || n <= t.certsMax); }) || tiers[0];
+	}
+	const a = byFacturacion(Math.max(0, Number(facturacion) || 0));
+	if (!conCompromiso) return a;
+	const b = byCerts(Math.max(0, Number(certsActivos) || 0));
+	return tiers.indexOf(a) >= tiers.indexOf(b) ? a : b;
+}
+
+// Cuál de los dos ejes asignó el nivel: "facturacion", "certificados" o "ambos". Para
+// explicarlo en la interfaz. Sin compromiso anual el eje es siempre la facturación.
+export function distributorVolTierDriver(facturacion, certsActivos, conCompromiso, tiers) {
+	if (!Array.isArray(tiers) || tiers.length === 0) return null;
+	if (!conCompromiso) return "facturacion";
+	const porFact = getDistributorVolTier(facturacion, 0, true, tiers);
+	const porCerts = getDistributorVolTier(0, certsActivos, true, tiers);
+	const iFact = tiers.indexOf(porFact);
+	const iCerts = tiers.indexOf(porCerts);
+	if (iCerts > iFact) return "certificados";
+	if (iFact > iCerts) return "facturacion";
+	return "ambos";
 }
 
 // ── Volumen (B2B2C) ──

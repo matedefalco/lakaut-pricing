@@ -208,16 +208,26 @@ export function normalizeChannelConfig(raw) {
 		if (merged.webFirmaExtraTiers.length === 0) merged.webFirmaExtraTiers = WEB_FIRMA_EXTRA_TIERS;
 	}
 
-	// Niveles de Distribuidores-Volumen: el modelo pasó a asignar el nivel ÚNICAMENTE por
-	// el COMPROMISO ANUAL declarado (rangos en `compromisoMin`/`compromisoMax`), con la
-	// escala de descuentos de la matriz comercial (10%–50% sobre la firma; el cert va
-	// bonificado). Las configs guardadas con el modelo anterior (nivel por firmas +
-	// facturación de la cotización, otra columna de descuentos) traen tiers sin
-	// `compromisoMin`, así que se reemplazan por el default nuevo: los rangos y descuentos
-	// cambiaron de significado y no hay traducción 1:1. Sin nada cargado, también al default.
+	// Niveles de Distribuidores-Volumen: el nivel se alcanza por el MAYOR entre la
+	// FACTURACIÓN (rangos en `compromisoMin`/`compromisoMax`) y los CERTIFICADOS ACTIVOS
+	// (`certsMin`/`certsMax`, que cuentan solo con compromiso anual), con la escala de
+	// descuentos de la matriz comercial (10%–50% sobre la firma; el cert va bonificado). Las
+	// configs guardadas con el modelo viejo (nivel por firmas + facturación de la cotización,
+	// otra columna de descuentos) traen tiers sin `compromisoMin`, así que se reemplazan por
+	// el default nuevo: los rangos y descuentos cambiaron de significado y no hay traducción
+	// 1:1. Sin nada cargado, también al default.
 	if (!Array.isArray(merged.distribuidorVolTiers) || merged.distribuidorVolTiers.length === 0
 		|| merged.distribuidorVolTiers.some(function (t) { return !t || t.compromisoMin == null; })) {
 		merged.distribuidorVolTiers = DISTRIBUIDOR_VOL_TIERS;
+	} else if (merged.distribuidorVolTiers.some(function (t) { return t && t.certsMin == null; })) {
+		// El eje de certificados activos volvió a asignar el nivel: las configs guardadas
+		// mientras era informativo pueden no traer `certsMin`/`certsMax`. Se backfillean desde
+		// el default por posición, sin tocar el resto de la fila.
+		merged.distribuidorVolTiers = merged.distribuidorVolTiers.map(function (t, i) {
+			if (t && t.certsMin != null) return t;
+			const d = DISTRIBUIDOR_VOL_TIERS[i] || DISTRIBUIDOR_VOL_TIERS[DISTRIBUIDOR_VOL_TIERS.length - 1] || {};
+			return Object.assign({}, t, { certsMin: d.certsMin != null ? d.certsMin : 0, certsMax: d.certsMax !== undefined ? d.certsMax : null });
+		});
 	}
 
 	// Precio base propio del canal Distribuidores-Volumen. Si la config no lo trae (era
