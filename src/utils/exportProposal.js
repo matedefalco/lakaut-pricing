@@ -33,9 +33,10 @@ const DESCUENTO_ABONO = 0.35;
 const ABONO_DESDE_MES = 2;
 const ABONO_VIGENCIA_MESES = 24;
 
-// Todos los precios del sistema se guardan sin IVA. `fm` sigue devolviendo el
-// valor neto (sin IVA); `fmGross` agrega el IVA solo para ARS, ya que en
-// USD los montos no se facturan con IVA discriminado en esta propuesta.
+// Todos los precios del sistema se guardan sin IVA. `fm` devuelve el valor neto
+// (sin IVA); `fmGross` le agrega el IVA. El IVA aplica en ambas monedas: las
+// cotizaciones se expresan en USD o ARS, pero la facturación (en USD o en pesos
+// al TC del día) lleva IVA en los dos casos.
 function fm(v, currency, tc) {
 	if (v == null || isNaN(v)) return "—";
 	if (currency === "ARS") return "$ " + (v * tc).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -43,8 +44,15 @@ function fm(v, currency, tc) {
 }
 function fmGross(v, currency, tc) {
 	if (v == null || isNaN(v)) return "—";
-	if (currency !== "ARS") return fm(v, currency, tc);
-	return "$ " + (v * tc * (1 + IVA_RATE)).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+	const gross = v * (1 + IVA_RATE);
+	if (currency === "ARS") return "$ " + (gross * tc).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+	return "USD " + gross.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+// Aclaración de precios para el subtítulo del slide comercial, según la moneda.
+function ivaSubtitle(currency) {
+	return currency === "ARS"
+		? "Precios expresados en pesos argentinos. IVA discriminado al 21%."
+		: "Precios expresados en dólares (USD). IVA discriminado al 21%; la facturación se emite en pesos al TC del día.";
 }
 // Igual que `fm` pero conserva 2 decimales en USD: es para precios UNITARIOS chicos
 // (firma, certificado), que con el redondeo a entero de `fm` aparecerían como "USD 0"
@@ -398,7 +406,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 	// Precio de la firma adicional: promedio ponderado de los packs cotizados
 	// (resumen). El fallback cubre deals viejos del ex canal distribuidores.
 	const precioFirmaUSD = Number(res.precioFirmaAdic) || Number(inp.precioFirmaUSD) || 0;
-	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
+	const showIva = true; // el IVA (21%) se discrimina en ambas monedas
 
 	const webProducts = models || [];
 	const distributorTiers = (channelConfig && channelConfig.distributorTiers) || [];
@@ -533,7 +541,7 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 		// El Borrador v5 condiciona el nivel al cumplimiento efectivo de los compromisos
 		// asumidos, así que la propuesta lo dice en lugar de dejarlo implícito.
 		subtitle: [
-			showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : null,
+			showIva ? ivaSubtitle(currency) : null,
 			conNivel ? "El nivel comercial asignado queda sujeto al cumplimiento efectivo de los compromisos asumidos." : null,
 		].filter(Boolean).join(" ") || null,
 		chips,
@@ -562,7 +570,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const firmaCap = langApi ? "Documentos firmados" : "Firmas";
 	// La Cotizadora B2B2C no tiene (todavía) un selector de modalidad única/recurrente:
 	// el volumen de IDC es un dato neutro. No hay que asumir periodicidad que no se configuró.
-	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
+	const showIva = true; // el IVA (21%) se discrimina en ambas monedas
 	const apiTiers = (channelConfig && channelConfig.b2b2cApiTiers) || [];
 	const slaPlans = (channelConfig && channelConfig.slaPlans) || [];
 	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "SDK Standard" };
@@ -828,7 +836,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	}) : "";
 
 	const subtitleParts = [sinApi ? `Cotización de volumen directo, sin integración SDK` : `Integración ${api.label} · incluye fee de implementación y soporte ${sla.label}`];
-	if (showIva) subtitleParts.push("precios en pesos argentinos, IVA discriminado al 21%");
+	if (showIva) subtitleParts.push(currency === "ARS" ? "precios en pesos argentinos, IVA discriminado al 21%" : "precios en dólares (USD), IVA discriminado al 21%");
 	// El descuento del segmento ya viene aplicado en el precio unitario, así que se
 	// nombra como condición alcanzada y no como una línea aparte (sería doble conteo).
 	if ((res.segmentoDescuento || 0) > 0) subtitleParts.push(`descuento por volumen del ${Math.round(res.segmentoDescuento * 100)}% ya aplicado`);
@@ -876,7 +884,7 @@ function s3VolumenEscalonado(deal, clientName, currency, tc, pageN) {
 	const precioFirmaBase = Number(proy.precioFirmaBase) || Number(res.precioFirmaExtraLista) || Number(res.precioFirma) || 0;
 	const firmasActual = Number(res.firmasTotales != null ? res.firmasTotales : res.firmasMes) || 0;
 	const rows = buildEscalonadoFirmas(proy.steps || [], precioFirmaBase, firmasActual);
-	const showIva = currency === "ARS";
+	const showIva = true;
 	// Distribuidores-Volumen: el escalonado se muestra como BANDAS de nivel (rango de
 	// firmas, costo al tope de la banda). Volumen: umbrales "desde X" con costo al umbral.
 	const dv = isDistribVol(deal.channel);
@@ -955,7 +963,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, langApi) {
 	const precioCert = Number(res.precioIDC) || 0;
 	const precioFirma = Number(res.precioFirma != null ? res.precioFirma : inp.precioFirmaAdic) || 0;
 	const rows = buildProyeccion({ idc, firmas, precioCert, precioFirma }, proy.driver || "packs", proy.steps || []);
-	const showIva = currency === "ARS";
+	const showIva = true;
 	// La proyección es a precio de lista del escenario: la bonificación de la
 	// activación no se arrastra, así que se aclara en la nota al pie.
 	const bonifNota = (Number(inp.firmasBonificadas) || 0) > 0 ? `, ${langApi ? "los" : "las"} ${firmaNpl} bonificad${langApi ? "os" : "as"} de la activación` : "";
@@ -1032,7 +1040,7 @@ function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
 	const qtys = inp.qtys || {};
 	const firmasAdic = Number(inp.firmasAdic) || 0;
 	const precioFirmaUSD = Number(res.precioFirmaAdic) || 0;
-	const showIva = currency === "ARS"; // desglose s/IVA y c/IVA solo aplica a cotizaciones en pesos
+	const showIva = true; // el IVA (21%) se discrimina en ambas monedas
 
 	const webProducts = models || [];
 	const packRows = webProducts
@@ -1101,7 +1109,7 @@ function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
 	return commercialSlide({
 		kicker: "Modelo comercial · packs a precio de lista",
 		title: "Tu propuesta a medida",
-		subtitle: showIva ? "Precios expresados en pesos argentinos. IVA discriminado al 21%." : "Precios de lista web, sin descuento.",
+		subtitle: showIva ? ivaSubtitle(currency) : "Precios de lista web, sin descuento.",
 		chips,
 		cardsHtml: momento1,
 		scheduleHtml: "",
