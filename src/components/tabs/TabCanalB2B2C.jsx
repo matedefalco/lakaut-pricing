@@ -158,11 +158,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const [overridePrecioCert, setOverridePrecioCert] = useState("");
 	const [overridePrecioFirma, setOverridePrecioFirma] = useState("");
 	const [abono, setAbono] = useState(false);
-	// Proyección de crecimiento:
-	//   · Volumen → escalonado ESTÁNDAR por firmas absolutas (config), activo por
-	//     defecto, con override por propuesta (proyCustom lo marca).
-	//   · IDC → proyección relativa (driver + % de crecimiento), opcional, como antes.
-	const [proyEnabled, setProyEnabled] = useState(!esIDC);
+	// Proyección de crecimiento: siempre OPT-IN, en los dos canales. Sumar la tabla de
+	// precios por rango a toda propuesta le da al cliente una escala de descuentos que
+	// no pidió y que invita a negociar hacia abajo; se activa cuando la cotización
+	// puntual la necesita.
+	//   · Volumen → escalonado ESTÁNDAR por firmas absolutas (config), con override
+	//     por propuesta (proyCustom lo marca).
+	//   · IDC → proyección relativa (driver + % de crecimiento), como antes.
+	const [proyEnabled, setProyEnabled] = useState(false);
 	const [proyDriver, setProyDriver] = useState("packs");
 	const [proyCustom, setProyCustom] = useState(false);
 	const [proySteps, setProySteps] = useState(function () {
@@ -354,7 +357,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				setProyCustom(!!p.custom);
 				setProySteps(p.steps.map(function (s) { return { firmas: Number(s.firmas) || 0, descuento: Number(s.descuento) || 0 }; }));
 			} else {
-				setProyEnabled(p ? p.enabled !== false : true);
+				setProyEnabled(!!p && p.enabled !== false);
 				setProyCustom(false);
 				setProySteps(esDistribVol ? distribVolEscalonadoSteps(channelConfig.distribuidorVolTiers || []) : (channelConfig.volumenProyeccion || []).map(function (s) { return { ...s }; }));
 			}
@@ -1512,7 +1515,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{proyEnabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
 						{proyEnabled && !esIDC && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">{esDistribVol ? "según niveles" : (proyCustom ? "personalizado" : "estándar")}</Badge>}
 					</label>
-					{!proyEnabled && <p className="text-[11px] text-muted-foreground pl-6">{esIDC ? "Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo." : esDistribVol ? "Escalonado derivado de los niveles de Distribuidores-Volumen: una fila por nivel, alineada con el descuento que alcanza la cotización. Va por defecto en la propuesta." : "Escalonado estándar de precios por volumen de firmas. Va por defecto en la propuesta; podés ajustarlo para esta cotización puntual."}</p>}
+					{!proyEnabled && <p className="text-[11px] text-muted-foreground pl-6">{esIDC ? "Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo." : esDistribVol ? "Opcional. Agrega al PDF un escalonado derivado de los niveles de Distribuidores-Volumen: una fila por nivel, alineada con el descuento que alcanza la cotización." : "Opcional. Agrega al PDF el escalonado estándar de precios por volumen de firmas; podés ajustarlo para esta cotización puntual."}</p>}
 
 				{proyEnabled && (esIDC ? (
 					<div className="space-y-4">

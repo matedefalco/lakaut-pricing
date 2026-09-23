@@ -616,11 +616,34 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const api = [...apiTiers].reverse().find(t => (Number(inp.fee)||0) >= t.feeMin) || apiTiers[0] || { label: "SDK Standard" };
 	const sla = slaPlans.find(s => s.id === inp.slaId) || slaPlans[0] || { label: "Standard", precioMes: 0, desc: "" };
 
-	// precioIDC es un valor unitario chico (ej. USD 0.65): se formatea aparte de fm/fmGross para no perder los decimales.
+	// Los precios unitarios (certificado, firma) son valores chicos (ej. USD 0.65): se
+	// formatean aparte de fm/fmGross para no perder los decimales.
+	const fmUnit = (v) => currency === "ARS"
+		? "$ " + Math.round((Number(v) || 0) * tc).toLocaleString("es-AR")
+		: "USD " + (Number(v) || 0).toFixed(2);
 	const precioIDC = res.precioIDC != null ? res.precioIDC : 0;
-	const precioIDCFmt = currency === "ARS"
-		? "$ " + Math.round(precioIDC * tc).toLocaleString("es-AR")
-		: "USD " + precioIDC.toFixed(2);
+	const precioIDCFmt = fmUnit(precioIDC);
+
+	// Segmento alcanzado: su descuento por volumen ya viene aplicado en los precios
+	// unitarios, así que sin el precio de lista al lado el cliente no ve el beneficio
+	// que está recibiendo. `precioIDCLista` / `precioFirmaExtraLista` son el precio de
+	// TABLA del segmento (o sea, ya con el descuento), así que la lista base se
+	// reconstruye sacándole el descuento. Deals viejos sin estos campos no tachan nada.
+	const segNombre = res.segmento || "";
+	const segDesc = Math.min(0.99, Math.max(0, Number(res.segmentoDescuento) || 0));
+	const segDescPts = res.segmentoDescuento != null ? Math.round(res.segmentoDescuento * 100) : 0;
+	const listaBase = (precioSegmento) => {
+		const v = Number(precioSegmento) || 0;
+		return segDesc > 0 && v > 0 ? v / (1 - segDesc) : null;
+	};
+	// Tachado + precio vigente, uno al lado del otro. Solo se muestra si la lista es
+	// efectivamente mayor: si el precio se ajustó a mano por encima del de tabla, no
+	// hay beneficio que mostrar y se imprime el precio solo.
+	const precioConLista = (efectivo, lista) => {
+		if (!lista || lista <= efectivo) return fmUnit(efectivo);
+		return `<span style="text-decoration:line-through;color:${GR};">${fmUnit(lista)}</span> <strong style="color:${B};">${fmUnit(efectivo)}</strong>`;
+	};
+	const precioIDCHtml = precioConLista(precioIDC, listaBase(res.precioIDCLista));
 
 	// Un certificado (IDC) es jurídico o físico; la firma es solo la manifestación de
 	// voluntad y cuesta/cotiza igual. El volumen se carga por cantidad de certificados
@@ -664,11 +687,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const firmasSueltas = Math.max(0, Number(inp.firmasSueltas) || 0);
 	const firmasAdicTotal = idc * adicPorIDC;
 	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
-	// Precio de firma a precio de lista (mes 1, sin el 35% del abono). Se formatea
-	// aparte como precioIDC: es un decimal chico y fm/USD lo redondearía a entero.
-	const precioFirmaFmt = currency === "ARS"
-		? "$ " + Math.round(precioFirmaAdicN * tc).toLocaleString("es-AR")
-		: "USD " + precioFirmaAdicN.toFixed(2);
+	// Precio de firma a precio de lista (mes 1, sin el 35% del abono).
+	const precioFirmaFmt = fmUnit(precioFirmaAdicN);
+	const precioFirmaHtml = precioConLista(precioFirmaAdicN, listaBase(res.precioFirmaExtraLista));
 
 	// Desglose del mes 1 (activación): certificados + bolsa inicial de firmas a precio
 	// de lista + firmas adicionales. El 35% de descuento aplica recién al abono (mes 2
@@ -719,22 +740,22 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const items = [
 		// Certificados: se desglosan por tipo solo cuando hay jurídicos en el mix.
 		...(hayJuridicos ? [
-			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcJuridicos * precioIDC },
-			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: idcFisicos * precioIDC }] : []),
+			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcJuridicos * precioIDC },
+			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcFisicos * precioIDC }] : []),
 		] : idc > 0 ? [
-			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})`, v: revIDC },
+			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: revIDC },
 		] : []),
 		// Firmas que exceden el cupo del bundle: se atribuyen al tipo de certificado que
 		// las genera. Las que entran en el cupo no llevan línea de cargo (ya están en el
 		// precio de la IDC) y se muestran como parte de lo incluido, más abajo.
 		...(hayJuridicos ? [
-			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaFmt})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica }] : []),
-			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaFmt})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica }] : []),
+			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica }] : []),
+			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaFmt})${firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl }] : []),
 		]),
-		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasAdic }] : []),
-		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaFmt})`, v: revFirmasSueltas }] : []),
+		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic }] : []),
+		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
@@ -779,19 +800,34 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// mostrar la línea del descuento); no colapsamos a "cantidad × precio".
 	// El colapso a "cantidad × precio" es solo para el caso de un único concepto de
 	// certificados: no aplica cuando hay firmas sueltas (aunque sean el único item).
-	const singleItem = items.length === 1 && idc > 0 && firmasSueltas <= 0 && descCondPct <= 0 && bonifMonto <= 0;
+	// Con descuento de segmento no se colapsa: el desglose es el único lugar donde se
+	// ve la lista tachada contra el precio vigente, que es lo que muestra el beneficio.
+	const singleItem = items.length === 1 && idc > 0 && firmasSueltas <= 0 && descCondPct <= 0 && bonifMonto <= 0 && segDescPts <= 0;
 	const subtotalNota = singleItem ? `${idc.toLocaleString("es-AR")} × ${precioIDCFmt}` : null;
 	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
 	// condiciones, para que el valor entregado quede a la vista.
-	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+	// Densidad del desglose: la tarjeta tiene alto fijo y con 5+ conceptos (certificados
+	// por tipo, firmas por tipo, SLA, fee) la última línea se recortaba. Con muchos
+	// ítems se achica la tipografía en vez de perder un cargo real de la cotización.
+	const denso = items.length >= 5;
+	const itemFs = denso ? "7.8pt" : "8.5pt";
+	const itemGap = denso ? "0.06cm" : "0.14cm";
+	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
       <span style="color:${GR};">${firmaCap} bonificad${langApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">Sin cargo: recibís ${langApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${Math.max(0, firmasFacturables - firmasBonif).toLocaleString("es-AR")}.</span></span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(bonifMonto, currency, tc)}</span>
     </div>` : "";
-	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
       <span style="color:${GR};">Descuento por condiciones (−${condPctV}%)${condTerms ? `<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">${condTerms}</span>` : ""}</span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(descCondMonto, currency, tc)}</span>
     </div>` : "";
-	const itemsListHtml = !singleItem ? items.map(it => `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+	// El tachado dice que hay un precio mejor, pero no por qué. Esta línea nombra el
+	// segmento (nivel, en Distribuidores-Volumen) que lo habilitó, que es el argumento
+	// comercial: el beneficio lo ganó el cliente con su volumen comprometido.
+	const segPalabra = isDistribVol(deal.channel) ? "nivel" : "segmento";
+	const segNotaHtml = segDescPts > 0
+		? `<div style="font-size:7.5pt;color:${B};font-weight:600;line-height:1.3;margin-top:${denso ? "0.08cm" : "0.16cm"};">Precios unitarios con el ${segDescPts}% de descuento ${segNombre ? `del ${segPalabra} ${segNombre}` : "por volumen"} ya aplicado sobre el precio de lista.</div>`
+		: "";
+	const itemsListHtml = !singleItem ? items.map(it => `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
       <span style="color:${GR};">${it.l}</span>
       <span style="color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
     </div>`).join("") + bonifLineHtml + descCondLineHtml : "";
@@ -828,10 +864,11 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		icon: SVG.shield(B, 16),
 		heading: langApi ? "Activás tu servicio" : (esIDC ? "Activás tus identidades" : "Comprás tu volumen"),
 		body: `
-      <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
+      <div style="font-size:${denso ? "8pt" : "8.5pt"};color:${GR};line-height:1.45;margin-bottom:${denso ? "0.12cm" : "0.22cm"};">
         ${activacionTxt}
       </div>
-      ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:0.14cm;margin-bottom:0.05cm;min-height:0;overflow:hidden;">${itemsListHtml}</div>` : ""}
+      ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:${itemGap};margin-bottom:0.05cm;min-height:0;overflow:hidden;">${itemsListHtml}</div>` : ""}
+      ${segNotaHtml}
       ${priceFlow({
 				dark: false,
 				neto: subtotal,
@@ -888,8 +925,6 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// Segmento alcanzado: el cliente cae en un solo segmento por su compromiso, y su
 	// descuento por volumen ya está aplicado en los precios de arriba. Se nombra en el
 	// kicker para que la propuesta diga explícitamente en qué segmento entró.
-	const segNombre = res.segmento || "";
-	const segDescPts = res.segmentoDescuento != null ? Math.round(res.segmentoDescuento * 100) : 0;
 	const segKicker = segNombre
 		? `Segmento ${segNombre}${segDescPts > 0 ? ` · ${segDescPts}% por volumen` : ""}`
 		: (langApi ? "Modelo comercial · consumo por validación de identidad" : "Modelo comercial · volumen");
