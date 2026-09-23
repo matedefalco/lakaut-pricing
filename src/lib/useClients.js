@@ -11,6 +11,30 @@ const TIPOS_KEY = "client_tipos";
 // muestre aunque recargues la página.
 const LAST_IMPORT_KEY = "last_pipeline_import";
 
+// PostgREST corta cualquier select en 1000 filas por default. El Sheet de pipeline
+// ya bajó más de 1000 empresas a `clients`, así que un `select("*")` suelto dejaba
+// afuera a todas las que caían después del corte alfabético: la empresa existía en
+// Supabase pero no aparecía ni en la pestaña Clientes ni en el buscador de la
+// cotización, y reimportar no cambiaba nada. Hay que paginar con `.range()` hasta
+// traerlas todas. Mismo problema (y misma solución) que la Edge Function
+// import-pipeline. Ver docs/sync-pipeline-sheet.md.
+const PAGE_SIZE = 1000;
+
+async function fetchAllClients() {
+	const all = [];
+	for (let offset = 0; ; offset += PAGE_SIZE) {
+		const { data, error } = await supabase
+			.from("clients")
+			.select("*")
+			.order("name")
+			.range(offset, offset + PAGE_SIZE - 1);
+		if (error) return { data: null, error };
+		all.push(...(data || []));
+		if (!data || data.length < PAGE_SIZE) break;
+	}
+	return { data: all, error: null };
+}
+
 export function useClients() {
 	const [rows, setRows] = useState([]);
 	const [tipos, setTipos] = useState({});
@@ -19,7 +43,7 @@ export function useClients() {
 	const [lastImport, setLastImport] = useState(null);
 
 	const fetchClients = useCallback(function () {
-		return supabase.from("clients").select("*").order("name").then(function (res) {
+		return fetchAllClients().then(function (res) {
 			if (!res.error && res.data) setRows(res.data);
 			return res;
 		});
@@ -27,7 +51,7 @@ export function useClients() {
 
 	useEffect(function () {
 		Promise.all([
-			supabase.from("clients").select("*").order("name"),
+			fetchAllClients(),
 			loadConfig(TIPOS_KEY),
 			loadConfig(LAST_IMPORT_KEY),
 		]).then(function (res) {

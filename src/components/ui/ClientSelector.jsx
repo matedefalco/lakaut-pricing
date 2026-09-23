@@ -20,8 +20,15 @@ export function ClientSelector({ clients, value, onChange }) {
 		return function () { document.removeEventListener("mousedown", handler); };
 	}, []);
 
-	const filtered = clients
-		.filter(function (c) { return !query || c.name.toLowerCase().includes(query.toLowerCase()); });
+	// La búsqueda mira el nombre, pero también la clave de cuenta (LK-E-2026-NNNN),
+	// la razón social y el CUIT: el nombre comercial del Sheet no siempre es el que
+	// uno tiene en la cabeza, y pegar la clave es la forma más rápida de no fallar.
+	const filtered = clients.filter(function (c) {
+		if (!query) return true;
+		const q = query.toLowerCase().trim();
+		return [c.name, c.empresa_id, c.razon_social, c.cuit]
+			.some(function (f) { return f && String(f).toLowerCase().includes(q); });
+	});
 
 	function select(client) {
 		onChange(client);

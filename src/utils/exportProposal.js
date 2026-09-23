@@ -14,7 +14,11 @@ const W   = "#FFFFFF";  // white
 const NG  = "#565961";  // numeric gray
 
 // ─── Términos y condiciones (footer de la propuesta) ────────────────────────────
-const TERMS_RETENCIONES = "Lakaut S.A. reviste la condición de Agente de Retención y Percepción, por lo que las percepciones y/o retenciones impositivas que correspondan serán aplicadas en la facturación de acuerdo con la normativa vigente.";
+// La condición de agente de percepción es un dato que el cliente necesita leer, no
+// letra chica: va destacada (negrita, 8pt) y con la redacción exacta que usa
+// administración. La aclaración de cómo se aplica queda debajo, en tamaño nota.
+const TERMS_PERCEPCION = "Lakaut S.A. es agente de percepción de IIBB C.A.B.A. y BS.AS.";
+const TERMS_PERCEPCION_NOTA = "Las percepciones impositivas que correspondan serán aplicadas en la facturación de acuerdo con la normativa vigente.";
 // Solo para propuestas en USD: los precios se comparten en dólares, pero la
 // facturación se emite en pesos al tipo de cambio del día. El TC que se muestra
 // en la portada es orientativo; el de facturación es el oficial BNA vendedor del
@@ -109,22 +113,8 @@ function momentoCard({ dark, kicker, icon, heading, body, pageBg }) {
   </div>`;
 }
 
-// Precio grande dentro de un momentoCard. `note` va debajo, chico.
-function bigPrice({ dark, label, value, perMes, note }) {
-	const labelColor = dark ? "rgba(255,255,255,0.8)" : GR;
-	const valueColor = dark ? W : DK;
-	const noteColor = dark ? "rgba(255,255,255,0.68)" : GR;
-	return `<div style="margin-top:auto;padding-top:0.25cm;">
-    <div style="font-size:8pt;font-weight:600;color:${labelColor};margin-bottom:0.1cm;">${label}</div>
-    <div style="display:flex;align-items:baseline;gap:0.15cm;">
-      <div style="font-size:23pt;font-weight:800;color:${valueColor};line-height:1;">${value}</div>
-      ${perMes ? `<span style="font-size:11pt;font-weight:700;color:${dark ? "rgba(255,255,255,0.85)" : GR};">/mes</span>` : ""}
-    </div>
-    ${note ? `<div style="font-size:7.5pt;color:${noteColor};margin-top:0.15cm;">${note}</div>` : ""}
-  </div>`;
-}
-
-// Par de mini-stats lado a lado (ej. Subtotal | IVA), separadas por un divisor arriba.
+// Par de mini-stats lado a lado (ej. Precio de lista | Descuento total), separadas
+// por un divisor arriba. El desglose subtotal/IVA vive en priceFlow.
 function miniStats(dark, statsList) {
 	const line = dark ? "rgba(255,255,255,0.2)" : GRL;
 	return `<div style="border-top:1px solid ${line};margin-top:0.22cm;padding-top:0.22cm;display:flex;gap:0.4cm;">
@@ -132,6 +122,55 @@ function miniStats(dark, statsList) {
       <div style="font-size:7.5pt;color:${dark ? "rgba(255,255,255,0.68)" : GR};margin-bottom:2px;">${s.label}</div>
       <div style="font-size:11pt;font-weight:700;color:${dark ? W : DK};">${s.value}</div>
     </div>`).join("")}
+  </div>`;
+}
+
+// Percepción de IIBB: Lakaut es agente de percepción de CABA y Buenos Aires, pero
+// la alícuota efectiva depende de la jurisdicción y del padrón en que esté inscripto
+// el cliente, así que la propuesta la enuncia como paso del precio SIN monto (el
+// total que se cotiza sigue siendo neto + IVA). Las alícuotas van como referencia.
+const IIBB_VALOR = "Según corresponda";
+const IIBB_NOTA = "C.A.B.A. 2% · BS.AS. 3,5% sobre el neto";
+
+// Desglose del precio en una sola línea progresiva: subtotal + IVA + percepciones
+// = total. Reemplaza al par bigPrice + miniStats, que mostraba el total arriba y
+// sus componentes debajo: se leía al revés de como se arma el precio. Cada paso es
+// una celda (etiqueta + valor), separadas por el operador que las relaciona.
+function priceFlow({ dark, neto, currency, tc, totalLabel, subtotalNote, perMes }) {
+	const labelColor = dark ? "rgba(255,255,255,0.72)" : GR;
+	const valueColor = dark ? W : DK;
+	const noteColor = dark ? "rgba(255,255,255,0.6)" : GR;
+	const line = dark ? "rgba(255,255,255,0.2)" : GRL;
+	const opColor = dark ? "rgba(255,255,255,0.5)" : "#B4B8C4";
+
+	function cell(s) {
+		return `<div style="min-width:0;">
+      <div style="font-size:7pt;font-weight:600;color:${labelColor};text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.08cm;white-space:nowrap;">${s.label}</div>
+      <div style="font-size:${s.muted ? "9.5pt" : "12pt"};font-weight:${s.muted ? 600 : 700};color:${s.muted ? labelColor : valueColor};line-height:1.15;white-space:nowrap;">${s.value}</div>
+      ${s.note ? `<div style="font-size:6.5pt;color:${noteColor};line-height:1.3;margin-top:0.06cm;white-space:nowrap;">${s.note}</div>` : ""}
+    </div>`;
+	}
+	// El operador se alinea con la fila de valores, no con la de etiquetas.
+	function op(sym) {
+		return `<div style="flex-shrink:0;font-size:11pt;font-weight:700;color:${opColor};padding-top:0.32cm;">${sym}</div>`;
+	}
+
+	const steps = [
+		cell({ label: "Subtotal", value: fm(neto, currency, tc), note: subtotalNote }),
+		cell({ label: "IVA (21%)", value: fm(neto * IVA_RATE, currency, tc) }),
+		cell({ label: "Percepciones IIBB", value: IIBB_VALOR, note: IIBB_NOTA, muted: true }),
+	].join(op("+"));
+
+	const total = `<div style="flex-shrink:0;text-align:right;">
+    <div style="font-size:7pt;font-weight:700;color:${labelColor};text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.08cm;white-space:nowrap;">${totalLabel}</div>
+    <div style="display:flex;align-items:baseline;justify-content:flex-end;gap:0.12cm;">
+      <div style="font-size:20pt;font-weight:800;color:${valueColor};line-height:1;white-space:nowrap;">${fmGross(neto, currency, tc)}</div>
+      ${perMes ? `<span style="font-size:10pt;font-weight:700;color:${labelColor};">/mes</span>` : ""}
+    </div>
+  </div>`;
+
+	return `<div style="margin-top:auto;flex-shrink:0;border-top:1px solid ${line};padding-top:0.28cm;display:flex;align-items:flex-start;justify-content:space-between;gap:0.3cm;">
+    ${steps}${op("=")}${total}
   </div>`;
 }
 
@@ -206,11 +245,11 @@ function scheduleBar({ mes1Value, abonoValue, totalValue, totalNote }) {
 // `validUntil` es opcional: si viene, agrega la línea de vigencia de 15 días
 // al pie de términos (además de mostrarse arriba, junto a la fecha de emisión).
 function termsFooterLight(currency) {
-	const facturacionUsd = currency === "USD"
-		? `<div style="margin-bottom:0.08cm;">${TERMS_FACTURACION_USD}</div>`
-		: "";
-	return `<div style="font-size:6.5pt;color:${GR};line-height:1.4;font-style:italic;">
-    ${facturacionUsd}<div>${TERMS_RETENCIONES}</div>
+	const facturacionUsd = currency === "USD" ? TERMS_FACTURACION_USD : "";
+	return `<div style="line-height:1.4;">
+    ${facturacionUsd ? `<div style="font-size:6.5pt;color:${GR};font-style:italic;">${facturacionUsd}</div>` : ""}
+    <div style="font-size:8pt;font-weight:700;color:${DK};">${TERMS_PERCEPCION}</div>
+    <div style="font-size:6.5pt;color:${GR};font-style:italic;">${TERMS_PERCEPCION_NOTA}</div>
   </div>`;
 }
 
@@ -488,23 +527,23 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
 						? "Adquirís el volumen contratado con un descuento especial por tus condiciones comerciales."
 						: "Adquirís el volumen contratado a precio de lista.")}
       </div>
-      <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
+      <div style="display:flex;flex-direction:column;gap:0.14cm;min-height:0;overflow:hidden;">${packItemsHtml}${firmasAdicItemHtml}</div>
       <div style="display:flex;flex-direction:column;gap:0.14cm;border-top:1px solid ${GRL};margin-top:0.1cm;padding-top:0.14cm;">
         ${descRows([
 					conNivel ? { label: `Descuento nivel ${res.tier} (−${descPct}%)`, amount: descNivel } : null,
 					condPctV > 0 ? { label: `Descuento por condiciones (−${condPctV}%)`, amount: descCondMontoV, sub: condTerms } : null,
 				], currency, tc)}
       </div>
-      ${bigPrice({
-				dark: false,
-				label: abonoActivo ? "Pago único de activación" : "Total a pagar",
-				value: showIva ? fmGross(neto, currency, tc) : fm(neto, currency, tc),
-				note: showIva ? "IVA 21% incluido" : null,
-			})}
       ${miniStats(false, [
 				{ label: "Precio de lista", value: fm(lista, currency, tc) },
 				{ label: "Descuento total", value: "−" + fm(desc, currency, tc) },
 			])}
+      ${priceFlow({
+				dark: false,
+				neto,
+				currency, tc,
+				totalLabel: abonoActivo ? "Pago único de activación" : "Total a pagar",
+			})}
       ${condOfrecidasBox}
     `,
 	});
@@ -519,11 +558,12 @@ function s3Dist(deal, clientName, currency, tc, channelConfig, models) {
         Tus packs contratados renuevan su bolsa de firmas cada mes, con un abono fijo y previsible.
       </div>
       ${discountBadge(`${(abonoPct * 100).toFixed(0)}% de ahorro sobre precio de lista`)}
-      ${bigPrice({
+      ${priceFlow({
 				dark: true, perMes: true,
-				label: "Abono mensual",
-				value: showIva ? fmGross(res.abonoMes, currency, tc) : fm(res.abonoMes, currency, tc),
-				note: `Precio de lista (${fm(lista, currency, tc)}) × ${((1 - abonoPct) * 100).toFixed(0)}%${showIva ? ` · IVA 21% incluido (neto ${fm(res.abonoMes, currency, tc)})` : ""}`,
+				neto: res.abonoMes,
+				currency, tc,
+				totalLabel: "Abono mensual",
+				subtotalNote: `Lista (${fm(lista, currency, tc)}) × ${((1 - abonoPct) * 100).toFixed(0)}%`,
 			})}
     `,
 	}) : "";
@@ -740,7 +780,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	// El colapso a "cantidad × precio" es solo para el caso de un único concepto de
 	// certificados: no aplica cuando hay firmas sueltas (aunque sean el único item).
 	const singleItem = items.length === 1 && idc > 0 && firmasSueltas <= 0 && descCondPct <= 0 && bonifMonto <= 0;
-	const subtotalLabel = singleItem ? `Subtotal (${idc.toLocaleString("es-AR")} × ${precioIDCFmt})` : "Subtotal (sin IVA)";
+	const subtotalNota = singleItem ? `${idc.toLocaleString("es-AR")} × ${precioIDCFmt}` : null;
 	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
 	// condiciones, para que el valor entregado quede a la vista.
 	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:8.5pt;">
@@ -755,9 +795,6 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
       <span style="color:${GR};">${it.l}</span>
       <span style="color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
     </div>`).join("") + bonifLineHtml + descCondLineHtml : "";
-	const stats = [{ label: subtotalLabel, value: fm(subtotal, currency, tc) }];
-	if (showIva) stats.push({ label: "IVA (21%)", value: fm(subtotal * IVA_RATE, currency, tc) });
-
 	const firmaWord = (n) => `${n} ${n === 1 ? firmaSing : firmaPlur}`;
 	// El nombre de la unidad: "validaciones de identidad" (IDC con SDK), "identidades"
 	// (IDC sin SDK) o "certificados" (Volumen).
@@ -794,14 +831,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
         ${activacionTxt}
       </div>
-      ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:0.14cm;margin-bottom:0.05cm;">${itemsListHtml}</div>` : ""}
-      ${bigPrice({
+      ${itemsListHtml ? `<div style="display:flex;flex-direction:column;gap:0.14cm;margin-bottom:0.05cm;min-height:0;overflow:hidden;">${itemsListHtml}</div>` : ""}
+      ${priceFlow({
 				dark: false,
-				label: abonoActivo ? "Pago único de activación" : "Total a pagar",
-				value: showIva ? fmGross(subtotal, currency, tc) : fm(subtotal, currency, tc),
-				note: showIva ? "IVA 21% incluido" : null,
+				neto: subtotal,
+				currency, tc,
+				totalLabel: abonoActivo ? "Pago único de activación" : "Total a pagar",
+				subtotalNote: subtotalNota,
 			})}
-      ${miniStats(false, stats)}
       ${condOfrecidasBox}
       ${descLiqClause ? `<div style="margin-top:0.2cm;font-size:8pt;color:${GR};line-height:1.45;border-top:1px solid ${GRL};padding-top:0.18cm;"><strong style="color:${DK};">Forma de pago del descuento.</strong> ${descLiqClause}</div>` : ""}
     `,
@@ -817,11 +854,12 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
         Tu bolsa de ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} se renueva cada mes, con un abono fijo y previsible.
       </div>
       ${discountBadge(`${(abonoPct * 100).toFixed(0)}% de ahorro · ${fm2(precioAbonoUnit, currency, tc)} en vez de ${fm2(precioFirmaAdicN, currency, tc)} por ${firmaSing}`)}
-      ${bigPrice({
+      ${priceFlow({
 				dark: true, perMes: true,
-				label: "Abono mensual",
-				value: showIva ? fmGross(abonoMensual, currency, tc) : fm(abonoMensual, currency, tc),
-				note: `${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} × ${fm2(precioAbonoUnit, currency, tc)}${showIva ? ` · IVA 21% incluido (neto ${fm(abonoMensual, currency, tc)})` : ""}`,
+				neto: abonoMensual,
+				currency, tc,
+				totalLabel: "Abono mensual",
+				subtotalNote: `${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} × ${fm2(precioAbonoUnit, currency, tc)}`,
 			})}
     `,
 	}) : "";
@@ -1083,9 +1121,6 @@ function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
       <span style="color:${DK};font-weight:600;white-space:nowrap;">${fm(firmasAdic * precioFirmaUSD, currency, tc)}</span>
     </div>` : "";
 
-	const stats = [{ label: "Subtotal (sin IVA)", value: fm(total, currency, tc) }];
-	if (showIva) stats.push({ label: "IVA (21%)", value: fm(total * IVA_RATE, currency, tc) });
-
 	const momento1 = momentoCard({
 		dark: false,
 		kicker: "Tu compra",
@@ -1095,14 +1130,13 @@ function s3Web(deal, clientName, currency, tc, channelConfig, models, pageN) {
       <div style="font-size:8.5pt;color:${GR};line-height:1.5;margin-bottom:0.22cm;">
         Contratás los packs seleccionados a <strong style="color:${DK};">precio de lista web</strong>, sin intermediación. Se abona una única vez.
       </div>
-      <div style="display:flex;flex-direction:column;gap:0.14cm;">${packItemsHtml}${firmasAdicItemHtml}</div>
-      ${bigPrice({
+      <div style="display:flex;flex-direction:column;gap:0.14cm;min-height:0;overflow:hidden;">${packItemsHtml}${firmasAdicItemHtml}</div>
+      ${priceFlow({
 				dark: false,
-				label: "Total a pagar",
-				value: showIva ? fmGross(total, currency, tc) : fm(total, currency, tc),
-				note: showIva ? "IVA 21% incluido" : null,
+				neto: total,
+				currency, tc,
+				totalLabel: "Total a pagar",
 			})}
-      ${showIva ? miniStats(false, stats) : ""}
     `,
 	});
 

@@ -50,3 +50,6 @@ coverage
 *.lcov
 # Backups del catálogo (push-models.mjs)
 scripts/_backup-*.json
+
+# Estado local del CLI de Supabase
+supabase/.temp/
