@@ -43,7 +43,7 @@ export function FieldGroup({ step, title, subtitle, action, channel, done, child
 				<div className="flex items-start gap-2.5">
 					{step != null && (
 						<span
-							className="mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-300"
+							className="mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-300"
 							style={done
 								? { background: tint, color: "#fff", boxShadow: "0 1px 6px -1px " + (meta ? meta.glow : "rgba(48,65,213,0.3)") }
 								: { background: meta ? meta.colorSoft : "var(--secondary)", color: tintFg }}
@@ -54,7 +54,7 @@ export function FieldGroup({ step, title, subtitle, action, channel, done, child
 					)}
 					<div className="min-w-0 flex-1">
 						<h3 className="font-heading text-sm font-semibold text-foreground">{title}</h3>
-						{subtitle && <p className={cn("text-[11px] text-muted-foreground mt-0.5")}>{subtitle}</p>}
+						{subtitle && <p className={cn("text-xs text-muted-foreground mt-0.5")}>{subtitle}</p>}
 					</div>
 					{action && <div className="shrink-0">{action}</div>}
 				</div>

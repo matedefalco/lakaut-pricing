@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { BLUE, BLUEL, GRAY, BLACK, WHITE, BORD, ER, ERBG, CHART_COLORS, os, mont } from "../../theme/tokens";
+import { CHART_COLORS } from "../../theme/tokens";
+import { cn } from "@/lib/utils";
 import { useModels } from "../../context/ModelsContext";
 import { NumInput } from "../ui/NumInput";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toaster";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const ARCH_OPTIONS = [
 	{ k: "bolsa", label: "Bolsa prepaga" },
@@ -47,10 +49,10 @@ const EMPTY_MODEL = {
 
 function FieldRow({ label, children }) {
 	return (
-		<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-			<div style={Object.assign({}, os(11, 400, GRAY), { width: 130, flexShrink: 0 })}>{label}</div>
-			<div style={{ flex: 1 }}>{children}</div>
-		</div>
+		<label className="mb-2 flex items-center gap-2.5">
+			<span className="w-[130px] shrink-0 text-xs text-muted-foreground">{label}</span>
+			<span className="flex-1">{children}</span>
+		</label>
 	);
 }
 
@@ -61,16 +63,7 @@ function TextInput({ value, onChange, placeholder }) {
 			value={value}
 			placeholder={placeholder || ""}
 			onChange={function (e) { onChange(e.target.value); }}
-			style={{
-				width: "100%",
-				padding: "5px 8px",
-				border: "1.5px solid " + BORD,
-				borderRadius: 7,
-				fontFamily: "'Open Sans',sans-serif",
-				fontSize: 12,
-				color: BLACK,
-				boxSizing: "border-box",
-			}}
+			className="box-border w-full rounded-md border-[1.5px] border-input bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 		/>
 	);
 }
@@ -143,49 +136,29 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 
 	const SectionTitle = function ({ text }) {
 		return (
-			<div style={Object.assign({}, os(10, 700, GRAY), {
-				textTransform: "uppercase",
-				letterSpacing: "0.5px",
-				marginBottom: 10,
-				paddingBottom: 6,
-				borderBottom: "1px solid " + BORD,
-			})}>
+			<h3 className="mb-2.5 border-b border-border pb-1.5 text-xs font-bold tracking-[0.5px] text-muted-foreground uppercase">
 				{text}
-			</div>
+			</h3>
 		);
 	};
 
 	return (
-		<div style={{
-			background: WHITE,
-			border: "2px solid " + BLUE + "55",
-			borderRadius: 12,
-			overflow: "hidden",
-			marginTop: 16,
-		}}>
+		<div className="mt-4 overflow-hidden rounded-xl border-2 border-primary/35 bg-card">
 			{/* Editor header */}
-			<div style={{
-				background: BLUE,
-				padding: "12px 20px",
-				display: "flex",
-				alignItems: "center",
-				justifyContent: "space-between",
-			}}>
-				<div style={Object.assign({}, os(12, 700, WHITE))}>
+			<div className="flex items-center justify-between bg-primary px-5 py-3">
+				<div className="text-sm font-bold text-primary-foreground">
 					{isNew ? "Nuevo modelo" : "Editando: " + model.label}
 				</div>
-				<div style={{
-					width: 14,
-					height: 14,
-					borderRadius: "50%",
-					background: draft.color,
-					border: "2px solid rgba(255,255,255,0.5)",
-				}} />
+				<div
+					className="size-3.5 rounded-full border-2 border-white/50"
+					style={{ background: draft.color }}
+					aria-hidden="true"
+				/>
 			</div>
 
-			<div style={{ padding: 20 }}>
+			<div className="p-5">
 				{/* 2-column grid for sections */}
-				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 32px" }}>
+				<div className="grid gap-x-8 md:grid-cols-2">
 
 					{/* Col 1: Identidad + Display */}
 					<div>
@@ -197,23 +170,20 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							<TextInput value={draft.tagline} onChange={function (v) { upd("tagline", v); }} placeholder="Descripción corta" />
 						</FieldRow>
 						<FieldRow label="Segmento">
-							<div style={{ display: "flex", gap: 6 }}>
+							<div className="flex gap-1.5">
 								{SEGMENT_OPTIONS.map(function (s) {
 									return (
 										<button
 											key={s.k}
 											onClick={function () { upd("segment", s.k); }}
-											style={{
-												padding: "4px 12px",
-												borderRadius: 6,
-												border: "1.5px solid " + (draft.segment === s.k ? BLUE : BORD),
-												background: draft.segment === s.k ? BLUE : WHITE,
-												color: draft.segment === s.k ? WHITE : GRAY,
-												fontFamily: "'Open Sans',sans-serif",
-												fontSize: 11,
-												fontWeight: 700,
-												cursor: "pointer",
-											}}
+											type="button"
+											aria-pressed={draft.segment === s.k}
+											className={cn(
+												"cursor-pointer rounded-md border-[1.5px] px-3 py-1 text-xs font-bold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+												draft.segment === s.k
+													? "border-primary bg-primary text-primary-foreground"
+													: "border-input bg-card text-muted-foreground"
+											)}
 										>
 											{s.label}
 										</button>
@@ -222,28 +192,27 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							</div>
 						</FieldRow>
 						<FieldRow label="Color">
-							<div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+							<div className="flex flex-wrap gap-1.5">
 								{PRESET_COLORS.map(function (c) {
 									return (
 										<button
 											key={c}
 											onClick={function () { upd("color", c); }}
-											style={{
-												width: 24,
-												height: 24,
-												borderRadius: "50%",
-												background: c,
-												border: draft.color === c ? "3px solid " + BLACK : "2px solid transparent",
-												outline: draft.color === c ? "2px solid " + c + "66" : "none",
-												cursor: "pointer",
-											}}
+											type="button"
+											aria-label={"Color " + c}
+											aria-pressed={draft.color === c}
+											className={cn(
+												"size-6 cursor-pointer rounded-full focus-visible:ring-[3px] focus-visible:ring-ring/50",
+												draft.color === c ? "border-[3px] border-foreground" : "border-2 border-transparent"
+											)}
+											style={{ background: c }}
 										/>
 									);
 								})}
 							</div>
 						</FieldRow>
 
-						<div style={{ marginTop: 20 }}>
+						<div className="mt-5">
 							<SectionTitle text="Display" />
 						</div>
 						<FieldRow label="Nota de precio">
@@ -253,15 +222,15 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							<TextInput value={draft.cta} onChange={function (v) { upd("cta", v); }} />
 						</FieldRow>
 						<FieldRow label="Recomendado">
-							<label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+							<label className="flex cursor-pointer items-center gap-1.5">
 								<input type="checkbox" checked={draft.recommended} onChange={function (e) { upd("recommended", e.target.checked); }} />
-								<span style={os(11, 400, GRAY)}>Mostrar badge "Recomendado"</span>
+								<span className="text-xs text-muted-foreground">Mostrar badge "Recomendado"</span>
 							</label>
 						</FieldRow>
 						<FieldRow label="Activo">
-							<label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+							<label className="flex cursor-pointer items-center gap-1.5">
 								<input type="checkbox" checked={draft.activo !== false} onChange={function (e) { upd("activo", e.target.checked); }} />
-								<span style={os(11, 400, GRAY)}>Visible en cotizadora y Canal Web</span>
+								<span className="text-xs text-muted-foreground">Visible en cotizadora y Canal Web</span>
 							</label>
 						</FieldRow>
 					</div>
@@ -273,16 +242,7 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							<select
 								value={draft.arch}
 								onChange={function (e) { upd("arch", e.target.value); }}
-								style={{
-									padding: "5px 8px",
-									border: "1.5px solid " + BORD,
-									borderRadius: 7,
-									fontFamily: "'Open Sans',sans-serif",
-									fontSize: 12,
-									color: BLACK,
-									background: WHITE,
-									width: "100%",
-								}}
+								className="w-full cursor-pointer rounded-md border-[1.5px] border-input bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 							>
 								{ARCH_OPTIONS.map(function (a) {
 									return <option key={a.k} value={a.k}>{a.label}</option>;
@@ -290,9 +250,9 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							</select>
 						</FieldRow>
 						<FieldRow label={"Precio s/IVA (" + (isARS ? "ARS" : "USD") + ")"}>
-							<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+							<div className="flex flex-col gap-1">
 								<NumInput value={precioDisplay} onChange={updPrecio} prefix={isARS ? "$" : "USD"} />
-								<span style={Object.assign({}, os(10, 400, GRAY))}>
+								<span className="text-xs text-muted-foreground">
 									{isARS
 										? ("≈ USD " + precioHintUSD.toFixed(2))
 										: ("≈ $ " + precioHintARS.toLocaleString("es-AR") + " ARS")
@@ -309,28 +269,28 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							</FieldRow>
 						)}
 
-						<div style={{ marginTop: 20 }}>
+						<div className="mt-5">
 							<SectionTitle text="Contenido del pack" />
 						</div>
 						<FieldRow label="Certificados">
 							<NumInput value={draft.certs} onChange={function (v) { upd("certs", v); }} suffix="cert" />
 						</FieldRow>
 						<FieldRow label="Firmas incluidas">
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-								<div style={{ flex: 1 }}>
+							<div className="flex items-center gap-2">
+								<div className="flex-1">
 									<NumInput
 										value={draft.firmas}
 										onChange={function (v) { upd("firmas", v); upd("ilimitadas", false); }}
 										suffix="firmas"
 									/>
 								</div>
-								<label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", flexShrink: 0 }}>
+								<label className="flex shrink-0 cursor-pointer items-center gap-1.5">
 									<input
 										type="checkbox"
 										checked={draft.ilimitadas}
 										onChange={function (e) { upd("ilimitadas", e.target.checked); }}
 									/>
-									<span style={os(11, 400, GRAY)}>Ilimitadas</span>
+									<span className="text-xs text-muted-foreground">Ilimitadas</span>
 								</label>
 							</div>
 						</FieldRow>
@@ -338,10 +298,10 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 							<NumInput value={draft.admins || 0} onChange={function (v) { upd("admins", v || null); }} suffix="admin" />
 						</FieldRow>
 						<FieldRow label={"Firma adicional (" + (isARS ? "ARS" : "USD") + ")"}>
-							<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+							<div className="flex flex-col gap-1">
 								<NumInput value={firmaExtraDisplay} onChange={updFirmaExtra} prefix={isARS ? "$" : "USD"} suffix="/ firma" />
 								{firmaExtraDisplay > 0 && (
-									<span style={Object.assign({}, os(10, 400, GRAY))}>
+									<span className="text-xs text-muted-foreground">
 										{isARS
 											? ("≈ USD " + (draft.extraFirmaPrice || 0).toFixed(2))
 											: ("≈ $ " + (draft.firmaExtraARS || Math.round((draft.extraFirmaPrice || 0) * tc)).toLocaleString("es-AR") + " ARS")
@@ -355,44 +315,22 @@ function ModelEditor({ model, onSave, onCancel, isNew, currency, tc }) {
 				</div>
 
 				{/* Actions */}
-				<div style={{
-					display: "flex",
-					gap: 8,
-					marginTop: 20,
-					paddingTop: 16,
-					borderTop: "1px solid " + BORD,
-					justifyContent: "flex-end",
-				}}>
+				<div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
 					<button
 						onClick={onCancel}
-						style={{
-							padding: "8px 20px",
-							border: "1.5px solid " + BORD,
-							borderRadius: 7,
-							background: WHITE,
-							fontFamily: "'Open Sans',sans-serif",
-							fontSize: 12,
-							fontWeight: 700,
-							color: GRAY,
-							cursor: "pointer",
-						}}
+						type="button"
+						className="cursor-pointer rounded-md border-[1.5px] border-input bg-card px-5 py-2 text-xs font-bold text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 					>
 						Cancelar
 					</button>
 					<button
 						onClick={function () { onSave(Object.assign({}, draft, { priceUSD: derivedPriceUSD, priceARS: derivedPriceARS, priceDefinedIn: priceTruth.currency, extraFirmaPrice: derivedFirmaExtraUSD, firmaExtraARS: derivedFirmaExtraARS })); }}
 						disabled={!isDirty && !isNew}
-						style={{
-							padding: "8px 20px",
-							border: "none",
-							borderRadius: 7,
-							background: isDirty || isNew ? BLUE : BORD,
-							fontFamily: "'Open Sans',sans-serif",
-							fontSize: 12,
-							fontWeight: 700,
-							color: WHITE,
-							cursor: isDirty || isNew ? "pointer" : "default",
-						}}
+						type="button"
+						className={cn(
+							"rounded-md border-none px-5 py-2 text-xs font-bold text-white outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+							isDirty || isNew ? "cursor-pointer bg-primary" : "cursor-default bg-input"
+						)}
 					>
 						{isNew ? "Crear modelo" : "Guardar cambios"}
 					</button>
@@ -407,61 +345,36 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 
 	return (
 		<div
-			style={{
-				border: "2px solid " + (isEditing ? BLUE : isSelected ? model.color : BORD),
-				borderRadius: 12,
-				overflow: "hidden",
-				background: WHITE,
-				boxShadow: isEditing ? "0 0 0 3px " + BLUE + "22" : "none",
-			}}
+			className={cn("overflow-hidden rounded-xl border-2 bg-card", isEditing && "ring-[3px] ring-primary/15")}
+			style={{ borderColor: isEditing ? "var(--primary)" : isSelected ? model.color : "var(--border)" }}
 		>
 			{/* Header */}
-			<div
+			<button
+				type="button"
 				onClick={onSelect}
-				style={{
-					display: "flex",
-					alignItems: "center",
-					gap: 12,
-					padding: "12px 14px",
-					cursor: "pointer",
-					background: isSelected ? model.color + "0d" : WHITE,
-				}}
+				aria-pressed={isSelected}
+				className="flex w-full cursor-pointer items-center gap-3 border-none px-3.5 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
+				style={{ background: isSelected ? model.color + "0d" : "var(--card)" }}
 			>
-				<div style={{
-					width: 10, height: 10, borderRadius: "50%",
-					background: model.color, flexShrink: 0,
-				}} />
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<div style={os(13, 700, BLACK)}>{model.label}</div>
-					<div style={Object.assign({}, os(10, 400, GRAY), { marginTop: 1 })}>
+				<span className="size-2.5 shrink-0 rounded-full" style={{ background: model.color }} aria-hidden="true" />
+				<span className="min-w-0 flex-1">
+					<span className="block text-sm font-bold text-foreground">{model.label}</span>
+					<span className="mt-px block text-xs text-muted-foreground">
 						{model.segment === "persona" ? "Persona" : "Empresa"} · {model.arch} · USD {model.priceUSD}
-					</div>
-				</div>
-				<div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-					<span style={Object.assign({}, os(10, 700, GRAY), {
-						background: "#f1f5f9",
-						padding: "2px 7px",
-						borderRadius: 10,
-					})}>
+					</span>
+				</span>
+				<span className="flex shrink-0 gap-1">
+					<span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground tabular-nums">
 						{model.ilimitadas ? "∞ firmas" : (model.firmas || 0).toLocaleString("es-AR") + " firmas"}
 					</span>
-					<span style={Object.assign({}, os(10, 700, GRAY), {
-						background: "#f1f5f9",
-						padding: "2px 7px",
-						borderRadius: 10,
-					})}>
+					<span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground tabular-nums">
 						{model.certs} cert · {model.vigencia}m
 					</span>
-				</div>
-			</div>
+				</span>
+			</button>
 
 			{/* Actions */}
-			<div style={{
-				display: "flex",
-				gap: 0,
-				borderTop: "1px solid " + BORD,
-				background: "#fafafa",
-			}}>
+			<div className="flex border-t border-border bg-muted/40">
 				{[
 					{ label: "Editar", action: onEdit },
 					{ label: "Duplicar", action: onDuplicate },
@@ -470,18 +383,8 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 						<button
 							key={btn.label}
 							onClick={btn.action}
-							style={{
-								flex: 1,
-								padding: "6px 0",
-								background: "none",
-								border: "none",
-								borderRight: "1px solid " + BORD,
-								fontFamily: "'Open Sans',sans-serif",
-								fontSize: 11,
-								fontWeight: 700,
-								color: GRAY,
-								cursor: "pointer",
-							}}
+							type="button"
+							className="flex-1 cursor-pointer border-none border-r border-border bg-transparent py-1.5 text-xs font-bold text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 						>
 							{btn.label}
 						</button>
@@ -491,13 +394,15 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 					<>
 						<button
 							onClick={function () { setConfirmDelete(false); }}
-							style={{ flex: 1, padding: "6px 0", background: "none", border: "none", borderRight: "1px solid " + BORD, fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, color: GRAY, cursor: "pointer" }}
+							type="button"
+							className="flex-1 cursor-pointer border-none bg-transparent py-1.5 text-xs font-bold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 border-r border-border text-muted-foreground"
 						>
 							Cancelar
 						</button>
 						<button
 							onClick={onDelete}
-							style={{ flex: 1, padding: "6px 0", background: ERBG, border: "none", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, color: ER, cursor: "pointer" }}
+							type="button"
+							className="flex-1 cursor-pointer border-none bg-transparent py-1.5 text-xs font-bold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 bg-[#fee2e2] text-destructive"
 						>
 							¿Confirmar?
 						</button>
@@ -505,7 +410,8 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 				) : (
 					<button
 						onClick={function () { setConfirmDelete(true); }}
-						style={{ flex: 1, padding: "6px 0", background: "none", border: "none", fontFamily: "'Open Sans',sans-serif", fontSize: 11, fontWeight: 700, color: ER, cursor: "pointer" }}
+						type="button"
+						className="flex-1 cursor-pointer border-none bg-transparent py-1.5 text-xs font-bold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 text-destructive"
 					>
 						Eliminar
 					</button>
@@ -516,6 +422,7 @@ function ModelCard({ model, isSelected, isEditing, onSelect, onEdit, onDuplicate
 }
 
 export function TabGuardados({ selectedId, onSelect, currency, tc }) {
+	const confirm = useConfirm();
 	const { models, upsert, remove, duplicate, resetToDefaults } = useModels();
 	const [editingId, setEditingId] = useState(null); // null | "new" | model.id
 	const { toast } = useToast();
@@ -546,13 +453,20 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 				actions={
 					<>
 						<Button size="sm" onClick={function () { setEditingId("new"); }}>+ Nuevo modelo</Button>
-						<Button size="sm" variant="outline" onClick={function () { if (window.confirm("¿Restaurar modelos por defecto? Se perderán los cambios.")) resetToDefaults(); }}>Restaurar defaults</Button>
+						<Button size="sm" variant="outline" onClick={async function () {
+							const ok = await confirm({
+								title: "¿Restaurar los modelos por defecto?",
+								description: "Se pierden todos los modelos que hayas creado o editado.",
+								confirmLabel: "Restaurar",
+							});
+							if (ok) resetToDefaults();
+						}}>Restaurar defaults</Button>
 					</>
 				}
 			/>
 
 			{/* Model list */}
-			<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>
+			<div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))]">
 				{models.map(function (model) {
 					return (
 						<ModelCard
@@ -596,15 +510,9 @@ export function TabGuardados({ selectedId, onSelect, currency, tc }) {
 			})()}
 
 			{models.length === 0 && (
-				<div style={{
-					textAlign: "center",
-					padding: "40px 20px",
-					background: BLUEL,
-					borderRadius: 12,
-					border: "1px dashed " + BORD,
-				}}>
-					<div style={os(13, 400, GRAY)}>No hay modelos guardados.</div>
-					<div style={Object.assign({}, os(11, 400, GRAY), { marginTop: 4 })}>Creá uno nuevo o restaurá los defaults.</div>
+				<div className="rounded-xl border border-dashed border-border bg-secondary px-5 py-10 text-center">
+					<div className="text-sm text-muted-foreground">No hay modelos guardados.</div>
+					<div className="mt-1 text-xs text-muted-foreground">Creá uno nuevo o restaurá los defaults.</div>
 				</div>
 			)}
 		</div>

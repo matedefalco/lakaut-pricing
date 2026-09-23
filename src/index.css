@@ -27,13 +27,13 @@
   --secondary: #eef0fb;
   --secondary-foreground: #3041d5;
   --muted: #f4f6fd;
-  --muted-foreground: #7f828e;
+  --muted-foreground: #666a78;
   --accent: #eef0fb;
   --accent-foreground: #3041d5;
-  --destructive: #dc2626;
+  --destructive: #cc2121;
   --destructive-foreground: #ffffff;
-  --success: #059669;
-  --warning: #c87a00;
+  --success: #047d58;
+  --warning: #9f6100;
   --border: #e2e5f1;
   --input: #dde0eb;
   --ring: #3041d5;
@@ -51,8 +51,17 @@
   --glass-bg-strong: rgba(255, 255, 255, 0.78);
   --glass-border: rgba(255, 255, 255, 0.65);
   --glass-blur: 20px;
-  --shadow-card: 0 1px 2px rgba(30, 32, 48, 0.04), 0 8px 24px -12px rgba(48, 65, 213, 0.10);
-  --shadow-float: 0 4px 12px rgba(30, 32, 48, 0.06), 0 16px 40px -12px rgba(48, 65, 213, 0.22);
+  /* ── Elevación · una sola escala neutra de tres niveles ──
+     Antes convivían tres sistemas: estas vars (tintadas de azul), la escala
+     default de Tailwind (shadow-xs/sm/md) y sombras arbitrarias también azules
+     en button.jsx. Tres lenguajes de profundidad sobre la misma superficie.
+     Ahora los tres niveles son neutros y multicapa, y los pasos de Tailwind se
+     redefinen abajo contra estos mismos valores: `shadow-xs` y `--shadow-control`
+     son el mismo milímetro de altura, se escriba como se escriba.
+     El azul queda reservado para lo que de verdad significa: foco y CTA. */
+  --shadow-control: 0px 2px 3px -1px rgba(0,0,0,0.1), 0px 1px 0px 0px rgba(25,28,33,0.02), 0px 0px 0px 1px rgba(25,28,33,0.08);
+  --shadow-card: 0px 0px 0px 1px rgba(0,0,0,0.06), 0px 1px 1px -0.5px rgba(0,0,0,0.06), 0px 3px 3px -1.5px rgba(0,0,0,0.06), 0px 6px 6px -3px rgba(0,0,0,0.06), 0px 12px 12px -6px rgba(0,0,0,0.06), 0px 24px 24px -12px rgba(0,0,0,0.06);
+  --shadow-float: 0 2.8px 2.2px rgba(0,0,0,0.034), 0 6.7px 5.3px rgba(0,0,0,0.048), 0 12.5px 10px rgba(0,0,0,0.06), 0 22.3px 17.9px rgba(0,0,0,0.072), 0 41.8px 33.4px rgba(0,0,0,0.086), 0 100px 80px rgba(0,0,0,0.12);
 
   /* ── Paleta secundaria ──
      El azul de marca marcaba nueve cosas distintas a la vez, así que dejó de
@@ -96,6 +105,22 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  /* ── Escala tipográfica · 11 / 13 / 16 / 20 / 26 / 32 ──
+     La app tenía seis tamaños metidos en 5px (9, 10, 11, 12, 13, 14): ratios de
+     1.08 a 1.1, que el ojo no separa. Seis pasos indistinguibles no son jerarquía.
+     Se redefinen los pasos de Tailwind para que las clases que ya se usan caigan
+     en una escala real (ratio >= 1.18), en vez de barrer 10k líneas a mano.
+     El piso sube de 10 a 11px: `text-[10px]` tenía 75 usos en labels y notas. */
+  --text-xs: 0.6875rem;   /* 11px · labels, notas, meta de tabla */
+  --text-sm: 0.8125rem;   /* 13px · cuerpo */
+  --text-base: 1rem;      /* 16px · título de sección */
+  --text-lg: 1.25rem;     /* 20px */
+  --text-xl: 1.625rem;    /* 26px */
+  --text-2xl: 2rem;       /* 32px · número grande del resultado */
+  --shadow-xs: var(--shadow-control);
+  --shadow-sm: var(--shadow-control);
+  --shadow-md: var(--shadow-card);
+  --shadow-lg: var(--shadow-float);
   --font-sans: "Open Sans", system-ui, sans-serif;
   --font-heading: "Montserrat", system-ui, sans-serif;
 }
@@ -148,6 +173,7 @@
     }
   }
 
+  .shadow-control { box-shadow: var(--shadow-control); }
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-float { box-shadow: var(--shadow-float); }
 
@@ -257,12 +283,16 @@
 
   /* Festejo al cruzar de nivel: un rebote corto con overshoot. El
      `prefers-reduced-motion` global ya lo neutraliza. */
+  /* Duraciones: el pop es un cambio de estado (260ms, dentro de la banda de
+     entrada) y el sheen es una celebración de una sola vez al subir de nivel,
+     no una transición de UI, así que se acorta a 500ms en vez de eliminarse:
+     el momento es deliberado, lo que sobraba era la lentitud. */
   @keyframes tier-pop {
     0%   { transform: scale(1); }
     35%  { transform: scale(1.04); }
     100% { transform: scale(1); }
   }
-  .animate-tier-pop { animation: tier-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .animate-tier-pop { animation: tier-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
 
   /* Brillo que barre el material del nivel una sola vez, para que el ascenso se
      lea como que el metal se "encendió". */
@@ -271,7 +301,7 @@
     25%  { opacity: 0.9; }
     100% { opacity: 0; transform: translateX(120%); }
   }
-  .animate-tier-sheen { animation: tier-sheen 900ms ease-out; }
+  .animate-tier-sheen { animation: tier-sheen 500ms ease-out; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 // no se distinguía sin leer. Ahora Packs es azul y Volumen violeta, con emoji.
 
 const SIZES = {
-	sm: { pad: "px-1.5 py-0.5", text: "text-[10px]", radius: 6, gap: "gap-1" },
-	md: { pad: "px-2 py-0.5", text: "text-[11px]", radius: 8, gap: "gap-1" },
+	sm: { pad: "px-1.5 py-0.5", text: "text-xs", radius: 6, gap: "gap-1" },
+	md: { pad: "px-2 py-0.5", text: "text-xs", radius: 8, gap: "gap-1" },
 };
 
 export function ChannelBadge({ channel, size = "md", showEmoji = true, className }) {

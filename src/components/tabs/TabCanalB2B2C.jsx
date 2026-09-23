@@ -5,12 +5,14 @@ import { getB2B2CSegment, b2b2cSegmentDriver, getVolumenSegment, volumenSegmentD
 import { dealStatus } from "@/lib/dealStatus";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
-import { buildProyeccion, buildEscalonadoFirmas, PROYECCION_DRIVERS, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
+import { buildProyeccion, buildEscalonadoFirmas, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
 import { CHANNELS, isDistribVol, resolveChannel, channelLabel } from "@/data/channelMeta";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ProyeccionSection } from "./b2b2c/ProyeccionSection";
+import { SegmentoSection } from "./b2b2c/SegmentoSection";
 import { Separator } from "@/components/ui/separator";
 import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
@@ -897,8 +899,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{nf > 0 && (
 						<div className="rounded-lg bg-sky-50 px-3 py-2">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
-								{ff > 0 && <span className="text-[11px] text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>}
+								<span className="text-xs font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
+								{ff > 0 && <span className="text-xs text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>}
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nf.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertFisicos} format={fMoney2} />} accent="primary" />
 							{firmasExtraFisica > 0 && <ResultRow label={(esIDC ? "Firmas sobre el cupo (" : "Firmas (") + firmasExtraFisica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasFisica} format={fMoney2} />} />}
@@ -907,8 +909,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{nj > 0 && (
 						<div className="rounded-lg bg-violet-50 px-3 py-2">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold text-violet-700">{esIDC ? "IDC jurídicas" : "Certificados jurídicos"}</span>
-								{fj > 0 && <span className="text-[11px] text-muted-foreground">{nj.toLocaleString("es-AR")} × {fj} firma{fj !== 1 ? "s" : ""}</span>}
+								<span className="text-xs font-semibold text-violet-700">{esIDC ? "IDC jurídicas" : "Certificados jurídicos"}</span>
+								{fj > 0 && <span className="text-xs text-muted-foreground">{nj.toLocaleString("es-AR")} × {fj} firma{fj !== 1 ? "s" : ""}</span>}
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney2} />} accent="primary" />
 							{firmasExtraJuridica > 0 && <ResultRow label={(esIDC ? "Firmas sobre el cupo (" : "Firmas (") + firmasExtraJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney2} />} />}
@@ -917,8 +919,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{fs > 0 && (
 						<div className="rounded-lg bg-amber-50 px-3 py-2">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold text-amber-700">Firmas sueltas</span>
-								<span className="text-[11px] text-muted-foreground">sin certificado</span>
+								<span className="text-xs font-semibold text-amber-700">Firmas sueltas</span>
+								<span className="text-xs text-muted-foreground">sin certificado</span>
 							</div>
 							<ResultRow label={"Firmas (" + fs.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasSueltas} format={fMoney2} />} accent="primary" />
 						</div>
@@ -944,8 +946,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{mostrarFormas && descNivelMonto > 0 && (
 						<div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 space-y-1">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Liquidación del descuento</span>
-								<span className="text-[10px] text-muted-foreground">{descLiq.label}</span>
+								<span className="text-xs font-semibold uppercase tracking-wide text-primary">Liquidación del descuento</span>
+								<span className="text-xs text-muted-foreground">{descLiq.label}</span>
 							</div>
 							{descLiq.esFull ? (
 								<>
@@ -982,8 +984,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{hayCondOfrecidas && (
 						<div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 space-y-1">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Condiciones que puede aprovechar</span>
-								<span className="text-[10px] text-muted-foreground">no afectan el total</span>
+								<span className="text-xs font-semibold uppercase tracking-wide text-primary">Condiciones que puede aprovechar</span>
+								<span className="text-xs text-muted-foreground">no afectan el total</span>
 							</div>
 							{leverRes.items.map(function (it) {
 								return (
@@ -996,7 +998,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						</div>
 					)}
 
-					<p className="text-[10px] text-muted-foreground">
+					<p className="text-xs text-muted-foreground">
 						{esIDC
 							? "Cada IDC incluye " + cupo + " firma" + (cupo === 1 ? "" : "s") + ". Firma sobre el cupo: " + fMoney2(precioFirmaExtraEff) + " c/u" + (overridePrecioFirma !== "" ? " · manual" : " · segmento") + "."
 							: esDistribVol
@@ -1006,12 +1008,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 					{markupBajoMin && (
 						<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-							<div className="text-[11px] font-semibold text-destructive">Markup bajo el mínimo ({markupMin.toFixed(2)}x)</div>
-							<p className="text-[10px] text-muted-foreground mt-0.5">
+							<div className="text-xs font-semibold text-destructive">Markup bajo el mínimo ({markupMin.toFixed(2)}x)</div>
+							<p className="text-xs text-muted-foreground mt-0.5">
 								Esta cotización factura {fMarkup(markup)} su costo variable ({fMoney(costoTotal)}). Subí el precio, bajá el cupo de firmas incluidas o ajustá las condiciones para poder guardar y exportar.
 							</p>
 							{markupSeg != null && markupSeg < markupMin && (
-								<p className="text-[10px] text-muted-foreground mt-1">
+								<p className="text-xs text-muted-foreground mt-1">
 									El precio de tabla del segmento {segLabel} ya no cierra por sí solo: con {cupo} firma{cupo === 1 ? "" : "s"} incluidas el bundle cuesta {fMoney2(costoBundle)} y el mínimo viable es {fMoney2(precioMinSeg)} por IDC.
 								</p>
 							)}
@@ -1019,7 +1021,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					)}
 				</div>
 			) : (
-				<p className="text-[11px] text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
+				<p className="text-xs text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
 			)}
 		</ResultPanel>
 
@@ -1028,23 +1030,23 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		{hasVolume && (
 			<div className="rounded-xl border border-border bg-card p-4 shadow-float">
 				<div className="mb-3">
-					<span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rentabilidad · uso interno</span>
+					<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rentabilidad · uso interno</span>
 				</div>
 				<div className="mb-3 grid grid-cols-3 gap-3">
 					<div>
-						<div className="text-[10px] text-muted-foreground">Markup sobre costo</div>
+						<div className="text-xs text-muted-foreground">Markup sobre costo</div>
 						<div className={"font-heading text-base font-semibold tabular-nums " + markupClass(markup, markupMin)}>{fMarkup(markup)}</div>
-						<div className="text-[10px] text-muted-foreground">mín. {markupMin.toFixed(2)}x · {markupWord(markup, markupMin)}</div>
+						<div className="text-xs text-muted-foreground">mín. {markupMin.toFixed(2)}x · {markupWord(markup, markupMin)}</div>
 					</div>
 					<div>
-						<div className="text-[10px] text-muted-foreground">Contribución marginal</div>
+						<div className="text-xs text-muted-foreground">Contribución marginal</div>
 						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={margen} format={fMoney2} /></div>
-						<div className="text-[10px] text-muted-foreground">{(margenPct * 100).toFixed(0)}% sobre ingreso</div>
+						<div className="text-xs text-muted-foreground">{(margenPct * 100).toFixed(0)}% sobre ingreso</div>
 					</div>
 					<div>
-						<div className="text-[10px] text-muted-foreground">Costo variable total</div>
+						<div className="text-xs text-muted-foreground">Costo variable total</div>
 						<div className="font-heading text-base font-semibold tabular-nums"><AnimatedNumber value={costoTotal} format={fMoney2} /></div>
-						<div className="text-[10px] text-muted-foreground">{idc.toLocaleString("es-AR")} {esIDC ? "IDC" : "certs"} + {firmasTotales.toLocaleString("es-AR")} firmas{firmasBonif > 0 ? " (" + firmasBonif.toLocaleString("es-AR") + " bonificadas)" : ""}</div>
+						<div className="text-xs text-muted-foreground">{idc.toLocaleString("es-AR")} {esIDC ? "IDC" : "certs"} + {firmasTotales.toLocaleString("es-AR")} firmas{firmasBonif > 0 ? " (" + firmasBonif.toLocaleString("es-AR") + " bonificadas)" : ""}</div>
 					</div>
 				</div>
 				<div className="space-y-1 border-t border-border/60 pt-2">
@@ -1088,9 +1090,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 					</Label>
 					<ClientSelector clients={clientsApi?.clients || []} value={selectedClient} onChange={setSelectedClient} />
-					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
+					{!selectedClient && <p className="text-xs text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
 					{selectedClient && selectedClient.channel && resolveChannel(selectedClient.channel) !== resolveChannel(canal) && (
-						<p className="text-[11px] text-[var(--warning)]">
+						<p className="text-xs text-[var(--warning)]">
 							Este cliente es del canal <span className="font-semibold">{channelLabel(selectedClient.channel)}</span>. Podés cotizarlo acá igual
 							{onNavChannel && <> o <button type="button" onClick={function () { onNavChannel(resolveChannel(selectedClient.channel)); }} className="font-semibold underline underline-offset-2 hover:opacity-80">cotizar en {channelLabel(selectedClient.channel)}</button></>}.
 						</p>
@@ -1121,7 +1123,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							);
 						})}
 					</div>
-					{!conApi && <p className="text-[11px] text-muted-foreground">Sin integración {intgTerm}: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
+					{!conApi && <p className="text-xs text-muted-foreground">Sin integración {intgTerm}: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
 				</div>
 
 				<Separator />
@@ -1132,7 +1134,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<div className="mb-2.5 flex items-center gap-1.5">
 							<span className="inline-block size-2 rounded-full bg-sky-500" />
 							<span className="text-xs font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
-							<span className="text-[10px] text-muted-foreground">· personas</span>
+							<span className="text-xs text-muted-foreground">· personas</span>
 						</div>
 						<div className="grid grid-cols-2 gap-2.5">
 							<NumberField label={esIDC ? "Cantidad / mes" : "Cantidad"} value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" />
@@ -1143,7 +1145,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<div className="mb-2.5 flex items-center gap-1.5">
 							<span className="inline-block size-2 rounded-full bg-violet-500" />
 							<span className="text-xs font-semibold text-violet-700">{esIDC ? "IDC jurídicas" : "Certificados jurídicos"}</span>
-							<span className="text-[10px] text-muted-foreground">· empresas</span>
+							<span className="text-xs text-muted-foreground">· empresas</span>
 						</div>
 						<div className="grid grid-cols-2 gap-2.5">
 							<NumberField label={esIDC ? "Cantidad / mes" : "Cantidad"} value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
@@ -1160,7 +1162,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<div className="mb-2.5 flex items-center gap-1.5">
 							<span className="inline-block size-2 rounded-full bg-amber-500" />
 							<span className="text-xs font-semibold text-amber-700">Firmas sueltas</span>
-							<span className="text-[10px] text-muted-foreground">· sin certificado</span>
+							<span className="text-xs text-muted-foreground">· sin certificado</span>
 						</div>
 						<div className="grid grid-cols-2 gap-2.5">
 							<NumberField
@@ -1183,18 +1185,18 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Precio por IDC" : "Precio por certificado"}</Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioIDC) : "—"}</span>
-							<span className="ml-2 text-[11px] text-muted-foreground truncate">{hasVolume ? (esDistribVol ? "nivel " + segLabel : "segmento " + segLabel) + (overridePrecioCert !== "" ? " · manual" : "") : (esIDC ? "según el volumen de IDC" : esDistribVol ? "certificado bonificado" : "según el compromiso")}</span>
+							<span className="ml-2 text-xs text-muted-foreground truncate">{hasVolume ? (esDistribVol ? "nivel " + segLabel : "segmento " + segLabel) + (overridePrecioCert !== "" ? " · manual" : "") : (esIDC ? "según el volumen de IDC" : esDistribVol ? "certificado bonificado" : "según el compromiso")}</span>
 						</div>
-						<span className="text-[11px] text-muted-foreground">{esIDC ? "Escala por volumen mensual de IDC." : esDistribVol ? "El certificado va siempre bonificado (USD 0)." : "Precio base menos el descuento del segmento."}</span>
+						<span className="text-xs text-muted-foreground">{esIDC ? "Escala por volumen mensual de IDC." : esDistribVol ? "El certificado va siempre bonificado (USD 0)." : "Precio base menos el descuento del segmento."}</span>
 					</div>
 					{esIDC ? (
 						<div className="flex flex-col gap-1.5">
 							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Firmas incluidas por IDC</Label>
 							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 								<span className="font-semibold tabular-nums">{cupo}</span>
-								<span className="ml-2 text-[11px] text-muted-foreground truncate">{hasVolume && firmasExtra > 0 ? firmasExtra.toLocaleString("es-AR") + " sobre el cupo" : "cupo del bundle"}</span>
+								<span className="ml-2 text-xs text-muted-foreground truncate">{hasVolume && firmasExtra > 0 ? firmasExtra.toLocaleString("es-AR") + " sobre el cupo" : "cupo del bundle"}</span>
 							</div>
-							<span className="text-[11px] text-muted-foreground">Firma inicial de la institución más firmas de activación.</span>
+							<span className="text-xs text-muted-foreground">Firma inicial de la institución más firmas de activación.</span>
 						</div>
 					) : (
 						<div className="flex flex-col gap-1.5">
@@ -1202,16 +1204,16 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 								<span className="font-semibold tabular-nums">{segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : "sin descuento"}</span>
 							</div>
-							<span className="text-[11px] text-muted-foreground">Se aplica por igual al certificado y a la firma.</span>
+							<span className="text-xs text-muted-foreground">Se aplica por igual al certificado y a la firma.</span>
 						</div>
 					)}
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Firma sobre el cupo" : "Precio por firma"}</Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{fMoney2(precioFirmaExtraEff)}</span>
-							<span className="ml-2 text-[11px] text-muted-foreground truncate">{overridePrecioFirma !== "" ? "manual" : "segmento"}</span>
+							<span className="ml-2 text-xs text-muted-foreground truncate">{overridePrecioFirma !== "" ? "manual" : "segmento"}</span>
 						</div>
-						<span className="text-[11px] text-muted-foreground">{esIDC ? "Se factura por unidad a partir de la firma " + (cupo + 1) + " de cada IDC." : "Cada firma se factura por unidad."}</span>
+						<span className="text-xs text-muted-foreground">{esIDC ? "Se factura por unidad a partir de la firma " + (cupo + 1) + " de cada IDC." : "Cada firma se factura por unidad."}</span>
 					</div>
 				</div>
 			</FieldGroup>
@@ -1227,9 +1229,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Fee de implementación</Label>
 									<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 										<span className="font-semibold tabular-nums">sin fee</span>
-										<span className="ml-2 text-[11px] text-muted-foreground truncate">nivel {segLabel}</span>
+										<span className="ml-2 text-xs text-muted-foreground truncate">nivel {segLabel}</span>
 									</div>
-									<span className="text-[11px] text-muted-foreground">El fee de implementación solo aplica a los niveles Azul y Bronce.</span>
+									<span className="text-xs text-muted-foreground">El fee de implementación solo aplica a los niveles Azul y Bronce.</span>
 								</div>
 							)}
 						<div className="flex flex-col gap-1.5">
@@ -1239,7 +1241,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
 									<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
 									Bonificar SLA para este cliente
-									{slaBonificado && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
+									{slaBonificado && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">bonificado</Badge>}
 								</label>
 							)}
 						</div>
@@ -1252,7 +1254,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				    incentivos que el cliente puede aprovechar. No bajan el total. */}
 				<div className="flex flex-col gap-2">
 					<span className="text-sm font-medium">Condiciones comerciales que ofrecés</span>
-					<p className="text-[11px] text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
+					<p className="text-xs text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
 					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
 				</div>
 
@@ -1265,7 +1267,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<>
 						<div className="flex flex-col gap-2.5">
 							<span className="text-sm font-medium">Forma de liquidación del descuento</span>
-							<p className="text-[11px] text-muted-foreground">
+							<p className="text-xs text-muted-foreground">
 								{descNivelMonto > 0
 									? "Elegí cómo se entrega el descuento de nivel de " + fMoney(descNivelMonto) + ". El neto es el mismo en todas; cambia el cash flow y el compromiso que se le pide al cliente."
 									: "En este nivel no hay descuento que liquidar (0%). La opción elegida solo fija la condición de pago en la propuesta."}
@@ -1276,7 +1278,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 									if (!opciones.length) return null;
 									return (
 										<div key={grupo} className="flex flex-col gap-1">
-											<span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">{grupo}</span>
+											<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">{grupo}</span>
 											{opciones.map(function (o) {
 												const active = descOpcionSel === o.id;
 												return (
@@ -1284,7 +1286,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 														<span className={"mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors " + (active ? "border-primary bg-primary" : "border-muted-foreground/40")} />
 														<span className="flex flex-col gap-0.5">
 															<span className={"text-xs font-medium " + (active ? "text-primary" : "text-foreground")}>{o.label}</span>
-															<span className="text-[11px] text-muted-foreground leading-snug">{o.desc}</span>
+															<span className="text-xs text-muted-foreground leading-snug">{o.desc}</span>
 														</span>
 													</button>
 												);
@@ -1294,7 +1296,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								})}
 							</div>
 							{hasVolume && descNivelMonto > 0 && (
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-xs text-muted-foreground">
 									{descLiq.esFull
 										? "Se factura " + fMoney(descLiq.cargoAnioFull) + " a precio de lista durante el año" + (descLiq.sub === "firmas" ? "; al cierre se bonifican " + descLiq.firmasCierre.toLocaleString("es-AR") + " firmas (costo " + fMoney(descLiq.costoFirmasCierre) + ", baja el margen)." : "; al cierre se acredita " + fMoney(descLiq.rebate) + ".")
 										: descForma === "C"
@@ -1313,9 +1315,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<label className="flex items-center gap-2.5 cursor-pointer select-none">
 						<input type="checkbox" checked={showBonif} onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }} className="rounded" />
 						<span className="text-sm font-medium">Bonificar firmas</span>
-						{firmasBonif > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge>}
+						{firmasBonif > 0 && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge>}
 					</label>
-					{!showBonif && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Regalá firmas que estén por encima del cupo del bundle: son las únicas que se facturan por unidad.</p>}
+					{!showBonif && <p className="text-xs text-muted-foreground pl-6">Opcional. Regalá firmas que estén por encima del cupo del bundle: son las únicas que se facturan por unidad.</p>}
 					{showBonif && (
 						<div className="pl-6 border-l-2 border-muted ml-1 space-y-2">
 							<div className="max-w-xs">
@@ -1328,122 +1330,41 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								</p>
 							)}
 							{Number(firmasBonificadas) > firmasExtra && (
-								<p className="text-[11px] text-[var(--warning)]">Solo se pueden bonificar las {firmasExtra.toLocaleString("es-AR")} firmas que exceden el cupo; las del cupo ya van sin cargo.</p>
+								<p className="text-xs text-[var(--warning)]">Solo se pueden bonificar las {firmasExtra.toLocaleString("es-AR")} firmas que exceden el cupo; las del cupo ya van sin cargo.</p>
 							)}
-							<p className="text-[11px] text-muted-foreground">El segmento se sigue calculando sobre el volumen completo de IDC. El costo variable de las firmas bonificadas se paga igual, así que baja el markup.</p>
+							<p className="text-xs text-muted-foreground">El segmento se sigue calculando sobre el volumen completo de IDC. El costo variable de las firmas bonificadas se paga igual, así que baja el markup.</p>
 						</div>
 					)}
 				</div>
 
 				<Separator />
 
-				{/* Segmento y proyección. En IDC el segmento sale del volumen del paso 2 y acá
-				    solo se muestra; en Volumen lo define el compromiso del contrato en USD, que
-				    se sugiere como facturación a lista × meses de vinculación y se puede
-				    sobrescribir cuando el cliente compromete un volumen distinto al cotizado. */}
-				<div className="flex flex-col gap-2">
-					<span className="text-sm font-medium">{esIDC ? "Segmento y proyección" : esDistribVol ? "Nivel del distribuidor" : "Compromiso del contrato"}</span>
-					<p className="text-[11px] text-muted-foreground">
-						{esIDC
-							? "El segmento es el MAYOR entre dos ejes: el volumen mensual de IDC del paso 2 y la facturación de la ventana medida a precio Start Up (referencia que evita la circularidad precio↔segmento). Lo que llegue al segmento más grande, manda."
-							: esDistribVol
-								? "El nivel (Azul→Platinum) se alcanza por el mayor entre la facturación a precio base (con compromiso anual, servicio × 12; sin compromiso, el período mensual × 1) y los certificados activos del socio (que cuentan solo con compromiso anual). A mayor nivel, mayor descuento sobre la firma (el certificado va bonificado). El descuento se aplica en ambas condiciones: diferido con compromiso anual, o directo en cada factura sin compromiso."
-								: "El segmento es el MAYOR entre dos ejes de esta cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (compromiso del contrato). Lo que llegue al segmento más alto, manda."}
-					</p>
-					{/* Modalidad de facturación (IDC y Volumen): windowea el eje de facturación.
-					    En Distribuidores-Volumen el nivel sale del compromiso anual declarado,
-					    así que la modalidad no aplica. */}
-					{!esDistribVol && (
-						<div className="flex flex-col gap-1.5">
-							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de facturación</Label>
-							<div className="inline-flex w-fit rounded-md border border-border bg-muted/30 p-0.5">
-								{[{ id: "unico", label: "Consumo único" }, { id: "anual", label: "Anual" }].map(function (o) {
-									const active = modalidadFact === o.id;
-									return (
-										<button key={o.id} type="button" onClick={function () { setModalidadFact(o.id); }} className={"px-3 py-1 rounded text-xs font-medium transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{o.label}</button>
-									);
-								})}
-							</div>
-							<span className="text-[11px] text-muted-foreground">{modalidadFact === "unico" ? "Compra puntual: la facturación se mide sobre ese único período (× 1)." : "Contrato anual: la facturación se anualiza (× " + mesesVinculacion + " " + (mesesVinculacion === 1 ? "mes" : "meses") + " de vinculación)."}</span>
-						</div>
-					)}
-
-					{esDistribVol ? (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">{distribConCompromiso ? "Facturación anual (compromiso)" : "Facturación mensual"} <span className="normal-case tracking-normal font-normal">(calculado)</span></Label>
-								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-									<span className="font-semibold tabular-nums">{hasVolume ? fMoney(facturacionNivelDistrib) : "—"}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">{distribConCompromiso ? "Servicio mensual a precio base × 12. Asigna el nivel junto con los certificados activos (gana el mayor)." : "Servicio del período a precio base (× 1). Asigna el nivel. Con compromiso anual se anualiza (× 12) y suman los certificados activos."}</span>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Nivel alcanzado</Label>
-								<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
-									{hasVolume ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={"−" + Math.round(segDesc * 100) + "%"} /> : <span className="text-sm text-muted-foreground/60">—</span>}
-									<span className="text-[11px] text-muted-foreground truncate">{!hasVolume ? "cargá volumen" : segDriver === "certificados" ? "por certificados activos" : segDriver === "ambos" ? "por facturación y certificados" : distribConCompromiso ? "por facturación anual " + fMoney(facturacionNivelDistrib) : "por facturación mensual " + fMoney(facturacionNivelDistrib)}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">{distribConCompromiso ? "Descuento sobre la firma, liquidado según la forma de pago." : "Descuento directo sobre la firma, sin compromiso de permanencia anual."}</span>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos <span className="normal-case tracking-normal font-normal">{distribConCompromiso ? "(asigna nivel)" : "(informativo sin compromiso)"}</span></Label>
-								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-									<span className="font-semibold tabular-nums">{certsActivosNum.toLocaleString("es-AR")}</span>
-									<span className="ml-2 text-[11px] text-muted-foreground truncate">{certsHistoricos.toLocaleString("es-AR")} + {idc.toLocaleString("es-AR")} de esta cotización</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">{distribConCompromiso ? "Suben el nivel si superan el que da la facturación (gana el mayor)." : "Solo suben el nivel con compromiso anual."}</span>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Facturación mensual</Label>
-								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-									<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(revSinFee) : "—"}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">Servicio + SLA, sin el fee.</span>
-							</div>
-						</div>
-					) : (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "IDC / mes" : "Firmas totales"}</Label>
-								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-									<span className="font-semibold tabular-nums">{(esIDC ? idc : firmasTotales).toLocaleString("es-AR")}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">{esIDC ? "eje de volumen · identidades por mes" : "eje de volumen · firmas por certificado + firmas sueltas"}</span>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Facturación del segmento</Label>
-								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-									<span className="font-semibold tabular-nums">{hasVolume ? fMoney(facturacionEje) : "—"}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">{hasVolume ? (esIDC ? "eje de facturación · a precio Start Up × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses") : "eje de facturación · " + fMoney(facturacionAtList) + " a lista × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses")) : "se calcula del volumen cotizado"}</span>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>
-								<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
-									{hasVolume ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={esIDC ? fMoney2(segPrice.precioIDC) : (segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null)} /> : <span className="text-sm text-muted-foreground/40">—</span>}
-									<span className="text-[11px] text-muted-foreground truncate">{hasVolume ? (esIDC ? (segDriver === "facturacion" ? "por facturación " + fMoney(facturacionEje) : segDriver === "idc" ? "por " + idc.toLocaleString("es-AR") + " IDC/mes" : "por IDC/mes y facturación") : segDriver === "facturacion" ? "por facturación " + fMoney(facturacionEje) : segDriver === "firmas" ? "por " + firmasTotales.toLocaleString("es-AR") + " firmas" : "por firmas y facturación") : "cargá volumen"}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">{esIDC ? "Precio de tabla del segmento." : "Descuento sobre los dos precios de lista."}</span>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Facturación mensual</Label>
-								<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-									<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(revSinFee) : "—"}</span>
-								</div>
-								<span className="text-[11px] text-muted-foreground">Servicio + SLA, sin el fee.</span>
-							</div>
-							{esIDC && (
-								<div className="flex flex-col gap-1.5">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Por la vinculación</Label>
-									<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-										<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(revSinFee * mesesVinculacion + feeAplicado) : "—"}</span>
-									</div>
-									<span className="text-[11px] text-muted-foreground">{mesesVinculacion} {mesesVinculacion === 1 ? "mes" : "meses"} + fee.</span>
-								</div>
-							)}
-						</div>
-					)}
-				</div>
+				<SegmentoSection
+					esIDC={esIDC}
+					esDistribVol={esDistribVol}
+					hasVolume={hasVolume}
+					seg={seg}
+					segDesc={segDesc}
+					segDriver={segDriver}
+					segmentList={segmentList}
+					segPrice={segPrice}
+					distribConCompromiso={distribConCompromiso}
+					certsActivosNum={certsActivosNum}
+					certsHistoricos={certsHistoricos}
+					facturacionAtList={facturacionAtList}
+					facturacionEje={facturacionEje}
+					facturacionNivelDistrib={facturacionNivelDistrib}
+					firmasTotales={firmasTotales}
+					feeAplicado={feeAplicado}
+					idc={idc}
+					revSinFee={revSinFee}
+					mesesVentanaFact={mesesVentanaFact}
+					mesesVinculacion={mesesVinculacion}
+					modalidadFact={modalidadFact}
+					setModalidadFact={setModalidadFact}
+					fMoney={fMoney}
+					fMoney2={fMoney2}
+				/>
 
 				<Separator />
 
@@ -1452,7 +1373,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<label className="flex items-center gap-2.5 cursor-pointer select-none">
 						<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
 						<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
-						{abono && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
+						{abono && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
 					</label>
 					{abono && (
 						<div className="pl-6 border-l-2 border-muted ml-1 flex items-center gap-2">
@@ -1478,12 +1399,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					<label className="flex items-center gap-2.5 cursor-pointer select-none">
 						<input type="checkbox" checked={showOverrides} onChange={function (e) { setShowOverrides(e.target.checked); if (!e.target.checked) { setOverridePrecioCert(""); setOverridePrecioFirma(""); } }} className="rounded" />
 						<span className="text-sm font-medium">Ajuste de precios personalizado</span>
-						{overrideActive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
+						{overrideActive && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
 					</label>
-					{!showOverrides && <p className="text-[11px] text-muted-foreground pl-6">Opcional. Fijá a mano el precio de certificado o de firma para esta cotización; lo que dejes vacío usa el precio del segmento.</p>}
+					{!showOverrides && <p className="text-xs text-muted-foreground pl-6">Opcional. Fijá a mano el precio de certificado o de firma para esta cotización; lo que dejes vacío usa el precio del segmento.</p>}
 					{showOverrides && (
 						<div className="space-y-2">
-							<p className="text-[11px] text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
+							<p className="text-xs text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
 							<div className="grid grid-cols-2 gap-3 max-w-sm">
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
@@ -1500,201 +1421,21 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 									</div>
 								</div>
 							</div>
-							<p className="text-[10px] text-muted-foreground">Precio efectivo: IDC {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma sobre el cupo {fMoney2(precioFirmaExtraEff)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
+							<p className="text-xs text-muted-foreground">Precio efectivo: IDC {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma sobre el cupo {fMoney2(precioFirmaExtraEff)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
 						</div>
 					)}
 				</div>
 				<Separator />
 
-				{/* Proyección de crecimiento (opcional): override por propuesta que suma
-				    al PDF una tabla de precios por volumen alcanzado. */}
-				<div className="flex flex-col gap-3">
-					<label className="flex items-center gap-2.5 cursor-pointer select-none">
-						<input type="checkbox" checked={proyEnabled} onChange={function (e) { setProyEnabled(e.target.checked); }} className="rounded" />
-						<span className="text-sm font-medium">{esIDC ? "Proyección de crecimiento en la propuesta" : "Escalonado de crecimiento en la propuesta"}</span>
-						{proyEnabled && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
-						{proyEnabled && !esIDC && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">{esDistribVol ? "según niveles" : (proyCustom ? "personalizado" : "estándar")}</Badge>}
-					</label>
-					{!proyEnabled && <p className="text-[11px] text-muted-foreground pl-6">{esIDC ? "Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo." : esDistribVol ? "Opcional. Agrega al PDF un escalonado derivado de los niveles de Distribuidores-Volumen: una fila por nivel, alineada con el descuento que alcanza la cotización." : "Opcional. Agrega al PDF el escalonado estándar de precios por volumen de firmas; podés ajustarlo para esta cotización puntual."}</p>}
-
-				{proyEnabled && (esIDC ? (
-					<div className="space-y-4">
-						<p className="text-[11px] text-muted-foreground">
-							Parte del volumen y el precio de esta cotización y muestra escalones crecientes con mejor precio. Es un override solo para esta propuesta: no cambia tu segmentación.
-						</p>
-
-						{/* Driver: qué escala en cada escalón */}
-						<div className="flex flex-col gap-1.5">
-							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Qué crece en cada escalón</Label>
-							<div className="flex gap-1 flex-wrap">
-								{PROYECCION_DRIVERS.map(function (d) {
-									const active = proyDriver === d.id;
-									return (
-										<button key={d.id} onClick={function () { changeDriver(d.id); }} className={"px-2.5 py-1 rounded-md text-xs transition-colors " + (active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{d.label}</button>
-									);
-								})}
-							</div>
-							<span className="text-[11px] text-muted-foreground">{(PROYECCION_DRIVERS.find(function (d) { return d.id === proyDriver; }) || {}).desc}</span>
-						</div>
-
-						{/* Escalones editables */}
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Escalones</Label>
-								<button onClick={resetSteps} className="text-[11px] text-muted-foreground hover:text-foreground">restaurar (5/10/25/50%)</button>
-							</div>
-							<div className="space-y-1.5">
-								{proySteps.map(function (s, i) {
-									return (
-										<div key={i} className="flex items-end gap-2 flex-wrap">
-											{proyDriver === "manual" ? (
-												<>
-													<div className="flex flex-col gap-1">
-														<span className="text-[10px] text-muted-foreground">Certificados</span>
-														<Input type="number" min={0} value={s.idc != null ? s.idc : ""} onChange={function (e) { updateStep(i, { idc: e.target.value }); }} className="h-8 w-28 text-sm tabular-nums" />
-													</div>
-													<div className="flex flex-col gap-1">
-														<span className="text-[10px] text-muted-foreground">Firmas</span>
-														<Input type="number" min={0} value={s.firmas != null ? s.firmas : ""} onChange={function (e) { updateStep(i, { firmas: e.target.value }); }} className="h-8 w-28 text-sm tabular-nums" />
-													</div>
-												</>
-											) : (
-												<div className="flex flex-col gap-1">
-													<span className="text-[10px] text-muted-foreground">Crecimiento</span>
-													<div className="flex items-center">
-														<span className="text-xs text-muted-foreground mr-1">+</span>
-														<Input type="number" min={0} value={s.pct} onChange={function (e) { updateStep(i, { pct: e.target.value }); }} className="h-8 w-20 text-sm tabular-nums" />
-														<span className="text-xs text-muted-foreground ml-1">%</span>
-													</div>
-												</div>
-											)}
-											<div className="flex flex-col gap-1">
-												<span className="text-[10px] text-muted-foreground">Descuento</span>
-												<div className="flex items-center">
-													<span className="text-xs text-muted-foreground mr-1">−</span>
-													<Input type="number" min={0} max={100} value={s.descuento} onChange={function (e) { updateStep(i, { descuento: e.target.value }); }} className="h-8 w-20 text-sm tabular-nums" />
-													<span className="text-xs text-muted-foreground ml-1">%</span>
-												</div>
-											</div>
-											<button onClick={function () { removeStep(i); }} className="h-8 px-2 text-muted-foreground hover:text-destructive text-xs shrink-0" title="Quitar escalón">✕</button>
-										</div>
-									);
-								})}
-							</div>
-							<button onClick={addStep} className="text-xs font-medium text-primary hover:underline">+ agregar escalón</button>
-						</div>
-
-						{/* Preview de la tabla que va al PDF */}
-						{hasVolume ? (
-							<div className="rounded-lg border border-border overflow-hidden">
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Escenario</TableHead>
-											<TableHead>Volumen</TableHead>
-											<TableHead className="text-right">/ cert</TableHead>
-											<TableHead className="text-right">/ firma</TableHead>
-											<TableHead className="text-right">Costo est.</TableHead>
-											<TableHead className="text-right">Ahorro</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{proyRows.map(function (r, i) {
-											const isBase = i === 0;
-											const isTarget = proyRows.length > 1 && i === proyRows.length - 1;
-											return (
-												<TableRow key={i} className={isTarget ? "bg-primary/5" : ""}>
-													<TableCell className="font-medium">{isBase ? "Actual" : "+" + r.pct + "%"}{isTarget ? <span className="ml-1 text-[10px] text-primary font-semibold">objetivo</span> : null}</TableCell>
-													<TableCell className="text-muted-foreground text-xs tabular-nums">{r.idc.toLocaleString("es-AR")} cert{r.firmas > 0 ? " · " + r.firmas.toLocaleString("es-AR") + " firmas" : ""}</TableCell>
-													<TableCell className="text-right tabular-nums">{fMoney2(r.precioCert)}</TableCell>
-													<TableCell className="text-right tabular-nums">{fMoney2(r.precioFirma)}</TableCell>
-													<TableCell className="text-right tabular-nums font-semibold">{esDistribVol ? (r.firmasHasta != null ? fMoney(r.firmasHasta * r.precioFirma) : "—") : fMoney(r.costo)}</TableCell>
-													<TableCell className="text-right tabular-nums text-[var(--success)]">{isBase ? "—" : fMoney(r.ahorroMonto) + " (" + (r.ahorroPct * 100).toFixed(0) + "%)"}</TableCell>
-												</TableRow>
-											);
-										})}
-									</TableBody>
-								</Table>
-							</div>
-						) : (
-							<p className="text-[11px] text-muted-foreground">Cargá certificados para ver la proyección.</p>
-						)}
-						<p className="text-[10px] text-muted-foreground">Costo estimado = volumen de certificados y firmas a ese escalón (sin fee ni SLA). El descuento se aplica al precio de cert y de firma por igual.</p>
-						</div>
-					) : (
-					<div className="space-y-4">
-						<p className="text-[11px] text-muted-foreground">
-							{esDistribVol
-								? <>Escalonado derivado de los niveles: una fila por nivel (Azul a Platinum) con su rango de firmas y su descuento sobre el precio base de la firma ({fMoney2(baseCanal.firma)}). El rango de firmas de cada nivel es de referencia; el nivel que aplica lo define el mayor entre la facturación (windoweada por la condición comercial) y los certificados activos. Se ajusta en Config, niveles de Distribuidores-Volumen.</>
-								: <>Escala estándar de precios por cantidad de firmas: el mismo escalonado para todas las propuestas. El precio por firma de cada escalón sale del precio base ({fMoney2(baseCanal.firma)}). {proyCustom ? "Personalizaste el escalonado para esta propuesta." : "Se toma de la config; podés ajustarlo acá para esta propuesta."}</>}
-						</p>
-
-						{/* Escalones editables (firmas absolutas). En Distribuidores-Volumen el escalonado
-						    se deriva de los niveles y no se edita a mano acá. */}
-						{!esDistribVol && (
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Escalones (firmas → descuento)</Label>
-								<button onClick={resetSteps} className="text-[11px] text-muted-foreground hover:text-foreground">restaurar estándar</button>
-							</div>
-							<div className="space-y-1.5">
-								{proySteps.map(function (s, i) {
-									return (
-										<div key={i} className="flex items-end gap-2 flex-wrap">
-											<div className="flex flex-col gap-1">
-												<span className="text-[10px] text-muted-foreground">Desde firmas</span>
-												<Input type="number" min={0} value={s.firmas != null ? s.firmas : ""} onChange={function (e) { updateStep(i, { firmas: e.target.value }); }} className="h-8 w-32 text-sm tabular-nums" />
-											</div>
-											<div className="flex flex-col gap-1">
-												<span className="text-[10px] text-muted-foreground">Descuento</span>
-												<div className="flex items-center">
-													<span className="text-xs text-muted-foreground mr-1">−</span>
-													<Input type="number" min={0} max={100} value={s.descuento} onChange={function (e) { updateStep(i, { descuento: e.target.value }); }} className="h-8 w-20 text-sm tabular-nums" />
-													<span className="text-xs text-muted-foreground ml-1">%</span>
-												</div>
-											</div>
-											<div className="flex flex-col gap-1">
-												<span className="text-[10px] text-muted-foreground">Precio / firma</span>
-												<div className="flex h-8 items-center rounded-md border border-dashed border-border bg-muted/30 px-2 text-sm tabular-nums">{fMoney2(baseCanal.firma * (1 - Math.min(100, Math.max(0, Number(s.descuento) || 0)) / 100))}</div>
-											</div>
-											<button onClick={function () { removeStep(i); }} className="h-8 px-2 text-muted-foreground hover:text-destructive text-xs shrink-0" title="Quitar escalón">✕</button>
-										</div>
-									);
-								})}
-							</div>
-							<button onClick={addStep} className="text-xs font-medium text-primary hover:underline">+ agregar escalón</button>
-						</div>
-					)}
-
-						{/* Preview del escalonado que va al PDF */}
-						<div className="rounded-lg border border-border overflow-hidden">
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{esDistribVol ? "Nivel · firmas" : "Volumen de firmas"}</TableHead>
-										<TableHead className="text-right">Descuento</TableHead>
-										<TableHead className="text-right">/ firma</TableHead>
-										<TableHead className="text-right">Costo est.</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{escalonadoRows.map(function (r, i) {
-										return (
-											<TableRow key={i} className={r.actual ? "bg-primary/5" : ""}>
-												<TableCell className="font-medium tabular-nums">{esDistribVol ? (r.firmasHasta != null ? r.firmas.toLocaleString("es-AR") + "–" + r.firmasHasta.toLocaleString("es-AR") : r.firmas.toLocaleString("es-AR") + "+") : r.firmas.toLocaleString("es-AR")}{r.actual ? <span className="ml-1 text-[10px] text-primary font-semibold">{esDistribVol ? "tu nivel" : "tu volumen"}</span> : null}</TableCell>
-												<TableCell className="text-right tabular-nums">{r.descuento > 0 ? "−" + r.descuento + "%" : "—"}</TableCell>
-												<TableCell className="text-right tabular-nums">{fMoney2(r.precioFirma)}</TableCell>
-												<TableCell className="text-right tabular-nums font-semibold">{esDistribVol ? (r.firmasHasta != null ? fMoney(r.firmasHasta * r.precioFirma) : "—") : fMoney(r.costo)}</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
-						</div>
-						<p className="text-[10px] text-muted-foreground">{esDistribVol ? "Una fila por nivel (Azul a Platinum): el rango es la banda de firmas y el costo estimado es el tope de la banda a su precio por firma, sin certificados, fee ni SLA. Se resalta el nivel que alcanza esta cotización (tu volumen exacto está arriba)." : "Escala fija de precios por volumen de firmas (misma en toda propuesta). El costo estimado es el volumen de firmas de cada escalón a su precio, sin certificados, fee ni SLA. Se resalta el tramo que alcanza el volumen de esta cotización."}</p>
-						</div>
-					))}
-				</div>
+				<ProyeccionSection
+					esIDC={esIDC} esDistribVol={esDistribVol} hasVolume={hasVolume}
+					baseCanal={baseCanal} fMoney={fMoney} fMoney2={fMoney2}
+					proyEnabled={proyEnabled} setProyEnabled={setProyEnabled}
+					proyCustom={proyCustom} proyDriver={proyDriver} proySteps={proySteps}
+					proyRows={proyRows} escalonadoRows={escalonadoRows}
+					changeDriver={changeDriver} resetSteps={resetSteps}
+					updateStep={updateStep} addStep={addStep} removeStep={removeStep}
+				/>
 			</FieldGroup>
 
 			{/* ── Matriz de niveles (solo Distribuidores-Volumen) ── */}
@@ -1716,7 +1457,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								const cMin = Number(t.compromisoMin) || 0;
 								return (
 									<TableRow key={t.id} className={act ? "bg-accent" : ""}>
-										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={segmentList} size="sm" />{act && <span className="text-[10px] font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>
+										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={segmentList} size="sm" />{act && <span className="text-xs font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>
 										<TableCell className="text-right tabular-nums">{certsMin.toLocaleString("es-AR")}{t.certsMax == null ? "+" : "–" + (Number(t.certsMax) || 0).toLocaleString("es-AR")}</TableCell>
 										<TableCell className="text-right tabular-nums font-semibold">{Math.round((Number(t.descuento) || 0) * 100)}%</TableCell>
 										<TableCell className="text-right tabular-nums">{cMin === 0 && t.compromisoMax != null ? "hasta " + fMoney(Number(t.compromisoMax) || 0) : fMoney(cMin) + (t.compromisoMax == null ? "+" : "–" + fMoney(Number(t.compromisoMax) || 0))}</TableCell>

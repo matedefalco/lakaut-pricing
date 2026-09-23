@@ -1,16 +1,8 @@
-import { BLUE, BLUEL, os } from "../../theme/tokens";
-
+// Encabezado de sección dentro de una card. El tamaño sube de 10 a 11px: en
+// mayúsculas y con letter-spacing, 10px quedaba por debajo del piso legible.
 export function Sec({ title }) {
 	return (
-		<div
-			style={Object.assign({}, os(10, 700, BLUE), {
-				textTransform: "uppercase",
-				letterSpacing: "1px",
-				margin: "14px 0 8px",
-				paddingBottom: 4,
-				borderBottom: "2px solid " + BLUEL,
-			})}
-		>
+		<div className="mt-3.5 mb-2 border-b-2 border-secondary pb-1 text-xs font-bold tracking-[1px] text-primary uppercase">
 			{title}
 		</div>
 	);

@@ -9,6 +9,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { dealStatus } from "@/lib/dealStatus";
 import { CHANNELS, channelMeta, isPacks, isUnit, isVolumenLike } from "@/data/channelMeta";
 import { dealRevenue } from "@/lib/dealMetrics";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { SkeletonRows, SkeletonCards } from "@/components/ui/Skeleton";
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -28,6 +30,7 @@ function dealValue(deal, fMoney) {
 }
 
 export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, onNewQuote, onOpenHistorial, onEditQuote }) {
+	const confirm = useConfirm();
 	const { fMoney } = makeMoney(currency, tc);
 	const deals = (dealsApi && dealsApi.deals) || [];
 	const clients = (clientsApi && clientsApi.clients) || [];
@@ -103,11 +106,13 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 			</div>
 
 			{/* Resumen rápido */}
+			{dealsApi?.loading ? <SkeletonCards cards={3} /> : (
 			<div className="flex flex-wrap gap-3">
 				<StatCard label="Cotizaciones" value={totalCotizaciones} accent="muted" />
 				<StatCard label="Pendientes" value={pendientes} accent={pendientes > 0 ? "warning" : "muted"} />
 				<StatCard label="Tipo de cambio" value={"$ " + tc} sub={tcLastUpdated ? "Actualizado " + fDate(tcLastUpdated) : null} accent="primary" />
 			</div>
+			)}
 
 			{/* Últimas cotizaciones */}
 			<div>
@@ -121,7 +126,9 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 				</div>
 				<Card>
 					<CardContent className="p-0">
-						{recientes.length === 0 ? (
+						{dealsApi?.loading ? (
+							<SkeletonRows rows={4} className="p-3" />
+						) : recientes.length === 0 ? (
 							<EmptyState
 								glyph="✍️"
 								title="Todavía no hay cotizaciones"
@@ -142,14 +149,20 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 													<span className="font-semibold text-sm truncate">{name}</span>
 													<ChannelBadge channel={d.channel} size="sm" />
 												</div>
-												<div className="text-[11px] text-muted-foreground mt-0.5">{fDate(d.fecha)}</div>
+												<div className="text-xs text-muted-foreground mt-0.5">{fDate(d.fecha)}</div>
 											</div>
 											<StatusBadge status={st} />
 											<span className="shrink-0 tabular-nums text-sm font-semibold w-24 text-right">{dealValue(d, fMoney)}</span>
 											<button
-												onClick={function (e) {
+												type="button"
+												onClick={async function (e) {
 													e.stopPropagation();
-													if (window.confirm("¿Borrar la cotización de " + name + "?")) dealsApi.remove(d.id);
+													const ok = await confirm({
+														title: "¿Borrar la cotización?",
+														description: "Se elimina la cotización de " + name + ". No se puede deshacer.",
+														confirmLabel: "Borrar",
+													});
+													if (ok) dealsApi.remove(d.id);
 												}}
 												className="shrink-0 text-muted-foreground/40 transition-colors hover:text-destructive group-hover:text-muted-foreground"
 												title="Borrar cotización"

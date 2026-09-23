@@ -31,7 +31,7 @@ export function SwitchField({ label, description, checked, onChange, action }) {
 					<span className="text-sm font-medium text-foreground">{label}</span>
 					{action}
 				</div>
-				{description && <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{description}</p>}
+				{description && <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>}
 			</div>
 			<input type="checkbox" checked={checked} onChange={function () {}} className="sr-only" tabIndex={-1} aria-hidden="true" />
 		</div>

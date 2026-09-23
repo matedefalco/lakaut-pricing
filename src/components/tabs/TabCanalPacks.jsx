@@ -443,8 +443,8 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 					{hayCondOfrecidas && (
 						<div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 space-y-1">
 							<div className="flex items-center justify-between">
-								<span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Condiciones que puede aprovechar</span>
-								<span className="text-[10px] text-muted-foreground">no afectan el total</span>
+								<span className="text-xs font-semibold uppercase tracking-wide text-primary">Condiciones que puede aprovechar</span>
+								<span className="text-xs text-muted-foreground">no afectan el total</span>
 							</div>
 							{leverRes.items.map(function (it) {
 								return (
@@ -465,7 +465,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 					)}
 				</div>
 			) : (
-				<p className="text-[11px] text-muted-foreground">Cargá al menos un producto para ver el precio.</p>
+				<p className="text-xs text-muted-foreground">Cargá al menos un producto para ver el precio.</p>
 			)}
 		</ResultPanel>
 	);
@@ -495,9 +495,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						{editingId && <span className="ml-1.5 text-[var(--success)] font-semibold normal-case tracking-normal">· editando</span>}
 					</Label>
 					<ClientSelector clients={clientsApi?.clients || []} value={selectedClient} onChange={setSelectedClient} />
-					{!selectedClient && <p className="text-[11px] text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
+					{!selectedClient && <p className="text-xs text-[var(--warning)]">Indicá el cliente antes de guardar o exportar la cotización.</p>}
 					{selectedClient && selectedClient.channel && resolveChannel(selectedClient.channel) !== resolveChannel(canal) && (
-						<p className="text-[11px] text-[var(--warning)]">
+						<p className="text-xs text-[var(--warning)]">
 							Este cliente es del canal <span className="font-semibold">{channelLabel(selectedClient.channel)}</span>. Podés cotizarlo acá igual
 							{onNavChannel && <> o <button type="button" onClick={function () { onNavChannel(resolveChannel(selectedClient.channel)); }} className="font-semibold underline underline-offset-2 hover:opacity-80">cotizar en {channelLabel(selectedClient.channel)}</button></>}.
 						</p>
@@ -534,7 +534,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 									<TableCell className="font-semibold">
 										<span>{p.label}</span>
 										{p.segment && (
-											<span className={"ml-2 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded " + (p.segment === "empresa" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700")}>
+											<span className={"ml-2 inline-block text-xs font-medium px-1.5 py-0.5 rounded " + (p.segment === "empresa" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700")}>
 												{p.segment === "empresa" ? "Jurídica" : "Física"}
 											</span>
 										)}
@@ -593,15 +593,15 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						? "Excepción habilitada: condiciones ofrecidas" + (conAbono ? " · abono mensual activo" : "")
 						: "Precio de lista puro: sin descuento ni abono")}
 				action={descTotal > 0
-					? <Badge variant="secondary" className="text-[10px] px-1.5 py-0">−{((descTotal) * 100).toFixed(0)}% nivel</Badge>
-					: <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">a lista</Badge>}
+					? <Badge variant="secondary" className="text-xs px-1.5 py-0">−{((descTotal) * 100).toFixed(0)}% nivel</Badge>
+					: <Badge variant="outline" className="text-xs px-1.5 py-0 text-muted-foreground">a lista</Badge>}
 			>
 				{/* ── Variables del socio (solo Distribuidores) ── */}
 				{esDistribuidor && (
 					<>
 						<div className="flex flex-col gap-2">
 							<span className="text-sm font-medium">Nivel del socio</span>
-							<p className="text-[11px] text-muted-foreground">
+							<p className="text-xs text-muted-foreground">
 								El nivel es el mayor entre los certificados activos y el compromiso anual. Los certificados activos se calculan solos; el compromiso lo declarás vos.
 							</p>
 							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -609,9 +609,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos <span className="normal-case tracking-normal font-normal">(calculado)</span></Label>
 									<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 										<span className="font-semibold tabular-nums">{certsActivosNum.toLocaleString("es-AR")}</span>
-										<span className="ml-2 text-[11px] text-muted-foreground truncate">{certsHistoricos.toLocaleString("es-AR")} ya adquiridos + {calc.certsTotal.toLocaleString("es-AR")} de esta cotización</span>
+										<span className="ml-2 text-xs text-muted-foreground truncate">{certsHistoricos.toLocaleString("es-AR")} ya adquiridos + {calc.certsTotal.toLocaleString("es-AR")} de esta cotización</span>
 									</div>
-									<span className="text-[11px] text-muted-foreground">Base de cotizaciones confirmadas del cliente más los certificados de esta cotización.</span>
+									<span className="text-xs text-muted-foreground">Base de cotizaciones confirmadas del cliente más los certificados de esta cotización.</span>
 								</div>
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Compromiso anual de facturación</Label>
@@ -619,16 +619,16 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 										<span className="absolute left-3 text-sm text-muted-foreground">USD</span>
 										<Input type="number" min={0} value={compromisoAnual} onChange={function (e) { setCompromisoAnual(e.target.value); }} placeholder="0" className="tabular-nums pl-11" />
 									</div>
-									<span className="text-[11px] text-muted-foreground">Facturación anual que el socio se compromete a generar por certificados y firmas.</span>
+									<span className="text-xs text-muted-foreground">Facturación anual que el socio se compromete a generar por certificados y firmas.</span>
 								</div>
 							</div>
 							{!tieneDeclarado && (
-								<p className="text-[11px] text-[var(--warning)]">
+								<p className="text-xs text-[var(--warning)]">
 									Sin certificados activos ni compromiso, el socio queda en {distributorTiers[0] ? distributorTiers[0].label : "el primer nivel"} ({((distributorTiers[0] ? distributorTiers[0].descuento : 0) * 100).toFixed(0)}% de descuento).
 								</p>
 							)}
 							{tieneDeclarado && (
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-xs text-muted-foreground">
 									Nivel <strong>{tier.label}</strong> por {drivenBy} · {(tier.descuento * 100).toFixed(0)}% de descuento sobre la lista.
 								</p>
 							)}
@@ -656,7 +656,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						    incentivos que el cliente puede aprovechar. No bajan el total. */}
 						<div className="flex flex-col gap-2">
 							<span className="text-sm font-medium">Condiciones comerciales que ofrecés</span>
-							<p className="text-[11px] text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
+							<p className="text-xs text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
 							<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
 						</div>
 
@@ -665,7 +665,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						<label className="flex items-center gap-2.5 cursor-pointer select-none">
 							<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
 							<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
-							{abono && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-[var(--success)] border-[var(--success)]">abono activo</Badge>}
+							{abono && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">abono activo</Badge>}
 						</label>
 						{abono && (
 							<div className="pl-6 border-l-2 border-muted ml-1 flex items-center gap-2">
@@ -731,7 +731,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 								const act = tieneDeclarado && t.id === tier.id;
 								return (
 									<TableRow key={t.id} className={act ? "bg-accent" : ""}>
-										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={distributorTiers} size="sm" />{act && <span className="text-[10px] font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>
+										<TableCell><span className="inline-flex items-center gap-2"><TierBadge tier={t} tiers={distributorTiers} size="sm" />{act && <span className="text-xs font-bold uppercase tracking-wide text-primary">actual</span>}</span></TableCell>
 										<TableCell className="text-right tabular-nums">{t.certsMin.toLocaleString("es-AR")}{t.certsMax == null ? "+" : "–" + t.certsMax.toLocaleString("es-AR")}</TableCell>
 										<TableCell className="text-right tabular-nums font-semibold">{(t.descuento * 100).toFixed(0)}%</TableCell>
 										<TableCell className="text-right tabular-nums">{t.compromisoMax == null ? "> " + t.compromisoMin.toLocaleString("es-AR") : t.compromisoMin.toLocaleString("es-AR") + "–" + t.compromisoMax.toLocaleString("es-AR")}</TableCell>

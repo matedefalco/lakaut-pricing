@@ -19,7 +19,7 @@ export function CollapsibleSection({ title, subtitle, defaultOpen = false, child
 			>
 				<div className="min-w-0 flex-1">
 					<div className="text-sm font-semibold text-foreground">{title}</div>
-					{subtitle && <div className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</div>}
+					{subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
 				</div>
 				<ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
 			</button>

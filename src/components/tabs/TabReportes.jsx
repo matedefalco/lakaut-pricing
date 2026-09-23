@@ -174,7 +174,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 
 					{/* Evolución mensual */}
 					<SectionCard title="Facturación por mes" description="Revenue año 1 de las cotizaciones creadas en cada mes, por estado.">
-						<div style={{ width: "100%", height: 280 }}>
+						<div className="h-[280px] w-full">
 							<ResponsiveContainer>
 								<BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
 									<CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -208,7 +208,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 								{agg.channels.map(function (c) {
 									return (
 										<TableRow key={c.canal}>
-											<TableCell><Badge variant="secondary" className="text-[10px]">{channelEmoji(c.canal)} {channelShort(c.canal)}</Badge></TableCell>
+											<TableCell><Badge variant="secondary" className="text-xs">{channelEmoji(c.canal)} {channelShort(c.canal)}</Badge></TableCell>
 											<TableCell className="text-right tabular-nums">{c.n}</TableCell>
 											<TableCell className="text-right tabular-nums">{c.nConf}</TableCell>
 											<TableCell className="text-right tabular-nums">{fMoney(c.cotizado)}</TableCell>
@@ -291,8 +291,8 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 									return (
 										<div key={ch.key}>
 											<div className="flex items-center gap-2 mb-2">
-												<Badge variant="secondary" className="text-[10px]">{channelEmoji(ch.key)} {ch.label}</Badge>
-												<span className="text-[11px] text-muted-foreground">{ch.block.n} {ch.block.n === 1 ? "cotización" : "cotizaciones"}</span>
+												<Badge variant="secondary" className="text-xs">{channelEmoji(ch.key)} {ch.label}</Badge>
+												<span className="text-xs text-muted-foreground">{ch.block.n} {ch.block.n === 1 ? "cotización" : "cotizaciones"}</span>
 											</div>
 											<Table>
 												<TableHeader>
@@ -311,7 +311,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 															<TableRow key={r.key}>
 																<TableCell>
 																	<span className="font-medium">{r.label}</span>
-																	{r.note && <span className="ml-1.5 text-[10px] text-muted-foreground">{r.note}</span>}
+																	{r.note && <span className="ml-1.5 text-xs text-muted-foreground">{r.note}</span>}
 																</TableCell>
 																<TableCell className="text-right tabular-nums font-semibold">{fPrice(r.stat.weighted)}</TableCell>
 																<TableCell className="text-right tabular-nums text-muted-foreground">{fPrice(r.stat.simple)}</TableCell>
@@ -327,7 +327,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 									);
 								})}
 							</div>
-							<p className="mt-3 text-[11px] text-muted-foreground">
+							<p className="mt-3 text-xs text-muted-foreground">
 								<strong>Ponderado</strong> = Σ(precio × unidades) ÷ Σ unidades (precio efectivo de mercado, pesa más las cotizaciones grandes). <strong>Simple</strong> = promedio por cotización. <strong>Rev./unidad</strong> = revenue año 1 ÷ unidades (blended, incluye todos los componentes). En Packs el precio por certificado es implícito (lista del pack ÷ certificados, incluye las firmas del bundle).
 							</p>
 						</SectionCard>
@@ -352,7 +352,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 											const d = ch.block.discount;
 											return (
 												<TableRow key={ch.key}>
-													<TableCell><Badge variant="secondary" className="text-[10px]">{ch.label}</Badge></TableCell>
+													<TableCell><Badge variant="secondary" className="text-xs">{ch.label}</Badge></TableCell>
 													<TableCell className="text-right tabular-nums font-semibold">{fPct(d.weighted)}</TableCell>
 													<TableCell className="text-right tabular-nums text-muted-foreground">{fPct(d.simple)}</TableCell>
 													<TableCell className="text-right tabular-nums text-muted-foreground">{d.weighted == null ? "—" : Math.round((1 - d.weighted) * 100) + "% de lista"}</TableCell>
@@ -370,9 +370,9 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 										const conv = ch.block.conversion;
 										return (
 											<div key={ch.key}>
-												<div className="mb-2"><Badge variant="secondary" className="text-[10px]">{ch.label}</Badge></div>
+												<div className="mb-2"><Badge variant="secondary" className="text-xs">{ch.label}</Badge></div>
 												{conv.sparse ? (
-													<p className="text-[11px] text-muted-foreground">Faltan cotizaciones cerradas (ganadas o perdidas) con suficiente dispersión de precios para medir conversión. Cerradas: {conv.n}.</p>
+													<p className="text-xs text-muted-foreground">Faltan cotizaciones cerradas (ganadas o perdidas) con suficiente dispersión de precios para medir conversión. Cerradas: {conv.n}.</p>
 												) : (
 													<Table>
 														<TableHeader>
@@ -387,7 +387,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 															{conv.bands.map(function (b) {
 																return (
 																	<TableRow key={b.label}>
-																		<TableCell><span className="font-medium">{b.label}</span> <span className="text-[10px] text-muted-foreground">{fPrice(b.from)}–{fPrice(b.to)}</span></TableCell>
+																		<TableCell><span className="font-medium">{b.label}</span> <span className="text-xs text-muted-foreground">{fPrice(b.from)}–{fPrice(b.to)}</span></TableCell>
 																		<TableCell className="text-right tabular-nums">{b.total}</TableCell>
 																		<TableCell className="text-right tabular-nums text-[var(--success)]">{b.won}</TableCell>
 																		<TableCell className="text-right tabular-nums font-semibold">{fPct(b.winRate)}</TableCell>
@@ -405,7 +405,7 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 						</div>
 					)}
 
-					<p className="text-[11px] text-muted-foreground">Revenue año 1 por cotización: en lista con descuento es el neto Lakaut (más abono × 11 si aplica); en volumen es el revenue anual (IDC + firmas + SLA + fee). Es la misma cifra que muestra cada cotizadora al guardar.</p>
+					<p className="text-xs text-muted-foreground">Revenue año 1 por cotización: en lista con descuento es el neto Lakaut (más abono × 11 si aplica); en volumen es el revenue anual (IDC + firmas + SLA + fee). Es la misma cifra que muestra cada cotizadora al guardar.</p>
 				</>
 			)}
 		</div>

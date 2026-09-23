@@ -20,6 +20,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 
 // Las cotizaciones se agrupan por canal vigente (ver resolveChannel para los ids
 // históricos). Web y Distribuidores comparten columnas porque cotizan el mismo
@@ -95,6 +97,7 @@ function summaryCols(channel, fMoney) {
 }
 
 export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clientsApi, highlightId }) {
+	const confirm = useConfirm();
 	const { channelConfig } = useChannelConfig();
 	const { models } = useModels();
 	const { fMoney } = makeMoney(currency, tc);
@@ -354,8 +357,13 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		URL.revokeObjectURL(a.href);
 	}
 
-	function del(q) {
-		if (window.confirm("¿Borrar la cotización de " + (q.clientName || "(sin nombre)") + "?")) dealsApi.remove(q.id);
+	async function del(q) {
+		const ok = await confirm({
+			title: "¿Borrar la cotización?",
+			description: "Se elimina la cotización de " + (q.clientName || "(sin nombre)") + ". No se puede deshacer.",
+			confirmLabel: "Borrar",
+		});
+		if (ok) dealsApi.remove(q.id);
 	}
 
 	// Clona la cotización como versión nueva (mismo correlativo, v+1) y la abre para
@@ -385,7 +393,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 					)}
 				>
 					<span>{props.label}</span>
-					<span className="text-[10px] w-2 opacity-70">{active ? (sortDir === "asc" ? "↑" : "↓") : ""}</span>
+					<span className="text-xs w-2 opacity-70">{active ? (sortDir === "asc" ? "↑" : "↓") : ""}</span>
 				</button>
 			</TableHead>
 		);
@@ -397,7 +405,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			<TableCell className="font-medium">
 				{q.clientName || "(sin nombre)"}
 				{isUnit(q.channel) && (
-					<Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
+					<Badge variant="outline" className="ml-2 text-xs px-1.5 py-0 font-normal text-muted-foreground">
 						{(q.inputs?.integracion === "sin_api" ? "sin " : "") + "SDK"}
 					</Badge>
 				)}
@@ -425,7 +433,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 						</button>
 					) : <span className="inline-block size-4" />}
 					<span>{idStr}</span>
-					{multi && <Badge variant="outline" className="text-[10px] px-1 py-0 font-normal">{group.versions.length} v</Badge>}
+					{multi && <Badge variant="outline" className="text-xs px-1 py-0 font-normal">{group.versions.length} v</Badge>}
 				</div>
 			</TableCell>
 		);
@@ -459,7 +467,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		);
 	}
 	function fechaCell(q) {
-		return <TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-[10px]">editada</span>}</TableCell>;
+		return <TableCell className="text-muted-foreground">{q.fecha.slice(0, 10)}{q.updatedAt && <span className="block text-xs">editada</span>}</TableCell>;
 	}
 	// Volumen genérico para la vista unificada: certs en Packs, IDC en el canal IDC,
 	// y certs/firmas sueltas en Volumen (donde `idcMensuales` guarda los certificados
@@ -548,7 +556,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 							<div className="pt-1 pb-0.5">
 								{openFilter === "canal" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar canales</span>
+										<span className="text-xs text-muted-foreground uppercase tracking-wide">Seleccionar canales</span>
 										<div className="flex gap-2">
 											{Object.entries(CHANNELS).map(function (entry) {
 												const key = entry[0], meta = entry[1];
@@ -575,7 +583,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								)}
 								{openFilter === "estado" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar estado</span>
+										<span className="text-xs text-muted-foreground uppercase tracking-wide">Seleccionar estado</span>
 										<div className="flex gap-2">
 											{DEAL_STATUSES.map(function (key) {
 												const meta = DEAL_STATUS_META[key];
@@ -602,7 +610,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								)}
 								{openFilter === "mes" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Seleccionar mes</span>
+										<span className="text-xs text-muted-foreground uppercase tracking-wide">Seleccionar mes</span>
 										<Select value={month} onValueChange={function (v) { setMonth(v); }}>
 											<SelectTrigger className="w-48 bg-background h-8"><SelectValue /></SelectTrigger>
 											<SelectContent>
@@ -614,13 +622,13 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								)}
 								{openFilter === "cliente" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Buscar por cliente o N° de cotización</span>
+										<span className="text-xs text-muted-foreground uppercase tracking-wide">Buscar por cliente o N° de cotización</span>
 										<Input className="max-w-xs h-8 bg-background text-sm" placeholder="Nombre o N° (ej. 8, COT-0008…)" value={search} onChange={function (e) { setSearch(e.target.value); }} autoFocus />
 									</div>
 								)}
 								{openFilter === "certs" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Certs cotizados (canal Packs)</span>
+										<span className="text-xs text-muted-foreground uppercase tracking-wide">Certs cotizados (canal Packs)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={certsMin} onChange={function (e) { setCertsMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>
@@ -630,7 +638,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								)}
 								{openFilter === "idc" && (
 									<div className="space-y-1.5">
-										<span className="text-[11px] text-muted-foreground uppercase tracking-wide">IDC / certificados (canales IDC y Volumen)</span>
+										<span className="text-xs text-muted-foreground uppercase tracking-wide">IDC / certificados (canales IDC y Volumen)</span>
 										<div className="flex items-center gap-2">
 											<Input className="w-28 h-8 bg-background text-sm" type="number" placeholder="Mín" value={idcMin} onChange={function (e) { setIdcMin(e.target.value); }} />
 											<span className="text-muted-foreground text-sm">—</span>
@@ -669,7 +677,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			</Card>
 
 			{dealsApi?.loading ? (
-				<p className="text-sm text-muted-foreground">Cargando historial…</p>
+				<SkeletonRows rows={6} />
 			) : sortedGroups.length === 0 ? (
 				<Card><CardContent className="p-0">
 					{quotes.length === 0 ? (

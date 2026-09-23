@@ -222,7 +222,7 @@ function MetricsTable({ metrics }) {
 						if (row.isHeader) {
 							return (
 								<TableRow key={"h" + i} className="bg-muted/60 hover:bg-muted/60">
-									<TableCell colSpan={4} className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground py-2">
+									<TableCell colSpan={4} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground py-2">
 										{row.label}
 									</TableCell>
 								</TableRow>
@@ -404,16 +404,16 @@ export function TabComparacion({ costs, currency, tc }) {
 								</SelectContent>
 							</Select>
 							{result?.refPack && (
-								<p className="text-[10px] text-muted-foreground">
+								<p className="text-xs text-muted-foreground">
 									Usando: <span className="font-medium text-foreground">{result.refPack.label}</span> · {result.refPack.certs} certs · {fMoney(result.refPack.priceUSD)} · {fMoney2(result.refPack.priceUSD / result.refPack.certs)}/cert
 								</p>
 							)}
 							{!result?.refPack && activePacks.length === 0 && (
-								<p className="text-[10px] text-destructive">No hay packs activos. Configurá modelos en la tab Modelos.</p>
+								<p className="text-xs text-destructive">No hay packs activos. Configurá modelos en la tab Modelos.</p>
 							)}
 						</div>
 					</div>
-					<div className="mt-3 flex gap-4 text-[11px] text-muted-foreground">
+					<div className="mt-3 flex gap-4 text-xs text-muted-foreground">
 						<span>Total certs: <span className="font-medium text-foreground">{scenario.certs.toLocaleString("es-AR")}</span></span>
 						<span>Total firmas: <span className="font-medium text-foreground">{(scenario.certs * scenario.firmasPorCert).toLocaleString("es-AR")}</span></span>
 						{result && <span>CV total: <span className="font-medium text-foreground">{fMoney(result.cvTotal)}</span></span>}

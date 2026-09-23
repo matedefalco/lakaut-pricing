@@ -23,7 +23,7 @@ export function NumberField({ label, value, onChange, prefix, suffix, note, plac
 				/>
 				{suffix && <span className="absolute right-3 text-sm text-muted-foreground">{suffix}</span>}
 			</div>
-			{note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+			{note && <span className="text-xs text-muted-foreground">{note}</span>}
 		</div>
 	);
 }
@@ -39,7 +39,7 @@ export function SelectField({ label, value, onValueChange, options, note }) {
 					{options.map(function (o) { return <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>; })}
 				</SelectContent>
 			</Select>
-			{note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+			{note && <span className="text-xs text-muted-foreground">{note}</span>}
 		</div>
 	);
 }
@@ -64,12 +64,12 @@ export function StatCard({ label, value, sub, accent = "primary", valueClass }) 
 			<div className="px-4">
 				<div className="flex items-center gap-1.5">
 					<span className={cn("size-1.5 rounded-full shrink-0", ACCENT_DOT[accent] || ACCENT_DOT.primary)} />
-					<span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+					<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
 				</div>
 				{/* whitespace-nowrap: una cifra larga ("USD 350.897") wrappeaba a dos líneas
 			    y rompía la lectura del KPI. */}
 			<div className={cn("font-display text-2xl mt-1 tabular-nums whitespace-nowrap", valueClass)}>{value}</div>
-				{sub && <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>}
+				{sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
 			</div>
 		</Card>
 	);

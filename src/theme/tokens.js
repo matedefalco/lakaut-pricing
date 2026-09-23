@@ -1,16 +1,16 @@
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 export const BLUE  = "#3041d5";
 export const BLUEL = "#eaecfb";
-export const GRAY  = "#7f828e";
+export const GRAY  = "#666a78";
 export const BLACK = "#36383a";
 export const BG    = "#f4f6fd";
 export const WHITE = "#fff";
 export const BORD  = "#dde0eb";
-export const OK    = "#059669";
+export const OK    = "#047d58";
 export const OKBG  = "#d1fae5";
-export const WN    = "#c87a00";
+export const WN    = "#9f6100";
 export const WNBG  = "#fef3c7";
-export const ER    = "#dc2626";
+export const ER    = "#cc2121";
 export const ERBG  = "#fee2e2";
 
 export const PURPLE = "#8b5cf6";

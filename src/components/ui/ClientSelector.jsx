@@ -51,8 +51,8 @@ export function ClientSelector({ clients, value, onChange }) {
 				{value ? (
 					<>
 						<span className="flex-1 text-sm font-medium">{value.name}</span>
-						{value.tipo && <Badge variant="outline" className="text-[10px] shrink-0 font-semibold">{value.tipo}</Badge>}
-						<Badge variant="secondary" className="text-[10px] shrink-0">{channelShort(value.channel)}</Badge>
+						{value.tipo && <Badge variant="outline" className="text-xs shrink-0 font-semibold">{value.tipo}</Badge>}
+						<Badge variant="secondary" className="text-xs shrink-0">{channelShort(value.channel)}</Badge>
 						<button onClick={clear} className="text-muted-foreground hover:text-foreground ml-1 shrink-0"><X className="size-3.5" /></button>
 					</>
 				) : (
@@ -85,7 +85,7 @@ export function ClientSelector({ clients, value, onChange }) {
 								>
 									<span className={value?.id === c.id ? "font-semibold" : ""}>{c.name}</span>
 									<span className="flex items-center gap-2">
-										{c.tipo && <Badge variant="outline" className="text-[10px] font-semibold">{c.tipo}</Badge>}
+										{c.tipo && <Badge variant="outline" className="text-xs font-semibold">{c.tipo}</Badge>}
 										{isPacks(c.channel) && c.certs_activos > 0 && (
 											<span className="text-xs text-muted-foreground">{c.certs_activos.toLocaleString("es-AR")} certs</span>
 										)}

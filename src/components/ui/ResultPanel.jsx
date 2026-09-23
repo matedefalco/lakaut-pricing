@@ -39,7 +39,7 @@ export function ResultPanel({ eyebrow = "Resultado", channel, children }) {
 			)}
 			<CardContent className="relative p-5 space-y-4">
 				<div
-					className="text-[10px] font-bold uppercase tracking-wide"
+					className="text-xs font-bold uppercase tracking-wide"
 					style={{ color: meta ? meta.colorFg : "var(--muted-foreground)" }}
 				>
 					{eyebrow}
@@ -58,13 +58,13 @@ export function ResultHero({ label, value, sub, accent = "primary", pill, empty 
 		<div>
 			<div className="flex items-center gap-2">
 				<span className={cn("size-2 rounded-full shrink-0", DOT[accent] || DOT.primary)} />
-				<span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+				<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
 			</div>
 			<div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
 				<span className={cn("font-display text-4xl tabular-nums leading-none [overflow-wrap:anywhere]", empty && "text-muted-foreground/40")}>{value}</span>
 				{pill}
 			</div>
-			{sub && <div className="text-[11px] text-muted-foreground mt-2">{sub}</div>}
+			{sub && <div className="text-xs text-muted-foreground mt-2">{sub}</div>}
 		</div>
 	);
 }
@@ -76,7 +76,7 @@ export function ResultRow({ label, value, accent = "muted", empty, valueClass })
 		<div className="flex items-center justify-between gap-3 py-2 border-t border-border/60">
 			<div className="flex items-center gap-1.5 min-w-0">
 				<span className={cn("size-2 rounded-full shrink-0", DOT[accent] || DOT.muted)} />
-				<span className="text-[11px] text-muted-foreground truncate">{label}</span>
+				<span className="text-xs text-muted-foreground truncate">{label}</span>
 			</div>
 			<span className={cn("text-sm font-semibold tabular-nums shrink-0", empty && "text-muted-foreground/40", valueClass)}>{value}</span>
 		</div>
@@ -92,11 +92,11 @@ export function ResultItem({ title, detail, value, accent = "primary", strong })
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex items-center gap-1.5 min-w-0">
 					<span className={cn("size-2 rounded-full shrink-0", DOT[accent] || DOT.primary)} />
-					<span className={cn("text-[12px] truncate", strong ? "font-semibold text-foreground" : "font-medium text-foreground")}>{title}</span>
+					<span className={cn("text-xs truncate", strong ? "font-semibold text-foreground" : "font-medium text-foreground")}>{title}</span>
 				</div>
 				<span className="text-sm font-semibold tabular-nums shrink-0">{value}</span>
 			</div>
-			{detail && <div className="text-[10px] text-muted-foreground mt-0.5 pl-3">{detail}</div>}
+			{detail && <div className="text-xs text-muted-foreground mt-0.5 pl-3">{detail}</div>}
 		</div>
 	);
 }
@@ -111,7 +111,7 @@ export function StatusPill({ tone = "muted", children }) {
 		muted: "text-muted-foreground bg-muted border-border",
 	}[tone] || "text-muted-foreground bg-muted border-border";
 	return (
-		<span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", cls)}>
+		<span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap", cls)}>
 			{children}
 		</span>
 	);

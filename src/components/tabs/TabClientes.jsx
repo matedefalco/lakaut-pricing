@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Pencil, Trash2, Check, X, ExternalLink, ArrowLeft, ChevronRight, ChevronDown, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/Toaster";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 // Fila de un error de importación: motivo claro arriba y, plegado, el motivo
 // técnico crudo (el que devuelve Postgres/Supabase) por si hace falta debug.
@@ -11,19 +12,19 @@ function ImportErrorRow({ err }) {
 		<li className="rounded-md border border-border/70 bg-background px-2.5 py-2">
 			<div className="flex items-baseline gap-2">
 				<span className="text-xs font-semibold text-foreground">{err.empresa || "(sin nombre)"}</span>
-				{err.empresa_id && <span className="text-[10px] tabular-nums text-muted-foreground opacity-70">{err.empresa_id}</span>}
+				{err.empresa_id && <span className="text-xs tabular-nums text-muted-foreground opacity-70">{err.empresa_id}</span>}
 			</div>
 			<div className="mt-0.5 text-xs text-muted-foreground">{err.motivo || "No se pudo guardar el registro"}</div>
 			{err.motivo_tecnico && (
 				<div className="mt-1">
 					<button
 						onClick={function () { setShowTech(function (v) { return !v; }); }}
-						className="text-[10px] font-medium text-muted-foreground/80 hover:text-foreground transition-colors"
+						className="text-xs font-medium text-muted-foreground/80 hover:text-foreground transition-colors"
 					>
 						{showTech ? "Ocultar técnico" : "Detalle técnico"}
 					</button>
 					{showTech && (
-						<pre className="mt-1 whitespace-pre-wrap break-words rounded bg-muted/60 p-1.5 text-[10px] leading-snug text-muted-foreground">{err.motivo_tecnico}</pre>
+						<pre className="mt-1 whitespace-pre-wrap break-words rounded bg-muted/60 p-1.5 text-xs leading-snug text-muted-foreground">{err.motivo_tecnico}</pre>
 					)}
 				</div>
 			)}
@@ -71,6 +72,7 @@ import { dealRevenue } from "@/lib/dealMetrics";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { ChannelBadge } from "@/components/ui/ChannelBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -115,6 +117,7 @@ function ClientAvatar({ name }) {
 }
 
 export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) {
+	const confirm = useConfirm();
 	const { channelConfig } = useChannelConfig();
 	const distributorTiers = channelConfig.distributorTiers;
 	const { fMoney } = makeMoney(currency, tc);
@@ -254,7 +257,12 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 	}
 
 	async function deleteClient(id) {
-		if (!window.confirm("¿Eliminar este cliente y desvincular sus deals?")) return;
+		const ok = await confirm({
+			title: "¿Eliminar este cliente?",
+			description: "Sus cotizaciones quedan sin cliente asociado. No se puede deshacer.",
+			confirmLabel: "Eliminar",
+		});
+		if (!ok) return;
 		await clientsApi.remove(id);
 		if (selectedId === id) setSelectedId(null);
 	}
@@ -298,8 +306,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 						</div>
 						<div className="flex flex-wrap items-center gap-2 pl-11">
 							<ChannelBadge channel={selected.channel} />
-							{selected.tipo && <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{selected.tipo}</span>}
-							{selected.etapa && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{selected.etapa}</span>}
+							{selected.tipo && <span className="rounded border border-border px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">{selected.tipo}</span>}
+							{selected.etapa && <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{selected.etapa}</span>}
 							{selected.industria && <span className="text-xs text-muted-foreground">{selected.industria}</span>}
 							<span className="text-xs text-muted-foreground">Desde {fDate(selected.created_at)}</span>
 						</div>
@@ -329,17 +337,17 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 								<div className="flex items-center justify-between">
 									<div>
 										<p className="text-xs text-muted-foreground uppercase tracking-wide">Certificados activos administrados</p>
-										<p className="text-[10px] text-muted-foreground mt-0.5">Suma de las cotizaciones del socio en la app</p>
+										<p className="text-xs text-muted-foreground mt-0.5">Suma de las cotizaciones del socio en la app</p>
 										<span className="text-xl font-semibold tabular-nums mt-1 block">{certsTotal.toLocaleString("es-AR")}</span>
 										{compromisoMax > 0 && (
-											<p className="text-[10px] text-muted-foreground mt-1.5">Mayor compromiso anual declarado: {fMoney(compromisoMax)}</p>
+											<p className="text-xs text-muted-foreground mt-1.5">Mayor compromiso anual declarado: {fMoney(compromisoMax)}</p>
 										)}
 									</div>
 									{(certsTotal > 0 || compromisoMax > 0) && (
 										<div className="text-right">
 											<p className="text-xs text-muted-foreground mb-1">Nivel actual</p>
 											<TierBadge tier={getDistributorTier(certsTotal, compromisoMax, distributorTiers)} tiers={distributorTiers} size="lg" />
-											<p className="text-[10px] text-muted-foreground mt-1">Gana el mayor de las dos variables</p>
+											<p className="text-xs text-muted-foreground mt-1">Gana el mayor de las dos variables</p>
 										</div>
 									)}
 								</div>
@@ -352,18 +360,18 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 				{stats && (
 					<div className="flex gap-3 flex-wrap">
 						<div className="flex flex-col gap-0.5 bg-muted/40 rounded-md px-4 py-3 min-w-[100px]">
-							<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Deals</span>
+							<span className="text-xs text-muted-foreground uppercase tracking-wide">Deals</span>
 							<span className="text-xl font-semibold tabular-nums">{stats.total}</span>
 						</div>
 						{stats.revenue > 0 && (
 							<div className="flex flex-col gap-0.5 bg-muted/40 rounded-md px-4 py-3 min-w-[140px]">
-								<span className="text-[11px] text-muted-foreground uppercase tracking-wide">Revenue acumulado</span>
+								<span className="text-xs text-muted-foreground uppercase tracking-wide">Revenue acumulado</span>
 								<span className="text-xl font-semibold tabular-nums">{fMoney(stats.revenue)}</span>
 							</div>
 						)}
 						{stats.confirmedRevenue > 0 && (
 							<div className="flex flex-col gap-0.5 bg-success/10 rounded-md px-4 py-3 min-w-[140px]">
-								<span className="text-[11px] text-success uppercase tracking-wide">Facturado (confirmado)</span>
+								<span className="text-xs text-success uppercase tracking-wide">Facturado (confirmado)</span>
 								<span className="text-xl font-semibold tabular-nums text-success">{fMoney(stats.confirmedRevenue)}</span>
 							</div>
 						)}
@@ -424,8 +432,14 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 															<button onClick={function () { onEditDeal(d); }} className="text-muted-foreground hover:text-foreground" title="Editar"><Pencil className="size-3.5" /></button>
 														)}
 														<button
-															onClick={function () {
-																if (window.confirm("¿Borrar esta cotización de " + (selected.name || "(sin nombre)") + "?")) dealsApi.remove(d.id);
+															type="button"
+															onClick={async function () {
+																const ok = await confirm({
+																	title: "¿Borrar la cotización?",
+																	description: "Se elimina la cotización de " + (selected.name || "(sin nombre)") + ". No se puede deshacer.",
+																	confirmLabel: "Borrar",
+																});
+																if (ok) dealsApi.remove(d.id);
 															}}
 															className="text-muted-foreground hover:text-destructive"
 															title="Borrar cotización"
@@ -532,8 +546,8 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 					>
 						<ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", unsyncedOpen && "rotate-180")} />
 						<span className="text-sm font-semibold text-foreground">Sin sincronizar con el Sheet</span>
-						<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{unsynced.length}</span>
-						<span className="ml-auto text-[11px] text-muted-foreground">clientes que no vienen del Sheet</span>
+						<span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{unsynced.length}</span>
+						<span className="ml-auto text-xs text-muted-foreground">clientes que no vienen del Sheet</span>
 					</button>
 					{unsyncedOpen && (
 						<div className="mt-3 space-y-2">
@@ -623,7 +637,14 @@ export function TabClientes({ clientsApi, dealsApi, currency, tc, onEditDeal }) 
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{filtered.length === 0 && (
+						{clientsApi?.loading && (
+							<TableRow>
+								<TableCell colSpan={6} className="p-3">
+									<SkeletonRows rows={5} />
+								</TableCell>
+							</TableRow>
+						)}
+						{!clientsApi?.loading && filtered.length === 0 && (
 							<TableRow>
 								<TableCell colSpan={6} className="p-0">
 									{search || channelFilter !== "all" ? (

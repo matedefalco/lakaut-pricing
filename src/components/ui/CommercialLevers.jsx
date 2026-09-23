@@ -46,7 +46,7 @@ export function CommercialLevers({ levers, value, onChange }) {
 				<span className="text-sm font-semibold tabular-nums">
 					−{(resolved.cappedPts).toFixed(0)}%
 					{resolved.capped && resolved.cap != null && (
-						<span className="ml-1.5 text-[11px] font-normal text-[var(--warning)]">tope {resolved.cap}% (suma {resolved.rawPct}%)</span>
+						<span className="ml-1.5 text-xs font-normal text-[var(--warning)]">tope {resolved.cap}% (suma {resolved.rawPct}%)</span>
 					)}
 				</span>
 			</div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useModels } from "@/context/ModelsContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { BLUE, BLUEL, BORD, GRAY, BLACK, WHITE, OK, WN, ER, os } from "@/theme/tokens";
+import { ColumnPicker } from "@/components/ui/ColumnPicker";
+import { OK, WN, ER } from "@/theme/tokens";
 
 const ALL_COLS = [
 	{ key: "precioARS", label: "Precio ARS s/IVA" },
@@ -19,77 +20,6 @@ const ALL_COLS = [
 	{ key: "margen", label: "Cont. marginal" },
 	{ key: "beAnual", label: "BE" },
 ];
-
-function ColFilterDropdown({ visible, onToggle }) {
-	const [open, setOpen] = useState(false);
-	const ref = useRef(null);
-	useEffect(function () {
-		function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
-		document.addEventListener("mousedown", handler);
-		return function () { document.removeEventListener("mousedown", handler); };
-	}, []);
-	return (
-		<div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-			<button
-				onClick={function () { setOpen(function (o) { return !o; }); }}
-				style={{
-					display: "flex", alignItems: "center", gap: 5, padding: "5px 12px",
-					border: "1px solid var(--border)", borderRadius: 6, background: open ? "var(--accent)" : "var(--background)",
-					cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--foreground)",
-				}}
-			>
-				<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-					<line x1="2" y1="4" x2="14" y2="4" /><line x1="4" y1="8" x2="12" y2="8" /><line x1="6" y1="12" x2="10" y2="12" />
-				</svg>
-				Propiedades
-				<span style={{ fontSize: 10, background: "var(--muted)", borderRadius: 10, padding: "1px 6px", color: "var(--muted-foreground)" }}>
-					{visible.size}/{ALL_COLS.length}
-				</span>
-			</button>
-			{open && (
-				<div style={{
-					position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50,
-					background: "var(--background)", border: "1px solid var(--border)",
-					borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 200, padding: "6px 0",
-				}}>
-					<div style={{ padding: "4px 12px 6px", fontSize: 11, fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-						Columnas visibles
-					</div>
-					{ALL_COLS.map(function (col) {
-						const checked = visible.has(col.key);
-						return (
-							<label key={col.key} style={{
-								display: "flex", alignItems: "center", gap: 9, padding: "6px 12px",
-								cursor: "pointer", fontSize: 13, color: "var(--foreground)",
-								background: checked ? "var(--accent)" : "transparent",
-							}}>
-								<input
-									type="checkbox"
-									checked={checked}
-									onChange={function () { onToggle(col.key); }}
-									style={{ accentColor: "var(--primary)", width: 14, height: 14, cursor: "pointer" }}
-								/>
-								{col.label}
-							</label>
-						);
-					})}
-					<div style={{ borderTop: "1px solid var(--border)", margin: "4px 0" }} />
-					<div style={{ display: "flex", gap: 6, padding: "4px 12px" }}>
-						<button onClick={function () { ALL_COLS.forEach(function (c) { if (!visible.has(c.key)) onToggle(c.key); }); }}
-							style={{ fontSize: 11, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-							Mostrar todas
-						</button>
-						<span style={{ color: "var(--muted-foreground)" }}>·</span>
-						<button onClick={function () { ALL_COLS.forEach(function (c) { if (visible.has(c.key)) onToggle(c.key); }); }}
-							style={{ fontSize: 11, color: "var(--muted-foreground)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-							Ocultar todas
-						</button>
-					</div>
-				</div>
-			)}
-		</div>
-	);
-}
 
 function margClass(pct) { return pct >= 0.5 ? "text-[var(--success)]" : pct >= 0.2 ? "text-[var(--warning)]" : "text-destructive"; }
 
@@ -143,16 +73,17 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 	const barColor = cfCovered ? OK : cfPct >= 60 ? WN : ER;
 
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+		<div className="flex flex-col gap-4">
+			<div className="flex items-start justify-between gap-3">
 				<div>
-					<div style={Object.assign({}, os(13, 400, GRAY), { marginTop: 2 })}>
+					<div className="mt-0.5 text-sm text-muted-foreground">
 						Estimá cuántas unidades vendés por mes de cada pack y verás si el mix cubre costos fijos.
 					</div>
 				</div>
 				<button
 					onClick={function () { const z = {}; activeModels.forEach(function (m) { z[m.id] = 0; }); setUnits(z); }}
-					style={{ fontSize: 12, color: GRAY, border: "1px solid " + BORD, borderRadius: 6, background: WHITE, cursor: "pointer", padding: "4px 10px", flexShrink: 0 }}
+					className="shrink-0 cursor-pointer rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+					type="button"
 				>
 					Limpiar
 				</button>
@@ -180,15 +111,15 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 								return (
 									<TableRow key={r.m.id}>
 										<TableCell>
-											<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-												<span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: r.color, flexShrink: 0 }} />
-												<span style={{ fontWeight: 600 }}>{r.m.label}</span>
+											<div className="flex items-center gap-2">
+												<span className="inline-block size-2 shrink-0 rounded-full" style={{ background: r.color }} />
+												<span className="font-semibold">{r.m.label}</span>
 											</div>
-											<div style={Object.assign({}, os(11, 400, GRAY), { paddingLeft: 16 })}>{r.m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
+											<div className="pl-4 text-xs text-muted-foreground">{r.m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
 										</TableCell>
 										<TableCell className="text-right tabular-nums">{isARS ? fARSraw(r.precioARS) : fUSD(r.m.priceUSD)}</TableCell>
-										<TableCell className="text-right tabular-nums" style={{ color: GRAY }}>{fMoney2(r.cvTotal)}</TableCell>
-										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: cmColor }}>{fMoney2(r.cmUnit)}</TableCell>
+										<TableCell className="text-right tabular-nums text-muted-foreground">{fMoney2(r.cvTotal)}</TableCell>
+										<TableCell className="text-right tabular-nums" style={{ color: cmColor }} >{fMoney2(r.cmUnit)}</TableCell>
 										<TableCell className="text-right">
 											<input
 												type="number"
@@ -196,23 +127,23 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 												step="1"
 												value={r.u}
 												onChange={function (e) { setUnit(r.m.id, e.target.value); }}
-												style={{ width: 80, textAlign: "right", fontSize: 13, border: "1px solid " + BORD, borderRadius: 6, padding: "4px 8px", background: WHITE, fontFamily: "'Open Sans',sans-serif" }}
+												className="w-20 rounded-md border border-input bg-card px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 											/>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">{r.u > 0 ? (isARS ? fARSraw(r.precioARS * r.u) : fUSD(Math.round(r.rev))) : <span style={{ color: GRAY }}>—</span>}</TableCell>
-										<TableCell className="text-right tabular-nums" style={{ fontWeight: 600, color: r.u > 0 ? cmColor : GRAY }}>{r.u > 0 ? fMoney2(Math.round(r.cmTot)) : "—"}</TableCell>
-										<TableCell className="text-right tabular-nums" style={{ color: GRAY, fontSize: 12 }}>{r.u > 0 ? mix + "%" : "—"}</TableCell>
+										<TableCell className="text-right tabular-nums">{r.u > 0 ? (isARS ? fARSraw(r.precioARS * r.u) : fUSD(Math.round(r.rev))) : <span className="text-muted-foreground">—</span>}</TableCell>
+										<TableCell className="text-right tabular-nums" style={{ color: r.u > 0 ? cmColor : "var(--muted-foreground)" }} >{r.u > 0 ? fMoney2(Math.round(r.cmTot)) : "—"}</TableCell>
+										<TableCell className="text-right tabular-nums text-xs text-muted-foreground">{r.u > 0 ? mix + "%" : "—"}</TableCell>
 									</TableRow>
 								);
 							})}
 						</TableBody>
 						<tfoot>
-							<tr style={{ borderTop: "1px solid " + BORD, background: BLUEL }}>
-								<td colSpan={4} style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 16px" })}>Total</td>
-								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—"}</td>
-								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{isARS ? (totalRevARS > 0 ? fARSraw(totalRevARS) : "—") : (totalRev > 0 ? fUSD(Math.round(totalRev)) : "—")}</td>
-								<td style={Object.assign({}, os(13, 700, BLACK), { padding: "10px 8px", textAlign: "right" })}>{totalCM !== 0 ? fMoney2(Math.round(totalCM)) : "—"}</td>
-								<td style={Object.assign({}, os(12, 400, GRAY), { padding: "10px 8px", textAlign: "right" })}>100%</td>
+							<tr className="border-t border-border bg-secondary">
+								<td colSpan={4} className="px-4 py-2.5 text-sm font-bold text-foreground">Total</td>
+								<td className="px-2 py-2.5 text-right text-sm font-bold text-foreground tabular-nums">{totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—"}</td>
+								<td className="px-2 py-2.5 text-right text-sm font-bold text-foreground tabular-nums">{isARS ? (totalRevARS > 0 ? fARSraw(totalRevARS) : "—") : (totalRev > 0 ? fUSD(Math.round(totalRev)) : "—")}</td>
+								<td className="px-2 py-2.5 text-right text-sm font-bold text-foreground tabular-nums">{totalCM !== 0 ? fMoney2(Math.round(totalCM)) : "—"}</td>
+								<td className="px-2 py-2.5 text-right text-sm text-muted-foreground tabular-nums">100%</td>
 							</tr>
 						</tfoot>
 					</Table>
@@ -220,13 +151,13 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 			</Card>
 
 			{/* KPI row */}
-			<div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+			<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
 				{[
 					{
 						label: "CM ponderado",
 						tooltip: "Contribución marginal promedio ponderada por el mix de ventas.\nFórmula: Σ(CM unit × unidades) ÷ Σ unidades.\nRepresenta cuánto aporta en promedio cada unidad vendida, considerando el mix actual.",
 						value: totalUnits > 0 ? fMoney2(Math.round(cmPond * 100) / 100) + " / u." : "—",
-						color: BLACK,
+						color: "var(--foreground)",
 					},
 					{
 						label: "BE portfolio",
@@ -241,41 +172,41 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 						label: "Unidades actuales",
 						tooltip: "Total de unidades ingresadas en el simulador, sumando todos los packs.",
 						value: totalUnits > 0 ? totalUnits.toLocaleString("es-AR") + " u." : "—",
-						color: BLACK,
+						color: "var(--foreground)",
 					},
 					{
 						label: "EBITDA",
 						tooltip: "Resultado estimado para el volumen ingresado, antes de impuestos y amortizaciones.\nFórmula: CM total − CF directo.\nCM total: " + (totalUnits > 0 ? fMoney2(Math.round(totalCM)) : "—") + " · CF directo: " + fMoney2(cf) + ".",
 						value: totalUnits > 0 ? (ebitda >= 0 ? "+" : "") + fMoney2(Math.round(ebitda)) : "—",
-						color: totalUnits > 0 ? (ebitda >= 0 ? OK : ER) : BLACK,
+						color: totalUnits > 0 ? (ebitda >= 0 ? OK : ER) : "var(--foreground)",
 					},
 				].map(function (kpi) {
 					return (
-						<div key={kpi.label} style={{ background: BLUEL, border: "1px solid " + BORD, borderRadius: 8, padding: "12px 14px" }}>
-							<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-							<span style={os(11, 400, GRAY)}>{kpi.label}</span>
+						<div key={kpi.label} className="rounded-lg border border-border bg-secondary px-3.5 py-3">
+							<div className="flex items-center gap-1">
+							<span className="text-xs text-muted-foreground">{kpi.label}</span>
 							{kpi.tooltip && <InfoTooltip dir="down" text={kpi.tooltip} />}
 						</div>
-							<div style={Object.assign({}, os(15, 700, kpi.color || BLACK), { marginTop: 4 })}>{kpi.value}</div>
-							{kpi.sub && <div style={Object.assign({}, os(11, 400, kpi.subColor), { marginTop: 3 })}>{kpi.sub}</div>}
+							<div className="mt-1 text-base font-bold tabular-nums" style={{ color: kpi.color || "var(--foreground)" }}>{kpi.value}</div>
+							{kpi.sub && <div className="mt-0.5 text-xs" style={{ color: kpi.subColor || "var(--muted-foreground)" }}>{kpi.sub}</div>}
 						</div>
 					);
 				})}
 			</div>
 
 			{/* CF coverage bar */}
-			<div style={{ border: "1px solid " + BORD, borderRadius: 8, padding: "14px 16px" }}>
-				<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-					<span style={os(12, 700, GRAY)}>Cobertura de CF</span>
-					<span style={os(12, 700, BLACK)}>
+			<div className="rounded-lg border border-border px-4 py-3.5">
+				<div className="mb-2 flex items-center justify-between">
+					<span className="text-sm font-bold text-muted-foreground">Cobertura de CF</span>
+					<span className="text-sm font-bold text-foreground tabular-nums">
 						{totalUnits > 0 ? Math.round(cfPct) + "%" : "0%"}
-						<span style={Object.assign({}, os(12, 400, GRAY), { marginLeft: 6 })}>de {fMoney2(cf)}</span>
+						<span className="ml-1.5 text-sm text-muted-foreground">de {fMoney2(cf)}</span>
 					</span>
 				</div>
-				<div style={{ height: 8, borderRadius: 99, background: BORD, overflow: "hidden" }}>
-					<div style={{ height: "100%", borderRadius: 99, width: Math.min(cfPct, 100) + "%", background: barColor, transition: "width 0.2s" }} />
+				<div className="h-2 overflow-hidden rounded-full bg-input">
+					<div className="h-full rounded-full transition-[width] duration-200" style={{ width: Math.min(cfPct, 100) + "%", background: barColor }} />
 				</div>
-				<p style={Object.assign({}, os(12, 400, GRAY), { marginTop: 8 })}>
+				<p className="mt-2 text-sm text-muted-foreground">
 					{totalUnits === 0
 						? "Ingresá unidades para ver la cobertura."
 						: cfCovered
@@ -284,7 +215,7 @@ function PortfolioSimulator({ models, costs, currency, tc }) {
 				</p>
 			</div>
 
-			<p style={os(11, 400, GRAY)}>
+			<p className="text-xs text-muted-foreground">
 				CM ponderado = Σ(CM unit × unidades) / Σ unidades · BE portfolio = CF directo / CM ponderado · CF directo: {fMoney2(cf)}
 			</p>
 		</div>
@@ -334,7 +265,7 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 					<PageHeader
 						title="Precios de lista"
 						description="Precio de lista de cada pack, el que paga el cliente que contrata sin intermediación. Valores en ARS, USD derivado por TC."
-						actions={<ColFilterDropdown visible={visibleCols} onToggle={toggleCol} />}
+						actions={<ColumnPicker cols={ALL_COLS} visible={visibleCols} onToggle={toggleCol} />}
 					/>
 					<Card>
 						<CardContent>
@@ -362,7 +293,7 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 											<TableRow key={m.id}>
 												<TableCell>
 													<div className="font-semibold">{m.label}</div>
-													<div className="text-[11px] text-muted-foreground">{m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
+													<div className="text-xs text-muted-foreground">{m.segment === "persona" ? "Persona / profesional" : "Empresa"}</div>
 												</TableCell>
 												{show("precioARS") && <TableCell className="text-right tabular-nums">
 													{e == null ? <Badge variant="outline">Consultar</Badge> : "$ " + e.precioARS.toLocaleString("es-AR")}
@@ -397,7 +328,7 @@ export function TabCanalWeb({ costs, currency, tc, view }) {
 
 			{showSimulador && (
 				<>
-					{!view && <div style={{ borderTop: "1px solid var(--border)", paddingTop: 24 }} />}
+					{!view && <div className="border-t border-border pt-6" />}
 					{view === "simulador" && (
 						<div className="mb-4">
 							<PageHeader

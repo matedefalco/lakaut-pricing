@@ -10,8 +10,8 @@ function Gate() {
 
 	if (loading) {
 		return (
-			<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--muted)" }}>
-				<Loader2 className="animate-spin" size={28} style={{ color: "var(--primary)" }} />
+			<div className="flex min-h-svh items-center justify-center bg-muted">
+				<Loader2 className="animate-spin text-primary" size={28} />
 			</div>
 		);
 	}

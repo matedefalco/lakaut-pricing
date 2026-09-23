@@ -94,7 +94,7 @@ export function TabGeneral({ tc, setTc, tcSource, setTcSource, tcLoading, tcErro
 					)}
 					{!tcError && (tcLastUpdated || saved) && (
 						<p className="text-xs text-muted-foreground">
-							{saved && <Badge variant="secondary" className="mr-2 text-[10px] text-[var(--success)] border-[var(--success)]">TC activo: {Number(tc).toLocaleString("es-AR")}</Badge>}
+							{saved && <Badge variant="secondary" className="mr-2 text-xs text-[var(--success)] border-[var(--success)]">TC activo: {Number(tc).toLocaleString("es-AR")}</Badge>}
 							{tcLastUpdated && <>Última actualización: {new Date(tcLastUpdated).toLocaleString("es-AR")}</>}
 						</p>
 					)}

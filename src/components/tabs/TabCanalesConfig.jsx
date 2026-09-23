@@ -133,7 +133,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 	const thNum = "text-right";
 
 	return (
-		<div className="space-y-4" style={{ maxWidth: 960 }}>
+		<div className="max-w-[960px] space-y-4">
 			<PageHeader
 				title="Precios por canal"
 				description={isDirty ? "Cambios sin guardar" : (savedAt ? "Última edición: " + formatSaved(savedAt) : "Sin cambios registrados")}
@@ -145,16 +145,16 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 				title="1b · Distribuidores-Volumen · Niveles y descuentos"
 				subtitle={"El certificado va siempre bonificado (precio USD " + (Number(distribVolBase.cert) || 0).toFixed(4) + "); solo se cobra la firma, con precio base USD " + (Number(distribVolBase.firma) || 0).toFixed(4) + ". El nivel lo asigna ÚNICAMENTE el compromiso anual declarado del socio (rangos abajo), que define el descuento sobre la firma. Sin compromiso anual el descuento es 0%. Los certificados activos son informativos. El precio de la firma no puede bajar del markup mínimo de " + markupMin.toFixed(2) + "x."}
 			>
-				<div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ maxWidth: 420 }}>
+				<div className="mb-3 grid max-w-[420px] grid-cols-1 gap-3 sm:grid-cols-2">
 					<div className="flex flex-col gap-1">
-						<span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Precio base certificado (USD)</span>
+						<span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Precio base certificado (USD)</span>
 						<NumCell value={distribVolBase.cert} decimals={4} onChange={function (v) { updDistribVolBase("cert", v); }} />
-						<span className="text-[10px] text-muted-foreground">Bonificado: dejar en 0.</span>
+						<span className="text-xs text-muted-foreground">Bonificado: dejar en 0.</span>
 					</div>
 					<div className="flex flex-col gap-1">
-						<span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Precio base firma (USD)</span>
+						<span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Precio base firma (USD)</span>
 						<NumCell value={distribVolBase.firma} decimals={4} onChange={function (v) { updDistribVolBase("firma", v); }} />
-						<span className="text-[10px] text-muted-foreground">Precio sin compromiso anual (0% de descuento).</span>
+						<span className="text-xs text-muted-foreground">Precio sin compromiso anual (0% de descuento).</span>
 					</div>
 				</div>
 				<Table>
@@ -242,7 +242,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					<div className="w-52">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Markup mínimo (x)</Label>
 						<NumCell value={markupMin} decimals={2} onChange={function (v) { updDraft({ b2b2cMarkupMin: v || 0 }); }} className="mt-1.5" />
-						<p className="text-[11px] text-muted-foreground mt-1">Precio ÷ costo. Es la métrica de la columna MARGEN del Borrador v5. Bajo este valor no se puede guardar ni exportar.</p>
+						<p className="text-xs text-muted-foreground mt-1">Precio ÷ costo. Es la métrica de la columna MARGEN del Borrador v5. Bajo este valor no se puede guardar ni exportar.</p>
 					</div>
 				</div>
 
@@ -298,7 +298,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					</TableBody>
 				</Table>
 				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, firmasIncluidas: 4, precioFirmaExtra: 0.5 }); }} />
-				<p className="text-[11px] text-muted-foreground mt-3">
+				<p className="text-xs text-muted-foreground mt-3">
 					El segmento sale del volumen mensual de IDC. <strong>CV bundle</strong> es el costo de lo que se entrega por el precio de la IDC (certificado + las firmas del cupo) y <strong>Mín. viable</strong> el precio más bajo que cumple el markup mínimo: si una fila queda en rojo, ninguna cotización de ese segmento se va a poder guardar. Se resuelve subiendo el precio o bajando el cupo.
 				</p>
 			</CollapsibleSection>
@@ -313,12 +313,12 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					<div className="w-44">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio base certificado (USD)</Label>
 						<NumCell value={volBase.cert} decimals={4} onChange={function (v) { updVolBase("cert", v); }} className="mt-1.5" />
-						<p className="text-[11px] text-muted-foreground mt-1">Markup a lista: {fMarkupTxt(volBase.cert, cvCert)}</p>
+						<p className="text-xs text-muted-foreground mt-1">Markup a lista: {fMarkupTxt(volBase.cert, cvCert)}</p>
 					</div>
 					<div className="w-44">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio base firma (USD)</Label>
 						<NumCell value={volBase.firma} decimals={4} onChange={function (v) { updVolBase("firma", v); }} className="mt-1.5" />
-						<p className="text-[11px] text-muted-foreground mt-1">Markup a lista: {fMarkupTxt(volBase.firma, cvFirma)}</p>
+						<p className="text-xs text-muted-foreground mt-1">Markup a lista: {fMarkupTxt(volBase.firma, cvFirma)}</p>
 					</div>
 				</div>
 
@@ -371,7 +371,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					</TableBody>
 				</Table>
 				<AddRowButton label="Agregar segmento" onClick={function () { addRow("volumenSegments", { id: genId("vseg"), label: "Nuevo segmento", firmasMin: 0, firmasMax: null, compromisoMin: 0, compromisoMax: null, descuento: 0 }); }} />
-				<p className="text-[11px] text-muted-foreground mt-3">
+				<p className="text-xs text-muted-foreground mt-3">
 					El compromiso se mide a precio de lista (certificados × base cert + firmas × base firma) por los meses de vinculación. Los precios y markups de cada fila son calculados: se editan el precio base y el descuento. Una fila en rojo vende algún elemento por debajo del markup mínimo.
 				</p>
 			</CollapsibleSection>
@@ -414,7 +414,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					</TableBody>
 				</Table>
 				<AddRowButton label="Agregar escalón" onClick={function () { addRow("volumenProyeccion", { firmas: 0, descuento: 0 }); }} />
-				<p className="text-[11px] text-muted-foreground mt-3">
+				<p className="text-xs text-muted-foreground mt-3">
 					Cada escalón es un umbral absoluto de firmas con su descuento sobre el precio base de la firma. Amplialo con varios tramos para cubrir un espectro de volumen: cada cliente ve el mismo escalonado y encuentra el tramo que se adecúa a su necesidad. Una fila en rojo vende la firma por debajo del markup mínimo.
 				</p>
 			</CollapsibleSection>
@@ -499,7 +499,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					<div className="w-56">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento de abono · default (%)</Label>
 						<NumCell value={draft.abonoDescuentoPct} decimals={0} onChange={function (v) { updDraft({ abonoDescuentoPct: v }); }} className="mt-1.5" />
-						<p className="text-[11px] text-muted-foreground mt-1">Valor sugerido al activar el abono; ajustable por cotización.</p>
+						<p className="text-xs text-muted-foreground mt-1">Valor sugerido al activar el abono; ajustable por cotización.</p>
 					</div>
 				</div>
 
@@ -531,7 +531,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						</div>
 					);
 				})}
-				<p className="text-[11px] text-muted-foreground">
+				<p className="text-xs text-muted-foreground">
 					El texto visible se arma con el número: la opción de mayor valor se muestra como "N o más"; en Time to cash, 0 = "Pago contado".
 				</p>
 			</CollapsibleSection>
@@ -545,12 +545,12 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 					<div>
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo variable certificado (USD)</Label>
 						<div className="mt-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-right font-semibold tabular-nums">{cvCert.toFixed(4)}</div>
-						<p className="text-[11px] text-muted-foreground mt-1.5">CV por certificado emitido.</p>
+						<p className="text-xs text-muted-foreground mt-1.5">CV por certificado emitido.</p>
 					</div>
 					<div>
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Costo variable firma (USD)</Label>
 						<div className="mt-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-right font-semibold tabular-nums">{cvFirma.toFixed(4)}</div>
-						<p className="text-[11px] text-muted-foreground mt-1.5">CV por firma emitida.</p>
+						<p className="text-xs text-muted-foreground mt-1.5">CV por firma emitida.</p>
 					</div>
 				</div>
 			</CollapsibleSection>

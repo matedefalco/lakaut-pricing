@@ -19,14 +19,14 @@ export function TierHint({ label = "¿por qué este nivel?", nextHint, columns, 
 			<button
 				type="button"
 				onClick={function () { setOpen(function (o) { return !o; }); }}
-				className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+				className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
 			>
 				<Info className="size-3" /> {label}
 			</button>
 			{open && (
 				<div className="glass-strong shadow-float absolute right-0 z-50 mt-2 w-[320px] max-w-[calc(100vw-32px)] rounded-xl border p-3">
-					{nextHint && <p className="mb-2 rounded-lg bg-primary/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-foreground">{nextHint}</p>}
-					<table className="w-full text-[11px]">
+					{nextHint && <p className="mb-2 rounded-lg bg-primary/5 px-2.5 py-1.5 text-xs leading-relaxed text-foreground">{nextHint}</p>}
+					<table className="w-full text-xs">
 						<thead>
 							<tr className="text-muted-foreground">
 								{columns.map(function (c, i) {

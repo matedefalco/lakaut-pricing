@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 function ExportCurrencyToggle({ value, onChange }) {
 	return (
 		<div className="flex items-center gap-1.5 mr-1" title="Moneda del PDF exportado">
-			<span className="text-[11px] uppercase tracking-wide text-muted-foreground">Exportar en</span>
+			<span className="text-xs uppercase tracking-wide text-muted-foreground">Exportar en</span>
 			<div className="inline-flex rounded-full border p-0.5">
 				{["ARS", "USD"].map(function (c) {
 					const active = value === c;
@@ -16,7 +16,7 @@ function ExportCurrencyToggle({ value, onChange }) {
 							key={c}
 							type="button"
 							onClick={function () { onChange(c); }}
-							className={"rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors " + (active ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-muted-foreground hover:text-foreground")}
+							className={"rounded-full px-2.5 py-0.5 text-xs font-bold transition-colors " + (active ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-muted-foreground hover:text-foreground")}
 						>
 							{c}
 						</button>

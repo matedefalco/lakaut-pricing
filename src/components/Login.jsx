@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/useAuth";
-import { BLUE, GRAY, os } from "@/theme/tokens";
 
 // Pantalla de acceso. Firma con la misma marca que la sidebar y el PDF ("FID by
 // Lakaut") para que el login se lea como parte de la app y no como un formulario
@@ -31,17 +30,17 @@ export function Login() {
 	}
 
 	return (
-		<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--muted)", padding: 24 }}>
-			<div className="glass" style={{ width: "100%", maxWidth: 380, borderRadius: 16, border: "1px solid var(--glass-border)", padding: "32px 28px", boxShadow: "0 12px 40px rgba(30,32,48,0.10)" }}>
+		<div className="flex min-h-svh items-center justify-center bg-muted p-6">
+			<div className="glass shadow-float w-full max-w-[380px] rounded-2xl border border-[var(--glass-border)] px-7 py-8">
 				{/* Brand header */}
-				<div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 3 }}>
-					<span className="font-display" style={{ fontSize: 26, color: BLUE, lineHeight: 1 }}>FID</span>
-					<span style={Object.assign({}, os(12, 600, GRAY), { lineHeight: 1 })}>by Lakaut</span>
+				<div className="mb-1 flex items-baseline gap-1.5">
+					<span className="font-display text-xl leading-none text-primary">FID</span>
+					<span className="text-sm leading-none font-semibold text-muted-foreground">by Lakaut</span>
 				</div>
-				<div style={Object.assign({}, os(11, 400, GRAY), { letterSpacing: "0.3px", marginBottom: 26 })}>Cotizador comercial</div>
+				<div className="mb-6 text-xs tracking-[0.3px] text-muted-foreground">Cotizador comercial</div>
 
-				<form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-					<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+					<div className="flex flex-col gap-1.5">
 						<Label htmlFor="login-email">Email</Label>
 						<Input
 							id="login-email"
@@ -54,7 +53,7 @@ export function Login() {
 							required
 						/>
 					</div>
-					<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+					<div className="flex flex-col gap-1.5">
 						<Label htmlFor="login-password">Contraseña</Label>
 						<Input
 							id="login-password"
@@ -67,7 +66,7 @@ export function Login() {
 					</div>
 
 					{error && (
-						<div role="alert" style={Object.assign({}, os(12, 400, "var(--destructive)"), { color: "var(--destructive)" })}>
+						<div role="alert" className="text-sm text-destructive">
 							{error}
 						</div>
 					)}

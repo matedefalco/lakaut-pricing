@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { ColumnPicker } from "@/components/ui/ColumnPicker";
 
 // La unidad del canal es la IDC: un bundle de certificado más el cupo de firmas
 // incluidas. El análisis se hace contra el costo de ese bundle, no del certificado
@@ -38,78 +39,6 @@ const API_STYLES = {
 	professional: { background: "#2563EB", color: "#fff" },
 	enterprise:   { background: "#6D28D9", color: "#fff" },
 };
-
-function ColFilterDropdown({ visible, onToggle }) {
-	const [open, setOpen] = useState(false);
-	const ref = useRef(null);
-	useEffect(function () {
-		function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
-		document.addEventListener("mousedown", handler);
-		return function () { document.removeEventListener("mousedown", handler); };
-	}, []);
-	return (
-		<div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-			<button
-				onClick={function () { setOpen(function (o) { return !o; }); }}
-				style={{
-					display: "flex", alignItems: "center", gap: 5, padding: "5px 12px",
-					border: "1px solid var(--border)", borderRadius: 6,
-					background: open ? "var(--accent)" : "var(--background)",
-					cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--foreground)",
-				}}
-			>
-				<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-					<line x1="2" y1="4" x2="14" y2="4" /><line x1="4" y1="8" x2="12" y2="8" /><line x1="6" y1="12" x2="10" y2="12" />
-				</svg>
-				Propiedades
-				<span style={{ fontSize: 10, background: "var(--muted)", borderRadius: 10, padding: "1px 6px", color: "var(--muted-foreground)" }}>
-					{visible.size}/{ALL_COLS.length}
-				</span>
-			</button>
-			{open && (
-				<div style={{
-					position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50,
-					background: "var(--background)", border: "1px solid var(--border)",
-					borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 220, padding: "6px 0",
-				}}>
-					<div style={{ padding: "4px 12px 6px", fontSize: 11, fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-						Columnas visibles
-					</div>
-					{ALL_COLS.map(function (col) {
-						const checked = visible.has(col.key);
-						return (
-							<label key={col.key} style={{
-								display: "flex", alignItems: "center", gap: 9, padding: "6px 12px",
-								cursor: "pointer", fontSize: 13, color: "var(--foreground)",
-								background: checked ? "var(--accent)" : "transparent",
-							}}>
-								<input
-									type="checkbox"
-									checked={checked}
-									onChange={function () { onToggle(col.key); }}
-									style={{ accentColor: "var(--primary)", width: 14, height: 14, cursor: "pointer" }}
-								/>
-								{col.label}
-							</label>
-						);
-					})}
-					<div style={{ borderTop: "1px solid var(--border)", margin: "4px 0" }} />
-					<div style={{ display: "flex", gap: 6, padding: "4px 12px" }}>
-						<button onClick={function () { ALL_COLS.forEach(function (c) { if (!visible.has(c.key)) onToggle(c.key); }); }}
-							style={{ fontSize: 11, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-							Mostrar todas
-						</button>
-						<span style={{ color: "var(--muted-foreground)" }}>·</span>
-						<button onClick={function () { ALL_COLS.forEach(function (c) { if (visible.has(c.key)) onToggle(c.key); }); }}
-							style={{ fontSize: 11, color: "var(--muted-foreground)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-							Ocultar todas
-						</button>
-					</div>
-				</div>
-			)}
-		</div>
-	);
-}
 
 export function TabCanalB2B2CPrecios({ costs }) {
 	const { channelConfig } = useChannelConfig();
@@ -167,7 +96,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 				<CardContent>
 					<div className="flex items-center justify-between gap-4 mb-3">
 						<div className="text-sm font-semibold">Pricing por segmento</div>
-						<ColFilterDropdown visible={visible} onToggle={toggleCol} />
+						<ColumnPicker cols={ALL_COLS} visible={visible} onToggle={toggleCol} />
 					</div>
 					<div className="overflow-x-auto">
 					<Table>
@@ -294,7 +223,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 							})}
 						</TableBody>
 					</Table>
-					<p className="text-[11px] text-muted-foreground mt-2">En la Cotizadora podés bonificar el SLA para un cliente específico sin modificar esta tabla.</p>
+					<p className="text-xs text-muted-foreground mt-2">En la Cotizadora podés bonificar el SLA para un cliente específico sin modificar esta tabla.</p>
 				</CardContent>
 			</Card>
 		</div>

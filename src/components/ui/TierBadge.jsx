@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 //   lg  → el nivel asignado en la cotizadora: es un logro, no un dato
 
 const SIZES = {
-	sm: { pad: "px-2 py-0.5", text: "text-[11px]", emoji: "text-[11px]", radius: 8, gap: "gap-1" },
+	sm: { pad: "px-2 py-0.5", text: "text-xs", emoji: "text-xs", radius: 8, gap: "gap-1" },
 	md: { pad: "px-2.5 py-1", text: "text-xs", emoji: "text-sm", radius: 10, gap: "gap-1.5" },
 	lg: { pad: "px-3.5 py-1.5", text: "text-sm", emoji: "text-base", radius: 12, gap: "gap-2" },
 };
@@ -74,7 +74,7 @@ export function TierTrophy({ tier, tiers, discountPct, note, empty, eyebrow = "N
 	if (!mat) {
 		return (
 			<div className="rounded-xl border border-dashed border-border px-3.5 py-2.5">
-				<div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{eyebrow}</div>
+				<div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{eyebrow}</div>
 				<div className="mt-1 font-heading text-lg font-semibold text-muted-foreground/40">—</div>
 			</div>
 		);
@@ -82,7 +82,7 @@ export function TierTrophy({ tier, tiers, discountPct, note, empty, eyebrow = "N
 
 	return (
 		<div
-			className={cn("relative overflow-hidden rounded-xl px-3.5 py-2.5 transition-all duration-300", celebrate && "animate-tier-pop")}
+			className={cn("relative overflow-hidden rounded-xl px-3.5 py-2.5 transition-all duration-200", celebrate && "animate-tier-pop")}
 			style={{
 				background: mat.bg,
 				border: "1px solid " + mat.border,
@@ -98,7 +98,7 @@ export function TierTrophy({ tier, tiers, discountPct, note, empty, eyebrow = "N
 					style={{ background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.85), transparent)" }}
 				/>
 			)}
-			<div className="relative text-[10px] font-bold uppercase tracking-wide" style={{ color: mat.fg, opacity: 0.7 }}>
+			<div className="relative text-xs font-bold uppercase tracking-wide" style={{ color: mat.fg, opacity: 0.7 }}>
 				{eyebrow}
 			</div>
 			<div className="mt-1 flex items-baseline gap-2">
@@ -113,7 +113,7 @@ export function TierTrophy({ tier, tiers, discountPct, note, empty, eyebrow = "N
 				)}
 			</div>
 			{note && (
-				<div className="mt-1 text-[11px]" style={{ color: mat.fg, opacity: 0.75 }}>{note}</div>
+				<div className="mt-1 text-xs" style={{ color: mat.fg, opacity: 0.75 }}>{note}</div>
 			)}
 		</div>
 	);
