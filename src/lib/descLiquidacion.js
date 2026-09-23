@@ -58,20 +58,31 @@ export const DESC_OPCIONES = [
 // Grupos en orden, para renderizar la lista con encabezados sin duplicar strings.
 export const DESC_GRUPOS = ["Con compromiso anual", "Sin compromiso anual"];
 
-// Opción por defecto: B1 (pago anticipado con descuento aplicado), el comportamiento
-// histórico del canal.
-export const DESC_OPCION_DEFAULT = "B1";
+// Opción por defecto de una cotización NUEVA: C1, descuento directo en factura, sin
+// compromiso anual. Es la forma que se ofrece primero: no le pide al cliente pago
+// anticipado ni permanencia, así que es la que menos fricción tiene para abrir la
+// conversación. El resto se elige cuando el cliente pide mejorar el precio a cambio
+// de comprometerse.
+export const DESC_OPCION_DEFAULT = "C1";
+
+// Fallback para deals GUARDADOS que no registraron forma de liquidación: B1, el
+// comportamiento histórico del canal. No se toca junto con el default de arriba a
+// propósito. `conCompromiso` (forma !== "C") cambia el eje de facturación del nivel
+// en Distribuidores-Volumen (×12 vs ×1) y si los certificados activos cuentan, así
+// que mover este valor haría que una cotización vieja se reabra en otro nivel y con
+// otro precio que cuando se envió.
+export const DESC_OPCION_LEGACY = "B1";
 
 // Busca la opción por su id plano; cae al default si no existe.
 export function descOpcion(id) {
-	return DESC_OPCIONES.find(function (o) { return o.id === id; }) || DESC_OPCIONES.find(function (o) { return o.id === DESC_OPCION_DEFAULT; });
+	return DESC_OPCIONES.find(function (o) { return o.id === id; }) || DESC_OPCIONES.find(function (o) { return o.id === DESC_OPCION_LEGACY; });
 }
 
 // Traduce el modelo persistido { forma, sub } al id plano de la opción. Deals viejos
 // (o sin el dato) caen al default.
 export function descOpcionId(forma, sub) {
 	const o = DESC_OPCIONES.find(function (x) { return x.forma === forma && x.sub === sub; });
-	return o ? o.id : DESC_OPCION_DEFAULT;
+	return o ? o.id : DESC_OPCION_LEGACY;
 }
 
 // Sub-variante por defecto de cada forma (compat: usado al resolver un { forma } suelto).

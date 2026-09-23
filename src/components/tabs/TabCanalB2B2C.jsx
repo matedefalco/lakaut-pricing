@@ -13,12 +13,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ProyeccionSection } from "./b2b2c/ProyeccionSection";
 import { SegmentoSection } from "./b2b2c/SegmentoSection";
+import { ConditionBlock, ConditionToggleBlock } from "./b2b2c/ConditionBlock";
+import { Handshake, Wallet, Gift, CalendarClock, SlidersHorizontal } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CommercialLevers } from "@/components/ui/CommercialLevers";
 import { resolveLevers, defaultLeverSelection, leverValue } from "@/lib/commercialLevers";
-import { DESC_OPCIONES, DESC_GRUPOS, DESC_OPCION_DEFAULT, descOpcion, descOpcionId, resolveDescLiquidacion } from "@/lib/descLiquidacion";
+import { DESC_OPCIONES, DESC_GRUPOS, DESC_OPCION_DEFAULT, DESC_OPCION_LEGACY, descOpcion, descOpcionId, resolveDescLiquidacion } from "@/lib/descLiquidacion";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
@@ -336,13 +338,15 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setFirmasBonificadas(i.firmasBonificadas != null ? String(i.firmasBonificadas) : "");
 		setShowBonif(i.firmasBonificadas != null);
-		// Forma de liquidación del descuento. Deals sin el dato (o de IDC) caen al
-		// default B1, que es el comportamiento histórico del canal.
+		// Forma de liquidación del descuento. Un deal guardado sin el dato (o de IDC)
+		// cae al LEGACY (B1), no al default de las cotizaciones nuevas: si cayera al
+		// default, cambiar ese default reabriría las cotizaciones históricas en otro
+		// nivel y con otro precio del que se envió.
 		const dl = i.descLiquidacion;
 		if (dl && (dl.forma === "A" || dl.forma === "B" || dl.forma === "C")) {
 			setDescOpcionSel(descOpcionId(dl.forma, dl.sub));
 		} else {
-			setDescOpcionSel(DESC_OPCION_DEFAULT);
+			setDescOpcionSel(DESC_OPCION_LEGACY);
 		}
 		setCasosDeUso(i.casosDeUso || "");
 		setAbono(i.abono || false);
@@ -1248,25 +1252,22 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					</div>
 				)}
 
-				{conApi && <Separator />}
-
 				{/* Condiciones comerciales OFRECIDAS: se listan en la propuesta como
 				    incentivos que el cliente puede aprovechar. No bajan el total. */}
-				<div className="flex flex-col gap-2">
-					<span className="text-sm font-medium">Condiciones comerciales que ofrecés</span>
+				<ConditionBlock
+					icon={Handshake}
+					title="Condiciones comerciales que ofrecés"
+				>
 					<p className="text-xs text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
 					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
-				</div>
-
-				<Separator />
+				</ConditionBlock>
 
 				{/* Forma de liquidación del descuento de nivel (solo Volumen y Distribuidores-
 				    Volumen). El neto no cambia entre formas; cambia el cash flow y, en A2, el
 				    margen (firmas bonificadas con costo). No aplica a IDC (escala de precios). */}
 				{mostrarFormas && (
 					<>
-						<div className="flex flex-col gap-2.5">
-							<span className="text-sm font-medium">Forma de liquidación del descuento</span>
+						<ConditionBlock icon={Wallet} title="Forma de liquidación del descuento">
 							<p className="text-xs text-muted-foreground">
 								{descNivelMonto > 0
 									? "Elegí cómo se entrega el descuento de nivel de " + fMoney(descNivelMonto) + ". El neto es el mismo en todas; cambia el cash flow y el compromiso que se le pide al cliente."
@@ -1304,22 +1305,21 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 											: (descSub === "anticipado" ? "Se cobra " + fMoney(revServicio) + " anticipado, con el descuento ya aplicado." : "Precio neto " + fMoney(revServicio) + " con seguro de caución ejecutable (solo cláusula en la propuesta).")}
 								</p>
 							)}
-						</div>
-						<Separator />
+						</ConditionBlock>
 					</>
 				)}
 
 				{/* Bonificación de firmas (opcional): parte de las firmas facturables no se
 				    cobra. No toca el volumen ni el segmento, solo el subtotal a facturar. */}
-				<div className="flex flex-col gap-3">
-					<label className="flex items-center gap-2.5 cursor-pointer select-none">
-						<input type="checkbox" checked={showBonif} onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }} className="rounded" />
-						<span className="text-sm font-medium">Bonificar firmas</span>
-						{firmasBonif > 0 && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge>}
-					</label>
-					{!showBonif && <p className="text-xs text-muted-foreground pl-6">Opcional. Regalá firmas que estén por encima del cupo del bundle: son las únicas que se facturan por unidad.</p>}
-					{showBonif && (
-						<div className="pl-6 border-l-2 border-muted ml-1 space-y-2">
+				<ConditionToggleBlock
+					icon={Gift}
+					title="Bonificar firmas"
+					checked={showBonif}
+					onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }}
+					badge={firmasBonif > 0 ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge> : null}
+					hint="Opcional. Regalá firmas que estén por encima del cupo del bundle: son las únicas que se facturan por unidad."
+				>
+					<div className="space-y-2">
 							<div className="max-w-xs">
 								<NumberField label="Firmas bonificadas" value={firmasBonificadas} onChange={setFirmasBonificadas} min={0} max={firmasExtra} placeholder="0"
 									note={hasVolume ? (firmasExtra > 0 ? "De las " + firmasExtra.toLocaleString("es-AR") + " firmas sobre el cupo." : "Este volumen no tiene firmas sobre el cupo.") : "Cargá el volumen primero."} />
@@ -1334,10 +1334,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							)}
 							<p className="text-xs text-muted-foreground">El segmento se sigue calculando sobre el volumen completo de IDC. El costo variable de las firmas bonificadas se paga igual, así que baja el markup.</p>
 						</div>
-					)}
-				</div>
-
-				<Separator />
+				</ConditionToggleBlock>
 
 				<SegmentoSection
 					esIDC={esIDC}
@@ -1366,44 +1363,39 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					fMoney2={fMoney2}
 				/>
 
-				<Separator />
-
 				{/* Abono mensual */}
-				<div className="flex flex-col gap-3">
-					<label className="flex items-center gap-2.5 cursor-pointer select-none">
-						<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
-						<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
-						{abono && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
-					</label>
-					{abono && (
-						<div className="pl-6 border-l-2 border-muted ml-1 flex items-center gap-2">
+				<ConditionToggleBlock
+					icon={CalendarClock}
+					title="Incluir abono mensual de firmas"
+					checked={abono}
+					onChange={function (e) { setAbono(e.target.checked); }}
+					badge={abono ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
+				>
+						<div className="flex items-center gap-2">
 							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del abono</Label>
 							<div className="flex items-center gap-1">
 								<Input type="number" min={0} max={100} value={abonoDescPct} onChange={function (e) { setAbonoDescPct(e.target.value === "" ? "" : Number(e.target.value)); }} className="h-8 w-20 text-sm tabular-nums" />
 								<span className="text-sm text-muted-foreground">%</span>
 							</div>
 						</div>
-					)}
 					{abono && hasVolume && (
-						<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1">
+						<div className="mt-2 text-sm text-muted-foreground space-y-1">
 							<p>Repone la bolsa de firmas cada mes con un descuento del {(descAbono * 100).toFixed(0)}% sobre el precio de firma.</p>
 							<p className="text-xs">{firmasTotales.toLocaleString("es-AR")} firmas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
 						</div>
 					)}
-				</div>
-
-				<Separator />
+				</ConditionToggleBlock>
 
 				{/* Ajuste de precios personalizado (por componente) */}
-				<div className="flex flex-col gap-3">
-					<label className="flex items-center gap-2.5 cursor-pointer select-none">
-						<input type="checkbox" checked={showOverrides} onChange={function (e) { setShowOverrides(e.target.checked); if (!e.target.checked) { setOverridePrecioCert(""); setOverridePrecioFirma(""); } }} className="rounded" />
-						<span className="text-sm font-medium">Ajuste de precios personalizado</span>
-						{overrideActive && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge>}
-					</label>
-					{!showOverrides && <p className="text-xs text-muted-foreground pl-6">Opcional. Fijá a mano el precio de certificado o de firma para esta cotización; lo que dejes vacío usa el precio del segmento.</p>}
-					{showOverrides && (
-						<div className="space-y-2">
+				<ConditionToggleBlock
+					icon={SlidersHorizontal}
+					title="Ajuste de precios personalizado"
+					checked={showOverrides}
+					onChange={function (e) { setShowOverrides(e.target.checked); if (!e.target.checked) { setOverridePrecioCert(""); setOverridePrecioFirma(""); } }}
+					badge={overrideActive ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
+					hint="Opcional. Fijá a mano el precio de certificado o de firma para esta cotización; lo que dejes vacío usa el precio del segmento."
+				>
+					<div className="space-y-2">
 							<p className="text-xs text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
 							<div className="grid grid-cols-2 gap-3 max-w-sm">
 								<div className="flex flex-col gap-1.5">
@@ -1422,10 +1414,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground">Precio efectivo: IDC {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma sobre el cupo {fMoney2(precioFirmaExtraEff)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
-						</div>
-					)}
-				</div>
-				<Separator />
+					</div>
+				</ConditionToggleBlock>
 
 				<ProyeccionSection
 					esIDC={esIDC} esDistribVol={esDistribVol} hasVolume={hasVolume}

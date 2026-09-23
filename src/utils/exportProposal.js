@@ -129,8 +129,13 @@ function miniStats(dark, statsList) {
 // la alícuota efectiva depende de la jurisdicción y del padrón en que esté inscripto
 // el cliente, así que la propuesta la enuncia como paso del precio SIN monto (el
 // total que se cotiza sigue siendo neto + IVA). Las alícuotas van como referencia.
+// Percepciones de IIBB. Lakaut es agente de percepción de C.A.B.A. y Buenos Aires,
+// pero la alícuota efectiva depende de la jurisdicción del cliente y del padrón en
+// que esté inscripto su CUIT, así que el monto no se conoce al cotizar: se determina
+// recién al emitir la factura. La nota decía "C.A.B.A. 2% · BS.AS. 3,5%", que se lee
+// como una alícuota cerrada y compromete un número que la propuesta no puede sostener.
 const IIBB_VALOR = "Según corresponda";
-const IIBB_NOTA = "C.A.B.A. 2% · BS.AS. 3,5% sobre el neto";
+const IIBB_NOTA = "C.A.B.A. y BS.AS. · se determinan al facturar, según el CUIT";
 
 // Desglose del precio en una sola línea progresiva: subtotal + IVA + percepciones
 // = total. Reemplaza al par bigPrice + miniStats, que mostraba el total arriba y
@@ -740,22 +745,22 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const items = [
 		// Certificados: se desglosan por tipo solo cuando hay jurídicos en el mix.
 		...(hayJuridicos ? [
-			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcJuridicos * precioIDC },
-			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcFisicos * precioIDC }] : []),
+			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcJuridicos * precioIDC, d: true },
+			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcFisicos * precioIDC, d: true }] : []),
 		] : idc > 0 ? [
-			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: revIDC },
+			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: revIDC, d: true },
 		] : []),
 		// Firmas que exceden el cupo del bundle: se atribuyen al tipo de certificado que
 		// las genera. Las que entran en el cupo no llevan línea de cargo (ya están en el
 		// precio de la IDC) y se muestran como parte de lo incluido, más abajo.
 		...(hayJuridicos ? [
-			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica }] : []),
-			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica }] : []),
+			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica, d: true }] : []),
+			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica, d: true }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl, d: true }] : []),
 		]),
-		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic }] : []),
-		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas }] : []),
+		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic, d: true }] : []),
+		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas, d: true }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
@@ -820,17 +825,40 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
       <span style="color:${GR};">Descuento por condiciones (−${condPctV}%)${condTerms ? `<span style="display:block;font-size:7pt;color:${GR};line-height:1.3;">${condTerms}</span>` : ""}</span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(descCondMonto, currency, tc)}</span>
     </div>` : "";
-	// El tachado dice que hay un precio mejor, pero no por qué. Esta línea nombra el
-	// segmento (nivel, en Distribuidores-Volumen) que lo habilitó, que es el argumento
-	// comercial: el beneficio lo ganó el cliente con su volumen comprometido.
+	// El descuento de segmento vive en el PRECIO UNITARIO, así que antes se enunciaba
+	// como una nota al pie del apartado ("precios con el N% ya aplicado"). El cliente
+	// veía un número y una promesa de descuento que no podía cotejar contra nada.
+	// Ahora cada línea que lo lleva muestra su precio de lista tachado, el porcentaje
+	// y el neto: el ahorro se lee donde ocurre, renglón por renglón.
+	//
+	// El descuento por condiciones y la bonificación de firmas NO se prorratean acá:
+	// son porcentajes sobre el subtotal, no sobre un unitario, y repartirlos por ítem
+	// sería inventar una atribución. Siguen como su propia línea, abajo.
 	const segPalabra = isDistribVol(deal.channel) ? "nivel" : "segmento";
+	const segFactor = segDescPts > 0 ? 1 - segDescPts / 100 : 0;
 	const segNotaHtml = segDescPts > 0
-		? `<div style="font-size:7.5pt;color:${B};font-weight:600;line-height:1.3;margin-top:${denso ? "0.08cm" : "0.16cm"};">Precios unitarios con el ${segDescPts}% de descuento ${segNombre ? `del ${segPalabra} ${segNombre}` : "por volumen"} ya aplicado sobre el precio de lista.</div>`
+		? `<div style="font-size:7pt;color:${GR};line-height:1.3;margin-top:${denso ? "0.06cm" : "0.12cm"};">El precio tachado es el de lista; el descuento del ${segDescPts}% lo habilitó ${segNombre ? `el ${segPalabra} <strong style="color:${B};">${segNombre}</strong>` : "tu volumen"}.</div>`
 		: "";
-	const itemsListHtml = !singleItem ? items.map(it => `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
+	// Una línea de ítem. Cuando el ítem lleva el descuento de segmento, el valor se
+	// parte en dos renglones: lista tachada + porcentaje arriba, neto abajo.
+	function itemRow(it) {
+		const conDesc = it.d && segFactor > 0;
+		const lista = conDesc ? it.v / segFactor : 0;
+		const valorHtml = conDesc
+			? `<span style="text-align:right;white-space:nowrap;">
+          <span style="display:block;font-size:6.5pt;color:${GR};">
+            <span style="text-decoration:line-through;">${fm(lista, currency, tc)}</span>
+            <span style="color:${B};font-weight:700;"> −${segDescPts}%</span>
+          </span>
+          <span style="display:block;color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
+        </span>`
+			: `<span style="color:${DK};font-weight:600;white-space:nowrap;">${fm(it.v, currency, tc)}</span>`;
+		return `<div style="display:flex;justify-content:space-between;gap:0.3cm;align-items:flex-start;font-size:${itemFs};">
       <span style="color:${GR};">${it.l}</span>
-      <span style="color:${DK};font-weight:600;">${fm(it.v, currency, tc)}</span>
-    </div>`).join("") + bonifLineHtml + descCondLineHtml : "";
+      ${valorHtml}
+    </div>`;
+	}
+	const itemsListHtml = !singleItem ? items.map(itemRow).join("") + bonifLineHtml + descCondLineHtml : "";
 	const firmaWord = (n) => `${n} ${n === 1 ? firmaSing : firmaPlur}`;
 	// El nombre de la unidad: "validaciones de identidad" (IDC con SDK), "identidades"
 	// (IDC sin SDK) o "certificados" (Volumen).
