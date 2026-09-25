@@ -49,7 +49,8 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 
 	const channelCards = [
 		{ key: "web", label: CHANNELS.web.label, desc: CHANNELS.web.desc },
-		{ key: "distribuidores", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores.desc },
+		// Distribuidores cotiza siempre por Volumen (la modalidad packs se descartó).
+		{ key: "distribuidores_vol", label: CHANNELS.distribuidores.label, desc: CHANNELS.distribuidores_vol.desc },
 		{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
 		{ key: "volumen", label: CHANNELS.volumen.label, desc: CHANNELS.volumen.desc },
 	];

@@ -249,10 +249,12 @@ function LakautCalcInner() {
 	}
 
 	function newQuote(channel) {
+		// Las cotizaciones nuevas de Distribuidores son siempre por Volumen: el id
+		// "distribuidores" (packs) solo sobrevive para abrir deals viejos vía editQuote.
+		if (channel === "distribuidores") channel = "distribuidores_vol";
 		setPendingEdit(null);
 		setQuoteNonce(function (prev) { return Object.assign({}, prev, { [channel]: (prev[channel] || 0) + 1 }); });
 		if (channel === "distribuidores_vol") setDistribMode("volumen");
-		else if (channel === "distribuidores") setDistribMode("packs");
 		navTo(navKeyForChannel(channel));
 	}
 
@@ -310,7 +312,12 @@ function LakautCalcInner() {
 			<button
 				type="button"
 				aria-current={isActive ? "page" : undefined}
-				onClick={function () { navTo(itemKey); }}
+				onClick={function () {
+					// Entrar a Distribuidores desde el nav arranca en Volumen, aunque antes
+					// se haya abierto un deal legacy de packs.
+					if (itemKey === "distribuidores") setDistribMode("volumen");
+					navTo(itemKey);
+				}}
 				className={cn(
 					"mx-2 my-px flex w-[calc(100%-16px)] cursor-pointer items-center gap-2.5 rounded-[10px] border-none px-3 py-1.5 text-left text-sm leading-snug outline-none transition-all duration-150 focus-visible:ring-[3px] focus-visible:ring-ring/50",
 					isActive ? "shadow-card bg-white/90 font-bold" : cn("bg-transparent text-foreground hover:bg-white/50", bold ? "font-semibold" : "font-normal")
