@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen } from "lucide-react";
+import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings } from "lucide-react";
+import { dealStatus, dealStatusMeta, dealsPorVencer, diasParaVencer } from "./lib/dealStatus";
 import { useDolarTC, DOLAR_SOURCES } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "./data/costs";
@@ -79,6 +80,21 @@ const QUOTABLE = [
 	{ key: "b2b2c", label: CHANNELS.b2b2c.label, desc: CHANNELS.b2b2c.desc },
 	{ key: "volumen", label: CHANNELS.volumen.label, desc: CHANNELS.volumen.desc },
 ];
+
+// ── Riel de navegación (escritorio) ───────────────────────────────────────────
+// La sidebar mostraba 17 entradas siempre abiertas. El riel deja a la vista solo
+// los destinos (Inicio + un botón por grupo) y cada grupo abre su panel al lado:
+// lo que no estás usando no ocupa lugar ni atención. Configuración, que se toca
+// poco, baja al pie del riel.
+const GROUP_TITLE = { cotizar: "Cotizar", seguimiento: "Seguimiento", analisis: "Análisis", configuracion: "Configuración" };
+const RAIL_ICON = { cotizar: FileText, seguimiento: Clock3, analisis: ChartColumn, configuracion: Settings };
+// Bajada corta por canal para el panel Cotizar (la desc completa vive en Inicio).
+const CHANNEL_SHORT = {
+	web: "Packs a precio de lista",
+	distribuidores: "Socios por nivel, por volumen",
+	b2b2c: "Identidades con firmas incluidas",
+	volumen: "Certificados y firmas sueltos",
+};
 
 // ── Sección visual de cada pantalla ───────────────────────────────────────────
 // Alimenta el `data-section` del fondo (ver `.app-bg[data-section]` en index.css),
@@ -196,11 +212,11 @@ function LakautCalcInner() {
 	const [activeNavItem, setActiveNavItem] = useState("inicio");
 	// Arranca abierto en escritorio y cerrado abajo de lg, donde es un drawer que
 	// tapa el contenido. `lg` = 1024px, el mismo breakpoint que usa el layout.
-	const [sidebarOpen, setSidebarOpen] = useState(function () {
-		if (typeof window === "undefined") return true;
-		return window.matchMedia("(min-width: 1024px)").matches;
-	});
+	// En escritorio navega el riel; la sidebar completa queda como drawer abajo de lg.
+	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [pendingEdit, setPendingEdit] = useState(null);
+	// Panel abierto al lado del riel: "nueva", o la clave de un grupo del nav.
+	const [flyout, setFlyout] = useState(null);
 	// Al ir a Cotizaciones desde el toast de guardado, resaltamos y hacemos scroll
 	// a esa fila. Se limpia sola tras el flash (ver TabHistorial).
 	const [historialHighlight, setHistorialHighlight] = useState(null);
@@ -214,6 +230,7 @@ function LakautCalcInner() {
 
 	function navTo(key) {
 		setActiveNavItem(key);
+		setFlyout(null);
 		// En mobile el drawer tapa el contenido, así que elegir una sección lo cierra.
 		if (typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches) {
 			setSidebarOpen(false);
@@ -224,6 +241,7 @@ function LakautCalcInner() {
 	useEffect(function () {
 		function onKey(e) {
 			if (e.key !== "Escape") return;
+			setFlyout(null);
 			if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) return;
 			setSidebarOpen(false);
 		}
@@ -340,13 +358,233 @@ function LakautCalcInner() {
 
 	const section = SECTION_BY_ITEM[activeNavItem] || "inicio";
 
+	// Grupo e ítem activos: marcan el botón del riel y arman la miga de pan.
+	const activeGroup = NAV_GROUPS.find(function (g) { return g.items.some(function (i) { return i.key === activeNavItem; }); });
+	const activeItem = activeGroup ? activeGroup.items.find(function (i) { return i.key === activeNavItem; }) : null;
+
+	const allDeals = useMemo(function () { return (dealsApi && dealsApi.deals) || []; }, [dealsApi]);
+	const porVencer = useMemo(function () { return dealsPorVencer(allDeals); }, [allDeals]);
+	const recientes = useMemo(function () { return allDeals.slice(0, 3); }, [allDeals]);
+	const clientsById = useMemo(function () {
+		const m = {};
+		((clientsApi && clientsApi.clients) || []).forEach(function (c) { m[c.id] = c; });
+		return m;
+	}, [clientsApi]);
+
+	function dealClientName(d) {
+		const c = (d.client_id && clientsById[d.client_id]) || d.clients || null;
+		return (c && c.name) || d.clientName || "(sin nombre)";
+	}
+
+	function toggleFlyout(key) {
+		setFlyout(function (f) { return f === key ? null : key; });
+	}
+
+	// Botón del riel: icono arriba, nombre abajo. Activo = pill blanca teñida.
+	function railButton({ key, label, Icon, active, open, onClick, badge, badgeLabel }) {
+		return (
+			<button
+				key={key}
+				type="button"
+				onClick={onClick}
+				aria-expanded={open === undefined ? undefined : open}
+				aria-current={active ? "page" : undefined}
+				className={cn(
+					"relative flex w-[76px] cursor-pointer flex-col items-center gap-1 rounded-xl border-none px-0 py-2 text-xs leading-tight outline-none transition-all duration-150 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+					active || open ? "shadow-card bg-white/90 font-bold text-primary" : "bg-transparent font-semibold text-muted-foreground hover:bg-white/60 hover:text-foreground"
+				)}
+			>
+				<Icon size={21} strokeWidth={active || open ? 2.3 : 1.9} aria-hidden="true" />
+				<span>{label}</span>
+				{badge > 0 && (
+					<span className="absolute top-1 right-3 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--warning)] px-1 text-xs font-bold text-white tabular-nums" aria-label={badgeLabel}>{badge}</span>
+				)}
+			</button>
+		);
+	}
+
+	// Fila del panel lateral: icono en caja, nombre y bajada opcional.
+	function flyoutLink({ key, itemKey, label, Icon, accent, desc, badge, onClick }) {
+		const isActive = itemKey && activeNavItem === itemKey;
+		const tint = accent || "var(--primary)";
+		return (
+			<button
+				key={key}
+				type="button"
+				onClick={onClick || function () {
+					if (itemKey === "distribuidores") setDistribMode("volumen");
+					navTo(itemKey);
+				}}
+				aria-current={isActive ? "page" : undefined}
+				className={cn(
+					"flex w-full cursor-pointer items-center gap-3 rounded-xl border-none px-2.5 py-2 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+					isActive ? "shadow-card bg-white/90" : "bg-transparent hover:bg-white/60"
+				)}
+			>
+				{Icon && (
+					<span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-white/80" style={{ color: tint }}>
+						<Icon size={18} strokeWidth={2.1} aria-hidden="true" />
+					</span>
+				)}
+				<span className="min-w-0 flex-1">
+					<span className={cn("block truncate text-[15px] text-foreground", isActive ? "font-bold" : "font-semibold")}>{label}</span>
+					{desc && <span className="block truncate text-xs text-muted-foreground">{desc}</span>}
+				</span>
+				{badge}
+			</button>
+		);
+	}
+
+	// Cotización en una fila del panel: punto del canal, cliente y estado/vencimiento.
+	function dealLink({ deal, onClick, showVence }) {
+		const meta = channelMeta(resolveChannel(deal.channel));
+		const dias = diasParaVencer(deal);
+		const sub = showVence
+			? (dias === 0 ? "vence hoy" : "vence en " + dias + " día" + (dias === 1 ? "" : "s"))
+			: (meta.label || "") + " · " + dealStatusMeta(dealStatus(deal)).label.toLowerCase();
+		return (
+			<button
+				key={deal.id}
+				type="button"
+				onClick={onClick}
+				className="flex w-full cursor-pointer items-center gap-3 rounded-xl border-none bg-white/50 px-3 py-2.5 text-left outline-none transition-colors hover:bg-white/90 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			>
+				<span className="size-2 shrink-0 rounded-full" style={{ background: meta.color }} aria-hidden="true" />
+				<span className="min-w-0 flex-1">
+					<span className="block truncate text-sm font-bold text-foreground">{dealClientName(deal)}</span>
+					<span className={cn("block truncate text-xs", showVence ? "font-semibold text-[var(--warning)]" : "text-muted-foreground")}>{sub}</span>
+				</span>
+			</button>
+		);
+	}
+
+	function flyoutContent(key) {
+		if (key === "nueva") {
+			return {
+				title: "Nueva cotización",
+				sub: "Elegí el canal y arrancás de cero.",
+				body: (
+					<div className="flex flex-col gap-1">
+						{QUOTABLE.map(function (q) {
+							const meta = channelMeta(q.key);
+							return flyoutLink({ key: q.key, label: q.label, Icon: meta.Icon, accent: meta.color, desc: CHANNEL_SHORT[q.key === "distribuidores_vol" ? "distribuidores" : q.key], onClick: function () { setFlyout(null); newQuote(q.key); } });
+						})}
+					</div>
+				),
+			};
+		}
+		const group = NAV_GROUPS.find(function (g) { return g.groupKey === key; });
+		if (!group) return null;
+		const links = (
+			<div className="flex flex-col gap-1">
+				{group.items.map(function (item) {
+					const badge = item.key === "historial" && porVencer.length > 0
+						? <span className="shrink-0 rounded-full bg-[var(--warning)]/10 px-2 py-0.5 text-xs font-bold text-[var(--warning)]">{porVencer.length} por vencer</span>
+						: null;
+					return flyoutLink({ key: item.key, itemKey: item.key, label: item.label, Icon: item.Icon, accent: item.color || group.accent, desc: key === "cotizar" ? CHANNEL_SHORT[item.key] : null, badge: badge });
+				})}
+			</div>
+		);
+		let extra = null;
+		if (key === "cotizar" && recientes.length > 0) {
+			extra = (
+				<div className="flex flex-col gap-1.5">
+					<div className="px-1 text-xs font-bold tracking-[0.6px] text-muted-foreground uppercase">Seguí donde quedaste</div>
+					{recientes.map(function (d) { return dealLink({ deal: d, onClick: function () { editQuote(d); } }); })}
+				</div>
+			);
+		}
+		if (key === "seguimiento" && porVencer.length > 0) {
+			extra = (
+				<div className="flex flex-col gap-1.5">
+					<div className="px-1 text-xs font-bold tracking-[0.6px] text-muted-foreground uppercase">Por vencer</div>
+					{porVencer.slice(0, 5).map(function (d) { return dealLink({ deal: d, showVence: true, onClick: function () { goHistorial(d.id); } }); })}
+				</div>
+			);
+		}
+		return {
+			title: GROUP_TITLE[key],
+			sub: key === "cotizar" ? "Seguí con el canal abierto o retomá una cotización." : null,
+			body: <>{links}{extra}</>,
+		};
+	}
+	const flyoutData = flyout ? flyoutContent(flyout) : null;
+
 	return (
 		<div className="app-bg flex min-h-svh font-sans" data-section={section}>
 
-			{/* ── Sidebar ──
-			    En escritorio es una columna sticky de 224px. Abajo de lg pasa a ser un
-			    drawer sobre el contenido con backdrop: la columna fija dejaba la app
-			    inusable en un celular, que es donde el vendedor la abre en la calle. */}
+			{/* ── Riel (escritorio) ── */}
+			<div className="no-print glass sticky top-0 z-40 hidden h-screen w-[88px] shrink-0 flex-col items-center gap-1 border-r border-[var(--glass-border)] py-4 lg:flex">
+				<button
+					type="button"
+					onClick={function () { navTo("inicio"); }}
+					aria-label="FID by Lakaut · Inicio"
+					className="mb-3 cursor-pointer border-none bg-transparent font-display text-xl leading-none text-primary outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+				>FID</button>
+				<button
+					type="button"
+					aria-label="Nueva cotización"
+					aria-expanded={flyout === "nueva"}
+					onClick={function () { toggleFlyout("nueva"); }}
+					className="shadow-float mb-3 flex size-[52px] cursor-pointer items-center justify-center rounded-2xl border-none bg-primary text-primary-foreground outline-none transition-all duration-150 hover:-translate-y-px hover:brightness-110 focus-visible:ring-[3px] focus-visible:ring-ring/50 active:translate-y-0"
+				>
+					<Plus size={24} strokeWidth={2.4} aria-hidden="true" />
+				</button>
+				{railButton({ key: "inicio", label: "Inicio", Icon: Home, active: activeNavItem === "inicio" && !flyout, onClick: function () { navTo("inicio"); } })}
+				{["cotizar", "seguimiento", "analisis"].map(function (key) {
+					return railButton({
+						key: key,
+						label: GROUP_TITLE[key],
+						Icon: RAIL_ICON[key],
+						active: !!activeGroup && activeGroup.groupKey === key && !flyout,
+						open: flyout === key,
+						onClick: function () { toggleFlyout(key); },
+						badge: key === "seguimiento" ? porVencer.length : 0,
+						badgeLabel: porVencer.length + " cotizaciones por vencer",
+					});
+				})}
+				<div className="flex-1" />
+				{railButton({
+					key: "configuracion",
+					label: "Ajustes",
+					Icon: Settings,
+					active: !!activeGroup && activeGroup.groupKey === "configuracion" && !flyout,
+					open: flyout === "configuracion",
+					onClick: function () { toggleFlyout("configuracion"); },
+				})}
+				<button
+					type="button"
+					onClick={signOut}
+					aria-label="Cerrar sesión"
+					className="mt-1 flex size-11 cursor-pointer items-center justify-center rounded-xl border-none bg-transparent text-muted-foreground outline-none transition-colors hover:bg-white/60 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+				>
+					<LogOut size={18} aria-hidden="true" />
+				</button>
+			</div>
+
+			{/* Panel del riel: se abre al lado, sobre el contenido, y se cierra al elegir,
+			    al tocar afuera o con Escape. */}
+			{flyoutData && (
+				<>
+					<div className="no-print fixed inset-y-0 right-0 left-[88px] z-30 hidden bg-black/10 lg:block" onClick={function () { setFlyout(null); }} aria-hidden="true" />
+					<div
+						role="dialog"
+						aria-label={flyoutData.title}
+						className="no-print glass-strong shadow-float fixed inset-y-0 left-[88px] z-40 hidden w-[300px] flex-col gap-5 overflow-y-auto border-r border-[var(--glass-border)] px-3.5 py-6 lg:flex"
+					>
+						<div className="px-1">
+							<div className="font-heading text-lg font-bold text-foreground">{flyoutData.title}</div>
+							{flyoutData.sub && <p className="mt-0.5 text-sm text-muted-foreground">{flyoutData.sub}</p>}
+						</div>
+						{flyoutData.body}
+					</div>
+				</>
+			)}
+
+			{/* ── Sidebar (mobile) ──
+			    Abajo de lg es un drawer sobre el contenido con backdrop: la columna fija
+			    dejaba la app inusable en un celular, que es donde el vendedor la abre en
+			    la calle. En escritorio navega el riel. */}
 			{sidebarOpen && (
 				<div
 					className="no-print fixed inset-0 z-30 bg-black/30 lg:hidden"
@@ -357,9 +595,8 @@ function LakautCalcInner() {
 			<div
 				id="sidebar-nav"
 				className={cn(
-					"no-print glass fixed inset-y-0 left-0 z-40 flex w-[224px] shrink-0 flex-col overflow-y-auto border-r border-[var(--glass-border)] transition-transform duration-200",
-					"lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
-					sidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"
+					"no-print glass fixed inset-y-0 left-0 z-40 flex w-[264px] shrink-0 flex-col overflow-y-auto border-r border-[var(--glass-border)] transition-transform duration-200 lg:hidden",
+					sidebarOpen ? "translate-x-0" : "-translate-x-full"
 				)}
 			>
 					{/* Brand header. Firma con la misma marca que el PDF que recibe el
@@ -407,19 +644,29 @@ function LakautCalcInner() {
 			{/* ── Content ── */}
 			<div className="flex min-w-0 flex-1 flex-col">
 				{/* Top bar · vidrio */}
-				<div className="no-print glass sticky top-0 z-30 flex shrink-0 items-center gap-3 border-b border-[var(--glass-border)] px-5 py-2">
+				<div className="no-print glass sticky top-0 z-30 flex min-h-[52px] shrink-0 items-center gap-3 border-b border-[var(--glass-border)] px-5 py-2 lg:px-6">
 					<button
 						type="button"
 						aria-expanded={sidebarOpen}
 						aria-controls="sidebar-nav"
 						aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
 						onClick={function () { setSidebarOpen(function (o) { return !o; }); }}
-						className="flex cursor-pointer items-center rounded-md border-none bg-transparent p-1.5 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+						className="flex cursor-pointer items-center rounded-md border-none bg-transparent p-1.5 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 lg:hidden"
 					>
 						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
 							<line x1="2" y1="4" x2="14" y2="4" /><line x1="2" y1="8" x2="14" y2="8" /><line x1="2" y1="12" x2="14" y2="12" />
 						</svg>
 					</button>
+					{/* Miga de pan: dónde estás, sin tener que abrir el nav. */}
+					<nav aria-label="Ubicación" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+						{activeGroup ? (
+							<>
+								<span className="hidden sm:inline">{GROUP_TITLE[activeGroup.groupKey]}</span>
+								<span className="hidden sm:inline" aria-hidden="true">/</span>
+								<span className="truncate font-semibold text-foreground">{activeItem ? activeItem.label : ""}</span>
+							</>
+						) : <span className="font-semibold text-foreground">Inicio</span>}
+					</nav>
 					<div className="flex-1" />
 					<div className="flex items-center gap-1.5" role="group" aria-label="Moneda">
 						{["USD", "ARS"].map(function (c) {
@@ -440,14 +687,11 @@ function LakautCalcInner() {
 						})}
 						{currency === "ARS" && <span className="text-xs text-muted-foreground tabular-nums">TC: {tcLoading ? "..." : tc}</span>}
 					</div>
-					<div className="hidden text-xs text-muted-foreground opacity-70 sm:block">
-						{new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
-					</div>
 					<button
 						type="button"
 						onClick={signOut}
 						aria-label="Cerrar sesión"
-						className="flex cursor-pointer items-center gap-1.5 rounded-md border-none bg-transparent p-1.5 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+						className="flex cursor-pointer lg:hidden items-center gap-1.5 rounded-md border-none bg-transparent p-1.5 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
 					>
 						<LogOut size={15} aria-hidden="true" />
 					</button>

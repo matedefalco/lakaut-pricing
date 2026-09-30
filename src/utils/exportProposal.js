@@ -2,6 +2,7 @@ import { buildProyeccion, buildEscalonadoFirmas } from "@/lib/proyeccion";
 import { formatCotId } from "@/lib/cotId";
 import { isPacks, isUnit, isIDC, isDistribVol, packsConDescuento } from "@/data/channelMeta";
 import { resolveDescLiquidacion } from "@/lib/descLiquidacion";
+import { VALIDEZ_DIAS } from "@/lib/dealStatus";
 
 // ─── Color tokens (from PPTX) ────────────────────────────────────────────────
 const B   = "#3041D5";   // primary blue
@@ -22,7 +23,6 @@ const TERMS_PERCEPCION = "Lakaut S.A. es agente de percepción de IIBB C.A.B.A. 
 // en la portada es orientativo; el de facturación es el oficial BNA vendedor del
 // día en que se emita la factura.
 const TERMS_FACTURACION_USD = "Los precios se expresan en dólares estadounidenses (USD) a título de referencia. La facturación se realizará en pesos argentinos, convertidos al tipo de cambio del dólar oficial del Banco de la Nación Argentina (BNA), tipo vendedor, vigente al día de facturación.";
-const VALIDEZ_DIAS = 15;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const IVA_RATE = 0.21; // Alineado a TabCanalWeb: precio ARS c/IVA = precio s/IVA × 1.21

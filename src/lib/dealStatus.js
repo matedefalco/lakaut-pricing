@@ -30,6 +30,32 @@ export const DEAL_STATUS_META = {
 	},
 };
 
+// Vigencia de una propuesta: días corridos desde la emisión (deal.fecha). La usa el
+// PDF ("válida hasta") y la navegación (aviso de cotizaciones por vencer).
+export const VALIDEZ_DIAS = 15;
+// Ventana del aviso: una pendiente entra en "por vencer" cuando le quedan estos días.
+export const AVISO_VENCIMIENTO_DIAS = 5;
+
+// Días que le quedan a la propuesta (0 = vence hoy, negativo = vencida). null sin fecha.
+export function diasParaVencer(deal, now) {
+	if (!deal || !deal.fecha) return null;
+	const emitida = new Date(deal.fecha);
+	if (isNaN(emitida.getTime())) return null;
+	const vence = new Date(emitida.getTime() + VALIDEZ_DIAS * 86400000);
+	return Math.floor((vence.getTime() - (now || Date.now())) / 86400000);
+}
+
+// Pendientes que vencen dentro de la ventana de aviso, la más urgente primero.
+export function dealsPorVencer(deals, now) {
+	return (deals || [])
+		.filter(function (d) {
+			if (dealStatus(d) !== "pendiente") return false;
+			const dias = diasParaVencer(d, now);
+			return dias != null && dias >= 0 && dias <= AVISO_VENCIMIENTO_DIAS;
+		})
+		.sort(function (a, b) { return diasParaVencer(a, now) - diasParaVencer(b, now); });
+}
+
 export function dealStatus(deal) {
 	return (deal && deal.resumen && deal.resumen.status) || "pendiente";
 }
