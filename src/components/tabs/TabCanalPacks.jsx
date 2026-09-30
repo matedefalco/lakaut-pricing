@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { NumberField, StatCard } from "@/components/ui/field";
+import { NumberField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CommercialLevers } from "@/components/ui/CommercialLevers";
 import { resolveLevers, defaultLeverSelection } from "@/lib/commercialLevers";
@@ -22,7 +22,10 @@ import { SaveExportBar } from "@/components/ui/SaveExportBar";
 import { QuoteLayout, FieldGroup } from "@/components/ui/QuoteLayout";
 import { TierBadge, TierTrophy } from "@/components/ui/TierBadge";
 import { SwitchField } from "@/components/ui/SwitchField";
-import { ResultPanel, ResultHero, ResultRow, ResultItem, StatusPill, AnimatedNumber } from "@/components/ui/ResultPanel";
+import { ResultPanel, ResultRow, ResultItem, AnimatedNumber } from "@/components/ui/ResultPanel";
+import { ExtraCard } from "./b2b2c/ConditionBlock";
+import { CalendarClock, MessageSquareText } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { TierHint } from "@/components/ui/TierHint";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
@@ -85,6 +88,10 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 	// Distribuidores es la regla del canal y no se puede apagar.
 	const [excepcionWeb, setExcepcionWeb] = useState(false);
 	const [abono, setAbono] = useState(false);
+	// Pestaña del panel: "cliente" (lo que va a la propuesta) o "interno" (rentabilidad).
+	const [panelTab, setPanelTab] = useState("cliente");
+	// Extra "Casos de uso": abierto a mano o porque ya hay texto (deal reabierto).
+	const [showCasos, setShowCasos] = useState(false);
 	// Descuento del abono mensual (%): default de la config, editable por cotización.
 	const [abonoDescPct, setAbonoDescPct] = useState(function () { return channelConfig.abonoDescuentoPct != null ? channelConfig.abonoDescuentoPct : ABONO_DESC_FALLBACK; });
 	// Palancas de descuento por condiciones (se suman al descuento de nivel).
@@ -373,20 +380,44 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 		/>
 	);
 
+	const totalLabel = conAbono ? "Mes 1 · compra inicial" : (aplicaDescuento ? "Ingreso neto Lakaut" : "Total a pagar");
 	const result = (
-		<ResultPanel channel={canal} eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
-			<ResultHero
-				label={conAbono ? "Mes 1 · compra inicial" : (aplicaDescuento ? "Ingreso neto Lakaut" : "Total a pagar")}
-				value={hasVolume ? <AnimatedNumber value={netoLakaut} format={fMoney2} /> : "—"}
-				sub={esDistribuidor ? "Con descuento de nivel aplicado" : (excepcionWeb ? "Precio de lista · condiciones ofrecidas aparte" : "Precio de lista, sin descuento")}
-				empty={!hasVolume}
-				pill={hasVolume ? <StatusPill tone={margAccent(margenPct)}>Margen {(margenPct * 100).toFixed(0)}% · {margWord(margenPct)}</StatusPill> : null}
-			/>
+		<>
+		<div role="tablist" aria-label="Vista del resumen" className="flex rounded-xl bg-muted p-1">
+			{[{ id: "cliente", label: "Cliente" }, { id: "interno", label: hasVolume ? "Interno · " + (margenPct * 100).toFixed(0) + "%" : "Interno" }].map(function (t) {
+				const active = panelTab === t.id;
+				return (
+					<button
+						key={t.id}
+						type="button"
+						role="tab"
+						aria-selected={active}
+						onClick={function () { setPanelTab(t.id); }}
+						className={cn(
+							"flex-1 rounded-[9px] border-none px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+							active ? "shadow-card bg-white font-bold text-foreground" : "bg-transparent font-semibold text-muted-foreground hover:text-foreground",
+							t.id === "interno" && hasVolume && !active && margAccent(margenPct) !== "success" && "text-[var(--warning)]"
+						)}
+					>{t.label}</button>
+				);
+			})}
+		</div>
 
-			{/* Nivel + acceso contextual a la matriz. Solo con descuento aplicado.
-			    El nivel se muestra con su material (bronce, plata, oro, platinum) en
-			    lugar de texto plano: es el momento en que el vendedor descubre cuánto
-			    puede negociar, así que se lee como logro y no como dato. */}
+		{panelTab === "cliente" ? (
+		<ResultPanel channel={canal} eyebrow="Lo que ve el cliente">
+			{/* Total una sola vez, en bloque de color (antes: héroe arriba + fila abajo). */}
+			<div className="rounded-xl bg-primary px-5 py-4 text-primary-foreground">
+				<div className="text-xs font-bold uppercase tracking-wide opacity-80">{totalLabel} · sin IVA</div>
+				<div className="mt-1.5 font-display text-4xl leading-none tabular-nums [overflow-wrap:anywhere]">
+					{hasVolume ? <AnimatedNumber value={netoLakaut} format={fMoney2} /> : "—"}
+				</div>
+				<div className="mt-2 text-sm opacity-90">
+					{hasVolume
+						? "Con IVA 21%: " + fMoney2(netoLakaut * 1.21) + (esDistribuidor ? " · descuento de nivel aplicado" : excepcionWeb ? " · condiciones aparte" : " · precio de lista")
+						: "Cargá al menos un producto para ver el precio"}
+				</div>
+			</div>
+
 			{aplicaNivel && (
 				<div className="space-y-2 border-t border-border/60 pt-3">
 					<TierTrophy
@@ -402,7 +433,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 				</div>
 			)}
 
-			{hasVolume ? (
+			{hasVolume && (
 				<div className="space-y-2">
 					{/* Packs cotizados a precio de lista */}
 					<div className={aplicaDescuento ? "max-h-[40vh] overflow-y-auto" : "max-h-[46vh] overflow-y-auto"}>
@@ -433,11 +464,6 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 							<ResultRow label={"Descuento " + tier.label + " (" + (tier.descuento * 100).toFixed(0) + "%)"} value={<>−<AnimatedNumber value={descNivelMonto} format={fMoney2} /></>} accent="destructive" valueClass="text-destructive" />
 						</>
 					)}
-					<div className="flex items-center justify-between border-t-2 border-border pt-2">
-						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conAbono ? "Mes 1 · compra inicial" : (aplicaDescuento ? "Ingreso neto Lakaut" : "Total a pagar")}</span>
-						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={netoLakaut} format={fMoney2} /></span>
-					</div>
-
 					{/* Condiciones comerciales OFRECIDAS: incentivos que el vendedor pone sobre la
 					    mesa, sin restarse del total. */}
 					{hayCondOfrecidas && (
@@ -464,10 +490,38 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						</div>
 					)}
 				</div>
-			) : (
-				<p className="text-xs text-muted-foreground">Cargá al menos un producto para ver el precio.</p>
 			)}
 		</ResultPanel>
+		) : (
+			<div className="rounded-xl border border-border bg-card p-4 shadow-float">
+				<div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rentabilidad · uso interno</div>
+				{hasVolume ? (
+					<>
+						<div className="mb-3 grid grid-cols-2 gap-3">
+							<div>
+								<div className="text-xs text-muted-foreground">Contribución marginal</div>
+								<div className={"font-heading text-base font-semibold tabular-nums " + margClass(margenPct)}>{fMoney(margenLakaut)}</div>
+								<div className="text-xs text-muted-foreground">{(margenPct * 100).toFixed(0)}% sobre neto · {margWord(margenPct)}</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Cobertura CF anual</div>
+								<div className="font-heading text-base font-semibold tabular-nums">{(coberturaPC * 100).toFixed(0)}%</div>
+								<div className="text-xs text-muted-foreground">de {fMoney(cfAnual)}</div>
+							</div>
+						</div>
+						<div className="space-y-1 border-t border-border/60 pt-2">
+							{aplicaDescuento && <ResultRow label="Facturación a lista" value={fMoney(calc.facturacionLista)} />}
+							{aplicaNivel && <ResultRow label={"Descuento nivel " + tier.label} value={<span className="text-destructive">−{fMoney(descNivelMonto)}</span>} />}
+							<ResultRow label={aplicaDescuento ? "Ingreso neto Lakaut" : "Precio de lista"} value={fMoney(netoLakaut)} accent="primary" />
+							<ResultRow label={"Costo variable (" + calc.certsTotal.toLocaleString("es-AR") + " certs + " + calc.firmasTotal.toLocaleString("es-AR") + " firmas)"} value={<span className="text-destructive">−{fMoney(cvTotal)}</span>} />
+						</div>
+					</>
+				) : (
+					<p className="text-sm text-muted-foreground">Cargá productos para ver contribución y costos.</p>
+				)}
+			</div>
+		)}
+		</>
 	);
 
 	const footer = (
@@ -487,8 +541,7 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
-			{/* ── 1 · Para la propuesta ── */}
-			<FieldGroup step={1} channel={canal} done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+			<FieldGroup channel={canal} done={!!selectedClient} title="Cliente">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente
@@ -503,61 +556,55 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 						</p>
 					)}
 				</div>
-
-				<div className="flex flex-col gap-1.5">
-					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
-					<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: firma de contratos, recibos, onboarding de clientes..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
-				</div>
 			</FieldGroup>
 
 			{/* ── 2 · Qué cotizás ── */}
-			<FieldGroup step={2} channel={canal} done={hasVolume} title="Qué cotizás" subtitle="Cargá los packs a precio de lista. El total se actualiza a la derecha.">
+			<FieldGroup channel={canal} done={hasVolume} title="Packs" subtitle="Cantidades a precio de lista; el total se arma a la derecha.">
+				{/* Tabla de packs en 4 columnas: lo que incluye cada pack va bajo su nombre
+				    (antes eran 3 columnas numéricas aparte) y la cantidad es el campo grande. */}
 				<Table>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Producto</TableHead>
-							<TableHead className="text-right">Lista USD</TableHead>
-							<TableHead className="text-right">Certs / u</TableHead>
-							<TableHead className="text-right">Firmas / u</TableHead>
+							<TableHead>Pack</TableHead>
+							<TableHead className="text-right">Lista</TableHead>
 							<TableHead className="text-right">Cantidad</TableHead>
-							<TableHead className="text-right">Certs total</TableHead>
-							<TableHead className="text-right">Firmas total</TableHead>
-							<TableHead className="text-right">Precio de lista</TableHead>
+							<TableHead className="text-right">Subtotal</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{models.filter(function (p) { return p.priceUSD > 0; }).map(function (p) {
 							const q = Math.max(0, Number(qtys[p.id]) || 0);
-							const firmasU = p.ilimitadas ? "ilim." : (p.firmas || 0);
+							const firmasU = p.ilimitadas ? "firmas ilimitadas" : (p.firmas || 0).toLocaleString("es-AR") + " firmas";
 							return (
-								<TableRow key={p.id}>
-									<TableCell className="font-semibold">
-										<span>{p.label}</span>
-										{p.segment && (
-											<span className={"ml-2 inline-block text-xs font-medium px-1.5 py-0.5 rounded " + (p.segment === "empresa" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700")}>
-												{p.segment === "empresa" ? "Jurídica" : "Física"}
-											</span>
-										)}
+								<TableRow key={p.id} className={q > 0 ? "bg-primary/5" : ""}>
+									<TableCell>
+										<span className="flex items-center gap-2">
+											<span className="text-sm font-semibold">{p.label}</span>
+											{p.segment && (
+												<span className={"inline-block rounded px-1.5 py-0.5 text-xs font-medium " + (p.segment === "empresa" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700")}>
+													{p.segment === "empresa" ? "Jurídica" : "Física"}
+												</span>
+											)}
+										</span>
+										<span className="mt-0.5 block text-xs text-muted-foreground">{(p.certs || 1) + " cert · " + firmasU + " por pack"}</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">{fMoney(p.priceUSD)}</TableCell>
-									<TableCell className="text-right tabular-nums text-muted-foreground">{p.certs || 1}</TableCell>
-									<TableCell className="text-right tabular-nums text-muted-foreground">{firmasU}</TableCell>
 									<TableCell className="text-right">
-										<Input type="number" min={0} value={qtys[p.id] || ""} placeholder="0" onChange={function (e) { setQty(p.id, e.target.value); }} className="ml-auto h-8 w-24 text-right tabular-nums" />
+										<Input type="number" min={0} value={qtys[p.id] || ""} placeholder="0" aria-label={"Cantidad de " + p.label} onChange={function (e) { setQty(p.id, e.target.value); }} className="ml-auto h-10 w-24 text-right text-base font-semibold tabular-nums" />
 									</TableCell>
-									<TableCell className="text-right tabular-nums">{q > 0 ? (q * (p.certs || 1)).toLocaleString("es-AR") : "—"}</TableCell>
-									<TableCell className="text-right tabular-nums">{q > 0 ? (p.ilimitadas ? "ilim." : (q * (p.firmas || 0)).toLocaleString("es-AR")) : "—"}</TableCell>
 									<TableCell className={"text-right tabular-nums " + (q > 0 ? "font-semibold" : "text-muted-foreground")}>{q > 0 ? fMoney(q * p.priceUSD) : "—"}</TableCell>
 								</TableRow>
 							);
 						})}
 						{hasVolume && (
 							<TableRow className="border-t-2 bg-muted/30">
-								<TableCell className="font-semibold text-sm" colSpan={4}>Total</TableCell>
-								<TableCell className="text-right tabular-nums text-muted-foreground text-xs">—</TableCell>
-								<TableCell className="text-right tabular-nums font-semibold">{calc.certsTotal.toLocaleString("es-AR")}</TableCell>
-								<TableCell className="text-right tabular-nums font-semibold">{calc.ilimitadasUsadas ? "ilim." : calc.firmasTotal.toLocaleString("es-AR")}</TableCell>
-								<TableCell className="text-right tabular-nums font-semibold">{fMoney(calc.facturacionLista)}</TableCell>
+								<TableCell className="text-sm font-semibold">
+									Total
+									<span className="ml-2 text-xs font-normal text-muted-foreground">{calc.certsTotal.toLocaleString("es-AR")} certs · {calc.ilimitadasUsadas ? "firmas ilimitadas" : calc.firmasTotal.toLocaleString("es-AR") + " firmas"}</span>
+								</TableCell>
+								<TableCell />
+								<TableCell />
+								<TableCell className="text-right font-semibold tabular-nums">{fMoney(calc.facturacionLista)}</TableCell>
 							</TableRow>
 						)}
 					</TableBody>
@@ -583,10 +630,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 
 			{/* ── 3 · Condiciones comerciales ── */}
 			<FieldGroup
-				step={3}
 				channel={canal}
 				done={esDistribuidor ? tieneDeclarado : hasVolume}
-				title="Condiciones comerciales"
+				title="Condiciones"
 				subtitle={esDistribuidor
 					? "Nivel del socio + condiciones ofrecidas" + (conAbono ? " · abono mensual activo" : "")
 					: (excepcionWeb
@@ -660,66 +706,63 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 							<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
 						</div>
 
-						<Separator />
-
-						<label className="flex items-center gap-2.5 cursor-pointer select-none">
-							<input type="checkbox" checked={abono} onChange={function (e) { setAbono(e.target.checked); }} className="rounded" />
-							<span className="text-sm font-medium">Incluir abono mensual de firmas</span>
-							{abono && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">abono activo</Badge>}
-						</label>
-						{abono && (
-							<div className="pl-6 border-l-2 border-muted ml-1 flex items-center gap-2">
-								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del abono</Label>
-								<div className="flex items-center gap-1">
-									<Input type="number" min={0} max={100} value={abonoDescPct} onChange={function (e) { setAbonoDescPct(e.target.value === "" ? "" : Number(e.target.value)); }} className="h-8 w-20 text-right tabular-nums" />
-									<span className="text-sm text-muted-foreground">%</span>
-								</div>
-							</div>
-						)}
-						{conAbono && (
-							<div className="pl-6 border-l-2 border-muted ml-1 text-sm text-muted-foreground space-y-1.5">
-								<p>Precio de lista × {((1 - descAbono) * 100).toFixed(0)}% ({(descAbono * 100).toFixed(0)}% de descuento). El pack se abona completo cada mes.</p>
-								<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-									<span className="text-muted-foreground">Mes 1 (compra inicial)</span>
-									<span className="font-semibold text-foreground">{fMoney(netoLakaut)} <span className="font-normal text-muted-foreground">· descuento total {(descTotal * 100).toFixed(0)}%</span></span>
-									<span className="text-muted-foreground">Mes 2 en adelante</span>
-									<span className="font-semibold text-foreground">{fMoney(abonoMes)}/mes <span className="font-normal text-muted-foreground">· {fMoney(abonoAnual)}/año</span></span>
-									<span className="text-muted-foreground">Facturación año 1</span>
-									<span className="font-semibold text-foreground">{fMoney(facturacionAnio1)} <span className="font-normal text-muted-foreground">(mes 1 + abono × 11)</span></span>
-								</div>
-							</div>
-						)}
-						{abono && abonoMes === 0 && <p className="pl-6 text-xs text-muted-foreground">Cargá packs con firmas finitas para calcular el abono.</p>}
 					</>
 				)}
 			</FieldGroup>
 
-			{/* ── Rentabilidad (interno) ── */}
-			{hasVolume && (
-				<CollapsibleSection tone="internal" title="Rentabilidad · uso interno" subtitle="Costo variable, contribución marginal y cobertura de costos fijos. No aparece en la propuesta del cliente.">
-					<div className="flex flex-wrap gap-3 mb-4">
-						<StatCard label="Contribución marginal" value={fMoney(margenLakaut)} sub={(margenPct * 100).toFixed(0) + "% sobre neto"} accent={margAccent(margenPct)} valueClass={margClass(margenPct)} />
-						<StatCard label="Cobertura CF anual" value={(coberturaPC * 100).toFixed(0) + "%"} sub={"de " + fMoney(cfAnual)} accent="muted" />
-					</div>
-					<Table>
-						<TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Total cotizado</TableHead></TableRow></TableHeader>
-						<TableBody>
-							{aplicaDescuento ? (
-								<>
-									<TableRow><TableCell>Facturación a lista</TableCell><TableCell className="text-right tabular-nums">{fMoney(calc.facturacionLista)}</TableCell></TableRow>
-									{aplicaNivel && <TableRow><TableCell>Descuento por nivel {tier.label} ({(tier.descuento * 100).toFixed(0)}%)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(descNivelMonto)}</TableCell></TableRow>}
-									<TableRow><TableCell className="font-semibold">Ingreso neto Lakaut</TableCell><TableCell className="text-right tabular-nums font-semibold">{fMoney(netoLakaut)}</TableCell></TableRow>
-								</>
-							) : (
-								<TableRow><TableCell className="font-semibold">Precio de lista (sin descuento)</TableCell><TableCell className="text-right tabular-nums font-semibold">{fMoney(netoLakaut)}</TableCell></TableRow>
+			{/* Extras: opcionales, como tarjetas con interruptor. La rentabilidad pasó a
+			    la pestaña Interno del panel. */}
+			<section aria-labelledby="extras-title" className="space-y-3">
+				<h3 id="extras-title" className="px-1 font-heading text-sm font-semibold text-foreground">Extras</h3>
+				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+					{aplicaDescuento && (
+						<ExtraCard
+							icon={CalendarClock}
+							title="Abono mensual"
+							desc="Repone las firmas del pack cada mes"
+							checked={abono}
+							onChange={function (e) { setAbono(e.target.checked); }}
+							badge={abono ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
+						>
+						<div className="space-y-2">
+							<div className="flex items-center gap-2">
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del abono</Label>
+								<div className="flex items-center gap-1">
+									<Input type="number" min={0} max={100} value={abonoDescPct} onChange={function (e) { setAbonoDescPct(e.target.value === "" ? "" : Number(e.target.value)); }} className="h-9 w-20 text-right tabular-nums" />
+									<span className="text-sm text-muted-foreground">%</span>
+								</div>
+							</div>
+							{conAbono && (
+								<div className="space-y-1.5 text-sm text-muted-foreground">
+									<p>Precio de lista × {((1 - descAbono) * 100).toFixed(0)}% ({(descAbono * 100).toFixed(0)}% de descuento). El pack se abona completo cada mes.</p>
+									<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
+										<span>Mes 1 (compra inicial)</span>
+										<span className="font-semibold text-foreground">{fMoney(netoLakaut)}</span>
+										<span>Mes 2 en adelante</span>
+										<span className="font-semibold text-foreground">{fMoney(abonoMes)}/mes <span className="font-normal text-muted-foreground">· {fMoney(abonoAnual)}/año</span></span>
+										<span>Facturación año 1</span>
+										<span className="font-semibold text-foreground">{fMoney(facturacionAnio1)}</span>
+									</div>
+								</div>
 							)}
-							<TableRow><TableCell>Costo variable ({calc.certsTotal.toLocaleString("es-AR")} certs + {calc.firmasTotal.toLocaleString("es-AR")} firmas)</TableCell><TableCell className="text-right tabular-nums text-destructive">−{fMoney(cvTotal)}</TableCell></TableRow>
-							<TableRow className="bg-success/5"><TableCell className="font-semibold text-[var(--success)]">Contribución marginal</TableCell><TableCell className={"text-right tabular-nums font-semibold " + margClass(margenPct)}>{fMoney(margenLakaut)} ({(margenPct * 100).toFixed(0)}%)</TableCell></TableRow>
-							<TableRow className="bg-muted/30"><TableCell className="font-semibold text-muted-foreground">CF anual Lakaut</TableCell><TableCell className="text-right tabular-nums text-muted-foreground">−{fMoney(cfAnual)} ({(coberturaPC * 100).toFixed(0)}% cubierto por este deal)</TableCell></TableRow>
-						</TableBody>
-					</Table>
-				</CollapsibleSection>
-			)}
+							{abono && abonoMes === 0 && <p className="text-sm text-muted-foreground">Cargá packs con firmas finitas para calcular el abono.</p>}
+						</div>
+						</ExtraCard>
+					)}
+					<ExtraCard
+						icon={MessageSquareText}
+						title="Casos de uso"
+						desc="Texto para la propuesta"
+						checked={showCasos || casosDeUso !== ""}
+						onChange={function (e) { setShowCasos(e.target.checked); if (!e.target.checked) setCasosDeUso(""); }}
+					>
+						<label className="flex flex-col gap-1.5">
+							<span className="sr-only">Casos de uso</span>
+							<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: firma de contratos, recibos, onboarding de clientes..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
+						</label>
+					</ExtraCard>
+				</div>
+			</section>
 
 			{/* ── Referencia: matriz completa de niveles ── */}
 			{aplicaNivel && (
