@@ -133,7 +133,9 @@ export function resolveDescLiquidacion(sel, nums) {
 			return "Durante la vigencia se factura a precio de lista (" + m(cargoAnioFull) + "). Al cierre del año se bonifican " + firmasCierre.toLocaleString("es-AR") + " firmas, equivalentes al descuento por volumen de " + m(descNivel) + ". Valor neto: " + m(neto) + ".";
 		}
 		if (forma === "C") {
-			return "El descuento por volumen ya está aplicado en el precio (" + m(neto) + ") y se factura en cada período, sin pago anticipado ni compromiso de permanencia anual.";
+			// Sin monto: el que se mostraba era el neto del servicio (con IVA), no el
+			// descuento, y el cliente lo leía como "me descuentan USD X".
+			return "El descuento por volumen ya está aplicado en los precios unitarios y se factura en cada período, sin pago anticipado ni compromiso de permanencia anual.";
 		}
 		if (forma === "B" && sub === "anticipado") {
 			return "Se abona el año completo por adelantado, con el descuento por volumen ya aplicado. Total: " + m(neto) + ".";
