@@ -29,7 +29,7 @@ import { TierBadge } from "@/components/ui/TierBadge";
 import { ResultPanel, ResultRow, AnimatedNumber } from "@/components/ui/ResultPanel";
 import { TierHint } from "@/components/ui/TierHint";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
+import { useToast, notifyQuoteSaved, notifyTierUp } from "@/components/ui/Toaster";
 import { TabCanalB2B2CPrecios } from "@/components/tabs/TabCanalB2B2CPrecios";
 
 // La rentabilidad de este canal se lee como MARKUP sobre el costo variable
@@ -842,11 +842,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		const src = saved ? saved.deal : buildDeal(editingId || "preview", now);
 		const client = saved ? saved.client : selectedClient;
 		onExport && onExport(src, client, exportCurrency);
-		notifyQuoteExported(toast, {
-			clientName: client && client.name,
-			channelLabel: meta.emoji + " " + meta.label,
-			onGoHistorial: (saved && onGoHistorial) ? function () { onGoHistorial(src.id); } : null,
-		});
 	}
 
 	const header = (

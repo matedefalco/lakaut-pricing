@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings } from "lucide-react";
+import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings, Search } from "lucide-react";
 import { dealStatus, dealStatusMeta, dealsPorVencer, diasParaVencer } from "./lib/dealStatus";
+import { formatCotId } from "./lib/cotId";
+import { CommandPalette } from "./components/ui/CommandPalette";
+import { ExportDoneDialog } from "./components/ui/ExportDoneDialog";
 import { useDolarTC, DOLAR_SOURCES } from "./lib/useDolarTC";
 import { loadConfig, subscribeConfig } from "./lib/supabase";
 import { FIXED_ITEMS, ASSET_ITEMS, CV_CERT_ITEMS, CV_FIRMA_ITEMS, CAPACIDAD_FIRMAS_ANUAL } from "./data/costs";
@@ -217,6 +220,9 @@ function LakautCalcInner() {
 	const [pendingEdit, setPendingEdit] = useState(null);
 	// Panel abierto al lado del riel: "nueva", o la clave de un grupo del nav.
 	const [flyout, setFlyout] = useState(null);
+	// Buscador ⌘K y cierre "Propuesta lista" (fase de momentos).
+	const [paletteOpen, setPaletteOpen] = useState(false);
+	const [exportDone, setExportDone] = useState(null);
 	// Al ir a Cotizaciones desde el toast de guardado, resaltamos y hacemos scroll
 	// a esa fila. Se limpia sola tras el flash (ver TabHistorial).
 	const [historialHighlight, setHistorialHighlight] = useState(null);
@@ -236,6 +242,19 @@ function LakautCalcInner() {
 			setSidebarOpen(false);
 		}
 	}
+
+	// ⌘K / Ctrl+K abre el buscador desde cualquier pantalla.
+	useEffect(function () {
+		function onKey(e) {
+			if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+				e.preventDefault();
+				setFlyout(null);
+				setPaletteOpen(function (o) { return !o; });
+			}
+		}
+		document.addEventListener("keydown", onKey);
+		return function () { document.removeEventListener("keydown", onKey); };
+	}, []);
 
 	// Escape cierra el drawer, como cualquier capa que tapa la pantalla.
 	useEffect(function () {
@@ -287,8 +306,10 @@ function LakautCalcInner() {
 		return { sourceLabel: srcMeta ? srcMeta.label : "Oficial", lastUpdated: tcLastUpdated };
 	}, [source, tcLastUpdated]);
 
+	// Exportar desde un cotizador abre el cierre "Propuesta lista" con el paso siguiente.
 	function exportDeal(deal, client, overrideCurrency) {
 		exportProposal(deal, client, overrideCurrency || currency, tc, channelConfig, models, tcMeta);
+		setExportDone({ deal: deal, client: client, cotId: formatCotId(deal.inputs && deal.inputs.cot, client && client.tipo, deal.channel) });
 	}
 
 	// Load costConfig from Supabase on mount; subscribe to remote changes
@@ -510,6 +531,12 @@ function LakautCalcInner() {
 	}
 	const flyoutData = flyout ? flyoutContent(flyout) : null;
 
+	// Destinos del buscador: Inicio + cada ítem del nav, con su grupo como bajada.
+	const paletteNav = [{ key: "inicio", label: "Inicio", group: "" }].concat(NAV_GROUPS.flatMap(function (g) {
+		return g.items.map(function (i) { return { key: i.key, label: i.label, group: GROUP_TITLE[g.groupKey] }; });
+	}));
+	function closeExportDone() { setExportDone(null); }
+
 	return (
 		<div className="app-bg flex min-h-svh font-sans" data-section={section}>
 
@@ -668,6 +695,16 @@ function LakautCalcInner() {
 						) : <span className="font-semibold text-foreground">Inicio</span>}
 					</nav>
 					<div className="flex-1" />
+					<button
+						type="button"
+						onClick={function () { setFlyout(null); setPaletteOpen(true); }}
+						aria-label="Buscar (⌘K)"
+						className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[var(--glass-border)] bg-white/70 px-2.5 text-sm text-muted-foreground outline-none transition-colors hover:bg-white hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-[280px]"
+					>
+						<Search size={16} aria-hidden="true" />
+						<span className="hidden flex-1 truncate text-left whitespace-nowrap sm:inline">Buscar cliente o cotización</span>
+						<kbd className="hidden rounded border border-border px-1.5 text-xs font-semibold sm:inline">⌘K</kbd>
+					</button>
 					<div className="flex items-center gap-1.5" role="group" aria-label="Moneda">
 						{["USD", "ARS"].map(function (c) {
 							return (
@@ -738,6 +775,25 @@ function LakautCalcInner() {
 					{activeNavItem === "docs" && <TabDocumentacion tc={tc} />}
 				</main>
 			</div>
+
+			{paletteOpen && <CommandPalette
+				onClose={function () { setPaletteOpen(false); }}
+				deals={allDeals}
+				clientsById={clientsById}
+				navItems={paletteNav}
+				quotable={QUOTABLE}
+				onOpenDeal={editQuote}
+				onNav={navTo}
+				onNewQuote={newQuote}
+			/>}
+			{exportDone && <ExportDoneDialog
+				data={exportDone}
+				onClose={closeExportDone}
+				onGoHistorial={exportDone && exportDone.deal && allDeals.some(function (d) { return d.id === exportDone.deal.id; })
+					? function () { const id = exportDone.deal.id; setExportDone(null); goHistorial(id); }
+					: null}
+				onNewQuote={function () { setExportDone(null); setFlyout("nueva"); }}
+			/>}
 		</div>
 	);
 }

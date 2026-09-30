@@ -28,7 +28,7 @@ import { CalendarClock, MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TierHint } from "@/components/ui/TierHint";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
+import { useToast, notifyQuoteSaved, notifyTierUp } from "@/components/ui/Toaster";
 
 function margClass(pct) { return pct >= 0.4 ? "text-[var(--success)]" : pct >= 0.15 ? "text-[var(--warning)]" : "text-destructive"; }
 function margAccent(pct) { return pct >= 0.4 ? "success" : pct >= 0.15 ? "warning" : "destructive"; }
@@ -349,11 +349,6 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 		const src = saved ? saved.deal : buildDeal(editingId || "preview", now);
 		const client = saved ? saved.client : selectedClient;
 		onExport && onExport(src, client, exportCurrency);
-		notifyQuoteExported(toast, {
-			clientName: client && client.name,
-			channelLabel: meta.emoji + " " + meta.label,
-			onGoHistorial: (saved && onGoHistorial) ? function () { onGoHistorial(src.id); } : null,
-		});
 	}
 
 	const header = (
