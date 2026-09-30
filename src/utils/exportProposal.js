@@ -784,7 +784,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 		// firmas, no identidades/certificados que no se cotizan.
 		...(idc > 0 ? [
 			chip(SVG.idcard(B, 15), langApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : (esIDC ? `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)` : `<strong>${idc.toLocaleString("es-AR")}</strong> certificados`)),
-			chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`),
+			// En Volumen la unidad ya es el certificado: "1 certificado c/u" sería repetir el
+			// chip anterior. Ahí el dato que suma es el total de firmas (va después del c/u).
+			...(esIDC ? [chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`)] : []),
 			...(hayJuridicos ? [
 				chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 			] : [
@@ -792,6 +794,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 					? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. por identidad`
 					: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`),
 			]),
+			...(!esIDC ? [chip(SVG.shield(B, 15), firmasIncl > 0
+				? `<strong>${firmasIncl.toLocaleString("es-AR")}</strong> ${firmasIncl === 1 ? firmaSing : firmaPlur} en total`
+				: "sin firmas incluidas")] : []),
 		] : [
 			chip(SVG.idcard(B, 15), `<strong>${firmasSueltas.toLocaleString("es-AR")}</strong> ${firmasSueltas === 1 ? firmaSing : firmaPlur}`),
 			chip(SVG.shield(B, 15), "sin certificado asociado"),
@@ -867,8 +872,22 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN) {
 	const certJurWord = langApi ? "consumos de validación · persona jurídica" : "certificados jurídicos";
 	const certFisWord = langApi ? "consumos de validación · persona física" : "certificados físicos";
 	const verboAct = langApi ? "Contratás" : "Comprás";
+	// Volumen: el título ("Comprás tu volumen") y los chips ya nombran los certificados,
+	// así que la frase solo cuenta lo que falta: cuántas firmas trae cada uno y el total.
+	const conFirmas = (n) => n > 0 ? `con ${firmaWord(n)} c/u` : "sin firmas incluidas";
+	const totalFirmasTxt = `${firmasIncl.toLocaleString("es-AR")} ${firmasIncl === 1 ? firmaSing : firmaPlur} en total`;
+	const volumenTxt = hayJuridicos
+		? `${[
+				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} ${idcJuridicos === 1 ? "jurídico" : "jurídicos"} ${conFirmas(fPorCertJur)}` : null,
+				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${idcFisicos === 1 ? "físico" : "físicos"} ${conFirmas(fPorCertFis)}` : null,
+			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `: ${totalFirmasTxt}` : ""}.`
+		: fPorCertFis > 0
+		? `Cada certificado incluye ${firmaWord(fPorCertFis)}: ${totalFirmasTxt}.`
+		: "Los certificados no incluyen firmas.";
 	const activacionTxt = idc <= 0
 		? `Comprás un volumen de ${firmasSueltas.toLocaleString("es-AR")} ${firmasSueltas === 1 ? firmaSing : firmaPlur}, sin certificados asociados.`
+		: !esIDC
+		? volumenTxt
 		: hayJuridicos
 		? `${verboAct} ${unidadArt} ${idc.toLocaleString("es-AR")} ${unidadPl}: ${[
 				idcJuridicos > 0 ? `${idcJuridicos.toLocaleString("es-AR")} ${certJurWord} (${firmaWord(fPorCertJur)} c/u)` : null,
