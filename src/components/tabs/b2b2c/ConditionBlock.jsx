@@ -74,3 +74,33 @@ export function ConditionToggleBlock({ icon, title, checked, onChange, badge, hi
 		</section>
 	);
 }
+
+// Extra opcional como tarjeta con interruptor. Apagada ocupa una celda de la grilla
+// (título + bajada) y se lee de un vistazo junto a las demás; prendida se expande a
+// todo el ancho con su contenido. Reemplaza la lista de checkboxes encadenados del
+// paso 3: los extras quedan juntos, y solo el que se usa ocupa lugar.
+export function ExtraCard({ icon: Icon, title, desc, checked, onChange, badge, children }) {
+	return (
+		<section className={cn("rounded-2xl border bg-card p-4 transition-colors", checked ? "col-span-full border-primary/50 ring-1 ring-primary/20" : "border-border hover:border-primary/30")}>
+			<label className="flex cursor-pointer items-start gap-3 select-none">
+				{Icon && (
+					<span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-secondary text-secondary-foreground">
+						<Icon className="size-4" strokeWidth={2.1} />
+					</span>
+				)}
+				<span className="min-w-0 flex-1">
+					<span className="flex flex-wrap items-center gap-2">
+						<h4 className="font-heading text-sm font-semibold text-foreground">{title}</h4>
+						{badge}
+					</span>
+					{desc && <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">{desc}</span>}
+				</span>
+				<input type="checkbox" role="switch" checked={checked} onChange={onChange} className="peer sr-only" />
+				<span aria-hidden="true" className={cn("relative mt-1 h-6 w-10 shrink-0 rounded-full transition-colors peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50", checked ? "bg-primary" : "bg-muted-foreground/30")}>
+					<span className={cn("absolute top-[3px] size-[18px] rounded-full bg-white shadow transition-all duration-200", checked ? "left-[19px]" : "left-[3px]")} />
+				</span>
+			</label>
+			{checked && children && <div className="mt-4 border-t border-border/60 pt-4">{children}</div>}
+		</section>
+	);
+}

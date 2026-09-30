@@ -13,20 +13,20 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ProyeccionSection } from "./b2b2c/ProyeccionSection";
 import { SegmentoSection } from "./b2b2c/SegmentoSection";
-import { ConditionBlock, ConditionToggleBlock } from "./b2b2c/ConditionBlock";
-import { Handshake, Wallet, Gift, CalendarClock, SlidersHorizontal } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { ConditionBlock, ExtraCard } from "./b2b2c/ConditionBlock";
+import { Handshake, Wallet, Gift, CalendarClock, SlidersHorizontal, TrendingUp, MessageSquareText } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { NumberField, SelectField } from "@/components/ui/field";
 import { ClientSelector } from "@/components/ui/ClientSelector";
 import { CommercialLevers } from "@/components/ui/CommercialLevers";
 import { resolveLevers, defaultLeverSelection, leverValue } from "@/lib/commercialLevers";
-import { DESC_OPCIONES, DESC_GRUPOS, DESC_OPCION_DEFAULT, DESC_OPCION_LEGACY, descOpcion, descOpcionId, resolveDescLiquidacion } from "@/lib/descLiquidacion";
+import { DESC_OPCIONES, DESC_OPCION_DEFAULT, DESC_OPCION_LEGACY, descOpcion, descOpcionId, resolveDescLiquidacion } from "@/lib/descLiquidacion";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveExportBar } from "@/components/ui/SaveExportBar";
 import { QuoteLayout, FieldGroup } from "@/components/ui/QuoteLayout";
-import { TierBadge, TierTrophy } from "@/components/ui/TierBadge";
-import { ResultPanel, ResultHero, ResultRow, StatusPill, AnimatedNumber } from "@/components/ui/ResultPanel";
+import { TierBadge } from "@/components/ui/TierBadge";
+import { ResultPanel, ResultRow, AnimatedNumber } from "@/components/ui/ResultPanel";
 import { TierHint } from "@/components/ui/TierHint";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useToast, notifyQuoteSaved, notifyQuoteExported, notifyTierUp } from "@/components/ui/Toaster";
@@ -170,6 +170,11 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	//     por propuesta (proyCustom lo marca).
 	//   · IDC → proyección relativa (driver + % de crecimiento), como antes.
 	const [proyEnabled, setProyEnabled] = useState(false);
+	// Pestaña del panel de resumen: "cliente" (lo que va a la propuesta) o "interno"
+	// (rentabilidad). Antes las dos vivían apiladas y el panel era una columna larga.
+	const [panelTab, setPanelTab] = useState("cliente");
+	// Extra "Casos de uso": abierto a mano o porque ya hay texto (deal reabierto).
+	const [showCasos, setShowCasos] = useState(false);
 	const [proyDriver, setProyDriver] = useState("packs");
 	const [proyCustom, setProyCustom] = useState(false);
 	const [proySteps, setProySteps] = useState(function () {
@@ -860,40 +865,106 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		/>
 	);
 
+	// Avance hacia el próximo nivel/segmento: el mayor avance entre los ejes que lo
+	// definen, medido desde el piso del nivel actual hasta el piso del siguiente.
+	const segProgress = (function () {
+		if (!hasVolume || !nextSeg) return null;
+		function axis(x, curMin, nextMin) {
+			const lo = Number(curMin) || 0;
+			const hi = Number(nextMin) || 0;
+			if (hi <= lo) return 0;
+			return Math.min(1, Math.max(0, ((Number(x) || 0) - lo) / (hi - lo)));
+		}
+		if (esIDC) return axis(idc, seg.idcMin, nextSeg.idcMin);
+		if (esDistribVol) return Math.max(axis(facturacionNivelDistrib, seg.compromisoMin, nextSeg.compromisoMin), distribConCompromiso ? axis(certsActivosNum, seg.certsMin, nextSeg.certsMin) : 0);
+		return Math.max(axis(compromiso, seg.compromisoMin, nextSeg.compromisoMin), axis(firmasTotales, seg.firmasMin, nextSeg.firmasMin));
+	})();
+
 	// Panel de resultado = resumen de la cotización: segmento, cantidades y precios
 	// por tipo, condiciones comerciales y total. Es lo que el vendedor lee para
 	// entender qué está cotizando de un vistazo.
 	const result = (
 		<>
-		<ResultPanel channel={canal} eyebrow={hasVolume ? "Resumen de la cotización" : "Resumen · sin datos"}>
-			<ResultHero
-				label={conApi ? "Total · mes 1" : "Total"}
-				value={hasVolume ? <AnimatedNumber value={revTotal} format={fMoney2} /> : "—"}
-				sub={hasVolume ? (conApi ? "Certificados + firmas + SLA · fee incluido" : "Certificados + firmas · sin integración " + intgTerm) : (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
-				empty={!hasVolume}
-				pill={hasVolume ? <StatusPill tone={markupAccent(markup, markupMin)}>Markup {fMarkup(markup)} · {markupWord(markup, markupMin)}</StatusPill> : null}
-			/>
+		<div role="tablist" aria-label="Vista del resumen" className="flex rounded-xl bg-muted p-1">
+			{[{ id: "cliente", label: "Cliente" }, { id: "interno", label: hasVolume ? "Interno · " + fMarkup(markup) : "Interno" }].map(function (t) {
+				const active = panelTab === t.id;
+				return (
+					<button
+						key={t.id}
+						type="button"
+						role="tab"
+						aria-selected={active}
+						onClick={function () { setPanelTab(t.id); }}
+						className={cn(
+							"flex-1 rounded-[9px] border-none px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+							active ? "shadow-card bg-white font-bold text-foreground" : "bg-transparent font-semibold text-muted-foreground hover:text-foreground",
+							t.id === "interno" && hasVolume && !active && markupAccent(markup, markupMin) !== "success" && "text-[var(--warning)]"
+						)}
+					>{t.label}</button>
+				);
+			})}
+		</div>
 
-			{/* Segmento + acceso contextual a la tabla de precios */}
-			<div className="space-y-2 border-t border-border/60 pt-3">
-				<TierTrophy
-					tier={seg}
-					tiers={segmentList}
-					eyebrow={esIDC ? "Segmento · precio por IDC" : esDistribVol ? "Nivel · descuento" : "Segmento · descuento"}
-					discountPct={!esIDC && segDesc > 0 ? "−" + Math.round(segDesc * 100) : null}
-					note={hasVolume
-						? (esIDC
-							? idc.toLocaleString("es-AR") + " IDC/mes · " + fMoney2(precioIDC) + " por IDC · " + cupo + " firma" + (cupo === 1 ? "" : "s") + " incluidas"
-							: esDistribVol
-								? (distribConCompromiso ? "compromiso " + fMoney(facturacionNivelDistrib) : "facturación mensual " + fMoney(facturacionNivelDistrib)) + " · cert bonificado · " + fMoney2(precioFirmaExtraEff) + "/firma"
-								: "compromiso " + fMoney(compromiso) + " · " + fMoney2(precioIDC) + "/cert · " + fMoney2(precioFirmaExtraEff) + "/firma")
-						: null}
-					empty={!hasVolume}
-				/>
-				{hasVolume && (
-					<div className="flex justify-end">
-						<TierHint label={esDistribVol ? "ver niveles" : "ver segmentos"} columns={esIDC ? ["Segmento", "IDC/mes", "Facturación", "Precio"] : esDistribVol ? ["Nivel", "Compromiso anual", "Certs activos", "Desc."] : ["Segmento", "Firmas", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />
-					</div>
+		{/* El aviso de markup bloquea guardar y exportar: se ve en las dos pestañas. */}
+		{hasVolume && markupBajoMin && (
+			<div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3">
+				<div className="text-sm font-semibold text-destructive">Markup bajo el mínimo ({markupMin.toFixed(2)}x)</div>
+				<p className="text-sm text-muted-foreground mt-1">
+					Esta cotización factura {fMarkup(markup)} su costo variable ({fMoney(costoTotal)}). Subí el precio, bajá el cupo de firmas incluidas o ajustá las condiciones para poder guardar y exportar.
+				</p>
+				{markupSeg != null && markupSeg < markupMin && (
+					<p className="text-sm text-muted-foreground mt-1">
+						El precio de tabla del segmento {segLabel} ya no cierra por sí solo: con {cupo} firma{cupo === 1 ? "" : "s"} incluidas el bundle cuesta {fMoney2(costoBundle)} y el mínimo viable es {fMoney2(precioMinSeg)} por IDC.
+					</p>
+				)}
+			</div>
+		)}
+
+		{panelTab === "cliente" && (
+		<ResultPanel channel={canal} eyebrow="Lo que ve el cliente">
+			{/* Total: el número que el vendedor vino a buscar, una sola vez y en bloque
+			    de color. Antes aparecía arriba (héroe) y abajo (fila "Total") a la vez. */}
+			<div className="rounded-xl bg-primary px-5 py-4 text-primary-foreground">
+				<div className="text-xs font-bold uppercase tracking-wide opacity-80">{conApi ? "Total mes 1" : "Total"} · sin IVA</div>
+				<div className="mt-1.5 font-display text-4xl leading-none tabular-nums [overflow-wrap:anywhere]">
+					{hasVolume ? <AnimatedNumber value={revTotal} format={fMoney2} /> : "—"}
+				</div>
+				<div className="mt-2 text-sm opacity-90">
+					{hasVolume
+						? "Con IVA 21%: " + fMoney2(revTotal * 1.21)
+						: (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
+				</div>
+			</div>
+
+			{/* Nivel / segmento con avance hacia el próximo: la barra convierte la tabla
+			    de niveles en una meta visible ("te falta poco"). */}
+			<div className="space-y-2.5 rounded-xl border border-border/60 bg-white/60 p-3.5">
+				<div className="flex items-center justify-between gap-2">
+					<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{esIDC ? "Segmento" : esDistribVol ? "Nivel" : "Segmento"}</span>
+					{hasVolume && <TierHint label={esDistribVol ? "ver niveles" : "ver segmentos"} columns={esIDC ? ["Segmento", "IDC/mes", "Facturación", "Precio"] : esDistribVol ? ["Nivel", "Compromiso anual", "Certs activos", "Desc."] : ["Segmento", "Firmas", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />}
+				</div>
+				{hasVolume ? (
+					<>
+						<div className="flex items-center justify-between gap-2">
+							<TierBadge tier={seg} tiers={segmentList} size="sm" sub={!esIDC && segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null} />
+							{nextSeg && <span className="text-xs text-muted-foreground">próximo: {nextSeg.label}</span>}
+						</div>
+						{segProgress != null && (
+							<div
+								role="progressbar"
+								aria-label={"Avance hacia " + nextSeg.label}
+								aria-valuemin={0}
+								aria-valuemax={100}
+								aria-valuenow={Math.round(segProgress * 100)}
+								className="h-2 overflow-hidden rounded-full bg-muted"
+							>
+								<div className="h-full rounded-full transition-[width] duration-500 ease-out" style={{ width: Math.max(4, segProgress * 100) + "%", background: meta.color }} />
+							</div>
+						)}
+						{segHint && <p className="text-sm leading-snug text-foreground/80">{segHint}</p>}
+					</>
+				) : (
+					<p className="text-sm text-muted-foreground">Se define con el volumen que cargues.</p>
 				)}
 			</div>
 
@@ -939,12 +1010,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney2} />/mes</>} accent="success" />}
 					</div>
 
-					{/* Total */}
-					<div className="flex items-center justify-between border-t-2 border-border pt-2">
-						<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{conApi ? "Total mes 1" : "Total"}</span>
-						<span className="font-heading text-lg font-semibold tabular-nums"><AnimatedNumber value={revTotal} format={fMoney2} /></span>
-					</div>
-
 					{/* Liquidación del descuento de nivel: cómo se entrega el descuento
 					    (mismo neto, distinto cash flow). Solo Volumen/Distribuidores-Vol. */}
 					{mostrarFormas && descNivelMonto > 0 && (
@@ -972,7 +1037,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								</>
 							) : (
 								<div className="flex items-center justify-between text-xs">
-									<span className="text-muted-foreground">{descLiq.sub === "anticipado" ? "Pago anual anticipado (descuento aplicado)" : "Con seguro de caución ejecutable"}</span>
+									<span className="text-muted-foreground">{descForma === "C" ? "Descuento directo en cada factura" : descLiq.sub === "anticipado" ? "Pago anual anticipado (descuento aplicado)" : "Con seguro de caución ejecutable"}</span>
 									<span className="font-semibold tabular-nums">{fMoney2(revServicio)}</span>
 								</div>
 							)}
@@ -1010,28 +1075,16 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								: "Certificado " + fMoney2(precioIDC) + " y firma " + fMoney2(precioFirmaExtraEff) + ", cada uno por unidad" + (overrideActive ? " · precio ajustado a mano" : " · segmento " + segLabel) + "."}
 					</p>
 
-					{markupBajoMin && (
-						<div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-							<div className="text-xs font-semibold text-destructive">Markup bajo el mínimo ({markupMin.toFixed(2)}x)</div>
-							<p className="text-xs text-muted-foreground mt-0.5">
-								Esta cotización factura {fMarkup(markup)} su costo variable ({fMoney(costoTotal)}). Subí el precio, bajá el cupo de firmas incluidas o ajustá las condiciones para poder guardar y exportar.
-							</p>
-							{markupSeg != null && markupSeg < markupMin && (
-								<p className="text-xs text-muted-foreground mt-1">
-									El precio de tabla del segmento {segLabel} ya no cierra por sí solo: con {cupo} firma{cupo === 1 ? "" : "s"} incluidas el bundle cuesta {fMoney2(costoBundle)} y el mínimo viable es {fMoney2(precioMinSeg)} por IDC.
-								</p>
-							)}
-						</div>
-					)}
 				</div>
 			) : (
 				<p className="text-xs text-muted-foreground">Cargá certificados físicos o jurídicos para ver el desglose y el total.</p>
 			)}
 		</ResultPanel>
+		)}
 
-		{/* Rentabilidad · uso interno: vive debajo del resumen para ver el impacto en
-		    vivo mientras se cotiza. No se exporta a la propuesta del cliente. */}
-		{hasVolume && (
+		{/* Rentabilidad · uso interno: su propia pestaña del panel. No se exporta a la
+		    propuesta del cliente. */}
+		{panelTab === "interno" && (hasVolume ? (
 			<div className="rounded-xl border border-border bg-card p-4 shadow-float">
 				<div className="mb-3">
 					<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rentabilidad · uso interno</span>
@@ -1065,7 +1118,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{esIDC && <ResultRow label={<>Costo del bundle por IDC<InfoTooltip text={"Certificado (" + fMoney2(cvCert) + ") + " + cupo + " firma" + (cupo === 1 ? "" : "s") + " del cupo (" + fMoney2(cvFirma) + " c/u) = " + fMoney2(costoBundle) + ". Precio mínimo viable a " + markupMin.toFixed(2) + "x: " + fMoney2(precioMinSeg) + "."} /></>} value={<span className="tabular-nums">{fMoney2(costoBundle)}</span>} />}
 				</div>
 			</div>
-		)}
+		) : (
+			<div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-float">Cargá volumen para ver markup, contribución y costos.</div>
+		))}
 		</>
 	);
 
@@ -1086,8 +1141,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 	return (
 		<QuoteLayout header={header} result={result} footer={footer}>
-			{/* ── 1 · Para la propuesta ── */}
-			<FieldGroup step={1} channel={canal} done={!!selectedClient} title="Para la propuesta" subtitle="Empezá por el cliente. Estos datos van al documento final; no cambian el cálculo.">
+			{/* Lienzo de la cotización: Cliente → Volumen → Condiciones → Extras. Los
+			    precios derivados (por certificado, por firma, descuento) ya no se repiten
+			    en recuadros de solo lectura: viven en el panel de resumen. */}
+			<FieldGroup channel={canal} done={!!selectedClient} title="Cliente">
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">
 						Cliente
@@ -1102,15 +1159,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						</p>
 					)}
 				</div>
-
-				<div className="flex flex-col gap-1.5">
-					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Casos de uso <span className="normal-case tracking-normal font-normal">(para propuesta comercial)</span></Label>
-					<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
-				</div>
 			</FieldGroup>
 
-			{/* ── 2 · Qué cotizás ── */}
-			<FieldGroup step={2} channel={canal} done={hasVolume} title="Qué cotizás" subtitle={esIDC ? "Modalidad y volumen de IDC por tipo. El resumen se arma a la derecha." : "Modalidad y cantidades de certificados y firmas. Cada elemento se cotiza por separado."}>
+			<FieldGroup channel={canal} done={hasVolume} title="Volumen" subtitle={esIDC ? "IDC por tipo; el segmento y el precio se calculan solos." : "Cantidades por tipo; el nivel y el precio se calculan solos."}>
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
 					<div className="flex gap-1 flex-wrap">
@@ -1129,8 +1180,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					</div>
 					{!conApi && <p className="text-xs text-muted-foreground">Sin integración {intgTerm}: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
 				</div>
-
-				<Separator />
 
 				{/* Volumen agrupado por tipo de certificado */}
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1180,50 +1229,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						</div>
 					</div>
 				)}
-
-				{/* Precios derivados del segmento. En IDC es el precio del bundle más su cupo;
-				    en Volumen, los dos precios de lista ya con el descuento del segmento. Ninguno
-				    se edita acá: se ajustan desde el bloque de precio personalizado del paso 3. */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Precio por IDC" : "Precio por certificado"}</Label>
-						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-							<span className="font-semibold tabular-nums">{hasVolume ? fMoney2(precioIDC) : "—"}</span>
-							<span className="ml-2 text-xs text-muted-foreground truncate">{hasVolume ? (esDistribVol ? "nivel " + segLabel : "segmento " + segLabel) + (overridePrecioCert !== "" ? " · manual" : "") : (esIDC ? "según el volumen de IDC" : esDistribVol ? "certificado bonificado" : "según el compromiso")}</span>
-						</div>
-						<span className="text-xs text-muted-foreground">{esIDC ? "Escala por volumen mensual de IDC." : esDistribVol ? "El certificado va siempre bonificado (USD 0)." : "Precio base menos el descuento del segmento."}</span>
-					</div>
-					{esIDC ? (
-						<div className="flex flex-col gap-1.5">
-							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Firmas incluidas por IDC</Label>
-							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-								<span className="font-semibold tabular-nums">{cupo}</span>
-								<span className="ml-2 text-xs text-muted-foreground truncate">{hasVolume && firmasExtra > 0 ? firmasExtra.toLocaleString("es-AR") + " sobre el cupo" : "cupo del bundle"}</span>
-							</div>
-							<span className="text-xs text-muted-foreground">Firma inicial de la institución más firmas de activación.</span>
-						</div>
-					) : (
-						<div className="flex flex-col gap-1.5">
-							<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esDistribVol ? "Descuento del nivel" : "Descuento del segmento"}</Label>
-							<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-								<span className="font-semibold tabular-nums">{segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : "sin descuento"}</span>
-							</div>
-							<span className="text-xs text-muted-foreground">Se aplica por igual al certificado y a la firma.</span>
-						</div>
-					)}
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "Firma sobre el cupo" : "Precio por firma"}</Label>
-						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
-							<span className="font-semibold tabular-nums">{fMoney2(precioFirmaExtraEff)}</span>
-							<span className="ml-2 text-xs text-muted-foreground truncate">{overridePrecioFirma !== "" ? "manual" : "segmento"}</span>
-						</div>
-						<span className="text-xs text-muted-foreground">{esIDC ? "Se factura por unidad a partir de la firma " + (cupo + 1) + " de cada IDC." : "Cada firma se factura por unidad."}</span>
-					</div>
-				</div>
 			</FieldGroup>
 
-			{/* ── 3 · Condiciones comerciales ── */}
-			<FieldGroup step={3} channel={canal} done={hasVolume} title="Condiciones comerciales" subtitle={condResumen}>
+			<FieldGroup channel={canal} done={hasVolume} title="Condiciones" subtitle={condResumen}>
 				{conApi && (
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						{feePermitido
@@ -1252,52 +1260,57 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					</div>
 				)}
 
-				{/* Condiciones comerciales OFRECIDAS: se listan en la propuesta como
-				    incentivos que el cliente puede aprovechar. No bajan el total. */}
-				<ConditionBlock
-					icon={Handshake}
-					title="Condiciones comerciales que ofrecés"
-				>
-					<p className="text-xs text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
-					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
-				</ConditionBlock>
-
-				{/* Forma de liquidación del descuento de nivel (solo Volumen y Distribuidores-
-				    Volumen). El neto no cambia entre formas; cambia el cash flow y, en A2, el
-				    margen (firmas bonificadas con costo). No aplica a IDC (escala de precios). */}
+				{/* Forma de liquidación del descuento (Volumen y Distribuidores-Volumen), en
+				    dos pasos: directo en factura o con compromiso anual. Las cuatro variantes
+				    del compromiso aparecen solo si se elige compromiso. El neto no cambia. */}
 				{mostrarFormas && (
-					<>
-						<ConditionBlock icon={Wallet} title="Forma de liquidación del descuento">
-							<p className="text-xs text-muted-foreground">
-								{descNivelMonto > 0
-									? "Elegí cómo se entrega el descuento de nivel de " + fMoney(descNivelMonto) + ". El neto es el mismo en todas; cambia el cash flow y el compromiso que se le pide al cliente."
-									: "En este nivel no hay descuento que liquidar (0%). La opción elegida solo fija la condición de pago en la propuesta."}
-							</p>
-							<div className="flex flex-col gap-2.5">
-								{DESC_GRUPOS.map(function (grupo) {
-									const opciones = DESC_OPCIONES.filter(function (o) { return o.grupo === grupo; });
-									if (!opciones.length) return null;
+					<ConditionBlock icon={Wallet} title="Cómo recibe el descuento del nivel">
+						<div className="flex flex-col gap-2.5">
+							<div role="radiogroup" aria-label="Forma de liquidación" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+								{[
+									{ id: "directo", label: "Directo en factura", desc: "Sin compromiso anual. Se aplica en cada factura." },
+									{ id: "compromiso", label: "Con compromiso anual", desc: "Anticipado, caución, rebate o firmas al cierre." },
+								].map(function (o) {
+									const active = o.id === "directo" ? descForma === "C" : descForma !== "C";
 									return (
-										<div key={grupo} className="flex flex-col gap-1">
-											<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">{grupo}</span>
-											{opciones.map(function (o) {
-												const active = descOpcionSel === o.id;
-												return (
-													<button key={o.id} type="button" onClick={function () { setDescOpcionSel(o.id); }} className={"flex items-start gap-2.5 px-3 py-2 rounded-md text-left border transition-colors " + (active ? "bg-primary/10 border-primary/50 ring-1 ring-primary/30" : "bg-muted/40 border-transparent hover:bg-muted")}>
-														<span className={"mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors " + (active ? "border-primary bg-primary" : "border-muted-foreground/40")} />
-														<span className="flex flex-col gap-0.5">
-															<span className={"text-xs font-medium " + (active ? "text-primary" : "text-foreground")}>{o.label}</span>
-															<span className="text-xs text-muted-foreground leading-snug">{o.desc}</span>
-														</span>
-													</button>
-												);
-											})}
-										</div>
+										<button
+											key={o.id}
+											type="button"
+											role="radio"
+											aria-checked={active}
+											onClick={function () {
+												if (o.id === "directo") setDescOpcionSel("C1");
+												else if (descForma === "C") setDescOpcionSel("B1");
+											}}
+											className={cn(
+												"flex flex-col gap-0.5 rounded-xl border px-3.5 py-3 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+												active ? "border-primary/60 bg-primary/10 ring-1 ring-primary/30" : "border-border bg-card hover:bg-muted/60"
+											)}
+										>
+											<span className={cn("text-sm font-semibold", active ? "text-primary" : "text-foreground")}>{o.label}</span>
+											<span className="text-sm leading-snug text-muted-foreground">{o.desc}</span>
+										</button>
 									);
 								})}
 							</div>
+							{descForma !== "C" && (
+								<div role="radiogroup" aria-label="Variante con compromiso anual" className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+									{DESC_OPCIONES.filter(function (o) { return o.forma !== "C"; }).map(function (o) {
+										const active = descOpcionSel === o.id;
+										return (
+											<button key={o.id} type="button" role="radio" aria-checked={active} onClick={function () { setDescOpcionSel(o.id); }} className={cn("flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50", active ? "border-primary/50 bg-primary/5" : "border-transparent bg-muted/40 hover:bg-muted")}>
+												<span className={cn("mt-0.5 size-3.5 shrink-0 rounded-full border-2 transition-colors", active ? "border-primary bg-primary" : "border-muted-foreground/40")} />
+												<span className="flex flex-col gap-0.5">
+													<span className={cn("text-sm font-medium", active ? "text-primary" : "text-foreground")}>{o.label}</span>
+													<span className="text-xs leading-snug text-muted-foreground">{o.desc}</span>
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							)}
 							{hasVolume && descNivelMonto > 0 && (
-								<p className="text-xs text-muted-foreground">
+								<p className="text-sm text-muted-foreground">
 									{descLiq.esFull
 										? "Se factura " + fMoney(descLiq.cargoAnioFull) + " a precio de lista durante el año" + (descLiq.sub === "firmas" ? "; al cierre se bonifican " + descLiq.firmasCierre.toLocaleString("es-AR") + " firmas (costo " + fMoney(descLiq.costoFirmasCierre) + ", baja el margen)." : "; al cierre se acredita " + fMoney(descLiq.rebate) + ".")
 										: descForma === "C"
@@ -1305,36 +1318,17 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 											: (descSub === "anticipado" ? "Se cobra " + fMoney(revServicio) + " anticipado, con el descuento ya aplicado." : "Precio neto " + fMoney(revServicio) + " con seguro de caución ejecutable (solo cláusula en la propuesta).")}
 								</p>
 							)}
-						</ConditionBlock>
-					</>
+						</div>
+					</ConditionBlock>
 				)}
 
-				{/* Bonificación de firmas (opcional): parte de las firmas facturables no se
-				    cobra. No toca el volumen ni el segmento, solo el subtotal a facturar. */}
-				<ConditionToggleBlock
-					icon={Gift}
-					title="Bonificar firmas"
-					checked={showBonif}
-					onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }}
-					badge={firmasBonif > 0 ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge> : null}
-					hint="Opcional. Regalá firmas que estén por encima del cupo del bundle: son las únicas que se facturan por unidad."
+				<ConditionBlock
+					icon={Handshake}
+					title="Condiciones comerciales que ofrecés"
 				>
-					<div className="space-y-2">
-							<div className="max-w-xs">
-								<NumberField label="Firmas bonificadas" value={firmasBonificadas} onChange={setFirmasBonificadas} min={0} max={firmasExtra} placeholder="0"
-									note={hasVolume ? (firmasExtra > 0 ? "De las " + firmasExtra.toLocaleString("es-AR") + " firmas sobre el cupo." : "Este volumen no tiene firmas sobre el cupo.") : "Cargá el volumen primero."} />
-							</div>
-							{firmasBonif > 0 && (
-								<p className="text-sm text-muted-foreground">
-									{firmasBonif.toLocaleString("es-AR")} firmas × {fMoney2(precioFirmaExtraEff)} = <span className="font-semibold text-[var(--success)]">−{fMoney(bonifMonto)}</span> · se facturan {firmasCobradas.toLocaleString("es-AR")} de {firmasExtra.toLocaleString("es-AR")} firmas sobre el cupo.
-								</p>
-							)}
-							{Number(firmasBonificadas) > firmasExtra && (
-								<p className="text-xs text-[var(--warning)]">Solo se pueden bonificar las {firmasExtra.toLocaleString("es-AR")} firmas que exceden el cupo; las del cupo ya van sin cargo.</p>
-							)}
-							<p className="text-xs text-muted-foreground">El segmento se sigue calculando sobre el volumen completo de IDC. El costo variable de las firmas bonificadas se paga igual, así que baja el markup.</p>
-						</div>
-				</ConditionToggleBlock>
+					<p className="text-xs text-muted-foreground">Se listan en la propuesta como incentivos que el cliente puede aprovechar. No modifican el total cotizado.</p>
+					<CommercialLevers levers={commercialLevers} value={levers} onChange={setLevers} />
+				</ConditionBlock>
 
 				<SegmentoSection
 					esIDC={esIDC}
@@ -1362,15 +1356,45 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					fMoney={fMoney}
 					fMoney2={fMoney2}
 				/>
+			</FieldGroup>
 
-				{/* Abono mensual */}
-				<ConditionToggleBlock
-					icon={CalendarClock}
-					title="Incluir abono mensual de firmas"
-					checked={abono}
-					onChange={function (e) { setAbono(e.target.checked); }}
-					badge={abono ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
-				>
+			{/* Extras: opcionales, como tarjetas con interruptor. Solo el que se usa se
+			    expande; el resto queda como una celda de la grilla. */}
+			<section aria-labelledby="extras-title" className="space-y-3">
+				<h3 id="extras-title" className="px-1 font-heading text-sm font-semibold text-foreground">Extras</h3>
+				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+					<ExtraCard
+						icon={Gift}
+						title="Bonificar firmas"
+						desc="Firmas sobre el cupo, sin cargo"
+						checked={showBonif}
+						onChange={function (e) { setShowBonif(e.target.checked); if (!e.target.checked) setFirmasBonificadas(""); }}
+						badge={firmasBonif > 0 ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">{firmasBonif.toLocaleString("es-AR")} bonificadas</Badge> : null}
+					>
+						<div className="space-y-2">
+								<div className="max-w-xs">
+									<NumberField label="Firmas bonificadas" value={firmasBonificadas} onChange={setFirmasBonificadas} min={0} max={firmasExtra} placeholder="0"
+										note={hasVolume ? (firmasExtra > 0 ? "De las " + firmasExtra.toLocaleString("es-AR") + " firmas sobre el cupo." : "Este volumen no tiene firmas sobre el cupo.") : "Cargá el volumen primero."} />
+								</div>
+								{firmasBonif > 0 && (
+									<p className="text-sm text-muted-foreground">
+										{firmasBonif.toLocaleString("es-AR")} firmas × {fMoney2(precioFirmaExtraEff)} = <span className="font-semibold text-[var(--success)]">−{fMoney(bonifMonto)}</span> · se facturan {firmasCobradas.toLocaleString("es-AR")} de {firmasExtra.toLocaleString("es-AR")} firmas sobre el cupo.
+									</p>
+								)}
+								{Number(firmasBonificadas) > firmasExtra && (
+									<p className="text-xs text-[var(--warning)]">Solo se pueden bonificar las {firmasExtra.toLocaleString("es-AR")} firmas que exceden el cupo; las del cupo ya van sin cargo.</p>
+								)}
+								<p className="text-xs text-muted-foreground">El segmento se sigue calculando sobre el volumen completo de IDC. El costo variable de las firmas bonificadas se paga igual, así que baja el markup.</p>
+							</div>
+					</ExtraCard>
+					<ExtraCard
+						icon={CalendarClock}
+						title="Abono mensual"
+						desc="Repone la bolsa de firmas cada mes"
+						checked={abono}
+						onChange={function (e) { setAbono(e.target.checked); }}
+						badge={abono ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
+					>
 						<div className="flex items-center gap-2">
 							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Descuento del abono</Label>
 							<div className="flex items-center gap-1">
@@ -1384,49 +1408,68 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							<p className="text-xs">{firmasTotales.toLocaleString("es-AR")} firmas × USD {precioFirmaAbono.toFixed(3)}/firma = <span className="font-semibold text-foreground">{fMoney(revAbonoMes)}/mes</span></p>
 						</div>
 					)}
-				</ConditionToggleBlock>
-
-				{/* Ajuste de precios personalizado (por componente) */}
-				<ConditionToggleBlock
-					icon={SlidersHorizontal}
-					title="Ajuste de precios personalizado"
-					checked={showOverrides}
-					onChange={function (e) { setShowOverrides(e.target.checked); if (!e.target.checked) { setOverridePrecioCert(""); setOverridePrecioFirma(""); } }}
-					badge={overrideActive ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
-					hint="Opcional. Fijá a mano el precio de certificado o de firma para esta cotización; lo que dejes vacío usa el precio del segmento."
-				>
-					<div className="space-y-2">
-							<p className="text-xs text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
-							<div className="grid grid-cols-2 gap-3 max-w-sm">
-								<div className="flex flex-col gap-1.5">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-									<div className="flex items-center gap-1">
-										<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={segPrice.precioIDC.toFixed(3)} className="h-8 text-sm" />
-										{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+					</ExtraCard>
+					<ExtraCard
+						icon={SlidersHorizontal}
+						title="Precio a mano"
+						desc="Pisa el precio del nivel"
+						checked={showOverrides}
+						onChange={function (e) { setShowOverrides(e.target.checked); if (!e.target.checked) { setOverridePrecioCert(""); setOverridePrecioFirma(""); } }}
+						badge={overrideActive ? <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activo</Badge> : null}
+					>
+						<div className="space-y-2">
+								<p className="text-xs text-muted-foreground">Completá el precio que quieras fijar a mano. El campo que dejes vacío usa el precio normal (segmento {seg.label}).</p>
+								<div className="grid grid-cols-2 gap-3 max-w-sm">
+									<div className="flex flex-col gap-1.5">
+										<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio cert. <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+										<div className="flex items-center gap-1">
+											<Input type="number" value={overridePrecioCert} onChange={function (e) { setOverridePrecioCert(e.target.value); }} placeholder={segPrice.precioIDC.toFixed(3)} className="h-8 text-sm" />
+											{overridePrecioCert !== "" && <button onClick={function () { setOverridePrecioCert(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+										</div>
+									</div>
+									<div className="flex flex-col gap-1.5">
+										<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
+										<div className="flex items-center gap-1">
+											<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segPrice.precioFirmaExtra.toFixed(3)} className="h-8 text-sm" />
+											{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+										</div>
 									</div>
 								</div>
-								<div className="flex flex-col gap-1.5">
-									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Precio firma <span className="normal-case tracking-normal font-normal">(USD)</span></Label>
-									<div className="flex items-center gap-1">
-										<Input type="number" value={overridePrecioFirma} onChange={function (e) { setOverridePrecioFirma(e.target.value); }} placeholder={segPrice.precioFirmaExtra.toFixed(3)} className="h-8 text-sm" />
-										{overridePrecioFirma !== "" && <button onClick={function () { setOverridePrecioFirma(""); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
-									</div>
-								</div>
-							</div>
-							<p className="text-xs text-muted-foreground">Precio efectivo: IDC {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma sobre el cupo {fMoney2(precioFirmaExtraEff)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
-					</div>
-				</ConditionToggleBlock>
-
-				<ProyeccionSection
-					esIDC={esIDC} esDistribVol={esDistribVol} hasVolume={hasVolume}
-					baseCanal={baseCanal} fMoney={fMoney} fMoney2={fMoney2}
-					proyEnabled={proyEnabled} setProyEnabled={setProyEnabled}
-					proyCustom={proyCustom} proyDriver={proyDriver} proySteps={proySteps}
-					proyRows={proyRows} escalonadoRows={escalonadoRows}
-					changeDriver={changeDriver} resetSteps={resetSteps}
-					updateStep={updateStep} addStep={addStep} removeStep={removeStep}
-				/>
-			</FieldGroup>
+								<p className="text-xs text-muted-foreground">Precio efectivo: IDC {fMoney2(precioIDC)}{overridePrecioCert !== "" ? " · manual" : " · segmento"} · firma sobre el cupo {fMoney2(precioFirmaExtraEff)}{overridePrecioFirma !== "" ? " · manual" : " · segmento"}.</p>
+						</div>
+					</ExtraCard>
+					<ExtraCard
+						icon={TrendingUp}
+						title={esIDC ? "Proyección de crecimiento" : "Escalonado en el PDF"}
+						desc="Escala de precios por volumen en la propuesta"
+						checked={proyEnabled}
+						onChange={function (e) { setProyEnabled(e.target.checked); }}
+					>
+						<ProyeccionSection
+							esIDC={esIDC} esDistribVol={esDistribVol} hasVolume={hasVolume}
+							baseCanal={baseCanal} fMoney={fMoney} fMoney2={fMoney2}
+							proyEnabled={proyEnabled} setProyEnabled={setProyEnabled}
+							proyCustom={proyCustom} proyDriver={proyDriver} proySteps={proySteps}
+							proyRows={proyRows} escalonadoRows={escalonadoRows}
+							changeDriver={changeDriver} resetSteps={resetSteps}
+							updateStep={updateStep} addStep={addStep} removeStep={removeStep}
+							hideToggle
+						/>
+					</ExtraCard>
+					<ExtraCard
+						icon={MessageSquareText}
+						title="Casos de uso"
+						desc="Texto para la propuesta"
+						checked={showCasos || casosDeUso !== ""}
+						onChange={function (e) { setShowCasos(e.target.checked); if (!e.target.checked) setCasosDeUso(""); }}
+					>
+						<label className="flex flex-col gap-1.5">
+							<span className="sr-only">Casos de uso</span>
+							<textarea value={casosDeUso} onChange={function (e) { setCasosDeUso(e.target.value); }} rows={2} placeholder="Ej: recibos de haberes, contratos de RRHH, acuerdos comerciales..." className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground" />
+						</label>
+					</ExtraCard>
+				</div>
+			</section>
 
 			{/* ── Matriz de niveles (solo Distribuidores-Volumen) ── */}
 			{esDistribVol && (

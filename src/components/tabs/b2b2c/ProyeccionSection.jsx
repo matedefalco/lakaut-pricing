@@ -11,7 +11,7 @@ import { PROYECCION_DRIVERS } from "@/lib/proyeccion";
 // presentacional: el estado y el cálculo siguen en el componente padre.
 export function ProyeccionSection({
 	esIDC, esDistribVol, hasVolume, baseCanal, fMoney, fMoney2,
-	proyEnabled, setProyEnabled, proyCustom, proyDriver, proySteps,
+	proyEnabled, setProyEnabled, proyCustom, proyDriver, proySteps, hideToggle,
 	proyRows, escalonadoRows,
 	changeDriver, resetSteps, updateStep, addStep, removeStep,
 }) {
@@ -20,13 +20,15 @@ export function ProyeccionSection({
 		{/* Proyección de crecimiento (opcional): override por propuesta que suma
 		    al PDF una tabla de precios por volumen alcanzado. */}
 		<div className="flex flex-col gap-3">
-			<label className="flex items-center gap-2.5 cursor-pointer select-none">
+			{/* hideToggle: cuando la sección vive dentro de una ExtraCard, el interruptor
+			    de la tarjeta ya es el control; este checkbox sería un duplicado. */}
+			{!hideToggle && <label className="flex items-center gap-2.5 cursor-pointer select-none">
 				<input type="checkbox" checked={proyEnabled} onChange={function (e) { setProyEnabled(e.target.checked); }} className="rounded" />
 				<span className="text-sm font-medium">{esIDC ? "Proyección de crecimiento en la propuesta" : "Escalonado de crecimiento en la propuesta"}</span>
 				{proyEnabled && <Badge variant="secondary" className="text-xs px-1.5 py-0 text-[var(--success)] border-[var(--success)]">activa</Badge>}
 				{proyEnabled && !esIDC && <Badge variant="outline" className="text-xs px-1.5 py-0 text-muted-foreground">{esDistribVol ? "según niveles" : (proyCustom ? "personalizado" : "estándar")}</Badge>}
-			</label>
-			{!proyEnabled && <p className="text-xs text-muted-foreground pl-6">{esIDC ? "Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo." : esDistribVol ? "Opcional. Agrega al PDF un escalonado derivado de los niveles de Distribuidores-Volumen: una fila por nivel, alineada con el descuento que alcanza la cotización." : "Opcional. Agrega al PDF el escalonado estándar de precios por volumen de firmas; podés ajustarlo para esta cotización puntual."}</p>}
+			</label>}
+			{!hideToggle && !proyEnabled && <p className="text-xs text-muted-foreground pl-6">{esIDC ? "Opcional. Agrega al PDF una tabla de precios por volumen alcanzado, con descuento progresivo." : esDistribVol ? "Opcional. Agrega al PDF un escalonado derivado de los niveles de Distribuidores-Volumen: una fila por nivel, alineada con el descuento que alcanza la cotización." : "Opcional. Agrega al PDF el escalonado estándar de precios por volumen de firmas; podés ajustarlo para esta cotización puntual."}</p>}
 
 		{proyEnabled && (esIDC ? (
 			<div className="space-y-4">
