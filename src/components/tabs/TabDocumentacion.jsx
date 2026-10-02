@@ -273,7 +273,7 @@ export function TabDocumentacion({ tc }) {
 					<LiveTable accent={C.idc.color} caption="Segmentos IDC" rows={idcSegs} rowKey={function (s) { return s.id || s.label; }}
 						columns={[
 							{ key: "seg", label: "Segmento", render: function (s) { return <TierBadge tier={s} tiers={idcSegs} size="sm" />; } },
-							{ key: "rango", label: "IDC (por mes si es anual)", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
+							{ key: "rango", label: "IDC contratadas", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
 							{ key: "fact", label: "Facturación", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return <span className="inline-flex items-center gap-2"><MagBar value={Number(s.precioIDC) || 0} max={idcPrecioMax} color={C.idc.color} />USD {usd(s.precioIDC)}</span>; } },
 							{ key: "cupo", label: "Firmas incl.", align: "right", render: function (s) { return num(s.firmasIncluidas); } },
@@ -291,10 +291,10 @@ export function TabDocumentacion({ tc }) {
 						</div>
 						<div className="rounded-xl border p-4 shadow-[var(--shadow-control)]" style={{ borderColor: C.idc.color + "40", background: C.idc.colorSoft }}>
 							<div className="font-heading text-sm font-semibold" style={{ color: C.idc.colorFg }}>Compromiso anual</div>
-							<P className="mt-1 text-sm">{"El consumo se carga **por mes** o **por año** (se divide por 12). Se cotiza el **total del año** (× 12), a pagar de una vez; el segmento se mide por el consumo mensual y la facturación anual."}</P>
+							<P className="mt-1 text-sm">{"El consumo se carga **por mes** o **por año** (se divide por 12). Se cotiza el **total del año** (× 12), a pagar de una vez; el segmento se mide por las IDC del año y su facturación."}</P>
 						</div>
 					</div>
-					<Callout type="ejemplo">{"12.000 IDC por año con compromiso anual = 1.000 IDC por mes de consumo. El segmento sale de ese consumo mensual (o de la facturación anual, si es mayor) y se cotizan las 12.000 IDC a ese precio, en un solo pago."}</Callout>
+					<Callout type="ejemplo">{"24.000 IDC por año con compromiso anual caen en Growth (10.001 – 50.000 IDC contratadas): se cotizan las 24.000 al precio Growth, en un solo pago. Si el cliente ya tiene identidades activas, la recompra cotiza solo firmas, sin volver a cobrar el certificado."}</Callout>
 
 					<SubHeading id="idc-fees">Fee de implementación (SDK)</SubHeading>
 					<P>Pago único, bonificable a discreción comercial.</P>

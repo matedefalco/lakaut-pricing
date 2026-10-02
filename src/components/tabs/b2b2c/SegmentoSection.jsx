@@ -18,7 +18,7 @@ export function SegmentoSection({
 			<span className="text-sm font-medium">{esIDC ? "Segmento y proyección" : esDistribVol ? "Nivel del distribuidor" : "Compromiso del contrato"}</span>
 			<p className="text-xs text-muted-foreground">
 				{esIDC
-					? "El segmento es el MAYOR entre dos ejes: la cantidad de IDC (por mes con compromiso anual; la puntual con consumo único) y su facturación medida a precio Start Up (referencia que evita la circularidad precio↔segmento), anualizada × 12 con compromiso anual. Lo que llegue al segmento más grande, manda."
+					? "El segmento es el MAYOR entre dos ejes: la cantidad TOTAL de IDC contratadas (el año completo con compromiso anual, la compra puntual con consumo único) y su facturación medida a precio Start Up (referencia que evita la circularidad precio↔segmento). Lo que llegue al segmento más grande, manda."
 					: esDistribVol
 						? "El nivel (Azul→Platinum) se alcanza por el mayor entre la facturación a precio base (con compromiso anual, servicio × 12; sin compromiso, el período mensual × 1) y los certificados activos del socio (que cuentan solo con compromiso anual). A mayor nivel, mayor descuento sobre la firma (el certificado va bonificado). El descuento se aplica en ambas condiciones: diferido con compromiso anual, o directo en cada factura sin compromiso."
 						: "El segmento es el MAYOR entre dos ejes de esta cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (compromiso del contrato). Lo que llegue al segmento más alto, manda."}
@@ -77,11 +77,11 @@ export function SegmentoSection({
 			) : (
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? (modalidadFact === "anual" ? "IDC / mes" : "IDC") : "Firmas totales"}</Label>
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "IDC contratadas" : "Firmas totales"}</Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{(esIDC ? idc : firmasTotales).toLocaleString("es-AR")}</span>
 						</div>
-						<span className="text-xs text-muted-foreground">{esIDC ? (modalidadFact === "anual" ? "eje de volumen · consumo mensual" : "eje de volumen · identidades a consumir") : "eje de volumen · firmas por certificado + firmas sueltas"}</span>
+						<span className="text-xs text-muted-foreground">{esIDC ? (modalidadFact === "anual" ? "eje de volumen · total del año" : "eje de volumen · identidades a consumir") : "eje de volumen · firmas por certificado + firmas sueltas"}</span>
 					</div>
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Facturación del segmento</Label>

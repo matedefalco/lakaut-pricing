@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-10-02 16:32 · **Fuente:** Supabase (config viva) · **Commit:** `faa5601`
+> **Última actualización:** 2026-10-02 16:57 · **Fuente:** Supabase (config viva) · **Commit:** `7e0e14c`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -75,9 +75,9 @@ Certificados y firmas sueltos: el único modo en que cotizan los distribuidores.
 Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Con **compromiso anual** el ingreso es recurrente (consumo mensual × 12); con **consumo único**, es el total cotizado.
 
 <!-- AUTO:idc:start -->
-Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año y el segmento se mide por el consumo mensual y la facturación anual). La IDC no distingue persona física o jurídica (mismo precio y costo).
+Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo).
 
-| Segmento | Rango (IDC; por mes si es anual) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |
+| Segmento | Rango (IDC contratadas) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |
 |---|---|---|---|---|---|
 | Start Up | hasta 10.000 IDC | hasta USD 160.000 | USD 1,3438 | 3 | USD 0,50 |
 | Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 1,2404 | 3 | USD 0,50 |

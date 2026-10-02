@@ -759,6 +759,13 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const revFirmasIncl = revFirmasInclJuridica + revFirmasInclFisica;
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
 	const revFirmasSueltas = firmasSueltas * precioFirmaAdicN;
+	// Recompra IDC: firmas para identidades que ya tienen certificado vigente, a la lista
+	// de Volumen con el descuento de su segmento (snapshot en el resumen del deal).
+	const firmasRecompra = Math.max(0, Number(res.firmasRecompra) || 0);
+	const precioFirmaRecompra = Number(res.precioFirmaRecompra) || 0;
+	const precioFirmaRecompraLista = Number(res.precioFirmaRecompraLista) || 0;
+	const recompraDescPts = Math.round((Number(res.recompraDescuento) || 0) * 100);
+	const revRecompra = firmasRecompra * precioFirmaRecompra;
 	// IDC con compromiso anual (idcCantidadAnual): se cotiza el año completo, así que el
 	// SLA entra por los 12 meses del contrato.
 	const slaMeses = esIDC && inp.idcCantidadAnual ? 12 : 1;
@@ -775,7 +782,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const bonifMonto = firmasBonif * precioFirmaAdicN;
 	// Descuento por condiciones comerciales (snapshot del deal): aplica sobre el
 	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
-	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic + revFirmasSueltas;
+	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic + revFirmasSueltas + revRecompra;
 	const servicioNeto = servicioBruto - bonifMonto;
 	// Modelo "ofrecido": en deals nuevos las condiciones no se restan del subtotal (se
 	// listan aparte). Los deals del modelo anterior las siguen restando.
@@ -826,6 +833,14 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		return { group: true, l: label, v: n * precioIDC, subs: subs };
 	}
 	const idcLblBase = langApi ? "Validaciones de identidad (IDC)" : "Identidades digitales (IDC)";
+	// Descuento del segmento frente al segmento base (Start Up): se muestra aparte del
+	// ahorro del bundle, en el encabezado del grupo, para que se lean los dos.
+	const idcPrecioBaseSeg = Number(res.idcPrecioBase) || 0;
+	const segVsBasePct = idcGrupo && idcPrecioBaseSeg > 0 && res.precioIDCLista != null && Number(res.precioIDCLista) < idcPrecioBaseSeg
+		? Math.round((1 - Number(res.precioIDCLista) / idcPrecioBaseSeg) * 100) : 0;
+	const segVsBaseHtml = segVsBasePct > 0
+		? `<span style="display:block;font-size:9.5pt;color:${B};font-weight:700;margin-top:0.04cm;">Segmento ${segNombre}: −${segVsBasePct}% por IDC frente a ${res.idcSegmentoBase || "Start Up"} (${fmUnit(precioIDC)} en vez de ${fmUnit(idcPrecioBaseSeg)})</span>`
+		: "";
 
 	const items = [
 		// IDC: un grupo por tipo cuando hay jurídicas en el mix; uno solo si no.
@@ -851,6 +866,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic, d: true }] : []),
 		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas, d: true }] : []),
+		...(revRecompra > 0 ? [{ l: `${firmaCap} para tus identidades activas (${firmasRecompra.toLocaleString("es-AR")} × ${precioConLista(precioFirmaRecompra, precioFirmaRecompraLista)}${recompraDescPts > 0 ? ` <span style="color:${B};font-weight:700;">−${recompraDescPts}%</span>` : ""})<span style="display:block;font-size:9pt;color:${GR};line-height:1.35;">Sin nuevo certificado: ${langApi ? "los" : "las"} ${firmaPlur} se suman a las identidades que ya tenés${res.recompraSegmento ? `, con el descuento por volumen del segmento ${res.recompraSegmento}` : ""}.</span>`, v: revRecompra }] : []),
 		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label}${slaMeses > 1 ? ` · ${slaMeses} meses` : ""})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
@@ -891,8 +907,8 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 				? `<strong>${firmasIncl.toLocaleString("es-AR")}</strong> ${firmasIncl === 1 ? firmaSing : firmaPlur} en total`
 				: "sin firmas incluidas")] : []),
 		] : [
-			chip(SVG.idcard(B, 15), `<strong>${firmasSueltas.toLocaleString("es-AR")}</strong> ${firmasSueltas === 1 ? firmaSing : firmaPlur}`),
-			chip(SVG.shield(B, 15), "sin certificado asociado"),
+			chip(SVG.idcard(B, 15), `<strong>${(firmasSueltas + firmasRecompra).toLocaleString("es-AR")}</strong> ${(firmasSueltas + firmasRecompra) === 1 ? firmaSing : firmaPlur}`),
+			chip(SVG.shield(B, 15), firmasRecompra > 0 ? "para tus identidades activas" : "sin certificado asociado"),
 		]),
 		chip(SVG.calendar(B, 15), `<strong>${ABONO_VIGENCIA_MESES} meses</strong> de vigencia`),
 	];
@@ -935,7 +951,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const segPalabra = isDistribVol(deal.channel) ? "nivel" : "segmento";
 	const segFactor = segDescPts > 0 ? 1 - segDescPts / 100 : 0;
 	const segNotaHtml = idcDescPct > 0
-		? `<div style="font-size:9pt;color:${GR};line-height:1.35;margin-top:${denso ? "0.08cm" : "0.15cm"};">El precio tachado es el de lista (certificado y ${firmaSing} sueltos); el descuento del ${idcDescPct}% lo habilita el bundle IDC${segNombre ? ` del segmento <strong style="color:${B};">${segNombre}</strong>` : ""}.</div>`
+		? `<div style="font-size:9pt;color:${GR};line-height:1.35;margin-top:${denso ? "0.08cm" : "0.15cm"};">Ahorro del bundle: el precio tachado es el de lista (certificado y ${firmaSing} sueltos); comprarlos juntos en la IDC${segNombre ? ` del segmento <strong style="color:${B};">${segNombre}</strong>` : ""} cuesta un ${idcDescPct}% menos.</div>`
 		: segDescPts > 0
 		? `<div style="font-size:9pt;color:${GR};line-height:1.35;margin-top:${denso ? "0.08cm" : "0.15cm"};">El precio tachado es el de lista; el descuento del ${segDescPts}% lo habilitó ${segNombre ? `el ${segPalabra} <strong style="color:${B};">${segNombre}</strong>` : "tu volumen"}.</div>`
 		: "";
@@ -956,7 +972,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			}).join("");
 			return `<div style="padding:${itemPad} 0;border-bottom:1px solid ${GRL};">
       <div style="display:flex;justify-content:space-between;gap:0.3cm;font-size:${itemFs};">
-        <span style="color:${DK};font-weight:600;">${it.l}</span>
+        <span style="color:${DK};font-weight:600;">${it.l}${segVsBaseHtml}</span>
         <span style="color:${DK};font-weight:700;white-space:nowrap;">${fm(it.v, currency, tc)}</span>
       </div>
       ${subsHtml}
@@ -1002,8 +1018,10 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		: fPorCertFis > 0
 		? `Cada certificado incluye ${firmaWord(fPorCertFis)}: ${totalFirmasTxt}.`
 		: "Los certificados no incluyen firmas.";
-	const activacionTxt = idc <= 0
-		? `Comprás un volumen de ${firmasSueltas.toLocaleString("es-AR")} ${firmasSueltas === 1 ? firmaSing : firmaPlur}, sin certificados asociados.`
+	const activacionTxtBase = idc <= 0
+		? firmasRecompra > 0
+			? `Sumás ${firmasRecompra.toLocaleString("es-AR")} ${firmaPlur}${idcAnualExp ? " en el año" : ""} para tus identidades ya activas, sin volver a pagar el certificado ni la implementación.`
+			: `Comprás un volumen de ${firmasSueltas.toLocaleString("es-AR")} ${firmasSueltas === 1 ? firmaSing : firmaPlur}, sin certificados asociados.`
 		: !esIDC
 		? volumenTxt
 		: cupo != null
@@ -1014,6 +1032,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 				idcFisicos > 0 ? `${idcFisicos.toLocaleString("es-AR")} ${certFisWord} (${firmaWord(fPorCertFis)} c/u)` : null,
 			].filter(Boolean).join(" y ")}${firmasIncl > 0 ? `, ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total` : ""}.`
 		: `${verboAct} ${unidadArt} ${idc.toLocaleString("es-AR")} ${unidadPl}: cada ${esIDC ? "una con su" : "uno con su"} ${langApi ? "consumo de validación" : "certificado"}${fPorCertFis > 0 ? ` y ${fPorCertFis === 1 ? "su " + firmaSing : `sus ${firmaWord(fPorCertFis)}`}${esIDC ? " de activación" : ""} (${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} en total${cupo != null && firmasEnCupo > 0 ? `, ${firmasEnCupo.toLocaleString("es-AR")} sin cargo` : ""})` : ""}.`;
+	const activacionTxt = activacionTxtBase + (idc > 0 && firmasRecompra > 0 ? ` Además, ${firmasRecompra.toLocaleString("es-AR")} ${firmaPlur} para tus identidades ya activas.` : "");
 	// Forma de liquidación del descuento de nivel (solo Volumen/Distribuidores-Vol).
 	// El neto no cambia; la cláusula describe cómo se entrega el descuento (rebate /
 	// firmas a fin de año, pago anticipado o seguro de caución). Ver [[descLiquidacion]].
@@ -1029,7 +1048,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		dark: false,
 		kicker: idcAnualExp ? "Pago único · compromiso anual" : "Momento 1 · mes 1",
 		icon: SVG.shield(B, 16),
-		heading: langApi ? "Activás tu servicio" : (esIDC ? "Activás tus identidades" : "Comprás tu volumen"),
+		heading: esIDC && idc <= 0 && firmasRecompra > 0 ? "Ampliás tu servicio" : (langApi ? "Activás tu servicio" : (esIDC ? "Activás tus identidades" : "Comprás tu volumen")),
 		body: `
       <div style="font-size:${denso ? "10pt" : "11.5pt"};color:${GR};line-height:1.45;margin-bottom:${denso ? "0.12cm" : "0.22cm"};">
         ${activacionTxt}

@@ -46,6 +46,9 @@ function fMarkup(m) { return m == null ? "—" : m.toFixed(2) + "x"; }
 const ABONO_DESC_FALLBACK = 10;
 // Fallbacks del precio de segmento si la config todavía no lo trae.
 const SEG_FALLBACK = { precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 0.5 };
+// Vigencia del certificado de una IDC (meses desde la emisión). Define si un cliente
+// tiene identidades activas para cotizar recompra. Mismo valor que el PDF.
+const IDC_VIGENCIA_MESES = 24;
 const MARKUP_MIN_FALLBACK = 1.2;
 const VOLUMEN_BASE_FALLBACK = { cert: 0.65, firma: 0.5 };
 
@@ -151,6 +154,11 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// IDC: por defecto no se distingue el tipo (cuestan y cotizan igual). Se puede
 	// activar para cargar físicas y jurídicas por separado (desglose de la propuesta).
 	const [idcPorTipo, setIdcPorTipo] = useState(false);
+	// Recompra IDC: el cliente ya tiene identidades activas (certificado vigente), así que
+	// se cotizan firmas para esas identidades sin volver a cobrar el certificado ni el
+	// cupo. Se sugiere sola por historial; el vendedor la puede forzar por cliente.
+	const [recompraManual, setRecompraManual] = useState(null); // { clientId, value } | null
+	const [firmasRecompra, setFirmasRecompra] = useState("");
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	// Base instalada del socio (solo Distribuidores-Volumen): certificados de sus
@@ -162,6 +170,20 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			.filter(function (d) { return d.client_id === selectedClient.id && d.id !== editingId && isDistribVol(d.channel) && dealStatus(d) === "confirmada"; })
 			.reduce(function (s, d) { return s + ((d.resumen && d.resumen.idcMensuales) || 0); }, 0);
 	}, [esDistribVol, selectedClient, dealsApi, editingId]);
+	// Identidades IDC activas del cliente: las de sus cotizaciones IDC confirmadas dentro
+	// de la vigencia del certificado (24 meses desde la emisión). Si hay, la cotización
+	// se sugiere como recompra.
+	const idcActivos = useMemo(function () {
+		if (!esIDC || !selectedClient) return { n: 0, deals: [] };
+		const limite = Date.now() - IDC_VIGENCIA_MESES * 30.44 * 86400000;
+		const ds = (dealsApi?.deals || []).filter(function (d) {
+			return d.client_id === selectedClient.id && d.id !== editingId && d.channel === "b2b2c" && dealStatus(d) === "confirmada"
+				&& (!d.fecha || new Date(d.fecha).getTime() >= limite) && !(d.inputs && d.inputs.recompra && !((d.resumen && (d.resumen.certFisicos || d.resumen.certJuridicos)) > 0));
+		});
+		return { n: ds.reduce(function (s, d) { const r = d.resumen || {}; return s + ((Number(r.certFisicos) || 0) + (Number(r.certJuridicos) || 0) || Number(r.idcMensuales) || 0); }, 0), deals: ds };
+	}, [esIDC, selectedClient, dealsApi, editingId]);
+	const recompraSugerida = idcActivos.n > 0;
+	const recompra = esIDC && (recompraManual && recompraManual.clientId === (selectedClient ? selectedClient.id : null) ? recompraManual.value : recompraSugerida);
 	// Id de la versión creada en esta sesión de edición: mientras se siga trabajando
 	// sobre ella, los guardados la pisan en vez de crear más versiones. Ver saveQuote.
 	const sessionVersionId = useRef(null);
@@ -202,8 +224,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// ── Cantidades ──
 	// IDC con compromiso anual: se cotiza el AÑO completo (el cliente paga el total al
 	// contado). La cantidad cotizada es la anual (cargada por año, o la mensual × 12) y
-	// el consumo mensual (÷ 12) solo se usa como eje del segmento, cuyos umbrales de
-	// cantidad son por mes. En consumo único lo ingresado es la cantidad que se cotiza.
+	// es también el eje del segmento. En consumo único lo ingresado es la cantidad que
+	// se cotiza.
 	const idcAnual = esIDC && modalidadFact === "anual";
 	const idcPorAnio = idcAnual && idcEntrada === "anual";
 	const conTipo = !esIDC || idcPorTipo;
@@ -216,9 +238,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// Firmas sueltas: solo aplican a Volumen (en IDC la firma va dentro del bundle).
 	const fs = esIDC ? 0 : Math.max(0, Number(firmasSueltas) || 0);
 	const idc = nf + nj; // total de certificados / IDC cotizados
-	// Eje de cantidad del segmento IDC: consumo mensual con compromiso anual, la
-	// cantidad puntual con consumo único.
-	const idcEje = idcAnual ? Math.round(idc / 12) : idc;
+	// Eje de cantidad del segmento IDC: la cantidad TOTAL contratada (el año completo con
+	// compromiso anual, la compra puntual con consumo único). Los umbrales de la tabla se
+	// leen como totales (oct 2026; antes eran IDC por mes).
+	const idcEje = idc;
+	// Firmas de recompra (identidades existentes): misma lógica de período que la IDC.
+	const frIn = recompra ? Math.max(0, Number(firmasRecompra) || 0) : 0;
+	const fr = idcAnual && !idcPorAnio ? frIn * 12 : frIn;
 	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
 
 	// Label y nota del campo de cantidad IDC según la modalidad y cómo se carga.
@@ -337,7 +363,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const firmasBonif = Math.min(firmasExtra, Math.max(0, Number(firmasBonificadas) || 0));
 	const firmasCobradas = firmasExtra - firmasBonif;
 
-	const hasVolume = idc > 0 || firmasTotales > 0;
+	const hasVolume = idc > 0 || firmasTotales > 0 || fr > 0;
 
 	useEffect(function () {
 		if (!pendingEdit) return;
@@ -377,6 +403,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		const entradaAnual = i.idcEntrada === "anual";
 		setIdcEntrada(entradaAnual ? "anual" : "mensual");
 		setIdcPorTipo(!!i.idcPorTipo || (Number(i.certJuridicos) || 0) > 0);
+		setRecompraManual(i.recompra != null ? { clientId: pendingEdit.client_id || null, value: !!i.recompra } : null);
+		setFirmasRecompra(i.firmasRecompraIngresada != null ? String(i.firmasRecompraIngresada) : "");
 		if (i.idcCantidadIngresada) {
 			setCertFisicos(i.idcCantidadIngresada.fis != null ? i.idcCantidadIngresada.fis : "");
 			setCertJuridicos(i.idcCantidadIngresada.jur ? i.idcCantidadIngresada.jur : "");
@@ -472,7 +500,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// El costo total se calcula sobre las firmas REALES cotizadas (dentro y fuera del
 	// cupo, bonificadas incluidas): todas se emiten y todas se pagan.
 	const costoCert = idc * cvCert;
-	const costoFirmas = firmasTotales * cvFirma;
+	const costoFirmas = (firmasTotales + fr) * cvFirma;
 	const costoTotal = costoCert + costoFirmas;
 	const costoBundle = idcBundleCost(cvCert, cvFirma, cupo);
 
@@ -499,7 +527,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// Firmas sueltas: mismo precio de firma del segmento, sin atribución de tipo.
 	const revFirmasSueltas = fs * precioFirmaExtraEff;
 	const revFirmas = firmasExtra * precioFirmaExtraEff;
-	const revServicioBruto = revIDC + revFirmas;
+	// Recompra: firmas para identidades existentes a la lista de Volumen (firma suelta)
+	// con el descuento del segmento de Volumen que alcanza esa cantidad.
+	const recompraSeg = fr > 0 ? (getVolumenSegment(fr, facturacionAtBase(0, fr, volumenBase), volumenSegments) || {}) : {};
+	const recompraDesc = Math.min(1, Math.max(0, Number(recompraSeg.descuento) > 1 ? Number(recompraSeg.descuento) / 100 : Number(recompraSeg.descuento) || 0));
+	const precioFirmaRecompraLista = Number(volumenBase.firma) || 0;
+	const precioFirmaRecompra = precioFirmaRecompraLista * (1 - recompraDesc);
+	const revRecompra = fr * precioFirmaRecompra;
+	const revServicioBruto = revIDC + revFirmas + revRecompra;
 
 	// Bonificación de firmas: se resta del subtotal a precio de firma extra. Va antes
 	// del descuento por condiciones para no descontar dos veces sobre firmas que no se
@@ -525,7 +560,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// allá de los lineamientos generales. No hay gate por nivel; el vendedor lo fija (o lo
 	// deja en 0) según el caso.
 	const feePermitido = true;
-	const feeAplicado = conApi && feePermitido ? Math.max(0, Number(fee) || 0) : 0;
+	// Recompra: el cliente ya está integrado, así que el fee de implementación no se
+	// vuelve a cobrar.
+	const feeAplicado = conApi && feePermitido && !recompra ? Math.max(0, Number(fee) || 0) : 0;
 	// ── SLA por facturación ──
 	// La facturación de la cotización (servicio del período: el año en IDC con compromiso
 	// anual; en Distribuidores × 12 con compromiso; en Volumen la ventana de la modalidad)
@@ -596,7 +633,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		if (esIDC) {
 			const faltan = Math.max(0, (Number(nextSeg.idcMin) || 0) - idcEje);
 			const precioNext = segmentPricing(nextSeg, SEG_FALLBACK).precioIDC;
-			segHint = "Con " + faltan.toLocaleString("es-AR") + (idcAnual ? " IDC/mes" : " IDC") + " más entra en " + nextSeg.label + " · " + fMoney2(precioNext) + " por IDC.";
+			segHint = "Con " + faltan.toLocaleString("es-AR") + " IDC más entra en " + nextSeg.label + " · " + fMoney2(precioNext) + " por IDC.";
 		} else if (esDistribVol) {
 			// El nivel sube por la facturación (windoweada por la condición) o, con compromiso,
 			// por los certificados activos.
@@ -753,7 +790,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				// guarda también lo ingresado para reabrir la cotización tal cual.
 				// idcCantidadAnual marca que certFisicos/certJuridicos son las cantidades del
 				// año (compromiso anual): el export cotiza el total y el SLA × 12.
-				...(esIDC ? { idcEntrada: idcPorAnio ? "anual" : "mensual", idcPorTipo, idcCantidadAnual: idcAnual, idcCantidadIngresada: { fis: nfIn, jur: njIn } } : {}),
+				...(esIDC ? { idcEntrada: idcPorAnio ? "anual" : "mensual", idcPorTipo, idcCantidadAnual: idcAnual, idcCantidadIngresada: { fis: nfIn, jur: njIn }, recompra, ...(recompra ? { firmasRecompraIngresada: frIn, firmasRecompra: fr } : {}) } : {}),
 				// Distribuidores-Volumen: el nivel es el mayor entre firmas y facturación de la
 				// ventana. `modalidadFacturacion` y `facturacionNivel` viajan para reproducir la
 				// asignación; el compromiso anual se deriva de la cotización (no se declara) y
@@ -836,7 +873,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				precioIDC, precioIDCLista: segPrice.precioIDC,
 				// IDC: lista de referencia (cert y firma sueltos de Volumen) contra la que la
 				// propuesta abre el bundle en sub-ítems y muestra el descuento.
-				...(esIDC ? { idcListaRef: { cert: Number(volumenBase.cert) || 0, firma: Number(volumenBase.firma) || 0 } } : {}),
+				...(esIDC ? { idcListaRef: { cert: Number(volumenBase.cert) || 0, firma: Number(volumenBase.firma) || 0 }, idcPrecioBase: idcPrecioBase, idcSegmentoBase: idcBaseSeg.label || null } : {}),
+				...(fr > 0 ? { firmasRecompra: fr, precioFirmaRecompra, precioFirmaRecompraLista, recompraDescuento: recompraDesc, recompraSegmento: recompraSeg.label || null, revRecompra } : {}),
 				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
 				precioFirmaExtraLista: segPrice.precioFirmaExtra,
 				revTotal, revMesTotal: idcAnual ? revSinFee / 12 : revSinFee,
@@ -1059,6 +1097,15 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney2} />} accent="primary" />
 							{firmasExtraJuridica > 0 && <ResultRow label={(esIDC ? "Firmas sobre el cupo (" : "Firmas (") + firmasExtraJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney2} />} />}
+						</div>
+					)}
+					{fr > 0 && (
+						<div className="rounded-lg bg-amber-50 px-3 py-2">
+							<div className="flex items-center justify-between">
+								<span className="text-xs font-semibold text-amber-700">Recompra · firmas</span>
+								<span className="text-xs text-muted-foreground">identidades existentes</span>
+							</div>
+							<ResultRow label={"Firmas (" + fr.toLocaleString("es-AR") + (recompraDesc > 0 ? " · −" + Math.round(recompraDesc * 100) + "%" : "") + ")"} value={<AnimatedNumber value={revRecompra} format={fMoney2} />} accent="primary" />
 						</div>
 					)}
 					{fs > 0 && (
@@ -1288,9 +1335,32 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{!idcAnual
 							? "Se cotiza la cantidad que se consuma en este momento. El segmento sale de esa cantidad y de su facturación."
 							: idcPorAnio
-								? "Cargás el consumo del año y se cotiza el total del año, a pagar de una vez. El segmento se mide por el consumo mensual (÷ 12) y la facturación anual."
-								: "Cargás el consumo mensual y se cotiza el total del año (× 12), a pagar de una vez. El segmento se mide por ese consumo mensual y la facturación anual."}
+								? "Cargás el consumo del año y se cotiza el total del año, a pagar de una vez. El segmento se mide por ese total de IDC y su facturación."
+								: "Cargás el consumo mensual y se cotiza el total del año (× 12), a pagar de una vez. El segmento se mide por el total de IDC del año y su facturación."}
 					</p>
+					{/* Recompra: el cliente ya tiene identidades activas. Se cotizan firmas para
+					    esas identidades (lista de Volumen con su descuento), sin certificado ni
+					    cupo. Las IDC del bloque de abajo son identidades NUEVAS (opcional). */}
+					<div className={"rounded-lg border p-3 " + (recompra ? "border-amber-200 bg-amber-50/60" : "border-border bg-muted/20")}>
+						<label className="flex cursor-pointer items-start gap-2 text-sm text-foreground">
+							<input type="checkbox" checked={recompra} onChange={function (e) { setRecompraManual({ clientId: selectedClient ? selectedClient.id : null, value: e.target.checked }); }} className="mt-0.5 size-4 accent-[var(--primary)]" />
+							<span>
+								<span className="font-semibold">Recompra · cliente con identidades activas</span>
+								<span className="block text-xs text-muted-foreground">
+									{recompraSugerida
+										? (selectedClient ? selectedClient.name : "El cliente") + " tiene " + idcActivos.n.toLocaleString("es-AR") + " IDC activas de " + idcActivos.deals.length + (idcActivos.deals.length === 1 ? " cotización confirmada" : " cotizaciones confirmadas") + " (certificados vigentes). Se cotizan firmas sin volver a cobrar el certificado ni bonificar el cupo."
+										: "Activalo si el cliente ya compró IDC: se cotizan firmas para sus identidades existentes, sin certificado ni cupo bonificado."}
+								</span>
+							</span>
+						</label>
+						{recompra && (
+							<div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+								<NumberField label={"Firmas · identidades existentes" + (idcAnual ? (idcPorAnio ? " / año" : " / mes") : "")} value={firmasRecompra} onChange={setFirmasRecompra} min={0} placeholder="0"
+									note={fr > 0 ? (recompraSeg.label ? "Segmento Volumen " + recompraSeg.label + " · " : "") + (recompraDesc > 0 ? "−" + Math.round(recompraDesc * 100) + "% · " : "") + fMoney2(precioFirmaRecompra) + " por firma" + (idcAnual && !idcPorAnio ? " · " + fr.toLocaleString("es-AR") + " en el año" : "") : "a lista de Volumen (" + fMoney2(precioFirmaRecompraLista) + ") con su descuento"} />
+								<p className="self-center text-xs text-muted-foreground">Si además suma identidades nuevas, cargalas abajo como IDC: esas sí llevan certificado y cupo.</p>
+							</div>
+						)}
+					</div>
 					<label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground">
 						<input type="checkbox" checked={idcPorTipo} onChange={function (e) { setIdcPorTipo(e.target.checked); }} className="size-4 accent-[var(--primary)]" />
 						Distinguir persona física y jurídica
@@ -1300,7 +1370,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
 							<div className="mb-2.5 flex items-center gap-1.5">
 								<span className="inline-block size-2 rounded-full bg-sky-500" />
-								<span className="text-xs font-semibold text-sky-700">{idcPorTipo ? "IDC físicas" : "IDC"}</span>
+								<span className="text-xs font-semibold text-sky-700">{(recompra ? "IDC nuevas" : "IDC") + (idcPorTipo ? " físicas" : "")}</span>
 								<span className="text-xs text-muted-foreground">· {idcPorTipo ? "personas" : "personas o empresas"}</span>
 							</div>
 							<div className="grid grid-cols-2 gap-2.5">
@@ -1378,7 +1448,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				{conApi && (
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						{feePermitido
-							? <NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
+							? recompra
+								? <div className="flex flex-col gap-1.5"><Label className="text-xs text-muted-foreground uppercase tracking-wide">Fee de implementación</Label><div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm text-muted-foreground">No aplica · cliente ya integrado (recompra)</div></div>
+								: <NumberField label="Fee de implementación" value={fee} onChange={setFee} prefix="USD" min={0} note={api.label + " · rango USD " + api.feeMin.toLocaleString("es-AR") + "–" + api.feeMax.toLocaleString("es-AR")} />
 							: (
 								<div className="flex flex-col gap-1.5">
 									<Label className="text-xs text-muted-foreground uppercase tracking-wide">Fee de implementación</Label>
@@ -1649,10 +1721,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				</CollapsibleSection>
 			)}
 
-			{/* ── Referencia ── */}
-			<CollapsibleSection title="Referencia · precios por segmento, SDK y SLA" subtitle="Tabla completa del modelo de volumen (Borrador v5).">
-				<TabCanalB2B2CPrecios costs={costs} />
-			</CollapsibleSection>
+			{/* ── Referencia ── (solo IDC: la tabla es la escala de segmentos IDC, el SDK y el SLA) */}
+			{esIDC && (
+				<CollapsibleSection title="Referencia · segmentos IDC, SDK y SLA" subtitle="Escala completa de precios del canal IDC.">
+					<TabCanalB2B2CPrecios costs={costs} />
+				</CollapsibleSection>
+			)}
 		</QuoteLayout>
 	);
 }

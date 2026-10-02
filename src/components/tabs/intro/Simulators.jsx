@@ -71,14 +71,16 @@ export function IdcSimulator() {
 	const [idc, setIdc] = useState(1000);
 	const [modalidad, setModalidad] = useState("unico");
 	const base = segs[0] || {};
-	const facturacionRef = idc * (Number(base.precioIDC) || 0) * (modalidad === "anual" ? 12 : 1);
-	const seg = getB2B2CSegment(idc, facturacionRef, segs) || {};
+	// Los umbrales se miden sobre el total contratado: el año completo con compromiso anual.
+	const idcTotal = modalidad === "anual" ? idc * 12 : idc;
+	const facturacionRef = idcTotal * (Number(base.precioIDC) || 0);
+	const seg = getB2B2CSegment(idcTotal, facturacionRef, segs) || {};
 	const p = segmentPricing(seg, {});
 	const total = idc * p.precioIDC;
 	const next = segs[segs.indexOf(seg) + 1];
 	return (
 		<SimShell channel="b2b2c" title="Simulador IDC"
-			hint={next ? "Probá: llevá la cantidad a " + num(next.idcMin) + " IDC o más y mirá cómo cambia el segmento y baja el precio por IDC." : "Llegaste al segmento más alto: el mejor precio por IDC."}
+			hint={next ? "Probá: llevá el total a " + num(next.idcMin) + " IDC o más" + (modalidad === "anual" ? " (" + num(Math.ceil(next.idcMin / 12)) + " por mes)" : "") + " y mirá cómo cambia el segmento y baja el precio por IDC." : "Llegaste al segmento más alto: el mejor precio por IDC."}
 			controls={<>
 				<Segmented label="Modalidad" value={modalidad} onChange={setModalidad} options={[{ id: "unico", label: "Consumo único" }, { id: "anual", label: "Compromiso anual" }]} />
 				<LogSlider label={modalidad === "anual" ? "IDC por mes" : "IDC a consumir"} value={idc} onChange={setIdc} min={100} max={1000000} color={CHANNELS.b2b2c.color} unit="IDC" />

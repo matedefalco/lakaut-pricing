@@ -81,9 +81,9 @@ function secIDC(segments, markupMin) {
 		`| ${s.label} | ${rangeCant(s.idcMin, s.idcMax, "IDC")} | ${rangeUSD(s.facturacionMin, s.facturacionMax)} | USD ${usd(s.precioIDC)} | ${num(s.firmasIncluidas)} | USD ${usd(s.precioFirmaExtra)} |`
 	);
 	return [
-		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año y el segmento se mide por el consumo mensual y la facturación anual). La IDC no distingue persona física o jurídica (mismo precio y costo).",
+		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo).",
 		"",
-		"| Segmento | Rango (IDC; por mes si es anual) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |",
+		"| Segmento | Rango (IDC contratadas) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |",
 		"|---|---|---|---|---|---|",
 		...rows,
 		"",
