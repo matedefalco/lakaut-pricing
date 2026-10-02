@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-10-02 18:27 · **Fuente:** Supabase (config viva) · **Commit:** `36e44cb`
+> **Última actualización:** 2026-10-02 19:36 · **Fuente:** Supabase (config viva) · **Commit:** `5fb1bd5`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -75,15 +75,15 @@ Certificados y firmas sueltos: el único modo en que cotizan los distribuidores.
 Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Con **compromiso anual** el ingreso es recurrente (consumo mensual × 12); con **consumo único**, es el total cotizado.
 
 <!-- AUTO:idc:start -->
-Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo). Las **firmas adicionales** que se piden se cotizan al precio de firma del segmento (su parte del precio de la IDC); la **firma excedente** de la tabla es el precio del consumo no planificado por encima de lo contratado, que va como condición del contrato.
+Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). La facturación se compara contra el umbral **anual** con compromiso; en **compra puntual**, contra el de una compra del mes: anual ÷ 12 × un factor de exigencia (default 1,25), así el compromiso anual siempre llega antes al segmento. En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo). Las **firmas adicionales** que se piden se cotizan al precio de firma del segmento (su parte del precio de la IDC); la **firma excedente** de la tabla es el precio del consumo no planificado por encima de lo contratado, que va como condición del contrato.
 
-| Segmento | Rango (IDC contratadas) | Facturación anual | Precio por IDC | Firmas incluidas | Firma excedente |
-|---|---|---|---|---|---|
-| Start Up | hasta 10.000 IDC | hasta USD 160.000 | USD 1,3438 | 3 | USD 0,50 |
-| Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 1,2404 | 3 | USD 0,50 |
-| PyME | 50.001 – 200.000 IDC | USD 800.001 – 3.200.000 | USD 1,137 | 3 | USD 0,50 |
-| Empresa | 200.001 – 600.000 IDC | USD 3.200.001 – 9.600.000 | USD 1,0337 | 3 | USD 0,50 |
-| Plataforma | 600.001+ IDC | +USD 9.600.001 | USD 0,9303 | 3 | USD 0,50 |
+| Segmento | Rango (IDC contratadas) | Facturación anual | Facturación puntual | Precio por IDC | Firmas incluidas | Firma excedente |
+|---|---|---|---|---|---|---|
+| Start Up | hasta 10.000 IDC | hasta USD 160.000 | hasta USD 16.667 | USD 1,3438 | 3 | USD 0,50 |
+| Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 16.668 – 83.333 | USD 1,2404 | 3 | USD 0,50 |
+| PyME | 50.001 – 200.000 IDC | USD 800.001 – 3.200.000 | USD 83.334 – 333.333 | USD 1,137 | 3 | USD 0,50 |
+| Empresa | 200.001 – 600.000 IDC | USD 3.200.001 – 9.600.000 | USD 333.334 – 1.000.000 | USD 1,0337 | 3 | USD 0,50 |
+| Plataforma | 600.001+ IDC | +USD 9.600.001 | +USD 1.000.001 | USD 0,9303 | 3 | USD 0,50 |
 
 Guardarraíl de rentabilidad: markup mínimo **1,20x** sobre el costo variable del bundle. Bajo ese piso el cotizador bloquea guardar y exportar.
 <!-- AUTO:idc:end -->

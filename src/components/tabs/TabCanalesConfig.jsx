@@ -236,13 +236,18 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			{/* ── 2 · Volumen · escala de precios por IDC ── */}
 			<CollapsibleSection
 				title="2 · IDC · Escala de precios por IDC"
-				subtitle={"El segmento es el MAYOR entre el volumen mensual de IDC y la facturación de la ventana medida a precio Start Up (rangos abajo). Cada segmento tiene su precio por IDC, más un cupo de firmas incluidas. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
+				subtitle={"El segmento es el MAYOR entre las IDC contratadas y la facturación medida a precio de lista (rangos anuales abajo; en compra puntual se usan anual ÷ 12 × factor). Cada segmento tiene su precio por IDC, más un cupo de firmas incluidas. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
 			>
 				<div className="mb-5 flex flex-wrap gap-6">
 					<div className="w-52">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Markup mínimo (x)</Label>
 						<NumCell value={markupMin} decimals={2} onChange={function (v) { updDraft({ b2b2cMarkupMin: v || 0 }); }} className="mt-1.5" />
 						<p className="text-xs text-muted-foreground mt-1">Precio ÷ costo. Es la métrica de la columna MARGEN del Borrador v5. Bajo este valor no se puede guardar ni exportar.</p>
+					</div>
+					<div className="w-64">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Factor compra puntual (x)</Label>
+						<NumCell value={draft.b2b2cFactorPuntual != null ? draft.b2b2cFactorPuntual : 1.25} decimals={2} onChange={function (v) { updDraft({ b2b2cFactorPuntual: v || 1 }); }} className="mt-1.5" />
+						<p className="text-xs text-muted-foreground mt-1">En compra puntual, el umbral de facturación de cada segmento es el anual ÷ 12 × este factor. Con 1,25 la compra del mes tiene que facturar un 25% más que el promedio mensual de un compromiso anual.</p>
 					</div>
 				</div>
 

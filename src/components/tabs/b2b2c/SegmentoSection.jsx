@@ -18,7 +18,7 @@ export function SegmentoSection({
 			<span className="text-sm font-medium">{esIDC ? "Segmento y proyección" : esDistribVol ? "Nivel del distribuidor" : "Compromiso del contrato"}</span>
 			<p className="text-xs text-muted-foreground">
 				{esIDC
-					? "El segmento es el MAYOR entre dos ejes: la cantidad TOTAL de IDC contratadas (el año completo con compromiso anual, la compra puntual con consumo único) y su facturación medida a precio Start Up (referencia que evita la circularidad precio↔segmento). Lo que llegue al segmento más grande, manda."
+					? "El segmento es el MAYOR entre dos ejes: la cantidad TOTAL de IDC contratadas (el año completo con compromiso anual, la compra puntual con consumo único) y su facturación medida a precio de lista (referencia que evita la circularidad precio↔segmento). Con compromiso anual la facturación se compara con los umbrales anuales; en compra puntual, con los de una compra del mes (anual ÷ 12 × factor), que exigen más que el promedio mensual del compromiso. Lo que llegue al segmento más grande, manda."
 					: esDistribVol
 						? "El nivel (Azul→Platinum) se alcanza por el mayor entre la facturación a precio base (con compromiso anual, servicio × 12; sin compromiso, el período mensual × 1) y los certificados activos del socio (que cuentan solo con compromiso anual). A mayor nivel, mayor descuento sobre la firma (el certificado va bonificado). El descuento se aplica en ambas condiciones: diferido con compromiso anual, o directo en cada factura sin compromiso."
 						: "El segmento es el MAYOR entre dos ejes de esta cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (compromiso del contrato). Lo que llegue al segmento más alto, manda."}

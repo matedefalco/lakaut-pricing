@@ -176,6 +176,12 @@ export const B2B2C_FIRMAS_INCLUIDAS = 3;
 // de cada segmento contra el costo de su bundle.
 export const B2B2C_MARKUP_MIN = 1.20;
 
+// Compra puntual IDC: el umbral de facturación de cada segmento es el promedio mensual
+// del umbral anual (÷ 12) por este factor de exigencia. Con 1,25 la compra del mes tiene
+// que facturar un 25% más que el promedio mensual de un compromiso anual para llegar al
+// mismo segmento: así el compromiso siempre conviene. Editable en Config.
+export const B2B2C_FACTOR_PUNTUAL = 1.25;
+
 // ── Canal D · Volumen ───────────────────────────────────────────────────────────
 // Certificados y firmas como items independientes: se cargan las cantidades a mano
 // y cada elemento tiene su precio, sin bundle ni cupo de firmas incluidas. Es el

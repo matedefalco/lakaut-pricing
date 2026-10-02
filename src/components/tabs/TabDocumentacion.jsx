@@ -5,6 +5,7 @@ import { useModels } from "../../context/ModelsContext";
 import { CHANNELS } from "../../data/channelMeta";
 import { num, usd, pct, pts, rangeCant, rangeUSD } from "../../lib/pricingDocSections";
 import { TierBadge } from "../ui/TierBadge";
+import { b2b2cSegmentsPuntual } from "../../lib/tiers";
 import { DocToc } from "./docs/DocToc";
 import { DocSection, SubHeading, P, Rich, Callout, LiveTable, MagBar, Segmented, Disclosure } from "./docs/DocPrimitives";
 
@@ -275,6 +276,7 @@ export function TabDocumentacion({ tc }) {
 							{ key: "seg", label: "Segmento", render: function (s) { return <TierBadge tier={s} tiers={idcSegs} size="sm" />; } },
 							{ key: "rango", label: "IDC contratadas", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
 							{ key: "fact", label: "Facturación anual", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
+							{ key: "factp", label: "Facturación puntual", align: "right", render: function (s, i) { const p = b2b2cSegmentsPuntual(idcSegs, cfg.b2b2cFactorPuntual)[i] || s; return rangeUSD(p.facturacionMin, p.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return <span className="inline-flex items-center gap-2"><MagBar value={Number(s.precioIDC) || 0} max={idcPrecioMax} color={C.idc.color} />USD {usd(s.precioIDC)}</span>; } },
 							{ key: "cupo", label: "Firmas incl.", align: "right", render: function (s) { return num(s.firmasIncluidas); } },
 							{ key: "extra", label: "Firma excedente", align: "right", render: function (s) { return "USD " + usd(s.precioFirmaExtra); } },

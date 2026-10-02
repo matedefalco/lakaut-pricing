@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { makeMoney } from "@/utils/useMoney";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
-import { getB2B2CSegment, b2b2cSegmentDriver, getVolumenSegment, volumenSegmentDriver, getDistributorVolTier, distributorVolTierDriver, facturacionAtBase, segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
+import { getB2B2CSegment, b2b2cSegmentDriver, b2b2cSegmentsPuntual, getVolumenSegment, volumenSegmentDriver, getDistributorVolTier, distributorVolTierDriver, facturacionAtBase, segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
 import { dealStatus } from "@/lib/dealStatus";
 import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
@@ -307,7 +307,16 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const idcFirmasExtraBase = nf * Math.max(0, ff - idcCupoBase) + nj * Math.max(0, fj - idcCupoBase) + fs;
 	// Las cantidades ya son las del período cotizado (el año con compromiso anual), así
 	// que la facturación de referencia no se vuelve a multiplicar.
-	const idcFacturacionRef = idc * idcPrecioBase + idcFirmasExtraBase * idcFirmaExtraBase;
+	// Las firmas adicionales entran a su precio de LISTA dentro de la IDC (su parte del
+	// precio del primer segmento), no al del excedente (precioFirmaExtra).
+	const idcLcRef = Number(volumenBase.cert) || 0;
+	const idcLfRef = Number(volumenBase.firma) || 0;
+	const idcFirmaListaRef = idcLcRef + idcCupoBase * idcLfRef > 0 ? idcPrecioBase * idcLfRef / (idcLcRef + idcCupoBase * idcLfRef) : idcFirmaExtraBase;
+	const idcFacturacionRef = idc * idcPrecioBase + idcFirmasExtraBase * idcFirmaListaRef;
+	// Escala con la que se asigna el segmento IDC: con compromiso anual, los umbrales
+	// anuales; en compra puntual, los de una compra del mes (anual ÷ 12 × factor).
+	const idcFactorPuntual = Number(channelConfig.b2b2cFactorPuntual) || 1.25;
+	const idcSegsEje = esIDC && !idcAnual ? b2b2cSegmentsPuntual(b2b2cSegments, idcFactorPuntual) : b2b2cSegments;
 	// El eje de facturación efectivo por canal (para asignar segmento y para la UI).
 	const facturacionEje = esIDC ? idcFacturacionRef : facturacionNivel;
 	// Compromiso mostrado en Volumen = la facturación de la ventana (misma cifra que el eje).
@@ -319,7 +328,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	//   Distribuidores-Volumen → MAYOR entre la facturación (windoweada por la condición) y
 	//     los certificados activos; los certs solo cuentan con compromiso anual.
 	const seg = (esIDC
-		? getB2B2CSegment(idcEje, idcFacturacionRef, b2b2cSegments)
+		? (function () { const p = getB2B2CSegment(idcEje, idcFacturacionRef, idcSegsEje); return p ? b2b2cSegments.find(function (s) { return s.id === p.id; }) || p : p; })()
 		: esDistribVol
 			? getDistributorVolTier(facturacionNivelDistrib, certsActivosNum, conCompromiso, distribVolTiers)
 			: getVolumenSegment(firmasTotales, facturacionNivel, volumenSegments)) || {};
@@ -327,7 +336,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const segDriver = esDistribVol
 		? distributorVolTierDriver(facturacionNivelDistrib, certsActivosNum, conCompromiso, distribVolTiers)
 		: esIDC
-			? b2b2cSegmentDriver(idcEje, idcFacturacionRef, b2b2cSegments)
+			? b2b2cSegmentDriver(idcEje, idcFacturacionRef, idcSegsEje)
 			: volumenSegmentDriver(firmasTotales, facturacionNivel, volumenSegments);
 	const segLabel = seg.label || "—";
 	// Distribuidores-Volumen con compromiso anual (formas A/B): anualiza la facturación y
@@ -667,8 +676,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			? "Es el nivel más alto."
 			: "Es el segmento de mayor volumen.";
 	}
-	const segRows = segmentList.map(function (s) {
+	const segRows = segmentList.map(function (s, si) {
 		if (esIDC) {
+			// La facturación que se muestra es la de la escala vigente (anual o puntual).
+			const sf = idcSegsEje[si] || s;
 			const min = Number(s.idcMin) || 0;
 			const p = segmentPricing(s, SEG_FALLBACK);
 			return {
@@ -676,7 +687,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				cells: [
 					<TierBadge key="seg" tier={s} tiers={segmentList} size="sm" />,
 					min.toLocaleString("es-AR") + (s.idcMax == null ? "+" : "–" + (Number(s.idcMax) || 0).toLocaleString("es-AR")),
-					(Number(s.facturacionMin) || 0) === 0 && s.facturacionMax != null ? "hasta " + fMoney(Number(s.facturacionMax) || 0) : fMoney(Number(s.facturacionMin) || 0) + (s.facturacionMax == null ? "+" : "–" + fMoney(Number(s.facturacionMax) || 0)),
+					(Number(sf.facturacionMin) || 0) === 0 && sf.facturacionMax != null ? "hasta " + fMoney(Number(sf.facturacionMax) || 0) : fMoney(Number(sf.facturacionMin) || 0) + (sf.facturacionMax == null ? "+" : "–" + fMoney(Number(sf.facturacionMax) || 0)),
 					fMoney2(p.precioIDC),
 				],
 			};

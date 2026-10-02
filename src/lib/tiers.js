@@ -100,6 +100,24 @@ export function getB2B2CSegment(idcMensuales, facturacion, segments) {
 	return segments.indexOf(a) >= segments.indexOf(b) ? a : b;
 }
 
+// Segmentos IDC para COMPRA PUNTUAL: misma escala, pero los umbrales de facturación
+// pasan de anuales a los de una compra del mes: anual ÷ 12 × factor de exigencia (ver
+// B2B2C_FACTOR_PUNTUAL). La cantidad de IDC usa los mismos umbrales. Devuelve copias
+// con el mismo id que el original (para volver al segmento real con `find`).
+export function b2b2cSegmentsPuntual(segments, factor) {
+	const f = Number(factor) > 0 ? Number(factor) : 1;
+	function conv(v) { return v == null ? null : Math.round((Number(v) || 0) / 12 * f); }
+	// El piso de cada segmento es el tope del anterior + 1, para que el redondeo no
+	// deje dos segmentos con el mismo monto de borde.
+	let prevMax = null;
+	return (segments || []).map(function (s, i) {
+		const max = conv(s.facturacionMax);
+		const min = i === 0 ? 0 : (prevMax != null ? prevMax + 1 : conv(s.facturacionMin));
+		prevMax = max;
+		return Object.assign({}, s, { facturacionMin: min, facturacionMax: max });
+	});
+}
+
 // Cuál de los dos ejes asignó el segmento IDC. Para explicarlo en la interfaz.
 export function b2b2cSegmentDriver(idcMensuales, facturacion, segments) {
 	if (!segments || segments.length === 0) return null;

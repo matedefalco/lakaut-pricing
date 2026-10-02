@@ -12,6 +12,7 @@ import {
 	B2B2C_SEGMENTS,
 	B2B2C_FIRMAS_INCLUIDAS,
 	B2B2C_MARKUP_MIN,
+	B2B2C_FACTOR_PUNTUAL,
 	B2B2C_API_TIERS,
 	VOLUMEN_BASE,
 	VOLUMEN_SEGMENTS,
@@ -33,6 +34,7 @@ export const DEFAULT_CHANNEL_CONFIG = {
 	// Escala de precios del canal IDC (bundle por IDC mensuales).
 	b2b2cSegments: B2B2C_SEGMENTS,
 	b2b2cMarkupMin: B2B2C_MARKUP_MIN,
+	b2b2cFactorPuntual: B2B2C_FACTOR_PUNTUAL,
 	b2b2cApiTiers: B2B2C_API_TIERS,
 	// Escala por volumen del precio de firma adicional del canal Web (ARS). Los
 	// canales de packs (Web y Distribuidores) la usan en vez del precio por plan.
@@ -141,6 +143,7 @@ export function normalizeChannelConfig(raw) {
 	// B2B2C_MARKUP_MIN). No se deriva del valor viejo: el 20% del Borrador v5 es
 	// markup, así que el default nuevo ya expresa la intención original.
 	if (merged.b2b2cMarkupMin == null) merged.b2b2cMarkupMin = B2B2C_MARKUP_MIN;
+	if (merged.b2b2cFactorPuntual == null || !(Number(merged.b2b2cFactorPuntual) > 0)) merged.b2b2cFactorPuntual = B2B2C_FACTOR_PUNTUAL;
 
 	// ── Canal Volumen ──
 	// Al separarse de IDC (jul 2026) recuperó el modelo de precio base + descuento por

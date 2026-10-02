@@ -76,15 +76,19 @@ function secDistribuidoresVol(tiers, base) {
 	].join("\n");
 }
 
-function secIDC(segments, markupMin) {
-	const rows = segments.map((s) =>
-		`| ${s.label} | ${rangeCant(s.idcMin, s.idcMax, "IDC")} | ${rangeUSD(s.facturacionMin, s.facturacionMax)} | USD ${usd(s.precioIDC)} | ${num(s.firmasIncluidas)} | USD ${usd(s.precioFirmaExtra)} |`
+function secIDC(segments, markupMin, factorPuntual) {
+	// Compra puntual: umbral de facturación = anual ÷ 12 × factor (ver b2b2cSegmentsPuntual).
+	const f = Number(factorPuntual) > 0 ? Number(factorPuntual) : 1.25;
+	const conv = (v) => (v == null ? null : Math.round((Number(v) || 0) / 12 * f));
+	const pMax = segments.map((s) => conv(s.facturacionMax));
+	const rows = segments.map((s, i) =>
+		`| ${s.label} | ${rangeCant(s.idcMin, s.idcMax, "IDC")} | ${rangeUSD(s.facturacionMin, s.facturacionMax)} | ${rangeUSD(i === 0 ? 0 : (pMax[i - 1] != null ? pMax[i - 1] + 1 : conv(s.facturacionMin)), pMax[i])} | USD ${usd(s.precioIDC)} | ${num(s.firmasIncluidas)} | USD ${usd(s.precioFirmaExtra)} |`
 	);
 	return [
-		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo). Las **firmas adicionales** que se piden se cotizan al precio de firma del segmento (su parte del precio de la IDC); la **firma excedente** de la tabla es el precio del consumo no planificado por encima de lo contratado, que va como condición del contrato.",
+		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). La facturación se compara contra el umbral **anual** con compromiso; en **compra puntual**, contra el de una compra del mes: anual ÷ 12 × un factor de exigencia (default 1,25), así el compromiso anual siempre llega antes al segmento. En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo). Las **firmas adicionales** que se piden se cotizan al precio de firma del segmento (su parte del precio de la IDC); la **firma excedente** de la tabla es el precio del consumo no planificado por encima de lo contratado, que va como condición del contrato.",
 		"",
-		"| Segmento | Rango (IDC contratadas) | Facturación anual | Precio por IDC | Firmas incluidas | Firma excedente |",
-		"|---|---|---|---|---|---|",
+		"| Segmento | Rango (IDC contratadas) | Facturación anual | Facturación puntual | Precio por IDC | Firmas incluidas | Firma excedente |",
+		"|---|---|---|---|---|---|---|",
 		...rows,
 		"",
 		`Guardarraíl de rentabilidad: markup mínimo **${usd(markupMin, 2, 2)}x** sobre el costo variable del bundle. Bajo ese piso el cotizador bloquea guardar y exportar.`,
@@ -175,7 +179,7 @@ export function buildDocBlocks({ channelConfig, models, tc }) {
 	return {
 		web: secWeb(models || [], tc),
 		"distribuidores-vol": secDistribuidoresVol(cfg.distribuidorVolTiers || [], cfg.distribuidorVolBase || { cert: 0, firma: 1 }),
-		idc: secIDC(cfg.b2b2cSegments || [], cfg.b2b2cMarkupMin),
+		idc: secIDC(cfg.b2b2cSegments || [], cfg.b2b2cMarkupMin, cfg.b2b2cFactorPuntual),
 		volumen: secVolumen(base, cfg.volumenSegments || []),
 		proyeccion: secProyeccion(cfg.volumenProyeccion || [], base),
 		fees: secFees(cfg.b2b2cApiTiers || []),
