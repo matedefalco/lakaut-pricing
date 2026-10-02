@@ -35,6 +35,10 @@ export function ToastProvider({ children }) {
 		setToasts(function (prev) { return prev.filter(function (t) { return t.id !== id; }); });
 	}, []);
 
+	// Cierra todos los toasts abiertos. Lo usa el cierre "Propuesta lista": al exportar
+	// queda solo esa ventana, sin el aviso de guardado todavía en pantalla.
+	const dismissAll = useCallback(function () { setToasts([]); }, []);
+
 	const toast = useCallback(function (opts) {
 		const id = ++idSeq;
 		const t = Object.assign({ id: id, variant: "success", duration: 6000 }, opts);
@@ -43,7 +47,7 @@ export function ToastProvider({ children }) {
 	}, []);
 
 	return (
-		<ToastContext.Provider value={{ toast: toast, dismiss: dismiss }}>
+		<ToastContext.Provider value={{ toast: toast, dismiss: dismiss, dismissAll: dismissAll }}>
 			{children}
 			<ToastViewport toasts={toasts} onDismiss={dismiss} />
 		</ToastContext.Provider>

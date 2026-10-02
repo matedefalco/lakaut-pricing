@@ -15,7 +15,7 @@ import { useClients } from "./lib/useClients";
 import { useAuth } from "./lib/useAuth";
 import { DiscountProvider } from "./context/DiscountContext";
 import { ChannelConfigProvider, useChannelConfig } from "./context/ChannelConfigContext";
-import { ToastProvider } from "./components/ui/Toaster";
+import { ToastProvider, useToast } from "./components/ui/Toaster";
 import { ConfirmProvider } from "./components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { TabConfig } from "./components/tabs/TabConfig";
@@ -195,6 +195,7 @@ function NuevaCotizacionButton({ onPick }) {
 
 
 function LakautCalcInner() {
+	const { dismissAll: dismissAllToasts } = useToast();
 	const { models } = useModels();
 	const { channelConfig, update: updateChannelConfig } = useChannelConfig();
 	const dealsApi = useDeals();
@@ -329,6 +330,9 @@ function LakautCalcInner() {
 
 	// Exportar desde un cotizador abre el cierre "Propuesta lista" con el paso siguiente.
 	function exportDeal(deal, client, overrideCurrency) {
+		// Una sola confirmación: al abrir "Propuesta lista" se cierra el aviso de guardado
+		// (o cualquier otro) que siguiera abierto abajo.
+		dismissAllToasts();
 		exportProposal(deal, client, overrideCurrency || "USD", tc, channelConfig, models, tcMeta);
 		setExportDone({ deal: deal, client: client, cotId: formatCotId(deal.inputs && deal.inputs.cot, client && client.tipo, deal.channel) });
 	}
