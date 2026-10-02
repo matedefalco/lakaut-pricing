@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-09-02 14:48 · **Fuente:** Supabase (config viva) · **Commit:** `5c19b74`
+> **Última actualización:** 2026-10-02 15:58 · **Fuente:** Supabase (config viva) · **Commit:** `7013841`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -13,7 +13,7 @@ Documentación viva de la estructura comercial de la cotizadora. Las tablas num�
 ## Cómo leer y mantener esta doc
 
 → **Fuente de verdad de los números:** la config viva en Supabase (`app_config`), que es lo que edita la pantalla de Config de la app y lo que persiste el código. El generador (`scripts/gen-pricing-docs.mjs`) la lee, aplica el mismo normalize que la app y reescribe las tablas.
-→ **Vista in-app:** la sección Documentación dentro de la cotizadora arma estas tablas **en vivo** desde la config actual, así que un cambio hecho en la interfaz de Config se ve al instante. Este archivo (para GitHub / equipo) se actualiza al regenerar.
+→ **Vista in-app:** la sección Documentación de la cotizadora es una página propia (JSX, `src/components/tabs/TabDocumentacion.jsx`) con índice, comparador y tablas vivas que leen la config actual, así que un cambio hecho en Config se ve al instante. Su prosa es independiente de este archivo: si cambia una regla comercial, actualizá los dos. Este archivo (para GitHub / equipo) se actualiza al regenerar.
 → **Regenerar el archivo:** `npm run docs:pricing`. Se corre solo cuando cambia algo de pricing (un hook se lo recuerda a Claude Code), pero también podés correrlo a mano cuando editás precios desde la interfaz.
 → **Editar:** la prosa entre bloques se edita libremente. Las tablas dentro de `<!-- AUTO:* -->` se pisan en cada regeneración, no las toques a mano.
 
@@ -27,7 +27,7 @@ La estructura se separa en canales según **quién paga, cómo se cotiza y qué 
 |---|---|---|---|
 | **Web** | Pack cerrado | Precio de lista, autoservicio | Único |
 | **Distribuidores** | Firma suelta (certificado bonificado) | Descuento por nivel, el mayor entre facturación (× 12 con compromiso anual, × 1 sin) y certificados activos | Único |
-| **IDC (B2B2C)** | IDC (bundle identidad + firma) | Precio por segmento de volumen | Recurrente mensual |
+| **IDC (B2B2C)** | IDC (bundle identidad + firma) | Precio por segmento de volumen | Único (consumo único) o recurrente (compromiso anual) |
 | **Volumen** | Certificado y firma sueltos | Descuento por compromiso | Único |
 
 ---
@@ -40,14 +40,14 @@ Autoservicio desde el sitio, sin intermediación. Es el **precio de lista**, la 
 | Pack | Segmento | Firmas | Certificados | Precio (USD) | Precio (ARS aprox.) |
 |---|---|---|---|---|---|
 | Cero | Persona | 5 | 1 | gratis | $0 |
-| Smart | Persona | 50 | 1 | USD 40,2 | $61.707 |
-| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $181.498 |
-| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.005 |
-| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $239.997 |
-| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $529.007 |
+| Smart | Persona | 50 | 1 | USD 40,2 | $61.908 |
+| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $182.090 |
+| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.331 |
+| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $240.779 |
+| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $530.730 |
 | Integración API | Empresa | ilimitadas | — | a consultar | — |
 
-TC de referencia usado para derivar ARS: **$1.535** por USD.
+TC de referencia usado para derivar ARS: **$1.540** por USD.
 <!-- AUTO:web:end -->
 
 ---
@@ -72,12 +72,12 @@ Certificados y firmas sueltos: el único modo en que cotizan los distribuidores.
 
 ## 3. IDC (B2B2C)
 
-Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Único canal con **ingreso recurrente mensual**.
+Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Con **compromiso anual** el ingreso es recurrente (consumo mensual × 12); con **consumo único**, es el total cotizado.
 
 <!-- AUTO:idc:start -->
-Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la cantidad de IDC mensuales y la **facturación** de la ventana medida a precio de referencia Start Up (evita la circularidad precio↔segmento), windoweada por la modalidad Consumo único / Anual.
+Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (consumo mensual, cargado por mes o por año ÷ 12, con facturación × 12). La IDC no distingue persona física o jurídica (mismo precio y costo).
 
-| Segmento | Rango (IDC/mes) | Facturación de la ventana | Precio IDC/mes | Firmas incluidas | Firma extra |
+| Segmento | Rango (IDC; por mes si es anual) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |
 |---|---|---|---|---|---|
 | Start Up | hasta 10.000 IDC | hasta USD 160.000 | USD 1,3438 | 3 | USD 0,50 |
 | Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 1,2404 | 3 | USD 0,50 |
@@ -159,7 +159,7 @@ Descuentos adicionales (aditivos) sobre el subtotal de servicio, aplicables en V
 |---|---|
 | Time-to-cash (días de pago) | contado → 8% · 30 → 4% · 60 → 2% · 90 → 0% |
 | Duración del contrato (meses) | 12 → 0% · 24 → 3% · 36 → 6% · 48 → 9% |
-| Velocidad de cierre (días) | 15 → 4% · 30 → 2% · 60 → 100% · 90 → 0% |
+| Velocidad de cierre (días) | 15 → 4% · 30 → 2% · 60 → 1% · 90 → 0% |
 
 Descuento del abono mensual (reposición de bolsa de firmas): **3%**. Se mantiene bajo a propósito: el beneficio principal lo da el volumen, no la recurrencia.
 <!-- AUTO:palancas:end -->

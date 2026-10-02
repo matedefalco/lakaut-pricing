@@ -21,14 +21,19 @@ export function pct(fraction) {
 	const p = v <= 1 ? v * 100 : v;
 	return `${nfInt.format(Math.round(p * 100) / 100)}%`;
 }
-function rangeCant(min, max, unidad = "") {
+// Puntos porcentuales (palancas, tope, abono): el valor ya ES el porcentaje
+// (1 = 1%), así que no pasa por pct(), que leería 1 como fracción (100%).
+export function pts(points) {
+	return `${nfInt.format(Math.round((Number(points) || 0) * 100) / 100)}%`;
+}
+export function rangeCant(min, max, unidad = "") {
 	const u = unidad ? ` ${unidad}` : "";
 	if (min == null && max == null) return "—";
 	if (max == null) return `${num(min)}+${u}`;
 	if (Number(min) <= 0) return `hasta ${num(max)}${u}`;
 	return `${num(min)} – ${num(max)}${u}`;
 }
-function rangeUSD(min, max) {
+export function rangeUSD(min, max) {
 	if (max == null) return `+USD ${num(min)}`;
 	if (Number(min) <= 0) return `hasta USD ${num(max)}`;
 	return `USD ${num(min)} – ${num(max)}`;
@@ -76,9 +81,9 @@ function secIDC(segments, markupMin) {
 		`| ${s.label} | ${rangeCant(s.idcMin, s.idcMax, "IDC")} | ${rangeUSD(s.facturacionMin, s.facturacionMax)} | USD ${usd(s.precioIDC)} | ${num(s.firmasIncluidas)} | USD ${usd(s.precioFirmaExtra)} |`
 	);
 	return [
-		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la cantidad de IDC mensuales y la **facturación** de la ventana medida a precio de referencia Start Up (evita la circularidad precio↔segmento), windoweada por la modalidad Consumo único / Anual.",
+		"Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (consumo mensual, cargado por mes o por año ÷ 12, con facturación × 12). La IDC no distingue persona física o jurídica (mismo precio y costo).",
 		"",
-		"| Segmento | Rango (IDC/mes) | Facturación de la ventana | Precio IDC/mes | Firmas incluidas | Firma extra |",
+		"| Segmento | Rango (IDC; por mes si es anual) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |",
 		"|---|---|---|---|---|---|",
 		...rows,
 		"",
@@ -142,10 +147,10 @@ function secSLA(plans) {
 
 function secPalancas(levers, abono) {
 	function lever(list) {
-		return list.map((o) => `${o.value === 0 ? "contado" : o.value} → ${pct(o.discount)}`).join(" · ");
+		return list.map((o) => `${o.value === 0 ? "contado" : o.value} → ${pts(o.discount)}`).join(" · ");
 	}
 	return [
-		`Descuentos adicionales (aditivos) sobre el subtotal de servicio, aplicables en Volumen y Distribuidores. Tope de la suma de las tres: **${pct(levers.cap)}**.`,
+		`Descuentos adicionales (aditivos) sobre el subtotal de servicio, aplicables en Volumen y Distribuidores. Tope de la suma de las tres: **${pts(levers.cap)}**.`,
 		"",
 		"| Palanca | Opciones (valor → descuento) |",
 		"|---|---|",
@@ -153,7 +158,7 @@ function secPalancas(levers, abono) {
 		`| Duración del contrato (meses) | ${lever(levers.duracion)} |`,
 		`| Velocidad de cierre (días) | ${lever(levers.velocidad)} |`,
 		"",
-		`Descuento del abono mensual (reposición de bolsa de firmas): **${pct(abono)}**. Se mantiene bajo a propósito: el beneficio principal lo da el volumen, no la recurrencia.`,
+		`Descuento del abono mensual (reposición de bolsa de firmas): **${pts(abono)}**. Se mantiene bajo a propósito: el beneficio principal lo da el volumen, no la recurrencia.`,
 	].join("\n");
 }
 
