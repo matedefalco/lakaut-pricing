@@ -138,8 +138,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// Modalidad de facturación (solo Distribuidores-Volumen): define la ventana de tiempo
 	// con la que se mide la facturación que puede asignar el nivel. "anual" anualiza la
 	// facturación del contrato (× meses de vinculación); "unico" mide solo la compra
-	// puntual (× 1). No cambia los totales, solo el eje de facturación del nivel.
-	const [modalidadFact, setModalidadFact] = useState("anual"); // "anual" | "unico"
+	// puntual (× 1). En Volumen no cambia los totales, solo el eje de facturación del nivel.
+	// En IDC define además el ingreso anual: "unico" = consumo puntual (sin × 12),
+	// "anual" = compromiso anual (consumo mensual × 12). Default IDC: consumo único.
+	const [modalidadFact, setModalidadFact] = useState(esIDC ? "unico" : "anual"); // "anual" | "unico"
+	// IDC con compromiso anual: el consumo se carga por mes o por año. Por año se divide
+	// por 12 para obtener el consumo mensual sobre el que se cotiza.
+	const [idcEntrada, setIdcEntrada] = useState("mensual"); // "mensual" | "anual"
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	// Base instalada del socio (solo Distribuidores-Volumen): certificados de sus
@@ -190,14 +195,29 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
 
 	// ── Cantidades ──
-	const nf = Math.max(0, Number(certFisicos) || 0);
-	const nj = Math.max(0, Number(certJuridicos) || 0);
+	// IDC con compromiso anual cargado por año: lo ingresado es el consumo del año y se
+	// cotiza su equivalente mensual (÷ 12, redondeado a IDC enteras). En el resto de los
+	// casos lo ingresado es la cantidad que se cotiza.
+	const idcAnual = esIDC && modalidadFact === "anual";
+	const idcPorAnio = idcAnual && idcEntrada === "anual";
+	const nfIn = Math.max(0, Number(certFisicos) || 0);
+	const njIn = Math.max(0, Number(certJuridicos) || 0);
+	const nf = idcPorAnio ? Math.round(nfIn / 12) : nfIn;
+	const nj = idcPorAnio ? Math.round(njIn / 12) : njIn;
 	const ff = Math.max(0, Number(firmasPorCertFisico) || 0);
 	const fj = Math.max(0, Number(firmasPorCertJuridico) || 0);
 	// Firmas sueltas: solo aplican a Volumen (en IDC la firma va dentro del bundle).
 	const fs = esIDC ? 0 : Math.max(0, Number(firmasSueltas) || 0);
 	const idc = nf + nj; // total de certificados / IDC
 	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
+
+	// Label y nota del campo de cantidad IDC según la modalidad y cómo se carga.
+	const idcLabelCant = !idcAnual ? "Cantidad" : idcPorAnio ? "Cantidad / año" : "Cantidad / mes";
+	function idcNoteCant(mensual) {
+		if (!idcAnual) return "IDC a consumir";
+		if (idcPorAnio) return "≈ " + mensual.toLocaleString("es-AR") + " / mes";
+		return "= " + (mensual * 12).toLocaleString("es-AR") + " / año";
+	}
 
 	// ── Cantidad de firmas ──
 	// En los dos canales las firmas se cargan por certificado y por tipo: cada tipo
@@ -212,7 +232,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const firmasTotales = firmasFisica + firmasJuridica + fs;
 
 	// ── Segmento ──
-	// IDC: sale de la cantidad de IDC mensuales (umbrales del Borrador v5) y cada
+	// IDC: sale de la cantidad de IDC consumidas (umbrales del Borrador v5) y cada
 	// segmento trae su propio PRECIO por IDC, no un descuento. Debajo del primer
 	// umbral se cotiza como Start Up en lugar de quedar sin precio.
 	// Volumen: sale del compromiso del contrato en USD medido a precio de lista, y
@@ -234,8 +254,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 	// Ventana de tiempo del eje de facturación: "anual" anualiza la facturación (× meses de
 	// vinculación); "unico" mide solo la compra puntual (× 1). El toggle Consumo único /
-	// Anual la controla en los tres canales, separado de la palanca de duración.
-	const mesesVentanaFact = modalidadFact === "unico" ? 1 : mesesVinculacion;
+	// Anual la controla en Volumen. En IDC, igual que en Distribuidores-Volumen: consumo
+	// único mide la facturación de esa cantidad (× 1); compromiso anual la anualiza (× 12).
+	const mesesVentanaFact = esIDC ? (idcAnual ? 12 : 1) : (modalidadFact === "unico" ? 1 : mesesVinculacion);
 
 	// Facturación que puede asignar el segmento por el eje de facturación:
 	//   · Volumen / Distribuidores-Volumen → facturación a lista del volumen cotizado, windoweada.
@@ -255,7 +276,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const compromiso = facturacionNivel;
 
 	// El segmento/nivel:
-	//   IDC → MAYOR entre IDC/mes y facturación ref · trae su precio por IDC.
+	//   IDC → MAYOR entre cantidad de IDC y facturación ref · trae su precio por IDC.
 	//   Volumen → MAYOR entre firmas y facturación/compromiso · trae su descuento.
 	//   Distribuidores-Volumen → MAYOR entre la facturación (windoweada por la condición) y
 	//     los certificados activos; los certs solo cuentan con compromiso anual.
@@ -337,6 +358,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		// Modalidad de facturación del nivel: deals viejos (sin el dato) caen a "anual",
 		// que reproduce el comportamiento del canal desde que existe el eje de facturación.
 		setModalidadFact(i.modalidadFacturacion === "unico" ? "unico" : "anual");
+		// IDC: consumo cargado por año. Se restaura lo ingresado (el deal guarda el
+		// equivalente mensual en certFisicos/certJuridicos para export y reportes).
+		const entradaAnual = i.idcEntrada === "anual" && i.idcCantidadIngresada;
+		setIdcEntrada(entradaAnual ? "anual" : "mensual");
+		if (entradaAnual) {
+			setCertFisicos(i.idcCantidadIngresada.fis != null ? i.idcCantidadIngresada.fis : "");
+			setCertJuridicos(i.idcCantidadIngresada.jur ? i.idcCantidadIngresada.jur : "");
+		}
 		setFee(i.fee != null ? i.fee : 3250);
 		setSlaId(i.slaId || "standard");
 		setSlaBonificado(i.slaBonificado || false);
@@ -688,6 +717,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				// Modalidad de facturación del segmento (los tres canales): se persiste para
 				// restaurar el toggle Consumo único / Anual al reabrir la cotización.
 				modalidadFacturacion: modalidadFact,
+				// IDC: cómo se cargó el consumo. certFisicos/certJuridicos llevan siempre la
+				// cantidad cotizada (mensual con compromiso anual); si se cargó por año, se
+				// guarda también lo ingresado para reabrir la cotización tal cual.
+				...(esIDC ? { idcEntrada: idcPorAnio ? "anual" : "mensual", ...(idcPorAnio ? { idcCantidadIngresada: { fis: nfIn, jur: njIn } } : {}) } : {}),
 				// Distribuidores-Volumen: el nivel es el mayor entre firmas y facturación de la
 				// ventana. `modalidadFacturacion` y `facturacionNivel` viajan para reproducir la
 				// asignación; el compromiso anual se deriva de la cotización (no se declara) y
@@ -770,11 +803,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
 				precioFirmaExtraLista: segPrice.precioFirmaExtra,
 				revTotal, revMesTotal: revSinFee,
-				// Año 1: en IDC el volumen es mensual recurrente (× 12 + fee único). En
+				...(esIDC ? { modalidadFacturacion: modalidadFact } : {}),
+				// Año 1: en IDC con compromiso anual el consumo es mensual recurrente
+				// (× 12 + fee único); con consumo único es el total cotizado. En
 				// Volumen es una COMPRA ÚNICA (revTotal, mes 1) y, si hay abono, se suman
 				// los meses 2-12 de reposición de la bolsa de firmas (11 meses, mismo
 				// criterio que Packs). No se multiplica el volumen × 12.
-				revAnual: esIDC ? revSinFee * 12 + feeAplicado : revTotal + (abono ? revAbonoMes * 11 : 0),
+				revAnual: esIDC ? (idcAnual ? revSinFee * 12 + feeAplicado : revTotal) : revTotal + (abono ? revAbonoMes * 11 : 0),
 				// Las condiciones ya no bajan el total; se guarda el % ofrecido como dato
 				// informativo (reportes lo ignoran para el descuento efectivo).
 				revServicioBruto,
@@ -851,7 +886,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				<>
 					{meta.desc}
 					<InfoTooltip text={esIDC
-						? "Un certificado es físico o jurídico; cuestan y cotizan igual. Cada IDC incluye un cupo de firmas sin cargo y las que lo excedan se facturan por unidad. El segmento sale de la cantidad de IDC mensuales y define el precio unitario."
+						? "Se cotiza la cantidad de IDC que se consuma, sin temporalidad y sin distinguir persona física o jurídica (cuestan y cotizan igual). Cada IDC incluye un cupo de firmas sin cargo y las que lo excedan se facturan por unidad. El segmento sale de la cantidad de IDC y define el precio unitario."
 						: esDistribVol
 							? "El certificado va siempre bonificado; solo se cobra la firma, con precio base USD 1,00. El nivel del socio (Azul→Platinum) se alcanza por el mayor entre la facturación (con compromiso anual, servicio × 12; sin compromiso, el período mensual) y los certificados activos (que cuentan solo con compromiso). Ese nivel define el descuento sobre la firma, que se aplica en ambas condiciones: diferido con compromiso anual, o directo en factura sin compromiso."
 							: "Certificados y firmas se cotizan como items independientes: se cargan las cantidades a mano, sin cupo de firmas incluidas. El segmento sale del compromiso del contrato en USD y aplica el mismo descuento sobre los dos precios de lista."} />
@@ -929,6 +964,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						? "Con IVA 21%: " + fMoney2(revTotal * 1.21)
 						: (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
 				</div>
+				{hasVolume && idcAnual && (
+					<div className="mt-1 text-sm opacity-90">Compromiso anual: {fMoney2(revSinFee * 12 + feeAplicado)} · {(idc * 12).toLocaleString("es-AR")} IDC/año</div>
+				)}
 			</div>
 
 			{/* Nivel / segmento con avance hacia el próximo: la barra convierte la tabla
@@ -936,7 +974,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			<div className="space-y-2.5 rounded-xl border border-border/60 bg-white/60 p-3.5">
 				<div className="flex items-center justify-between gap-2">
 					<span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{esIDC ? "Segmento" : esDistribVol ? "Nivel" : "Segmento"}</span>
-					{hasVolume && <TierHint label={esDistribVol ? "ver niveles" : "ver segmentos"} columns={esIDC ? ["Segmento", "IDC/mes", "Facturación", "Precio"] : esDistribVol ? ["Nivel", "Compromiso anual", "Certs activos", "Desc."] : ["Segmento", "Firmas", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />}
+					{hasVolume && <TierHint label={esDistribVol ? "ver niveles" : "ver segmentos"} columns={esIDC ? ["Segmento", "IDC", "Facturación", "Precio"] : esDistribVol ? ["Nivel", "Compromiso anual", "Certs activos", "Desc."] : ["Segmento", "Firmas", "Compromiso", "Desc."]} rows={segRows} activeId={seg.id} nextHint={segHint} />}
 				</div>
 				{hasVolume ? (
 					<>
@@ -969,7 +1007,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{nf > 0 && (
 						<div className="rounded-lg bg-sky-50 px-3 py-2">
 							<div className="flex items-center justify-between">
-								<span className="text-xs font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
+								<span className="text-xs font-semibold text-sky-700">{esIDC ? (nj > 0 ? "IDC físicas" : "IDC") : "Certificados físicos"}</span>
 								{ff > 0 && <span className="text-xs text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>}
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nf.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertFisicos} format={fMoney2} />} accent="primary" />
@@ -1176,31 +1214,99 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{!conApi && <p className="text-xs text-muted-foreground">Sin integración {intgTerm}: se cotiza únicamente el volumen de certificados, sin fee de implementación ni plan de soporte.</p>}
 				</div>
 
-				{/* Volumen agrupado por tipo de certificado */}
-				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
-						<div className="mb-2.5 flex items-center gap-1.5">
-							<span className="inline-block size-2 rounded-full bg-sky-500" />
-							<span className="text-xs font-semibold text-sky-700">{esIDC ? "IDC físicas" : "Certificados físicos"}</span>
-							<span className="text-xs text-muted-foreground">· personas</span>
+				{/* Volumen. En IDC es un solo bloque: la IDC no distingue persona física o
+				    jurídica (mismo precio y costo) y se carga la cantidad que se consuma, sin
+				    temporalidad. Se guarda en el slot físico (certFisicos), que el export
+				    muestra sin desglose por tipo. Si una cotización vieja trae IDC jurídicas,
+				    se muestra también ese bloque para no perder el dato. En Volumen se sigue
+				    agrupando por tipo de certificado. */}
+				{esIDC ? (
+					<>
+					{/* Modalidad IDC, como en Distribuidores: consumo único (la cantidad que se
+					    consuma en ese momento) o compromiso anual (consumo mensual × 12), que se
+					    puede cargar por mes o por año (÷ 12). */}
+					<div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+						<div className="flex flex-col gap-1.5">
+							<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad</Label>
+							<div className="inline-flex w-fit rounded-md border border-border bg-muted/30 p-0.5">
+								{[{ id: "unico", label: "Consumo único" }, { id: "anual", label: "Compromiso anual" }].map(function (o) {
+									const active = modalidadFact === o.id;
+									return <button key={o.id} type="button" aria-pressed={active} onClick={function () { setModalidadFact(o.id); }} className={"px-3 py-1 rounded text-xs font-medium transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{o.label}</button>;
+								})}
+							</div>
 						</div>
-						<div className="grid grid-cols-2 gap-2.5">
-							<NumberField label={esIDC ? "Cantidad / mes" : "Cantidad"} value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" />
-							<NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note={esIDC ? (ff > cupo ? (ff - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo) : (ff > 0 ? (nf * ff).toLocaleString("es-AR") + " firmas físicas" : "por certificado")} />
+						{idcAnual && (
+							<div className="flex flex-col gap-1.5">
+								<Label className="text-xs text-muted-foreground uppercase tracking-wide">Cargo el consumo</Label>
+								<div className="inline-flex w-fit rounded-md border border-border bg-muted/30 p-0.5">
+									{[{ id: "mensual", label: "Por mes" }, { id: "anual", label: "Por año" }].map(function (o) {
+										const active = idcEntrada === o.id;
+										return <button key={o.id} type="button" aria-pressed={active} onClick={function () { setIdcEntrada(o.id); }} className={"px-3 py-1 rounded text-xs font-medium transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{o.label}</button>;
+									})}
+								</div>
+							</div>
+						)}
+					</div>
+					<p className="text-xs text-muted-foreground -mt-1">
+						{!idcAnual
+							? "Se cotiza la cantidad que se consuma en este momento. El segmento sale de esa cantidad y de su facturación."
+							: idcPorAnio
+								? "Cargás el consumo del año; se cotiza su equivalente mensual (÷ 12). La facturación del segmento es la anual."
+								: "Cargás el consumo mensual; el compromiso es ese consumo × 12, y la facturación del segmento es la anual."}
+					</p>
+					<div className={"grid grid-cols-1 gap-3" + (njIn > 0 ? " sm:grid-cols-2" : "")}>
+						<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+							<div className="mb-2.5 flex items-center gap-1.5">
+								<span className="inline-block size-2 rounded-full bg-sky-500" />
+								<span className="text-xs font-semibold text-sky-700">{njIn > 0 ? "IDC físicas" : "IDC"}</span>
+								<span className="text-xs text-muted-foreground">· {njIn > 0 ? "personas" : "personas o empresas"}</span>
+							</div>
+							<div className="grid grid-cols-2 gap-2.5">
+								<NumberField label={idcLabelCant} value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" note={idcNoteCant(nf)} />
+								<NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note={ff > cupo ? (ff - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo} />
+							</div>
+						</div>
+						{njIn > 0 && (
+							<div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
+								<div className="mb-2.5 flex items-center gap-1.5">
+									<span className="inline-block size-2 rounded-full bg-violet-500" />
+									<span className="text-xs font-semibold text-violet-700">IDC jurídicas</span>
+									<span className="text-xs text-muted-foreground">· cotización anterior</span>
+								</div>
+								<div className="grid grid-cols-2 gap-2.5">
+									<NumberField label={idcLabelCant} value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" note="poné 0 para unificar" />
+									<NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note={fj > cupo ? (fj - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo} />
+								</div>
+							</div>
+						)}
+					</div>
+					</>
+				) : (
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+						<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+							<div className="mb-2.5 flex items-center gap-1.5">
+								<span className="inline-block size-2 rounded-full bg-sky-500" />
+								<span className="text-xs font-semibold text-sky-700">Certificados físicos</span>
+								<span className="text-xs text-muted-foreground">· personas</span>
+							</div>
+							<div className="grid grid-cols-2 gap-2.5">
+								<NumberField label="Cantidad" value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" />
+								<NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note={ff > 0 ? (nf * ff).toLocaleString("es-AR") + " firmas físicas" : "por certificado"} />
+							</div>
+						</div>
+						<div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
+							<div className="mb-2.5 flex items-center gap-1.5">
+								<span className="inline-block size-2 rounded-full bg-violet-500" />
+								<span className="text-xs font-semibold text-violet-700">Certificados jurídicos</span>
+								<span className="text-xs text-muted-foreground">· empresas</span>
+							</div>
+							<div className="grid grid-cols-2 gap-2.5">
+								<NumberField label="Cantidad" value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
+								<NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note={fj > 0 ? (nj * fj).toLocaleString("es-AR") + " firmas jurídicas" : "por certificado"} />
+							</div>
 						</div>
 					</div>
-					<div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
-						<div className="mb-2.5 flex items-center gap-1.5">
-							<span className="inline-block size-2 rounded-full bg-violet-500" />
-							<span className="text-xs font-semibold text-violet-700">{esIDC ? "IDC jurídicas" : "Certificados jurídicos"}</span>
-							<span className="text-xs text-muted-foreground">· empresas</span>
-						</div>
-						<div className="grid grid-cols-2 gap-2.5">
-							<NumberField label={esIDC ? "Cantidad / mes" : "Cantidad"} value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" />
-							<NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note={esIDC ? (fj > cupo ? (fj - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo) : (fj > 0 ? (nj * fj).toLocaleString("es-AR") + " firmas jurídicas" : "por certificado")} />
-						</div>
-					</div>
-				</div>
+				)}
 
 				{/* Firmas sueltas (solo Volumen): firmas sin certificado asociado ni tipo.
 				    Permiten cotizar firmas sin certificados necesariamente. Se cobran al

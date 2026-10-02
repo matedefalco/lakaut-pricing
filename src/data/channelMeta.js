@@ -56,7 +56,7 @@ export const CHANNELS = {
 		label: "IDC",
 		shortLabel: "IDC",
 		full: "IDC · Identidades Digitales Certificadas",
-		desc: "Empresas y plataformas que integran identidad y firma en sus propios productos. Se cotiza por IDC mensuales, con firmas incluidas en el bundle.",
+		desc: "Empresas y plataformas que integran identidad y firma en sus propios productos. Se cotiza por cantidad de IDC consumidas (persona física o jurídica, sin distinción), con firmas incluidas en el bundle.",
 		badgeVariant: "default",
 		// ── Identidad visual ──
 		// Violeta para el canal de contrato e integración: se diferencia del azul de

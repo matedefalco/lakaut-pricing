@@ -18,15 +18,15 @@ export function SegmentoSection({
 			<span className="text-sm font-medium">{esIDC ? "Segmento y proyección" : esDistribVol ? "Nivel del distribuidor" : "Compromiso del contrato"}</span>
 			<p className="text-xs text-muted-foreground">
 				{esIDC
-					? "El segmento es el MAYOR entre dos ejes: el volumen mensual de IDC del paso 2 y la facturación de la ventana medida a precio Start Up (referencia que evita la circularidad precio↔segmento). Lo que llegue al segmento más grande, manda."
+					? "El segmento es el MAYOR entre dos ejes: la cantidad de IDC (por mes con compromiso anual; la puntual con consumo único) y su facturación medida a precio Start Up (referencia que evita la circularidad precio↔segmento), anualizada × 12 con compromiso anual. Lo que llegue al segmento más grande, manda."
 					: esDistribVol
 						? "El nivel (Azul→Platinum) se alcanza por el mayor entre la facturación a precio base (con compromiso anual, servicio × 12; sin compromiso, el período mensual × 1) y los certificados activos del socio (que cuentan solo con compromiso anual). A mayor nivel, mayor descuento sobre la firma (el certificado va bonificado). El descuento se aplica en ambas condiciones: diferido con compromiso anual, o directo en cada factura sin compromiso."
 						: "El segmento es el MAYOR entre dos ejes de esta cotización: el volumen real de firmas y la facturación a lista de la ventana contemplada (compromiso del contrato). Lo que llegue al segmento más alto, manda."}
 			</p>
-			{/* Modalidad de facturación (IDC y Volumen): windowea el eje de facturación.
-			    En Distribuidores-Volumen el nivel sale del compromiso anual declarado,
-			    así que la modalidad no aplica. */}
-			{!esDistribVol && (
+			{/* Modalidad de facturación (solo Volumen): windowea el eje de facturación.
+			    En Distribuidores-Volumen el nivel sale del compromiso anual declarado, y en
+			    IDC la modalidad se elige junto a la cantidad (paso de volumen). */}
+			{!esDistribVol && !esIDC && (
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de facturación</Label>
 					<div className="inline-flex w-fit rounded-md border border-border bg-muted/30 p-0.5">
@@ -77,24 +77,24 @@ export function SegmentoSection({
 			) : (
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? "IDC / mes" : "Firmas totales"}</Label>
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">{esIDC ? (modalidadFact === "anual" ? "IDC / mes" : "IDC") : "Firmas totales"}</Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{(esIDC ? idc : firmasTotales).toLocaleString("es-AR")}</span>
 						</div>
-						<span className="text-xs text-muted-foreground">{esIDC ? "eje de volumen · identidades por mes" : "eje de volumen · firmas por certificado + firmas sueltas"}</span>
+						<span className="text-xs text-muted-foreground">{esIDC ? (modalidadFact === "anual" ? "eje de volumen · consumo mensual" : "eje de volumen · identidades a consumir") : "eje de volumen · firmas por certificado + firmas sueltas"}</span>
 					</div>
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Facturación del segmento</Label>
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{hasVolume ? fMoney(facturacionEje) : "—"}</span>
 						</div>
-						<span className="text-xs text-muted-foreground">{hasVolume ? (esIDC ? "eje de facturación · a precio Start Up × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses") : "eje de facturación · " + fMoney(facturacionAtList) + " a lista × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses")) : "se calcula del volumen cotizado"}</span>
+						<span className="text-xs text-muted-foreground">{hasVolume ? (esIDC ? "eje de facturación · a precio Start Up" + (mesesVentanaFact > 1 ? " × " + mesesVentanaFact + " meses" : "") : "eje de facturación · " + fMoney(facturacionAtList) + " a lista × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses")) : "se calcula del volumen cotizado"}</span>
 					</div>
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>
 						<div className="flex h-9 items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2">
 							{hasVolume ? <TierBadge tier={seg} tiers={segmentList} size="sm" sub={esIDC ? fMoney2(segPrice.precioIDC) : (segDesc > 0 ? "−" + Math.round(segDesc * 100) + "%" : null)} /> : <span className="text-sm text-muted-foreground/40">—</span>}
-							<span className="text-xs text-muted-foreground truncate">{hasVolume ? (esIDC ? (segDriver === "facturacion" ? "por facturación " + fMoney(facturacionEje) : segDriver === "idc" ? "por " + idc.toLocaleString("es-AR") + " IDC/mes" : "por IDC/mes y facturación") : segDriver === "facturacion" ? "por facturación " + fMoney(facturacionEje) : segDriver === "firmas" ? "por " + firmasTotales.toLocaleString("es-AR") + " firmas" : "por firmas y facturación") : "cargá volumen"}</span>
+							<span className="text-xs text-muted-foreground truncate">{hasVolume ? (esIDC ? (segDriver === "facturacion" ? "por facturación " + fMoney(facturacionEje) : segDriver === "idc" ? "por " + idc.toLocaleString("es-AR") + " IDC" : "por IDC y facturación") : segDriver === "facturacion" ? "por facturación " + fMoney(facturacionEje) : segDriver === "firmas" ? "por " + firmasTotales.toLocaleString("es-AR") + " firmas" : "por firmas y facturación") : "cargá volumen"}</span>
 						</div>
 						<span className="text-xs text-muted-foreground">{esIDC ? "Precio de tabla del segmento." : "Descuento sobre los dos precios de lista."}</span>
 					</div>

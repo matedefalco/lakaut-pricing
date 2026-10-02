@@ -839,6 +839,9 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			// En Volumen la unidad ya es el certificado: "1 certificado c/u" sería repetir el
 			// chip anterior. Ahí el dato que suma es el total de firmas (va después del c/u).
 			...(esIDC ? [chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`)] : []),
+			// IDC con compromiso anual (deals con modalidad IDC explícita): el volumen
+			// cotizado es mensual; el chip lo dice y muestra el consumo del año.
+			...(esIDC && inp.idcEntrada != null && inp.modalidadFacturacion === "anual" ? [chip(SVG.calendar(B, 15), `<strong>Compromiso anual</strong> · ${(idc * 12).toLocaleString("es-AR")} por año`)] : []),
 			...(hayJuridicos ? [
 				chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 			] : [

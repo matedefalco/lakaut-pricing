@@ -102,8 +102,8 @@ export function TabCanalB2B2CPrecios({ costs }) {
 					<Table>
 						<TableHeader>
 							<TableRow>
-								<TableHead>Segmento<InfoTooltip text="El cliente cae en un solo segmento, asignado por su volumen mensual de IDC." /></TableHead>
-								<TableHead className="text-right">IDC / mes<InfoTooltip text="Rango de volumen mensual de identidades digitales certificadas que alcanza el segmento." /></TableHead>
+								<TableHead>Segmento<InfoTooltip text="El cliente cae en un solo segmento, asignado por la cantidad de IDC que consume." /></TableHead>
+								<TableHead className="text-right">IDC<InfoTooltip text="Rango de cantidad de identidades digitales certificadas que alcanza el segmento. Sin temporalidad: cuenta lo que se consuma." /></TableHead>
 								{visible.has("precioIDC")     && <TableHead className="text-right">Precio IDC (USD)<InfoTooltip text="Precio unitario de la IDC en este segmento. Es un precio propio del tramo, no un descuento sobre una lista." /></TableHead>}
 								{visible.has("cupo")          && <TableHead className="text-right">Firmas incl.<InfoTooltip text="Cupo de firmas que entran en el precio de la IDC: la firma inicial que requiere la institución más las firmas de activación." /></TableHead>}
 								{visible.has("cvBundle")      && <TableHead className="text-right">CV bundle<InfoTooltip text={"Costo variable de lo que se entrega por el precio de la IDC = certificado (USD " + cvCert.toFixed(4) + ") + las firmas del cupo (USD " + cvFirma.toFixed(4) + " cada una)."} /></TableHead>}
