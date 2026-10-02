@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings, Search } from "lucide-react";
+import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings, Search, GraduationCap } from "lucide-react";
 import { dealStatus, dealStatusMeta, dealsPorVencer, diasParaVencer } from "./lib/dealStatus";
 import { formatCotId } from "./lib/cotId";
 import { CommandPalette } from "./components/ui/CommandPalette";
@@ -31,6 +31,7 @@ import { TabClientes } from "./components/tabs/TabClientes";
 import { TabInicio } from "./components/tabs/TabInicio";
 import { TabReportes } from "./components/tabs/TabReportes";
 import { TabDocumentacion } from "./components/tabs/TabDocumentacion";
+import { TabIntroduccion } from "./components/tabs/TabIntroduccion";
 
 
 // ── Estructura de navegación · agrupada por tarea del usuario ──────────────────
@@ -105,6 +106,7 @@ const CHANNEL_SHORT = {
 // propia. Los dos cotizadores tienen su sección para heredar el color del canal.
 const SECTION_BY_ITEM = {
 	inicio: "inicio",
+	intro: "inicio",
 	web: "web",
 	distribuidores: "distribuidores",
 	b2b2c: "b2b2c",
@@ -293,6 +295,14 @@ function LakautCalcInner() {
 		setQuoteNonce(function (prev) { return Object.assign({}, prev, { [channel]: (prev[channel] || 0) + 1 }); });
 		if (channel === "distribuidores_vol") setDistribMode("volumen");
 		navTo(navKeyForChannel(channel));
+	}
+
+	// Caso práctico de la Introducción: abre un cotizador en blanco y le carga los
+	// inputs del caso como si fuera una cotización a editar, pero sin id (no hay
+	// nada guardado: si el usuario guarda, se crea una cotización nueva).
+	function startPreset(channel, inputs) {
+		newQuote(channel);
+		setPendingEdit({ id: null, channel: channel === "distribuidores" ? "distribuidores_vol" : channel, inputs: inputs });
 	}
 
 	function goHistorial(dealId) {
@@ -532,7 +542,7 @@ function LakautCalcInner() {
 	const flyoutData = flyout ? flyoutContent(flyout) : null;
 
 	// Destinos del buscador: Inicio + cada ítem del nav, con su grupo como bajada.
-	const paletteNav = [{ key: "inicio", label: "Inicio", group: "" }].concat(NAV_GROUPS.flatMap(function (g) {
+	const paletteNav = [{ key: "inicio", label: "Inicio", group: "" }, { key: "intro", label: "Introducción", group: "" }].concat(NAV_GROUPS.flatMap(function (g) {
 		return g.items.map(function (i) { return { key: i.key, label: i.label, group: GROUP_TITLE[g.groupKey] }; });
 	}));
 	function closeExportDone() { setExportDone(null); }
@@ -558,6 +568,7 @@ function LakautCalcInner() {
 					<Plus size={24} strokeWidth={2.4} aria-hidden="true" />
 				</button>
 				{railButton({ key: "inicio", label: "Inicio", Icon: Home, active: activeNavItem === "inicio" && !flyout, onClick: function () { navTo("inicio"); } })}
+				{railButton({ key: "intro", label: "Intro", Icon: GraduationCap, active: activeNavItem === "intro" && !flyout, onClick: function () { navTo("intro"); } })}
 				{["cotizar", "seguimiento", "analisis"].map(function (key) {
 					return railButton({
 						key: key,
@@ -649,6 +660,7 @@ function LakautCalcInner() {
 					<nav className="flex-1 overflow-y-auto pt-1.5 pb-4" aria-label="Navegación principal">
 						<div className="pt-1.5">
 							<NavPill label="Inicio" itemKey="inicio" bold Icon={Home} />
+							<NavPill label="Introducción" itemKey="intro" Icon={GraduationCap} />
 						</div>
 						{NAV_GROUPS.map(function (group) {
 							return (
@@ -692,7 +704,7 @@ function LakautCalcInner() {
 								<span className="hidden sm:inline" aria-hidden="true">/</span>
 								<span className="truncate font-semibold text-foreground">{activeItem ? activeItem.label : ""}</span>
 							</>
-						) : <span className="font-semibold text-foreground">Inicio</span>}
+						) : <span className="font-semibold text-foreground">{activeNavItem === "intro" ? "Introducción" : "Inicio"}</span>}
 					</nav>
 					<div className="flex-1" />
 					<button
@@ -741,7 +753,8 @@ function LakautCalcInner() {
 				<main className="mx-auto w-full max-w-[1280px] flex-1 p-4 lg:p-6">
 
 					{/* ── INICIO ── */}
-					{activeNavItem === "inicio" && <TabInicio dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcLastUpdated={tcLastUpdated} onNewQuote={newQuote} onOpenHistorial={function () { navTo("historial"); }} onEditQuote={editQuote} />}
+					{activeNavItem === "inicio" && <TabInicio dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcLastUpdated={tcLastUpdated} onNewQuote={newQuote} onOpenHistorial={function () { navTo("historial"); }} onEditQuote={editQuote} onOpenIntro={function () { navTo("intro"); }} />}
+					{activeNavItem === "intro" && <TabIntroduccion onNav={navTo} onPreset={startPreset} onNewQuote={newQuote} />}
 
 					{/* ── COTIZAR ── */}
 					{activeNavItem === "web" && <TabCanalPacks channel="web" key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}

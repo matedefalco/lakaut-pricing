@@ -11,6 +11,7 @@ import { CHANNELS, channelMeta, isPacks, isUnit, isVolumenLike } from "@/data/ch
 import { dealRevenue } from "@/lib/dealMetrics";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SkeletonRows, SkeletonCards } from "@/components/ui/Skeleton";
+import { IntroWelcomeCard } from "./TabIntroduccion";
 
 function fDate(iso) {
 	if (!iso) return "—";
@@ -29,7 +30,7 @@ function dealValue(deal, fMoney) {
 	return "—";
 }
 
-export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, onNewQuote, onOpenHistorial, onEditQuote }) {
+export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, onNewQuote, onOpenHistorial, onEditQuote, onOpenIntro }) {
 	const confirm = useConfirm();
 	const { fMoney } = makeMoney(currency, tc);
 	const deals = (dealsApi && dealsApi.deals) || [];
@@ -57,6 +58,7 @@ export function TabInicio({ dealsApi, clientsApi, currency, tc, tcLastUpdated, o
 
 	return (
 		<div className="space-y-6 max-w-4xl">
+			{onOpenIntro && <IntroWelcomeCard onOpen={onOpenIntro} />}
 			<div>
 				<h1 className="font-display text-2xl text-foreground">Empezá una cotización</h1>
 				<p className="text-sm text-muted-foreground mt-1">Elegí el canal, cargá el volumen y exportá la propuesta. Tus cotizaciones quedan guardadas y sincronizadas con el equipo.</p>
