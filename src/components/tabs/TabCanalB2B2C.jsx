@@ -103,9 +103,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 
 	const [selectedClient, setSelectedClient] = useState(null);
 	// Moneda del PDF exportado. Independiente del toggle global de visualización:
-	// arranca en ARS (moneda de facturación histórica) y se puede pasar a USD por
+	// arranca en USD (default comercial desde oct 2026) y se puede pasar a ARS por
 	// cotización desde la barra de exportar.
-	const [exportCurrency, setExportCurrency] = useState("ARS");
+	const [exportCurrency, setExportCurrency] = useState("USD");
 	const [loadToken, setLoadToken] = useState(0);
 	const [integracion, setIntegracion] = useState("api"); // "api" | "sin_api"
 	// Modelo por tipo de certificado. Un certificado (IDC) es físico (persona) o
@@ -834,6 +834,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				// segmento. Con los dos, el descuento negociado se deriva sin mirar la
 				// config, que puede haber cambiado desde que se guardó la cotización.
 				precioIDC, precioIDCLista: segPrice.precioIDC,
+				// IDC: lista de referencia (cert y firma sueltos de Volumen) contra la que la
+				// propuesta abre el bundle en sub-ítems y muestra el descuento.
+				...(esIDC ? { idcListaRef: { cert: Number(volumenBase.cert) || 0, firma: Number(volumenBase.firma) || 0 } } : {}),
 				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
 				precioFirmaExtraLista: segPrice.precioFirmaExtra,
 				revTotal, revMesTotal: idcAnual ? revSinFee / 12 : revSinFee,

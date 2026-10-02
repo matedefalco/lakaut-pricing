@@ -318,7 +318,7 @@ function LakautCalcInner() {
 
 	// Exportar desde un cotizador abre el cierre "Propuesta lista" con el paso siguiente.
 	function exportDeal(deal, client, overrideCurrency) {
-		exportProposal(deal, client, overrideCurrency || currency, tc, channelConfig, models, tcMeta);
+		exportProposal(deal, client, overrideCurrency || "USD", tc, channelConfig, models, tcMeta);
 		setExportDone({ deal: deal, client: client, cotId: formatCotId(deal.inputs && deal.inputs.cot, client && client.tipo, deal.channel) });
 	}
 

@@ -459,7 +459,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	function actionsCell(q) {
 		return (
 			<TableCell className="text-right">
-				<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, "ARS", tc, channelConfig, models, tcMeta); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
+				<Button variant="ghost" size="icon" className="size-8" onClick={function () { exportProposal(q, (q.client_id && clientsById[q.client_id]) || q.clients || null, "USD", tc, channelConfig, models, tcMeta); }} title="Exportar propuesta PDF"><FileText className="size-4 text-muted-foreground" /></Button>
 				<Button variant="ghost" size="icon" className="size-8" onClick={function () { onEditQuote(q); }} title="Editar"><Pencil className="size-4 text-primary" /></Button>
 				<Button variant="ghost" size="icon" className="size-8" onClick={function () { newVersion(q); }} title="Nueva versión (clona subiendo la versión)"><CopyPlus className="size-4 text-muted-foreground" /></Button>
 				<Button variant="ghost" size="icon" className="size-8" onClick={function () { del(q); }} title="Borrar"><Trash2 className="size-4 text-muted-foreground" /></Button>

@@ -65,9 +65,9 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 
 	const [selectedClient, setSelectedClient] = useState(null);
 	// Moneda del PDF exportado. Independiente del toggle global de visualización:
-	// arranca en ARS (moneda de facturación histórica) y se puede pasar a USD por
+	// arranca en USD (default comercial desde oct 2026) y se puede pasar a ARS por
 	// cotización desde la barra de exportar.
-	const [exportCurrency, setExportCurrency] = useState("ARS");
+	const [exportCurrency, setExportCurrency] = useState("USD");
 	const [loadToken, setLoadToken] = useState(0);
 	// ── Variables declaradas del socio (solo Distribuidores) ──
 	// Definen el nivel de descuento y son datos de la RELACIÓN comercial. Los
