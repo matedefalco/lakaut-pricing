@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, Fragment } from "react";
-import { Pencil, Trash2, Download, FileText, ChevronDown, ChevronRight, X, CopyPlus } from "lucide-react";
+import { Pencil, Trash2, Download, FileText, ChevronDown, ChevronRight, X, CopyPlus, AlarmClock } from "lucide-react";
 import { formatCotId, maxCotVersion } from "@/lib/cotId";
 import { exportProposal } from "@/utils/exportProposal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,8 @@ import { makeMoney } from "@/utils/useMoney";
 import { cn } from "@/lib/utils";
 import { useChannelConfig } from "@/context/ChannelConfigContext";
 import { useModels } from "@/context/ModelsContext";
-import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus } from "@/lib/dealStatus";
-import { channelShort, resolveChannel, isPacks, isUnit, isVolumenLike, isDistribVol, packsConDescuento } from "@/data/channelMeta";
+import { DEAL_STATUSES, DEAL_STATUS_META, dealStatus, dealsPorVencer, diasParaVencer, AVISO_VENCIMIENTO_DIAS } from "@/lib/dealStatus";
+import { channelMeta, channelShort, resolveChannel, isPacks, isUnit, isVolumenLike, isDistribVol, packsConDescuento } from "@/data/channelMeta";
 import { dealRevenue } from "@/lib/dealMetrics";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TierBadge } from "@/components/ui/TierBadge";
@@ -154,6 +154,8 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 	const [certsMax, setCertsMax] = useState("");
 	const [idcMin, setIdcMin] = useState("");
 	const [idcMax, setIdcMax] = useState("");
+	// Filtro rápido "Por vencer": deja solo las pendientes que vencen en los próximos días.
+	const [soloPorVencer, setSoloPorVencer] = useState(false);
 
 	// clientName viene del join hecho al cargar los deals; puede quedar desactualizado
 	// si el cliente se renombró después. Se resuelve contra clientsApi.clients (siempre vivo).
@@ -169,6 +171,11 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			return live ? Object.assign({}, q, { clientName: live.name }) : q;
 		});
 	}, [dealsApi?.deals, clientsById]);
+
+	// Pendientes que vencen pronto: se muestran en una franja arriba de la tabla (con
+	// acceso directo) y alimentan el filtro rápido. El riel conserva solo el contador.
+	const porVencer = useMemo(function () { return dealsPorVencer(quotes); }, [quotes]);
+	const porVencerIds = useMemo(function () { return new Set(porVencer.map(function (d) { return d.id; })); }, [porVencer]);
 
 	const months = useMemo(function () {
 		const set = new Set(quotes.map(function (q) { return q.fecha.slice(0, 7); }));
@@ -238,16 +245,18 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 		setSearch("");
 		setCertsMin(""); setCertsMax("");
 		setIdcMin(""); setIdcMax("");
+		setSoloPorVencer(false);
 		setOpenFilter(null);
 	}
 
-	const hasActiveFilters = FILTER_DEFS.some(function (f) { return isActive(f.key); });
+	const hasActiveFilters = soloPorVencer || FILTER_DEFS.some(function (f) { return isActive(f.key); });
 
 	// Set de ids de versiones que pasan el filtro individualmente. Un grupo (número de
 	// cotización) se muestra si CUALQUIER versión está acá (requisito elegido).
 	const matchedIds = useMemo(function () {
 		const set = new Set();
 		quotes.forEach(function (q) {
+			if (soloPorVencer && !porVencerIds.has(q.id)) return;
 			if (selectedChannels.size > 0 && !selectedChannels.has(resolveChannel(q.channel))) return;
 			if (selectedStatuses.size > 0 && !selectedStatuses.has(dealStatus(q))) return;
 			if (month !== "all" && q.fecha.slice(0, 7) !== month) return;
@@ -272,7 +281,7 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 			set.add(q.id);
 		});
 		return set;
-	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax, clientsById]);
+	}, [quotes, selectedChannels, selectedStatuses, month, search, certsMin, certsMax, idcMin, idcMax, clientsById, soloPorVencer, porVencerIds]);
 
 	// ── Orden ──
 	// Comparador con soporte de números y acentos (es). Cuando el criterio empata,
@@ -498,6 +507,39 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 				}
 			/>
 
+			{/* Por vencer: pendientes que vencen en los próximos días, con acceso directo.
+			    Es la lista de seguimiento; antes vivía en el panel del riel. */}
+			{porVencer.length > 0 && (
+				<section aria-labelledby="por-vencer-title" className="rounded-2xl border border-[var(--warning)]/25 bg-[var(--warning)]/[0.06] p-4">
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<h2 id="por-vencer-title" className="flex items-center gap-2 text-sm font-semibold text-foreground">
+							<AlarmClock className="size-4 text-[var(--warning)]" aria-hidden="true" />
+							{porVencer.length} {porVencer.length === 1 ? "cotización vence" : "cotizaciones vencen"} en los próximos {AVISO_VENCIMIENTO_DIAS} días
+						</h2>
+						<button type="button" onClick={function () { setSoloPorVencer(!soloPorVencer); }} className="rounded-md border border-[var(--warning)]/30 bg-card px-2.5 py-1 text-xs font-semibold text-[var(--warning)] transition-colors hover:bg-[var(--warning)]/10">
+							{soloPorVencer ? "Ver todas" : "Ver solo estas en la tabla"}
+						</button>
+					</div>
+					<div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+						{porVencer.slice(0, 6).map(function (q) {
+							const meta = channelMeta(resolveChannel(q.channel));
+							const dias = diasParaVencer(q);
+							const cotStr = formatCotId(q.inputs?.cot, ((q.client_id && clientsById[q.client_id]) || {}).tipo, q.channel);
+							return (
+								<div key={q.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
+									<span className="size-2 shrink-0 rounded-full" style={{ background: meta.color }} aria-hidden="true" />
+									<div className="min-w-0 flex-1">
+										<div className="truncate text-sm font-semibold text-foreground">{q.clientName || "(sin nombre)"}</div>
+										<div className="truncate text-xs text-muted-foreground">{meta.label}{cotStr ? " · " + cotStr : ""} · <span className="font-semibold text-[var(--warning)]">{dias === 0 ? "vence hoy" : "vence en " + dias + " día" + (dias === 1 ? "" : "s")}</span></div>
+									</div>
+									<Button variant="outline" size="sm" onClick={function () { onEditQuote && onEditQuote(q); }}>Abrir</Button>
+								</div>
+							);
+						})}
+					</div>
+				</section>
+			)}
+
 			{/* Panel de filtros estilo Notion */}
 			<Card className="bg-card border-border">
 				<CardContent className="space-y-3 pt-4">
@@ -538,6 +580,13 @@ export function TabHistorial({ dealsApi, currency, tc, tcMeta, onEditQuote, clie
 								</div>
 							);
 						})}
+						{porVencer.length > 0 && (
+							<button type="button" aria-pressed={soloPorVencer} onClick={function () { setSoloPorVencer(!soloPorVencer); }}
+								className={cn("inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer select-none",
+									soloPorVencer ? "bg-[var(--warning)]/10 border-[var(--warning)]/40 text-[var(--warning)]" : "bg-background border-border text-muted-foreground hover:text-foreground")}>
+								<AlarmClock className="size-3" aria-hidden="true" /> Por vencer ({porVencer.length})
+							</button>
+						)}
 						{hasActiveFilters && (
 							<button
 								type="button"

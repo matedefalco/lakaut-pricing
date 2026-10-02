@@ -97,7 +97,8 @@ export function MagBar({ value, max, color }) {
 // Tabla viva: columnas declarativas, fila resaltada al pasar y una columna "clave"
 // con fondo propio para que el ojo vaya directo al dato que importa.
 // columns: [{ key, label, align, render(row, i), key: true }]
-export function LiveTable({ columns, rows, rowKey, caption, accent }) {
+// isActive(row): opcional, resalta la fila (ej. el tramo donde cae una cantidad).
+export function LiveTable({ columns, rows, rowKey, caption, accent, isActive }) {
 	return (
 		<div className="overflow-x-auto rounded-xl border border-border bg-card shadow-[var(--shadow-control)]">
 			<table className="w-full border-collapse text-sm">
@@ -115,8 +116,10 @@ export function LiveTable({ columns, rows, rowKey, caption, accent }) {
 				</thead>
 				<tbody>
 					{rows.map(function (r, i) {
+						const on = isActive ? isActive(r) : false;
 						return (
-							<tr key={rowKey ? rowKey(r, i) : i} className="group border-t border-border transition-colors hover:bg-accent/50">
+							<tr key={rowKey ? rowKey(r, i) : i} aria-current={on ? "true" : undefined} className={cn("group border-t border-border transition-colors hover:bg-accent/50", on && "font-semibold")}
+								style={on ? { background: "color-mix(in srgb, " + (accent || "var(--primary)") + " 12%, transparent)", boxShadow: "inset 3px 0 0 " + (accent || "var(--primary)") } : undefined}>
 								{columns.map(function (c) {
 									return (
 										<td key={c.key} className={cn("whitespace-nowrap px-4 py-2.5 tabular-nums", c.align === "right" ? "text-right" : "text-left", c.emphasis && "font-semibold text-foreground")} style={c.emphasis ? { background: "color-mix(in srgb, " + (accent || "var(--primary)") + " 5%, transparent)" } : undefined}>

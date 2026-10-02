@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Blocks, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings, Search, GraduationCap } from "lucide-react";
+import { Home, ScrollText, Users, ChartColumn, ArrowLeftRight, Tags, Receipt, Boxes, BadgeDollarSign, SlidersHorizontal, LogOut, BookOpen, Plus, FileText, Clock3, Settings, Search, GraduationCap, Info, ListOrdered } from "lucide-react";
 import { dealStatus, dealStatusMeta, dealsPorVencer, diasParaVencer } from "./lib/dealStatus";
 import { formatCotId } from "./lib/cotId";
 import { CommandPalette } from "./components/ui/CommandPalette";
@@ -32,6 +32,7 @@ import { TabInicio } from "./components/tabs/TabInicio";
 import { TabReportes } from "./components/tabs/TabReportes";
 import { TabDocumentacion } from "./components/tabs/TabDocumentacion";
 import { TabIntroduccion } from "./components/tabs/TabIntroduccion";
+import { TabNiveles } from "./components/tabs/TabNiveles";
 
 
 // ── Estructura de navegación · agrupada por tarea del usuario ──────────────────
@@ -60,8 +61,19 @@ const NAV_GROUPS = [
 		items: [
 			{ key: "reportes", label: "Reportes", Icon: ChartColumn },
 			{ key: "comparación", label: "Comparación de canales", Icon: ArrowLeftRight },
+			// "Simulador de portfolio" (web-simulador) archivado oct 2026: no se usaba. La
+			// vista sigue en TabCanalWeb (view="simulador") por si se recupera.
+		],
+	},
+	{
+		// Material de consulta y aprendizaje: la inducción, las escalas de cada canal,
+		// los precios de lista y la documentación del modelo comercial.
+		groupKey: "informacion", groupLabel: "INFORMACIÓN", accent: "#7c3aed",
+		items: [
+			{ key: "intro", label: "Introducción", Icon: GraduationCap },
+			{ key: "niveles", label: "Niveles y segmentos", Icon: ListOrdered },
 			{ key: "web-precios", label: "Precios de lista", Icon: Tags },
-			{ key: "web-simulador", label: "Simulador de portfolio", Icon: Blocks },
+			{ key: "docs", label: "Documentación", Icon: BookOpen },
 		],
 	},
 	{
@@ -71,7 +83,6 @@ const NAV_GROUPS = [
 			{ key: "cfg-modelos", label: "Modelos y packs", Icon: Boxes },
 			{ key: "cfg-precios", label: "Precios por canal", Icon: BadgeDollarSign },
 			{ key: "cfg-general", label: "General · tipo de cambio", Icon: SlidersHorizontal },
-			{ key: "docs", label: "Documentación", Icon: BookOpen },
 		],
 	},
 ];
@@ -90,8 +101,8 @@ const QUOTABLE = [
 // los destinos (Inicio + un botón por grupo) y cada grupo abre su panel al lado:
 // lo que no estás usando no ocupa lugar ni atención. Configuración, que se toca
 // poco, baja al pie del riel.
-const GROUP_TITLE = { cotizar: "Cotizar", seguimiento: "Seguimiento", analisis: "Análisis", configuracion: "Configuración" };
-const RAIL_ICON = { cotizar: FileText, seguimiento: Clock3, analisis: ChartColumn, configuracion: Settings };
+const GROUP_TITLE = { cotizar: "Cotizar", seguimiento: "Seguimiento", analisis: "Análisis", informacion: "Información", configuracion: "Configuración" };
+const RAIL_ICON = { cotizar: FileText, seguimiento: Clock3, analisis: ChartColumn, informacion: Info, configuracion: Settings };
 // Bajada corta por canal para el panel Cotizar (la desc completa vive en Inicio).
 const CHANNEL_SHORT = {
 	web: "Packs a precio de lista",
@@ -107,6 +118,7 @@ const CHANNEL_SHORT = {
 const SECTION_BY_ITEM = {
 	inicio: "inicio",
 	intro: "inicio",
+	niveles: "inicio",
 	web: "web",
 	distribuidores: "distribuidores",
 	b2b2c: "b2b2c",
@@ -115,13 +127,12 @@ const SECTION_BY_ITEM = {
 	clientes: "seguimiento",
 	reportes: "analisis",
 	"comparación": "analisis",
-	"web-precios": "analisis",
-	"web-simulador": "analisis",
+	"web-precios": "inicio",
 	"cfg-costos": "config",
 	"cfg-modelos": "config",
 	"cfg-precios": "config",
 	"cfg-general": "config",
-	docs: "config",
+	docs: "inicio",
 };
 
 
@@ -525,24 +536,16 @@ function LakautCalcInner() {
 				</div>
 			);
 		}
-		if (key === "seguimiento" && porVencer.length > 0) {
-			extra = (
-				<div className="flex flex-col gap-1.5">
-					<div className="px-1 text-xs font-bold tracking-[0.6px] text-muted-foreground uppercase">Por vencer</div>
-					{porVencer.slice(0, 5).map(function (d) { return dealLink({ deal: d, showVence: true, onClick: function () { goHistorial(d.id); } }); })}
-				</div>
-			);
-		}
 		return {
 			title: GROUP_TITLE[key],
-			sub: key === "cotizar" ? "Seguí con el canal abierto o retomá una cotización." : null,
+			sub: key === "cotizar" ? "Seguí con el canal abierto o retomá una cotización." : key === "informacion" ? "Para aprender y consultar el modelo comercial." : null,
 			body: <>{links}{extra}</>,
 		};
 	}
 	const flyoutData = flyout ? flyoutContent(flyout) : null;
 
 	// Destinos del buscador: Inicio + cada ítem del nav, con su grupo como bajada.
-	const paletteNav = [{ key: "inicio", label: "Inicio", group: "" }, { key: "intro", label: "Introducción", group: "" }].concat(NAV_GROUPS.flatMap(function (g) {
+	const paletteNav = [{ key: "inicio", label: "Inicio", group: "" }].concat(NAV_GROUPS.flatMap(function (g) {
 		return g.items.map(function (i) { return { key: i.key, label: i.label, group: GROUP_TITLE[g.groupKey] }; });
 	}));
 	function closeExportDone() { setExportDone(null); }
@@ -568,11 +571,10 @@ function LakautCalcInner() {
 					<Plus size={24} strokeWidth={2.4} aria-hidden="true" />
 				</button>
 				{railButton({ key: "inicio", label: "Inicio", Icon: Home, active: activeNavItem === "inicio" && !flyout, onClick: function () { navTo("inicio"); } })}
-				{railButton({ key: "intro", label: "Intro", Icon: GraduationCap, active: activeNavItem === "intro" && !flyout, onClick: function () { navTo("intro"); } })}
-				{["cotizar", "seguimiento", "analisis"].map(function (key) {
+				{["cotizar", "seguimiento", "analisis", "informacion"].map(function (key) {
 					return railButton({
 						key: key,
-						label: GROUP_TITLE[key],
+						label: key === "informacion" ? "Info" : GROUP_TITLE[key],
 						Icon: RAIL_ICON[key],
 						active: !!activeGroup && activeGroup.groupKey === key && !flyout,
 						open: flyout === key,
@@ -660,7 +662,6 @@ function LakautCalcInner() {
 					<nav className="flex-1 overflow-y-auto pt-1.5 pb-4" aria-label="Navegación principal">
 						<div className="pt-1.5">
 							<NavPill label="Inicio" itemKey="inicio" bold Icon={Home} />
-							<NavPill label="Introducción" itemKey="intro" Icon={GraduationCap} />
 						</div>
 						{NAV_GROUPS.map(function (group) {
 							return (
@@ -778,7 +779,6 @@ function LakautCalcInner() {
 					{/* ── ANÁLISIS ── */}
 					{activeNavItem === "reportes" && <TabReportes dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} />}
 					{activeNavItem === "comparación" && <TabComparacion costs={costs} currency={currency} tc={tc} />}
-					{activeNavItem === "web-simulador" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="simulador" />}
 
 					{/* ── CONFIGURACIÓN ── */}
 					{activeNavItem === "cfg-general" && <TabGeneral tc={tc} setTc={setTc} tcSource={source} setTcSource={setSource} tcLoading={tcLoading} tcError={tcError} tcLastUpdated={tcLastUpdated} tcRefresh={tcRefresh} />}
@@ -786,6 +786,7 @@ function LakautCalcInner() {
 					{activeNavItem === "cfg-precios" && <TabCanalesConfig channelConfig={channelConfig} updateChannelConfig={updateChannelConfig} costs={costs} />}
 					{activeNavItem === "cfg-modelos" && <TabGuardados selectedId={selectedModelId} onSelect={function (id) { setSelectedModelId(id); }} currency={currency} tc={tc} />}
 					{activeNavItem === "docs" && <TabDocumentacion tc={tc} />}
+					{activeNavItem === "niveles" && <TabNiveles />}
 				</main>
 			</div>
 
