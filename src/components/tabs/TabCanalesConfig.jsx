@@ -460,6 +460,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 							<TableHead className={thNum}>Precio/mes (USD)</TableHead>
 							<TableHead className={thNum}>SLA (%)</TableHead>
 							<TableHead className={thNum}>TX/mes</TableHead>
+							<TableHead className={thNum}>Incluido desde (USD fact.)</TableHead>
 							<TableHead>Descripción</TableHead>
 							<TableHead className="w-10" />
 						</TableRow>
@@ -476,6 +477,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 									<TableCell><NumCell value={plan.precioMes} decimals={0} onChange={function (v) { upd("precioMes", v); }} /></TableCell>
 									<TableCell><NumCell value={plan.sla !== null && plan.sla !== undefined ? Math.round(plan.sla * 1000) / 10 : null} decimals={1} onChange={function (v) { upd("sla", v === null ? null : v / 100); }} /></TableCell>
 									<TableCell><NumCell value={plan.txMes} decimals={0} onChange={function (v) { upd("txMes", v); }} /></TableCell>
+									<TableCell><NumCell value={plan.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
 									<TableCell><TextCell value={plan.desc} onChange={function (v) { upd("desc", v); }} className="min-w-[220px]" /></TableCell>
 									<TableCell><DeleteRowButton onClick={function () { removeRow("slaPlans", idx); }} /></TableCell>
 								</TableRow>
@@ -483,7 +485,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar plan SLA" onClick={function () { addRow("slaPlans", { id: genId("sla"), label: "Nuevo plan", precioMes: 0, sla: null, txMes: null, desc: "" }); }} />
+				<AddRowButton label="Agregar plan SLA" onClick={function () { addRow("slaPlans", { id: genId("sla"), label: "Nuevo plan", precioMes: 0, sla: null, txMes: null, facturacionMin: null, desc: "" }); }} />
 			</CollapsibleSection>
 
 			{/* ── 5 · Palancas de descuento comercial ── */}

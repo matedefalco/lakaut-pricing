@@ -7,6 +7,7 @@ import { tierMaterialInList } from "@/lib/tierMaterial";
 import { useTierUp } from "@/utils/useTierUp";
 import { buildProyeccion, buildEscalonadoFirmas, DEFAULT_PROYECCION_STEPS } from "@/lib/proyeccion";
 import { CHANNELS, isDistribVol, resolveChannel, channelLabel } from "@/data/channelMeta";
+import { slaGanadoPorFacturacion } from "@/data/channels";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,7 +120,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// sin atribución de tipo. Permiten cotizar firmas sin certificados necesariamente.
 	const [firmasSueltas, setFirmasSueltas] = useState("");
 	const [fee, setFee] = useState(3250);
-	const [slaId, setSlaId] = useState("standard");
+	// "auto" = el plan que se alcanza por facturación (incluido sin cargo). Un id puntual
+	// fija el plan: si está por encima del alcanzado, se cobra a su precio.
+	const [slaId, setSlaId] = useState("auto");
 	const [slaBonificado, setSlaBonificado] = useState(false);
 	// Palancas de descuento por condiciones (time-to-cash, duración, velocidad de cierre).
 	const [levers, setLevers] = useState(function () { return defaultLeverSelection(channelConfig.commercialLevers); });
@@ -195,7 +198,6 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// La integración es siempre por SDK (Lakaut no expone una API de integración).
 	const intgTerm = "SDK";
 	const api = b2b2cApiTiers.slice().reverse().find(function (t) { return (Number(fee) || 0) >= t.feeMin; }) || b2b2cApiTiers[0];
-	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
 
 	// ── Cantidades ──
 	// IDC con compromiso anual: se cotiza el AÑO completo (el cliente paga el total al
@@ -380,7 +382,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			setCertJuridicos(i.idcCantidadIngresada.jur ? i.idcCantidadIngresada.jur : "");
 		}
 		setFee(i.fee != null ? i.fee : 3250);
-		setSlaId(i.slaId || "standard");
+		setSlaId(i.slaAuto ? "auto" : (i.slaId || "auto"));
 		setSlaBonificado(i.slaBonificado || false);
 		setLevers(i.levers || defaultLeverSelection(commercialLevers));
 		setFirmasBonificadas(i.firmasBonificadas != null ? String(i.firmasBonificadas) : "");
@@ -524,7 +526,18 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// deja en 0) según el caso.
 	const feePermitido = true;
 	const feeAplicado = conApi && feePermitido ? Math.max(0, Number(fee) || 0) : 0;
-	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
+	// ── SLA por facturación ──
+	// La facturación de la cotización (servicio del período: el año en IDC con compromiso
+	// anual; en Distribuidores × 12 con compromiso; en Volumen la ventana de la modalidad)
+	// alcanza un plan de soporte que va incluido sin cargo. Un plan igual o menor al
+	// alcanzado también es sin cargo; uno superior se cobra.
+	const slaFacturacion = esIDC ? revServicio : revServicio * (esDistribVol ? (conCompromiso ? 12 : 1) : mesesVentanaFact);
+	const slaGanado = slaGanadoPorFacturacion(slaPlans, slaFacturacion) || slaPlans[0];
+	const sla = (slaId === "auto" ? slaGanado : slaPlans.find(function (s) { return s.id === slaId; })) || slaGanado;
+	const slaIncluido = slaPlans.indexOf(sla) <= slaPlans.indexOf(slaGanado);
+	const slaSiguiente = slaPlans.filter(function (p) { return p.facturacionMin != null && Number(p.facturacionMin) > slaFacturacion; })
+		.sort(function (a, b) { return a.facturacionMin - b.facturacionMin; })[0] || null;
+	const slaMes = conApi && !slaBonificado && !slaIncluido ? (sla.precioMes || 0) : 0;
 	// IDC con compromiso anual: el SLA se cotiza por los 12 meses del contrato.
 	const slaMeses = idcAnual ? 12 : 1;
 	const slaPeriodo = slaMes * slaMeses;
@@ -756,7 +769,8 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				...(mostrarFormas ? { descLiquidacion: { forma: descForma, sub: descSub } } : {}),
 				// El fee solo viaja al deal cuando el nivel lo permite (Azul/Bronce en
 				// Distribuidores-Volumen); si no, la propuesta lo lee como 0.
-				...(conApi ? { slaId, slaBonificado, ...(feePermitido ? { fee } : {}) } : {}),
+				// slaIncluido: el plan va sin cargo por la facturación alcanzada (el export no lo cobra).
+				...(conApi ? { slaId: sla.id, slaAuto: slaId === "auto", slaIncluido, slaBonificado, ...(feePermitido ? { fee } : {}) } : {}),
 				// Palancas de condiciones: selección + snapshot resuelto (estable ante
 				// cambios posteriores de la config). Modelo "ofrecido": se listan como
 				// incentivos en la propuesta pero no bajan el total. El flag distingue
@@ -1058,7 +1072,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					    ofrecen aparte (bloque debajo del total). */}
 					<div>
 						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney2} /></>} accent="success" valueClass="text-[var(--success)]" />}
-						{conApi && <ResultRow label={"SLA · " + sla.label + (slaMeses > 1 && slaMes > 0 ? " · " + slaMeses + " meses" : "")} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaPeriodo} format={fMoney2} /> : "incluido"} />}
+						{conApi && <ResultRow label={"SLA · " + sla.label + (slaMeses > 1 && slaMes > 0 ? " · " + slaMeses + " meses" : "")} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaPeriodo} format={fMoney2} /> : (slaIncluido && sla.precioMes ? "incluido por facturación" : "incluido")} />}
 						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney2} />} />}
 						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney2} />/mes</>} accent="success" />}
 					</div>
@@ -1374,8 +1388,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 							)}
 						<div className="flex flex-col gap-1.5">
 							<SelectField label="Plan de soporte / SLA" value={slaId} onValueChange={setSlaId}
-								options={slaPlans.map(function (s) { return { value: s.id, label: s.label + (s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : (s.precioMes === 0 ? " · incluido" : " · a medida")) }; })} note={sla.desc} />
-							{sla.precioMes > 0 && (
+								options={[{ value: "auto", label: "Según facturación · " + slaGanado.label + " incluido" }].concat(slaPlans.map(function (s) {
+									const incl = slaPlans.indexOf(s) <= slaPlans.indexOf(slaGanado);
+									return { value: s.id, label: s.label + (incl ? " · incluido" : s.precioMes ? " · USD " + s.precioMes.toLocaleString("es-AR") + "/mes" : " · a medida") };
+								}))}
+								note={(slaIncluido ? "Incluido por la facturación de la cotización (" + fMoney(slaFacturacion) + "). " : "Por encima del plan alcanzado (" + slaGanado.label + "): se cobra. ") + (slaSiguiente ? "Desde " + fMoney(slaSiguiente.facturacionMin) + " se incluye " + slaSiguiente.label + "." : "")} />
+							{sla.precioMes > 0 && !slaIncluido && (
 								<label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground select-none">
 									<input type="checkbox" checked={slaBonificado} onChange={function (e) { setSlaBonificado(e.target.checked); }} className="rounded" />
 									Bonificar SLA para este cliente

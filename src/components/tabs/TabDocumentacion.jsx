@@ -387,7 +387,7 @@ export function TabDocumentacion({ tc }) {
 
 				{/* ── SLA ── */}
 				<DocSection id="sla" eyebrow="Servicios premium" Icon={LifeBuoy} color="var(--accent-analysis)" title="Servicios y SLA"
-					lead="Planes de soporte para las cotizaciones con integración SDK.">
+					lead="Planes de soporte para las cotizaciones con integración SDK. El plan se **gana por facturación**: la de la cotización (la del año con compromiso anual) incluye sin cargo el plan cuyo umbral alcanza. Uno superior se cobra a su precio.">
 					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 						{slaPlans.map(function (p, i) {
 							const precio = p.precioMes == null ? "personalizado" : (p.precioMes === 0 ? "incluido" : "USD " + num(p.precioMes));
@@ -398,6 +398,7 @@ export function TabDocumentacion({ tc }) {
 									<div className="flex flex-wrap gap-1.5 text-xs">
 										{p.sla ? <span className="rounded-full bg-accent px-2 py-0.5 font-medium text-accent-foreground">SLA {usd(p.sla * 100, 1, 1)}%</span> : null}
 										{p.txMes ? <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{num(p.txMes)} tx/mes</span> : null}
+										{p.facturacionMin != null ? <span className="rounded-full bg-success/10 px-2 py-0.5 font-medium text-success">{Number(p.facturacionMin) <= 0 ? "Siempre incluido" : "Incluido desde USD " + num(p.facturacionMin)}</span> : null}
 									</div>
 									{p.desc && <p className="text-sm leading-relaxed text-muted-foreground">{p.desc}</p>}
 								</div>

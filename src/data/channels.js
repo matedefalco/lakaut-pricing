@@ -318,9 +318,24 @@ export const COMMERCIAL_LEVERS = {
 
 // ── Servicios premium / SLA ─────────────────────────────────────────────────────
 // Precio mensual en USD. Standard incluido en todos los productos.
+// facturacionMin: desde qué facturación de la cotización (USD, la del período
+// cotizado: el año con compromiso anual) el plan va INCLUIDO sin cargo. Elegir un plan
+// por encima del que se alcanza se cobra a su precio. null = nunca se incluye solo.
 export const SLA_PLANS = [
-	{ id: "standard", label: "Standard", precioMes: 0, sla: null, txMes: null, desc: "Horario comercial · mail y portal · respuesta hasta 8 h hábiles" },
-	{ id: "professional", label: "Professional", precioMes: 1000, sla: 0.999, txMes: 1000, desc: "Atención extendida · prioridad media · respuesta hasta 4 h" },
-	{ id: "enterprise", label: "Enterprise", precioMes: 3000, sla: 0.999, txMes: 10000, desc: "24x7 · ejecutivo técnico · respuesta <1 h en críticos" },
-	{ id: "dedicated", label: "SLA Dedicado", precioMes: null, sla: 0.999, txMes: null, desc: "+10.000 tx/mes · personalizado" },
+	{ id: "standard", label: "Standard", precioMes: 0, sla: null, txMes: null, facturacionMin: 0, desc: "Horario comercial · mail y portal · respuesta hasta 8 h hábiles" },
+	{ id: "professional", label: "Professional", precioMes: 1000, sla: 0.999, txMes: 1000, facturacionMin: 25000, desc: "Atención extendida · prioridad media · respuesta hasta 4 h" },
+	{ id: "enterprise", label: "Enterprise", precioMes: 3000, sla: 0.999, txMes: 10000, facturacionMin: 100000, desc: "24x7 · ejecutivo técnico · respuesta <1 h en críticos" },
+	{ id: "dedicated", label: "SLA Dedicado", precioMes: null, sla: 0.999, txMes: null, facturacionMin: 500000, desc: "+10.000 tx/mes · personalizado" },
 ];
+
+// Plan de SLA que se alcanza por facturación: el de mayor umbral cubierto. Si ninguno
+// tiene umbral, el primero (Standard).
+export function slaGanadoPorFacturacion(plans, facturacion) {
+	const list = Array.isArray(plans) ? plans : [];
+	let best = null;
+	list.forEach(function (p) {
+		if (p.facturacionMin == null) return;
+		if ((Number(facturacion) || 0) >= Number(p.facturacionMin) && (!best || Number(p.facturacionMin) >= Number(best.facturacionMin))) best = p;
+	});
+	return best || list[0] || null;
+}

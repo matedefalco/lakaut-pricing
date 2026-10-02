@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-10-02 16:15 · **Fuente:** Supabase (config viva) · **Commit:** `2d60525`
+> **Última actualización:** 2026-10-02 16:32 · **Fuente:** Supabase (config viva) · **Commit:** `faa5601`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -169,12 +169,14 @@ Descuento del abono mensual (reposición de bolsa de firmas): **3%**. Se mantien
 ## Servicios premium y SLA
 
 <!-- AUTO:sla:start -->
-| Plan | Precio | SLA | Volumen | Detalle |
-|---|---|---|---|---|
-| Standard | incluido | — | — | Horario comercial · mail y portal · respuesta hasta 8 h hábiles |
-| Professional | USD 1.000/mes | 99,9% | 1.000 tx/mes | Atención extendida · prioridad media · respuesta hasta 4 h |
-| Enterprise | USD 3.000/mes | 99,9% | 10.000 tx/mes | 24x7 · ejecutivo técnico · respuesta <1 h en críticos |
-| SLA Dedicado | personalizado | 99,9% | — | +10.000 tx/mes · personalizado |
+El plan de soporte se **gana por facturación**: la facturación de la cotización (la del año con compromiso anual) incluye sin cargo el plan cuyo umbral alcanza, y cualquiera por debajo. Un plan por encima del alcanzado se cobra a su precio.
+
+| Plan | Precio | SLA | Volumen | Incluido por facturación | Detalle |
+|---|---|---|---|---|---|
+| Standard | incluido | — | — | siempre | Horario comercial · mail y portal · respuesta hasta 8 h hábiles |
+| Professional | USD 1.000/mes | 99,9% | 1.000 tx/mes | desde USD 25.000 | Atención extendida · prioridad media · respuesta hasta 4 h |
+| Enterprise | USD 3.000/mes | 99,9% | 10.000 tx/mes | desde USD 100.000 | 24x7 · ejecutivo técnico · respuesta <1 h en críticos |
+| SLA Dedicado | personalizado | 99,9% | — | desde USD 500.000 | +10.000 tx/mes · personalizado |
 <!-- AUTO:sla:end -->
 
 ---

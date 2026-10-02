@@ -89,8 +89,10 @@ function chip(icon, html) {
 // (en vez de una tarjeta por dato) para que "Incluye" se lea de un vistazo.
 function chipsCard(items) {
 	return `<div style="background:${W};border:1px solid ${GRL};border-radius:12px;padding:0.38cm 0.6cm;box-shadow:0 2px 8px rgba(48,65,213,0.06);">
-    <div style="display:flex;align-items:center;flex-wrap:wrap;row-gap:0.2cm;">
-      ${items.map((it, i) => it + (i < items.length - 1 ? `<div style="width:1px;height:0.5cm;background:${GRL};margin:0 0.5cm;"></div>` : "")).join("")}
+    <div style="overflow:hidden;">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;row-gap:0.2cm;margin-left:calc(-0.5cm - 1px);">
+        ${items.map((it) => `<div style="border-left:1px solid ${GRL};padding:0.05cm 0.5cm;">${it}</div>`).join("")}
+      </div>
     </div>
   </div>`;
 }
@@ -760,7 +762,10 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	// IDC con compromiso anual (idcCantidadAnual): se cotiza el año completo, así que el
 	// SLA entra por los 12 meses del contrato.
 	const slaMeses = esIDC && inp.idcCantidadAnual ? 12 : 1;
-	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0) * slaMeses;
+	// IDC con compromiso anual explícito (deals con modalidad IDC): se cotiza el año.
+	const idcAnualExp = esIDC && inp.idcEntrada != null && inp.modalidadFacturacion === "anual";
+	// slaIncluido: el plan va sin cargo por la facturación alcanzada (ver cotizador).
+	const slaMesVal = sinApi || inp.slaBonificado || inp.slaIncluido ? 0 : (sla.precioMes || 0) * slaMeses;
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
 	// Bonificación de firmas (snapshot del deal): parte de la bolsa cotizada no se
 	// cobra. Se resta del subtotal a precio de firma de lista y va antes del descuento
@@ -838,20 +843,18 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		// Volumen de solo firmas sueltas (sin certificados): los chips describen las
 		// firmas, no identidades/certificados que no se cotizan.
 		...(idc > 0 ? [
-			chip(SVG.idcard(B, 15), langApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : (esIDC ? `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)` : `<strong>${idc.toLocaleString("es-AR")}</strong> certificados`)),
-			// En Volumen la unidad ya es el certificado: "1 certificado c/u" sería repetir el
-			// chip anterior. Ahí el dato que suma es el total de firmas (va después del c/u).
-			...(esIDC ? [chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`)] : []),
-			// IDC con compromiso anual (deals con modalidad IDC explícita): el volumen
-			// cotizado es mensual; el chip lo dice y muestra el consumo del año.
-			...(esIDC && inp.idcEntrada != null && inp.modalidadFacturacion === "anual" ? [chip(SVG.calendar(B, 15), `<strong>Compromiso anual</strong> · ${(inp.idcCantidadAnual ? idc : idc * 12).toLocaleString("es-AR")} en el año`)] : []),
+			// Chips cortos y sin repetir lo que ya dice el cuerpo de la slide: el
+			// "1 certificado por validación" se lee en el texto de activación, y la cantidad
+			// del año va en el primer chip (no en uno aparte), así la franja entra en una línea.
+			chip(SVG.idcard(B, 15), (langApi ? `<strong>${idc.toLocaleString("es-AR")}</strong> validaciones de identidad` : (esIDC ? `<strong>${idc.toLocaleString("es-AR")}</strong> identidades (IDC)` : `<strong>${idc.toLocaleString("es-AR")}</strong> certificados`)) + (idcAnualExp ? " en el año" : "")),
+			...(idcAnualExp ? [chip(SVG.calendar(B, 15), `<strong>Compromiso anual</strong> · pago único`)] : []),
 			...(hayJuridicos ? [
 				chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 			] : [
 				// Cupo 0 = ninguna firma entra sin cargo: el chip "0 firmas incl." se leía
 				// como que el certificado no trae firmas y contradecía el total de firmas.
 				...(cupo === 0 ? [] : [chip(SVG.checkSquare(B, 15), cupo != null
-					? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. por identidad`
+					? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. c/u`
 					: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`)]),
 			]),
 			...(!esIDC ? [chip(SVG.shield(B, 15), firmasIncl > 0
@@ -970,7 +973,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 
 	const momento1 = momentoCard({
 		dark: false,
-		kicker: "Momento 1 · mes 1",
+		kicker: idcAnualExp ? "Pago único · compromiso anual" : "Momento 1 · mes 1",
 		icon: SVG.shield(B, 16),
 		heading: langApi ? "Activás tu servicio" : (esIDC ? "Activás tus identidades" : "Comprás tu volumen"),
 		body: `

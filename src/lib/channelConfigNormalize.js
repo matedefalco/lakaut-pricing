@@ -267,5 +267,16 @@ export function normalizeChannelConfig(raw) {
 	// que no vuelvan a persistirse en el próximo guardado.
 	delete merged.b2b2cBase;
 	delete merged.b2b2cMargenMin;
+	// Planes SLA: el umbral de facturación que incluye cada plan es nuevo (oct 2026). Las
+	// configs guardadas sin él se completan por id desde el default; un plan agregado a
+	// mano queda sin umbral (no se incluye solo) hasta que se cargue en Config.
+	if (Array.isArray(merged.slaPlans)) {
+		merged.slaPlans = merged.slaPlans.map(function (p) {
+			if (!p || p.facturacionMin !== undefined) return p;
+			const d = SLA_PLANS.find(function (x) { return x.id === p.id; });
+			return Object.assign({}, p, { facturacionMin: d ? d.facturacionMin : null });
+		});
+	}
+
 	return merged;
 }

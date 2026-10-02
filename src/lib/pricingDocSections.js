@@ -136,11 +136,14 @@ function secSLA(plans) {
 		const precio = p.precioMes == null ? "personalizado" : (p.precioMes === 0 ? "incluido" : `USD ${num(p.precioMes)}/mes`);
 		const sla = p.sla ? `${usd(p.sla * 100, 1, 1)}%` : "—";
 		const tx = p.txMes ? `${num(p.txMes)} tx/mes` : "—";
-		return `| ${p.label} | ${precio} | ${sla} | ${tx} | ${p.desc} |`;
+		const desde = p.facturacionMin == null ? "—" : (Number(p.facturacionMin) <= 0 ? "siempre" : `desde USD ${num(p.facturacionMin)}`);
+		return `| ${p.label} | ${precio} | ${sla} | ${tx} | ${desde} | ${p.desc} |`;
 	});
 	return [
-		"| Plan | Precio | SLA | Volumen | Detalle |",
-		"|---|---|---|---|---|",
+		"El plan de soporte se **gana por facturación**: la facturación de la cotización (la del año con compromiso anual) incluye sin cargo el plan cuyo umbral alcanza, y cualquiera por debajo. Un plan por encima del alcanzado se cobra a su precio.",
+		"",
+		"| Plan | Precio | SLA | Volumen | Incluido por facturación | Detalle |",
+		"|---|---|---|---|---|---|",
 		...rows,
 	].join("\n");
 }
