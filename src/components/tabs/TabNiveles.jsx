@@ -100,7 +100,7 @@ export function TabNiveles() {
 
 			{tab === "b2b2c" && (
 				<div className="space-y-4">
-					<p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Escala de <strong className="text-foreground">precios</strong> por IDC. El segmento es el mayor entre la <strong className="text-foreground">cantidad total de IDC contratadas</strong> (el año completo con compromiso anual) y su facturación a precio Start Up.</p>
+					<p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Escala de <strong className="text-foreground">precios</strong> por IDC. El segmento es el mayor entre la <strong className="text-foreground">cantidad total de IDC contratadas</strong> (el año completo con compromiso anual) y su facturación a precio Start Up.{idcSegs[0] ? " Cada IDC incluye " + num(idcSegs[0].firmasIncluidas) + " firmas; la firma extra se cobra USD " + usd(idcSegs[0].precioFirmaExtra) + "." : ""}</p>
 					<Lookup color={CHANNELS.b2b2c.color} fields={[{ label: "IDC contratadas", value: idcQ, onChange: setIdcQ }]}
 						result={<ResultChip tier={idcSeg} tiers={idcSegs} text={idcSeg ? "USD " + usd(idcSeg.precioIDC) + " por IDC · total USD " + num(idcN * (Number(idcSeg.precioIDC) || 0)) : ""} />} />
 					<LiveTable accent={CHANNELS.b2b2c.color} caption="Segmentos IDC" rows={idcSegs} rowKey={function (s) { return s.id || s.label; }} isActive={function (s) { return s === idcSeg; }}
@@ -109,8 +109,6 @@ export function TabNiveles() {
 							{ key: "rango", label: "IDC contratadas", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
 							{ key: "fact", label: "Facturación", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return "USD " + usd(s.precioIDC); } },
-							{ key: "cupo", label: "Firmas incl.", align: "right", render: function (s) { return num(s.firmasIncluidas); } },
-							{ key: "extra", label: "Firma extra", align: "right", render: function (s) { return "USD " + usd(s.precioFirmaExtra); } },
 						]} />
 				</div>
 			)}
