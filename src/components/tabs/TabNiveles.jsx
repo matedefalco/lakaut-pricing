@@ -121,6 +121,7 @@ export function TabNiveles() {
 							{ key: "rango", label: "IDC contratadas", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
 							{ key: "fact", label: "Facturación", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return "USD " + usd(s.precioIDC); } },
+							{ key: "desc", label: "Descuento", align: "right", render: function (s) { const d = idcBase > 0 ? Math.round((1 - (Number(s.precioIDC) || 0) / idcBase) * 100) : 0; return d > 0 ? "−" + d + "%" : <span className="text-muted-foreground">precio de lista</span>; } },
 							{ key: "cert", label: "Certificado", align: "right", render: function (s) { return "USD " + usd(idcSplit(s).cert); } },
 							{ key: "firma", label: "Firma (incluida)", align: "right", render: function (s) { return "USD " + usd(idcSplit(s).firma); } },
 						]} />

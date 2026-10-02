@@ -811,36 +811,34 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	};
 	// ── IDC como grupo con sub-ítems ──
 	// El precio de la IDC es un bundle (certificado + cupo de firmas). Para que se lea
-	// qué vale cada parte, el bundle se abre en dos sub-ítems valuados a la LISTA de
-	// Volumen (certificado y firma sueltos): la diferencia entre esa lista y el precio
-	// del bundle es el descuento, y se reparte en el mismo % sobre los dos (así la suma
-	// da exactamente cantidad × precio de la IDC). Snapshot de la lista en el deal
-	// (resumen.idcListaRef); deals viejos caen a la config viva.
+	// qué vale cada parte, se abre en dos sub-ítems repartidos en la proporción de la
+	// lista suelta de Volumen (cert : firma). La LISTA de la IDC es el precio del primer
+	// segmento (se presenta como "precio de lista", sin nombrar el segmento) y el
+	// descuento es el que alcanza el volumen frente a esa lista: el mismo % en el
+	// encabezado y en los dos sub-ítems (tachado → neto). Snapshots en el deal
+	// (resumen.idcListaRef / idcPrecioBase); deals viejos caen a la config viva.
 	const listaRef = res.idcListaRef || (channelConfig && channelConfig.volumenBase) || { cert: 0.65, firma: 0.5 };
 	const listaCert = Number(listaRef.cert) || 0;
 	const listaFirma = Number(listaRef.firma) || 0;
 	const idcGrupo = esIDC && cupo != null && idc > 0 && (listaCert + cupo * listaFirma) > 0;
 	const listaBundle = listaCert + (cupo || 0) * listaFirma;
-	const idcFactor = idcGrupo ? precioIDC / listaBundle : 1;
-	const idcDescPct = idcGrupo && idcFactor < 1 ? Math.round((1 - idcFactor) * 100) : 0;
+	const shareCert = listaBundle > 0 ? listaCert / listaBundle : 1;
+	const shareFirma = listaBundle > 0 ? listaFirma / listaBundle : 0;
+	const segsCfg = (channelConfig && channelConfig.b2b2cSegments) || [];
+	const idcListaPrecio = Number(res.idcPrecioBase) || Number((segsCfg[0] || {}).precioIDC) || precioIDC;
+	const idcDescPct = idcGrupo && idcListaPrecio > 0 && precioIDC < idcListaPrecio ? Math.round((1 - precioIDC / idcListaPrecio) * 100) : 0;
 	const certSubLbl = langApi ? "Validación de identidad + certificado" : "Certificado";
 	const firmaSubLbl = `${firmaCap} incluid${langApi ? "os" : "as"} (${cupo} c/u)`;
 	function idcGroupItem(label, n) {
 		const subs = [
-			{ l: certSubLbl, qty: n, lista: listaCert, neto: listaCert * idcFactor },
-			...(cupo > 0 ? [{ l: firmaSubLbl, qty: n * cupo, lista: listaFirma, neto: listaFirma * idcFactor }] : []),
+			{ l: certSubLbl, qty: n, lista: idcListaPrecio * shareCert, neto: precioIDC * shareCert },
+			...(cupo > 0 ? [{ l: firmaSubLbl, qty: n * cupo, lista: idcListaPrecio * shareFirma, neto: precioIDC * shareFirma }] : []),
 		];
 		return { group: true, l: label, v: n * precioIDC, subs: subs };
 	}
 	const idcLblBase = langApi ? "Validaciones de identidad (IDC)" : "Identidades digitales (IDC)";
-	// Descuento del segmento frente al segmento base (Start Up): se muestra aparte del
-	// ahorro del bundle, en el encabezado del grupo, para que se lean los dos.
-	const idcPrecioBaseSeg = Number(res.idcPrecioBase) || 0;
-	const segVsBasePct = idcGrupo && idcPrecioBaseSeg > 0 && res.precioIDCLista != null && Number(res.precioIDCLista) < idcPrecioBaseSeg
-		? Math.round((1 - Number(res.precioIDCLista) / idcPrecioBaseSeg) * 100) : 0;
-	const segVsBaseHtml = segVsBasePct > 0
-		? `<span style="display:block;font-size:9.5pt;color:${B};font-weight:700;margin-top:0.04cm;">Segmento ${segNombre}: −${segVsBasePct}% por IDC frente a ${res.idcSegmentoBase || "Start Up"} (${fmUnit(precioIDC)} en vez de ${fmUnit(idcPrecioBaseSeg)})</span>`
-		: "";
+	// El descuento alcanzado va al lado del título del grupo.
+	const segVsBaseHtml = idcDescPct > 0 ? ` <span style="color:${B};font-weight:700;margin-left:0.15cm;">−${idcDescPct}%</span>` : "";
 
 	const items = [
 		// IDC: un grupo por tipo cuando hay jurídicas en el mix; uno solo si no.
@@ -951,7 +949,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const segPalabra = isDistribVol(deal.channel) ? "nivel" : "segmento";
 	const segFactor = segDescPts > 0 ? 1 - segDescPts / 100 : 0;
 	const segNotaHtml = idcDescPct > 0
-		? `<div style="font-size:9pt;color:${GR};line-height:1.35;margin-top:${denso ? "0.08cm" : "0.15cm"};">Ahorro del bundle: el precio tachado es el de lista (certificado y ${firmaSing} sueltos); comprarlos juntos en la IDC${segNombre ? ` del segmento <strong style="color:${B};">${segNombre}</strong>` : ""} cuesta un ${idcDescPct}% menos.</div>`
+		? `<div style="font-size:9pt;color:${GR};line-height:1.35;margin-top:${denso ? "0.08cm" : "0.15cm"};">El precio tachado es el de lista; el ${idcDescPct}% de descuento lo habilitó tu volumen.</div>`
 		: segDescPts > 0
 		? `<div style="font-size:9pt;color:${GR};line-height:1.35;margin-top:${denso ? "0.08cm" : "0.15cm"};">El precio tachado es el de lista; el descuento del ${segDescPts}% lo habilitó ${segNombre ? `el ${segPalabra} <strong style="color:${B};">${segNombre}</strong>` : "tu volumen"}.</div>`
 		: "";
@@ -963,7 +961,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			const subsHtml = it.subs.map(function (sb) {
 				const conD = idcDescPct > 0 && sb.lista > 0;
 				const unit = conD
-					? `<span style="text-decoration:line-through;">${fmUnit(sb.lista)}</span> <span style="color:${B};font-weight:700;">−${idcDescPct}%</span> ${fmUnit(sb.neto)}`
+					? `<span style="text-decoration:line-through;">${fmUnit(sb.lista)}</span> <strong style="color:${DK};">${fmUnit(sb.neto)}</strong>`
 					: fmUnit(sb.neto);
 				return `<div style="display:flex;justify-content:space-between;gap:0.3cm;align-items:baseline;font-size:${subFs};padding-left:0.45cm;margin-top:0.06cm;">
           <span style="color:${GR};">${sb.l} <span style="white-space:nowrap;">· ${sb.qty.toLocaleString("es-AR")} × ${unit}</span></span>
