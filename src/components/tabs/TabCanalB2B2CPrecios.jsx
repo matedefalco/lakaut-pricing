@@ -73,7 +73,7 @@ export function TabCanalB2B2CPrecios({ costs }) {
 	return (
 		<div className="space-y-6 max-w-4xl">
 			<div>
-				<h2 className="text-base font-semibold font-heading">Canal Volumen · Tabla de referencia</h2>
+				<h2 className="text-base font-semibold font-heading">IDC · Tabla de referencia</h2>
 				<p className="text-sm text-muted-foreground mt-1">Precios en USD. Cada segmento tiene su propio precio por IDC según el volumen mensual, con un cupo de firmas incluidas; las firmas que exceden el cupo se facturan por unidad. El precio final por cotización puede ajustarse en la Cotizadora.</p>
 			</div>
 
