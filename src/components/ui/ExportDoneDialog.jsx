@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Mail, CalendarPlus, X } from "lucide-react";
+import { Check, Mail, CalendarPlus, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VALIDEZ_DIAS } from "@/lib/dealStatus";
 
@@ -49,7 +49,9 @@ function descargarRecordatorio({ cotId, clientName, vence, uid }) {
 }
 
 // Se monta solo con datos: cada exportación arranca con las acciones sin marcar.
-export function ExportDoneDialog({ data, onClose, onGoHistorial, onNewQuote }) {
+// data.mode: "guardada" (recién guardada: el paso principal es exportar) o
+// "exportada" (el PDF ya se abrió). Una sola ventana para los dos momentos.
+export function ExportDoneDialog({ data, onClose, onGoHistorial, onNewQuote, onExport }) {
 	const [copiado, setCopiado] = useState(false);
 	const [agendado, setAgendado] = useState(false);
 	const closeRef = useRef(null);
@@ -65,6 +67,7 @@ export function ExportDoneDialog({ data, onClose, onGoHistorial, onNewQuote }) {
 	const vence = new Date(emitida.getTime() + VALIDEZ_DIAS * 86400000);
 	const clientName = data.client && data.client.name;
 	const cotId = data.cotId;
+	const guardada = data.mode === "guardada";
 
 	const mail = "Hola,\n\n"
 		+ "Te comparto la propuesta" + (cotId ? " " + cotId : "") + (clientName ? " para " + clientName : "") + ", vigente hasta el " + fechaLarga(vence) + ". Va adjunta en PDF.\n\n"
@@ -86,19 +89,27 @@ export function ExportDoneDialog({ data, onClose, onGoHistorial, onNewQuote }) {
 					<Check size={28} strokeWidth={2.6} aria-hidden="true" />
 				</span>
 				<h2 id="export-done-title" className="mt-4 font-heading text-2xl font-bold text-foreground">
-					Propuesta lista{clientName ? " para " + clientName : ""}
+					{guardada ? "Cotización guardada" : "Propuesta lista"}{clientName ? " para " + clientName : ""}
 				</h2>
 				<p className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground">
-					{cotId ? cotId + " · vence" : "Vence"} el {fechaLarga(vence)}. El PDF se abrió en otra pestaña.
+					{cotId ? cotId + " · vence" : "Vence"} el {fechaLarga(vence)}. {guardada ? "Ya quedó sincronizada con el equipo." : "El PDF se abrió en otra pestaña."}
 				</p>
+
+				{guardada && onExport && (
+					<button type="button" onClick={onExport} className="mt-5 flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-2xl border-none bg-primary px-5 py-3 text-left text-[16px] font-bold text-primary-foreground shadow-[var(--shadow-control)] outline-none transition hover:-translate-y-px hover:brightness-110 focus-visible:ring-[3px] focus-visible:ring-ring/50">
+						<FileText size={20} className="shrink-0" aria-hidden="true" />
+						<span className="flex-1">Exportar propuesta</span>
+						<span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{data.currency || "USD"}</span>
+					</button>
+				)}
 
 				<div className="mt-5 flex flex-col gap-2">
 					<div className="text-xs font-bold tracking-[0.6px] text-muted-foreground uppercase">¿Qué sigue?</div>
-					<button type="button" onClick={copiarMail} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-white/70 px-4 py-2.5 text-left text-[15px] font-semibold text-foreground outline-none transition-colors hover:bg-white focus-visible:ring-[3px] focus-visible:ring-ring/50">
+					{!guardada && <button type="button" onClick={copiarMail} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-white/70 px-4 py-2.5 text-left text-[15px] font-semibold text-foreground outline-none transition-colors hover:bg-white focus-visible:ring-[3px] focus-visible:ring-ring/50">
 						<Mail size={18} className="shrink-0 text-primary" aria-hidden="true" />
 						<span className="flex-1">{copiado ? "Mail copiado: pegalo y adjuntá el PDF" : "Copiar el mail para el cliente"}</span>
 						{copiado && <Check size={16} className="text-[var(--success)]" aria-hidden="true" />}
-					</button>
+					</button>}
 					<button type="button" onClick={function () { descargarRecordatorio({ cotId: cotId, clientName: clientName, vence: vence, uid: (data.deal && data.deal.id) || String(Date.now()) }); setAgendado(true); }} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-white/70 px-4 py-2.5 text-left text-[15px] font-semibold text-foreground outline-none transition-colors hover:bg-white focus-visible:ring-[3px] focus-visible:ring-ring/50">
 						<CalendarPlus size={18} className="shrink-0 text-primary" aria-hidden="true" />
 						<span className="flex-1">{agendado ? "Recordatorio descargado: abrilo para agendarlo" : "Recordarme el seguimiento antes del vencimiento"}</span>

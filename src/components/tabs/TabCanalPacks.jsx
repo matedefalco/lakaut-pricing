@@ -45,7 +45,7 @@ function margWord(pct) { return pct >= 0.4 ? "saludable" : pct >= 0.15 ? "ajusta
 //   · distribuidores → el descuento es la regla del canal. El nivel sale de dos
 //                      variables declaradas del socio (certificados activos y
 //                      compromiso anual de facturación), no del volumen cotizado.
-export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, onNavChannel, pendingEdit, onConsumeEdit }) {
+export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onSaved, onGoHistorial, onNavChannel, pendingEdit, onConsumeEdit }) {
 	const canal = channel === "distribuidores" ? "distribuidores" : "web";
 	const esDistribuidor = canal === "distribuidores";
 	const meta = CHANNELS[canal];
@@ -337,7 +337,10 @@ export function TabCanalPacks({ channel, costs, currency, tc, dealsApi, clientsA
 		setSaved({ deal: savedDeal, client });
 		setTimeout(function () { setFlash(false); }, 1500);
 
-		notifyQuoteSaved(toast, {
+		// Confirmación única: la ventana de cierre (con el botón para exportar). El toast
+		// queda como respaldo si el cotizador se monta sin onSaved.
+		if (onSaved) onSaved(savedDeal, client, exportCurrency);
+		else notifyQuoteSaved(toast, {
 			clientName: client?.name,
 			onExport: function () { onExport && onExport(savedDeal, client, exportCurrency); },
 			onGoHistorial: function () { onGoHistorial && onGoHistorial(savedDeal.id); },

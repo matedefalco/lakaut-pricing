@@ -334,7 +334,14 @@ function LakautCalcInner() {
 		// (o cualquier otro) que siguiera abierto abajo.
 		dismissAllToasts();
 		exportProposal(deal, client, overrideCurrency || "USD", tc, channelConfig, models, tcMeta);
-		setExportDone({ deal: deal, client: client, cotId: formatCotId(deal.inputs && deal.inputs.cot, client && client.tipo, deal.channel) });
+		setExportDone({ mode: "exportada", deal: deal, client: client, currency: overrideCurrency || "USD", cotId: formatCotId(deal.inputs && deal.inputs.cot, client && client.tipo, deal.channel) });
+	}
+
+	// Guardar una cotización abre la misma ventana de cierre en modo "guardada", con el
+	// botón para exportar adentro. Reemplaza al toast de guardado: una sola confirmación.
+	function quoteSaved(deal, client, exportCurrency) {
+		dismissAllToasts();
+		setExportDone({ mode: "guardada", deal: deal, client: client, currency: exportCurrency || "USD", cotId: formatCotId(deal.inputs && deal.inputs.cot, client && client.tipo, deal.channel) });
 	}
 
 	// Load costConfig from Supabase on mount; subscribe to remote changes
@@ -762,19 +769,19 @@ function LakautCalcInner() {
 					{activeNavItem === "intro" && <TabIntroduccion onNav={navTo} onPreset={startPreset} onNewQuote={newQuote} />}
 
 					{/* ── COTIZAR ── */}
-					{activeNavItem === "web" && <TabCanalPacks channel="web" key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "web" && <TabCanalPacks channel="web" key={"web-" + quoteNonce.web} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onSaved={quoteSaved} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("web"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "web" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 					{activeNavItem === "distribuidores" && (
 						// La modalidad packs (lista con descuento por nivel) se descartó del canal
 						// (ago 2026): Distribuidores cotiza siempre por Volumen. El branch de packs
 						// se conserva SOLO para abrir cotizaciones ya guardadas en ese canal
 						// (editQuote pone distribMode="packs"); no hay forma de crear nuevas.
 						distribMode === "packs"
-							? <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
-							: <TabCanalB2B2C channel="distribuidores_vol" key={"distribuidores_vol-" + quoteNonce.distribuidores_vol} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores_vol" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
+							? <TabCanalPacks channel="distribuidores" key={"distribuidores-" + quoteNonce.distribuidores} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onSaved={quoteSaved} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
+							: <TabCanalB2B2C channel="distribuidores_vol" key={"distribuidores_vol-" + quoteNonce.distribuidores_vol} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onSaved={quoteSaved} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("distribuidores_vol"); }} pendingEdit={pendingEdit && resolveChannel(pendingEdit.channel) === "distribuidores_vol" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />
 					)}
 					{activeNavItem === "web-precios" && <TabCanalWeb costs={costs} currency={currency} tc={tc} view="precios" />}
-					{activeNavItem === "b2b2c" && <TabCanalB2B2C channel="b2b2c" key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
-					{activeNavItem === "volumen" && <TabCanalB2B2C channel="volumen" key={"volumen-" + quoteNonce.volumen} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("volumen"); }} pendingEdit={pendingEdit && pendingEdit.channel === "volumen" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "b2b2c" && <TabCanalB2B2C channel="b2b2c" key={"b2b2c-" + quoteNonce.b2b2c} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onSaved={quoteSaved} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("b2b2c"); }} pendingEdit={pendingEdit && pendingEdit.channel === "b2b2c" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
+					{activeNavItem === "volumen" && <TabCanalB2B2C channel="volumen" key={"volumen-" + quoteNonce.volumen} costs={costs} currency={currency} tc={tc} dealsApi={dealsApi} clientsApi={clientsApi} onExport={exportDeal} onSaved={quoteSaved} onGoHistorial={goHistorial} onNavChannel={newQuote} onNewQuote={function () { newQuote("volumen"); }} pendingEdit={pendingEdit && pendingEdit.channel === "volumen" ? pendingEdit : null} onConsumeEdit={function () { setPendingEdit(null); }} />}
 
 					{/* ── SEGUIMIENTO ── */}
 					{activeNavItem === "historial" && <TabHistorial dealsApi={dealsApi} clientsApi={clientsApi} currency={currency} tc={tc} tcMeta={tcMeta} highlightId={historialHighlight} onEditQuote={editQuote} />}
@@ -811,6 +818,7 @@ function LakautCalcInner() {
 					? function () { const id = exportDone.deal.id; setExportDone(null); goHistorial(id); }
 					: null}
 				onNewQuote={function () { setExportDone(null); setFlyout("nueva"); }}
+				onExport={function () { exportDeal(exportDone.deal, exportDone.client, exportDone.currency); }}
 			/>}
 		</div>
 	);

@@ -65,7 +65,7 @@ function distribVolEscalonadoSteps(tiers) {
 		.sort(function (a, b) { return a.firmas - b.firmas; });
 }
 
-export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onGoHistorial, onNavChannel, pendingEdit, onConsumeEdit }) {
+export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsApi, onExport, onSaved, onGoHistorial, onNavChannel, pendingEdit, onConsumeEdit }) {
 	// Los canales por elemento comparten este cotizador y se distinguen por la prop
 	// `channel`. La diferencia es qué se vende y cómo se le pone precio:
 	//   · b2b2c (IDC)         → un bundle por IDC mensual, con cupo de firmas incluidas.
@@ -940,7 +940,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setSaved({ deal: savedDeal, client });
 		setTimeout(function () { setFlash(false); }, 1500);
 
-		notifyQuoteSaved(toast, {
+		// Confirmación única: la ventana de cierre (con el botón para exportar). El toast
+		// queda como respaldo si el cotizador se monta sin onSaved.
+		if (onSaved) onSaved(savedDeal, client, exportCurrency);
+		else notifyQuoteSaved(toast, {
 			clientName: client?.name,
 			onExport: function () { onExport && onExport(savedDeal, client, exportCurrency); },
 			onGoHistorial: function () { onGoHistorial && onGoHistorial(savedDeal.id); },
