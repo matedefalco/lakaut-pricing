@@ -748,7 +748,12 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const precioFirmaAdicN = Number(inp.precioFirmaAdic) || 0;
 	// Precio de firma a precio de lista (mes 1, sin el 35% del abono).
 	const precioFirmaFmt = fmUnit(precioFirmaAdicN);
-	const precioFirmaHtml = precioConLista(precioFirmaAdicN, listaBase(res.precioFirmaExtraLista));
+	// IDC (deals con excedente explícito): la lista de la firma adicional es su parte del
+	// precio de lista de la IDC, así que se tacha directo contra ella. Resto: lista
+	// reconstruida desde el descuento del segmento.
+	const precioFirmaHtml = esIDC && res.precioFirmaExcedente != null
+		? precioConLista(precioFirmaAdicN, Number(res.precioFirmaExtraLista) || 0)
+		: precioConLista(precioFirmaAdicN, listaBase(res.precioFirmaExtraLista));
 
 	// Desglose del mes 1 (activación): certificados + bolsa inicial de firmas a precio
 	// de lista + firmas adicionales. El 35% de descuento aplica recién al abono (mes 2
@@ -860,7 +865,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica, d: true }] : []),
 			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica, d: true }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "adicionales, sobre el cupo"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${idcGrupo ? "" : firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl, d: true }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "adicionales"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${idcGrupo ? "" : firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl, d: true }] : []),
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic, d: true }] : []),
 		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas, d: true }] : []),
@@ -1103,6 +1108,13 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	// Estos términos van a la slide de Condiciones, no al pie de esta.
 	if (terms) {
 		if (descLiqClause) terms.push({ icon: SVG.checkSquare(B, 22), q: "¿Cómo se aplica el descuento?", a: descLiqClause });
+		// Excedente no planificado (IDC): si el consumo supera lo contratado, el servicio no
+		// se corta y lo que exceda se factura a un precio mayor. Es condición, no cotización.
+		if (esIDC && res.precioFirmaExcedente != null && Number(res.precioFirmaExcedente) > 0) terms.push({
+			icon: SVG.checkSquare(B, 22),
+			q: "¿Qué pasa si consumo más de lo contratado?",
+			a: `El servicio sigue sin interrupción. Cada ${firmaSing} por encima de lo contratado se factura a <strong style="color:${DK};">${fmUnit(res.precioFirmaExcedente)}</strong>. Si sabés que vas a necesitar más, conviene sumarlos a la cotización: se cotizan al precio de tu volumen.`,
+		});
 		if (langApi) terms.push({
 			icon: SVG.idcard(B, 22),
 			q: "¿Cómo se factura el servicio?",

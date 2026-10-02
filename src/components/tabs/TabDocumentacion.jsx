@@ -274,10 +274,10 @@ export function TabDocumentacion({ tc }) {
 						columns={[
 							{ key: "seg", label: "Segmento", render: function (s) { return <TierBadge tier={s} tiers={idcSegs} size="sm" />; } },
 							{ key: "rango", label: "IDC contratadas", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
-							{ key: "fact", label: "Facturación", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
+							{ key: "fact", label: "Facturación anual", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return <span className="inline-flex items-center gap-2"><MagBar value={Number(s.precioIDC) || 0} max={idcPrecioMax} color={C.idc.color} />USD {usd(s.precioIDC)}</span>; } },
 							{ key: "cupo", label: "Firmas incl.", align: "right", render: function (s) { return num(s.firmasIncluidas); } },
-							{ key: "extra", label: "Firma extra", align: "right", render: function (s) { return "USD " + usd(s.precioFirmaExtra); } },
+							{ key: "extra", label: "Firma excedente", align: "right", render: function (s) { return "USD " + usd(s.precioFirmaExtra); } },
 						]} />
 					<Callout type="regla" title="Guardarraíl de rentabilidad">
 						{"Markup mínimo **" + usd(markupMin, 2, 2) + "x** sobre el costo variable del bundle. Bajo ese piso, el cotizador bloquea guardar y exportar."}
