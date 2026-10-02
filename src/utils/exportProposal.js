@@ -757,7 +757,10 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const revFirmasIncl = revFirmasInclJuridica + revFirmasInclFisica;
 	const revFirmasAdic = firmasAdicTotal * precioFirmaAdicN;
 	const revFirmasSueltas = firmasSueltas * precioFirmaAdicN;
-	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0);
+	// IDC con compromiso anual (idcCantidadAnual): se cotiza el año completo, así que el
+	// SLA entra por los 12 meses del contrato.
+	const slaMeses = esIDC && inp.idcCantidadAnual ? 12 : 1;
+	const slaMesVal = sinApi || inp.slaBonificado ? 0 : (sla.precioMes || 0) * slaMeses;
 	const feeVal = sinApi ? 0 : (Number(inp.fee) || 0);
 	// Bonificación de firmas (snapshot del deal): parte de la bolsa cotizada no se
 	// cobra. Se resta del subtotal a precio de firma de lista y va antes del descuento
@@ -813,7 +816,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic, d: true }] : []),
 		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas, d: true }] : []),
-		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label})`, v: slaMesVal }] : []),
+		...(slaMesVal > 0 ? [{ l: `Soporte / SLA (${sla.label}${slaMeses > 1 ? ` · ${slaMeses} meses` : ""})`, v: slaMesVal }] : []),
 		...(feeVal > 0 ? [{ l: "Fee de implementación (única vez)", v: feeVal }] : []),
 	];
 	// Abono: repone la bolsa de firmas incluidas desde el mes 2, durante la vigencia del certificado.
@@ -841,7 +844,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			...(esIDC ? [chip(SVG.shield(B, 15), langApi ? `<strong>1</strong> certificado por validación` : `<strong>1</strong> certificado c/u`)] : []),
 			// IDC con compromiso anual (deals con modalidad IDC explícita): el volumen
 			// cotizado es mensual; el chip lo dice y muestra el consumo del año.
-			...(esIDC && inp.idcEntrada != null && inp.modalidadFacturacion === "anual" ? [chip(SVG.calendar(B, 15), `<strong>Compromiso anual</strong> · ${(idc * 12).toLocaleString("es-AR")} por año`)] : []),
+			...(esIDC && inp.idcEntrada != null && inp.modalidadFacturacion === "anual" ? [chip(SVG.calendar(B, 15), `<strong>Compromiso anual</strong> · ${(inp.idcCantidadAnual ? idc : idc * 12).toLocaleString("es-AR")} en el año`)] : []),
 			...(hayJuridicos ? [
 				chip(SVG.checkSquare(B, 15), `<strong>${idcJuridicos.toLocaleString("es-AR")}</strong> jurídicos · <strong>${idcFisicos.toLocaleString("es-AR")}</strong> físicos`),
 			] : [

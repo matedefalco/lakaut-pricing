@@ -88,7 +88,7 @@ export function SegmentoSection({
 						<div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/30 px-3 text-sm">
 							<span className="font-semibold tabular-nums">{hasVolume ? fMoney(facturacionEje) : "—"}</span>
 						</div>
-						<span className="text-xs text-muted-foreground">{hasVolume ? (esIDC ? "eje de facturación · a precio Start Up" + (mesesVentanaFact > 1 ? " × " + mesesVentanaFact + " meses" : "") : "eje de facturación · " + fMoney(facturacionAtList) + " a lista × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses")) : "se calcula del volumen cotizado"}</span>
+						<span className="text-xs text-muted-foreground">{hasVolume ? (esIDC ? "eje de facturación · a precio Start Up" + (modalidadFact === "anual" ? ", del año" : "") : "eje de facturación · " + fMoney(facturacionAtList) + " a lista × " + mesesVentanaFact + " " + (mesesVentanaFact === 1 ? "mes" : "meses")) : "se calcula del volumen cotizado"}</span>
 					</div>
 					<div className="flex flex-col gap-1.5">
 						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Segmento alcanzado</Label>

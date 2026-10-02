@@ -291,10 +291,10 @@ export function TabDocumentacion({ tc }) {
 						</div>
 						<div className="rounded-xl border p-4 shadow-[var(--shadow-control)]" style={{ borderColor: C.idc.color + "40", background: C.idc.colorSoft }}>
 							<div className="font-heading text-sm font-semibold" style={{ color: C.idc.colorFg }}>Compromiso anual</div>
-							<P className="mt-1 text-sm">{"El consumo se carga **por mes** o **por año** (se divide por 12). La facturación del segmento es la anual (× 12) y el ingreso del año es el mensual × 12 más el fee."}</P>
+							<P className="mt-1 text-sm">{"El consumo se carga **por mes** o **por año** (se divide por 12). Se cotiza el **total del año** (× 12), a pagar de una vez; el segmento se mide por el consumo mensual y la facturación anual."}</P>
 						</div>
 					</div>
-					<Callout type="ejemplo">{"12.000 IDC por año con compromiso anual = 1.000 IDC por mes. Se cotiza el mes al precio de su segmento y la facturación anual decide si sube de segmento."}</Callout>
+					<Callout type="ejemplo">{"12.000 IDC por año con compromiso anual = 1.000 IDC por mes de consumo. El segmento sale de ese consumo mensual (o de la facturación anual, si es mayor) y se cotizan las 12.000 IDC a ese precio, en un solo pago."}</Callout>
 
 					<SubHeading id="idc-fees">Fee de implementación (SDK)</SubHeading>
 					<P>Pago único, bonificable a discreción comercial.</P>

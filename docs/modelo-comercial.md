@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-10-02 15:58 · **Fuente:** Supabase (config viva) · **Commit:** `7013841`
+> **Última actualización:** 2026-10-02 16:15 · **Fuente:** Supabase (config viva) · **Commit:** `2d60525`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -40,14 +40,14 @@ Autoservicio desde el sitio, sin intermediación. Es el **precio de lista**, la 
 | Pack | Segmento | Firmas | Certificados | Precio (USD) | Precio (ARS aprox.) |
 |---|---|---|---|---|---|
 | Cero | Persona | 5 | 1 | gratis | $0 |
-| Smart | Persona | 50 | 1 | USD 40,2 | $61.908 |
-| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $182.090 |
-| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.331 |
-| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $240.779 |
-| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $530.730 |
+| Smart | Persona | 50 | 1 | USD 40,2 | $62.109 |
+| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $182.681 |
+| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.657 |
+| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $241.561 |
+| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $532.453 |
 | Integración API | Empresa | ilimitadas | — | a consultar | — |
 
-TC de referencia usado para derivar ARS: **$1.540** por USD.
+TC de referencia usado para derivar ARS: **$1.545** por USD.
 <!-- AUTO:web:end -->
 
 ---
@@ -75,7 +75,7 @@ Certificados y firmas sueltos: el único modo en que cotizan los distribuidores.
 Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Con **compromiso anual** el ingreso es recurrente (consumo mensual × 12); con **consumo único**, es el total cotizado.
 
 <!-- AUTO:idc:start -->
-Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (consumo mensual, cargado por mes o por año ÷ 12, con facturación × 12). La IDC no distingue persona física o jurídica (mismo precio y costo).
+Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año y el segmento se mide por el consumo mensual y la facturación anual). La IDC no distingue persona física o jurídica (mismo precio y costo).
 
 | Segmento | Rango (IDC; por mes si es anual) | Facturación | Precio por IDC | Firmas incluidas | Firma extra |
 |---|---|---|---|---|---|

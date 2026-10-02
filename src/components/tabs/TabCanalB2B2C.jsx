@@ -145,6 +145,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// IDC con compromiso anual: el consumo se carga por mes o por año. Por año se divide
 	// por 12 para obtener el consumo mensual sobre el que se cotiza.
 	const [idcEntrada, setIdcEntrada] = useState("mensual"); // "mensual" | "anual"
+	// IDC: por defecto no se distingue el tipo (cuestan y cotizan igual). Se puede
+	// activar para cargar físicas y jurídicas por separado (desglose de la propuesta).
+	const [idcPorTipo, setIdcPorTipo] = useState(false);
 	const [casosDeUso, setCasosDeUso] = useState("");
 	const [editingId, setEditingId] = useState(null);
 	// Base instalada del socio (solo Distribuidores-Volumen): certificados de sus
@@ -195,28 +198,33 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const sla = slaPlans.find(function (s) { return s.id === slaId; }) || slaPlans[0];
 
 	// ── Cantidades ──
-	// IDC con compromiso anual cargado por año: lo ingresado es el consumo del año y se
-	// cotiza su equivalente mensual (÷ 12, redondeado a IDC enteras). En el resto de los
-	// casos lo ingresado es la cantidad que se cotiza.
+	// IDC con compromiso anual: se cotiza el AÑO completo (el cliente paga el total al
+	// contado). La cantidad cotizada es la anual (cargada por año, o la mensual × 12) y
+	// el consumo mensual (÷ 12) solo se usa como eje del segmento, cuyos umbrales de
+	// cantidad son por mes. En consumo único lo ingresado es la cantidad que se cotiza.
 	const idcAnual = esIDC && modalidadFact === "anual";
 	const idcPorAnio = idcAnual && idcEntrada === "anual";
+	const conTipo = !esIDC || idcPorTipo;
 	const nfIn = Math.max(0, Number(certFisicos) || 0);
-	const njIn = Math.max(0, Number(certJuridicos) || 0);
-	const nf = idcPorAnio ? Math.round(nfIn / 12) : nfIn;
-	const nj = idcPorAnio ? Math.round(njIn / 12) : njIn;
+	const njIn = conTipo ? Math.max(0, Number(certJuridicos) || 0) : 0;
+	const nf = idcAnual && !idcPorAnio ? nfIn * 12 : nfIn;
+	const nj = idcAnual && !idcPorAnio ? njIn * 12 : njIn;
 	const ff = Math.max(0, Number(firmasPorCertFisico) || 0);
 	const fj = Math.max(0, Number(firmasPorCertJuridico) || 0);
 	// Firmas sueltas: solo aplican a Volumen (en IDC la firma va dentro del bundle).
 	const fs = esIDC ? 0 : Math.max(0, Number(firmasSueltas) || 0);
-	const idc = nf + nj; // total de certificados / IDC
+	const idc = nf + nj; // total de certificados / IDC cotizados
+	// Eje de cantidad del segmento IDC: consumo mensual con compromiso anual, la
+	// cantidad puntual con consumo único.
+	const idcEje = idcAnual ? Math.round(idc / 12) : idc;
 	const mesesVinculacion = Math.max(1, leverValue(commercialLevers, levers, "duracion") || 1);
 
 	// Label y nota del campo de cantidad IDC según la modalidad y cómo se carga.
 	const idcLabelCant = !idcAnual ? "Cantidad" : idcPorAnio ? "Cantidad / año" : "Cantidad / mes";
-	function idcNoteCant(mensual) {
+	function idcNoteCant(ingresado) {
 		if (!idcAnual) return "IDC a consumir";
-		if (idcPorAnio) return "≈ " + mensual.toLocaleString("es-AR") + " / mes";
-		return "= " + (mensual * 12).toLocaleString("es-AR") + " / año";
+		if (idcPorAnio) return "≈ " + Math.round(ingresado / 12).toLocaleString("es-AR") + " / mes de consumo";
+		return "= " + (ingresado * 12).toLocaleString("es-AR") + " en el año";
 	}
 
 	// ── Cantidad de firmas ──
@@ -269,7 +277,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const idcFirmaExtraBase = Number(idcBaseSeg.precioFirmaExtra) || 0;
 	const idcCupoBase = Math.max(0, Number(idcBaseSeg.firmasIncluidas) || 0);
 	const idcFirmasExtraBase = nf * Math.max(0, ff - idcCupoBase) + nj * Math.max(0, fj - idcCupoBase) + fs;
-	const idcFacturacionRef = (idc * idcPrecioBase + idcFirmasExtraBase * idcFirmaExtraBase) * mesesVentanaFact;
+	// Las cantidades ya son las del período cotizado (el año con compromiso anual), así
+	// que la facturación de referencia no se vuelve a multiplicar.
+	const idcFacturacionRef = idc * idcPrecioBase + idcFirmasExtraBase * idcFirmaExtraBase;
 	// El eje de facturación efectivo por canal (para asignar segmento y para la UI).
 	const facturacionEje = esIDC ? idcFacturacionRef : facturacionNivel;
 	// Compromiso mostrado en Volumen = la facturación de la ventana (misma cifra que el eje).
@@ -281,7 +291,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	//   Distribuidores-Volumen → MAYOR entre la facturación (windoweada por la condición) y
 	//     los certificados activos; los certs solo cuentan con compromiso anual.
 	const seg = (esIDC
-		? getB2B2CSegment(idc, idcFacturacionRef, b2b2cSegments)
+		? getB2B2CSegment(idcEje, idcFacturacionRef, b2b2cSegments)
 		: esDistribVol
 			? getDistributorVolTier(facturacionNivelDistrib, certsActivosNum, conCompromiso, distribVolTiers)
 			: getVolumenSegment(firmasTotales, facturacionNivel, volumenSegments)) || {};
@@ -289,7 +299,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const segDriver = esDistribVol
 		? distributorVolTierDriver(facturacionNivelDistrib, certsActivosNum, conCompromiso, distribVolTiers)
 		: esIDC
-			? b2b2cSegmentDriver(idc, idcFacturacionRef, b2b2cSegments)
+			? b2b2cSegmentDriver(idcEje, idcFacturacionRef, b2b2cSegments)
 			: volumenSegmentDriver(firmasTotales, facturacionNivel, volumenSegments);
 	const segLabel = seg.label || "—";
 	// Distribuidores-Volumen con compromiso anual (formas A/B): anualiza la facturación y
@@ -360,9 +370,12 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 		setModalidadFact(i.modalidadFacturacion === "unico" ? "unico" : "anual");
 		// IDC: consumo cargado por año. Se restaura lo ingresado (el deal guarda el
 		// equivalente mensual en certFisicos/certJuridicos para export y reportes).
-		const entradaAnual = i.idcEntrada === "anual" && i.idcCantidadIngresada;
+		// Deals con lo ingresado guardado (idcCantidadIngresada) lo restauran tal cual;
+		// los anteriores tenían en certFisicos la cantidad mensual, que es lo que se carga.
+		const entradaAnual = i.idcEntrada === "anual";
 		setIdcEntrada(entradaAnual ? "anual" : "mensual");
-		if (entradaAnual) {
+		setIdcPorTipo(!!i.idcPorTipo || (Number(i.certJuridicos) || 0) > 0);
+		if (i.idcCantidadIngresada) {
 			setCertFisicos(i.idcCantidadIngresada.fis != null ? i.idcCantidadIngresada.fis : "");
 			setCertJuridicos(i.idcCantidadIngresada.jur ? i.idcCantidadIngresada.jur : "");
 		}
@@ -512,7 +525,10 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	const feePermitido = true;
 	const feeAplicado = conApi && feePermitido ? Math.max(0, Number(fee) || 0) : 0;
 	const slaMes = conApi && !slaBonificado ? (sla.precioMes || 0) : 0;
-	const revSinFee = revServicio + slaMes;
+	// IDC con compromiso anual: el SLA se cotiza por los 12 meses del contrato.
+	const slaMeses = idcAnual ? 12 : 1;
+	const slaPeriodo = slaMes * slaMeses;
+	const revSinFee = revServicio + slaPeriodo;
 	const revTotal = revSinFee + feeAplicado;
 
 	// ── Liquidación del descuento de nivel (solo Volumen y Distribuidores-Volumen) ──
@@ -546,7 +562,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// (default de la config, editable por cotización).
 	const descAbono = Math.min(1, Math.max(0, Number(abonoDescPct) || 0) / 100);
 	const precioFirmaAbono = precioFirmaExtraEff * (1 - descAbono);
-	const revAbonoMes = firmasTotales * precioFirmaAbono;
+	// El abono repone la bolsa MENSUAL de firmas: con compromiso anual IDC la bolsa
+	// cotizada es la del año, así que se toma su doceava parte.
+	const revAbonoMes = (idcAnual ? firmasTotales / 12 : firmasTotales) * precioFirmaAbono;
 	const revAbonoAnual = revAbonoMes * 12;
 
 	// Guardarraíl de rentabilidad: se evalúa sobre el markup MEZCLADO (IDC + firmas
@@ -563,9 +581,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	let segHint = null;
 	if (hasVolume && nextSeg) {
 		if (esIDC) {
-			const faltan = Math.max(0, (Number(nextSeg.idcMin) || 0) - idc);
+			const faltan = Math.max(0, (Number(nextSeg.idcMin) || 0) - idcEje);
 			const precioNext = segmentPricing(nextSeg, SEG_FALLBACK).precioIDC;
-			segHint = "Con " + faltan.toLocaleString("es-AR") + " IDC más entra en " + nextSeg.label + " · " + fMoney2(precioNext) + " por IDC.";
+			segHint = "Con " + faltan.toLocaleString("es-AR") + (idcAnual ? " IDC/mes" : " IDC") + " más entra en " + nextSeg.label + " · " + fMoney2(precioNext) + " por IDC.";
 		} else if (esDistribVol) {
 			// El nivel sube por la facturación (windoweada por la condición) o, con compromiso,
 			// por los certificados activos.
@@ -709,7 +727,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				certJuridicos: nj, firmasPorCertJuridico: fj,
 				// Firmas sueltas (Volumen): firmas sin certificado asociado ni tipo.
 				...(fs > 0 ? { firmasSueltas: fs } : {}),
-				idcMensuales: idc, // compat: consumido por historial/reportes/clientes
+				idcMensuales: idcEje, // compat: consumido por historial/reportes/clientes
 				firmasAdicPorIDC: 0,
 				// Volumen: el compromiso en USD es lo que asignó el segmento. Las firmas
 				// por tipo se guardan igual que en IDC (certFisicos/firmasPorCert…).
@@ -720,7 +738,9 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				// IDC: cómo se cargó el consumo. certFisicos/certJuridicos llevan siempre la
 				// cantidad cotizada (mensual con compromiso anual); si se cargó por año, se
 				// guarda también lo ingresado para reabrir la cotización tal cual.
-				...(esIDC ? { idcEntrada: idcPorAnio ? "anual" : "mensual", ...(idcPorAnio ? { idcCantidadIngresada: { fis: nfIn, jur: njIn } } : {}) } : {}),
+				// idcCantidadAnual marca que certFisicos/certJuridicos son las cantidades del
+				// año (compromiso anual): el export cotiza el total y el SLA × 12.
+				...(esIDC ? { idcEntrada: idcPorAnio ? "anual" : "mensual", idcPorTipo, idcCantidadAnual: idcAnual, idcCantidadIngresada: { fis: nfIn, jur: njIn } } : {}),
 				// Distribuidores-Volumen: el nivel es el mayor entre firmas y facturación de la
 				// ventana. `modalidadFacturacion` y `facturacionNivel` viajan para reproducir la
 				// asignación; el compromiso anual se deriva de la cotización (no se declara) y
@@ -782,7 +802,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				} : {}),
 			},
 			resumen: {
-				segmento: segLabel, idcMensuales: idc,
+				segmento: segLabel, idcMensuales: idcEje,
 				// Volumen y Distribuidores-Volumen: el segmento es un descuento, así que se
 				// guarda como tal para que Reportes y el export lo lean igual. En Volumen
 				// viaja el compromiso del contrato; en Distribuidores-Volumen, las variables
@@ -802,14 +822,14 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				precioIDC, precioIDCLista: segPrice.precioIDC,
 				precioFirma: precioFirmaExtraEff, precioFirmaExtra: precioFirmaExtraEff,
 				precioFirmaExtraLista: segPrice.precioFirmaExtra,
-				revTotal, revMesTotal: revSinFee,
+				revTotal, revMesTotal: idcAnual ? revSinFee / 12 : revSinFee,
 				...(esIDC ? { modalidadFacturacion: modalidadFact } : {}),
 				// Año 1: en IDC con compromiso anual el consumo es mensual recurrente
 				// (× 12 + fee único); con consumo único es el total cotizado. En
 				// Volumen es una COMPRA ÚNICA (revTotal, mes 1) y, si hay abono, se suman
 				// los meses 2-12 de reposición de la bolsa de firmas (11 meses, mismo
 				// criterio que Packs). No se multiplica el volumen × 12.
-				revAnual: esIDC ? (idcAnual ? revSinFee * 12 + feeAplicado : revTotal) : revTotal + (abono ? revAbonoMes * 11 : 0),
+				revAnual: esIDC ? revTotal : revTotal + (abono ? revAbonoMes * 11 : 0),
 				// Las condiciones ya no bajan el total; se guarda el % ofrecido como dato
 				// informativo (reportes lo ignoran para el descuento efectivo).
 				revServicioBruto,
@@ -905,7 +925,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			if (hi <= lo) return 0;
 			return Math.min(1, Math.max(0, ((Number(x) || 0) - lo) / (hi - lo)));
 		}
-		if (esIDC) return axis(idc, seg.idcMin, nextSeg.idcMin);
+		if (esIDC) return axis(idcEje, seg.idcMin, nextSeg.idcMin);
 		if (esDistribVol) return Math.max(axis(facturacionNivelDistrib, seg.compromisoMin, nextSeg.compromisoMin), distribConCompromiso ? axis(certsActivosNum, seg.certsMin, nextSeg.certsMin) : 0);
 		return Math.max(axis(compromiso, seg.compromisoMin, nextSeg.compromisoMin), axis(firmasTotales, seg.firmasMin, nextSeg.firmasMin));
 	})();
@@ -955,7 +975,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 			{/* Total: el número que el vendedor vino a buscar, una sola vez y en bloque
 			    de color. Antes aparecía arriba (héroe) y abajo (fila "Total") a la vez. */}
 			<div className="rounded-xl bg-primary px-5 py-4 text-primary-foreground">
-				<div className="text-xs font-bold uppercase tracking-wide opacity-80">{conApi ? "Total mes 1" : "Total"} · sin IVA</div>
+				<div className="text-xs font-bold uppercase tracking-wide opacity-80">{idcAnual ? "Total del año" : conApi && !esIDC ? "Total mes 1" : "Total"} · sin IVA</div>
 				<div className="mt-1.5 font-display text-4xl leading-none tabular-nums [overflow-wrap:anywhere]">
 					{hasVolume ? <AnimatedNumber value={revTotal} format={fMoney2} /> : "—"}
 				</div>
@@ -965,7 +985,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						: (esIDC ? "Cargá IDC para ver el total" : "Cargá certificados o firmas para ver el total")}
 				</div>
 				{hasVolume && idcAnual && (
-					<div className="mt-1 text-sm opacity-90">Compromiso anual: {fMoney2(revSinFee * 12 + feeAplicado)} · {(idc * 12).toLocaleString("es-AR")} IDC/año</div>
+					<div className="mt-1 text-sm opacity-90">Pago único por el compromiso anual · {idc.toLocaleString("es-AR")} IDC en el año</div>
 				)}
 			</div>
 
@@ -1038,7 +1058,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					    ofrecen aparte (bloque debajo del total). */}
 					<div>
 						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney2} /></>} accent="success" valueClass="text-[var(--success)]" />}
-						{conApi && <ResultRow label={"SLA · " + sla.label} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaMes} format={fMoney2} /> : "incluido"} />}
+						{conApi && <ResultRow label={"SLA · " + sla.label + (slaMeses > 1 && slaMes > 0 ? " · " + slaMeses + " meses" : "")} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaPeriodo} format={fMoney2} /> : "incluido"} />}
 						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney2} />} />}
 						{abono && <ResultRow label="Abono mensual (firmas)" value={<><AnimatedNumber value={revAbonoMes} format={fMoney2} />/mes</>} accent="success" />}
 					</div>
@@ -1194,7 +1214,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 				</div>
 			</FieldGroup>
 
-			<FieldGroup channel={canal} done={hasVolume} title="Volumen" subtitle={esIDC ? "IDC por tipo; el segmento y el precio se calculan solos." : "Cantidades por tipo; el nivel y el precio se calculan solos."}>
+			<FieldGroup channel={canal} done={hasVolume} title="Volumen" subtitle={esIDC ? "Cantidad de IDC; el segmento y el precio se calculan solos." : "Cantidades por tipo; el nivel y el precio se calculan solos."}>
 				<div className="flex flex-col gap-1.5">
 					<Label className="text-xs text-muted-foreground uppercase tracking-wide">Modalidad de integración</Label>
 					<div className="flex gap-1 flex-wrap">
@@ -1251,30 +1271,35 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 						{!idcAnual
 							? "Se cotiza la cantidad que se consuma en este momento. El segmento sale de esa cantidad y de su facturación."
 							: idcPorAnio
-								? "Cargás el consumo del año; se cotiza su equivalente mensual (÷ 12). La facturación del segmento es la anual."
-								: "Cargás el consumo mensual; el compromiso es ese consumo × 12, y la facturación del segmento es la anual."}
+								? "Cargás el consumo del año y se cotiza el total del año, a pagar de una vez. El segmento se mide por el consumo mensual (÷ 12) y la facturación anual."
+								: "Cargás el consumo mensual y se cotiza el total del año (× 12), a pagar de una vez. El segmento se mide por ese consumo mensual y la facturación anual."}
 					</p>
-					<div className={"grid grid-cols-1 gap-3" + (njIn > 0 ? " sm:grid-cols-2" : "")}>
+					<label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground">
+						<input type="checkbox" checked={idcPorTipo} onChange={function (e) { setIdcPorTipo(e.target.checked); }} className="size-4 accent-[var(--primary)]" />
+						Distinguir persona física y jurídica
+						<span className="text-xs text-muted-foreground">(opcional, mismo precio; solo cambia el desglose)</span>
+					</label>
+					<div className={"grid grid-cols-1 gap-3" + (idcPorTipo ? " sm:grid-cols-2" : "")}>
 						<div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
 							<div className="mb-2.5 flex items-center gap-1.5">
 								<span className="inline-block size-2 rounded-full bg-sky-500" />
-								<span className="text-xs font-semibold text-sky-700">{njIn > 0 ? "IDC físicas" : "IDC"}</span>
-								<span className="text-xs text-muted-foreground">· {njIn > 0 ? "personas" : "personas o empresas"}</span>
+								<span className="text-xs font-semibold text-sky-700">{idcPorTipo ? "IDC físicas" : "IDC"}</span>
+								<span className="text-xs text-muted-foreground">· {idcPorTipo ? "personas" : "personas o empresas"}</span>
 							</div>
 							<div className="grid grid-cols-2 gap-2.5">
-								<NumberField label={idcLabelCant} value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" note={idcNoteCant(nf)} />
+								<NumberField label={idcLabelCant} value={certFisicos} onChange={setCertFisicos} min={0} placeholder="0" note={idcNoteCant(nfIn)} />
 								<NumberField label="Firmas c/u" value={firmasPorCertFisico} onChange={setFirmasPorCertFisico} min={0} note={ff > cupo ? (ff - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo} />
 							</div>
 						</div>
-						{njIn > 0 && (
+						{idcPorTipo && (
 							<div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
 								<div className="mb-2.5 flex items-center gap-1.5">
 									<span className="inline-block size-2 rounded-full bg-violet-500" />
 									<span className="text-xs font-semibold text-violet-700">IDC jurídicas</span>
-									<span className="text-xs text-muted-foreground">· cotización anterior</span>
+									<span className="text-xs text-muted-foreground">· empresas</span>
 								</div>
 								<div className="grid grid-cols-2 gap-2.5">
-									<NumberField label={idcLabelCant} value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" note="poné 0 para unificar" />
+									<NumberField label={idcLabelCant} value={certJuridicos} onChange={setCertJuridicos} min={0} placeholder="0" note={idcNoteCant(Math.max(0, Number(certJuridicos) || 0))} />
 									<NumberField label="Firmas c/u" value={firmasPorCertJuridico} onChange={setFirmasPorCertJuridico} min={0} note={fj > cupo ? (fj - cupo) + " sobre el cupo" : "dentro del cupo de " + cupo} />
 								</div>
 							</div>
@@ -1448,7 +1473,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					facturacionNivelDistrib={facturacionNivelDistrib}
 					firmasTotales={firmasTotales}
 					feeAplicado={feeAplicado}
-					idc={idc}
+					idc={idcEje}
 					revSinFee={revSinFee}
 					mesesVentanaFact={mesesVentanaFact}
 					mesesVinculacion={mesesVinculacion}
