@@ -63,6 +63,18 @@ export function TabNiveles() {
 	const idcN = Math.max(0, Number(idcQ) || 0);
 	const idcBase = Number((idcSegs[0] || {}).precioIDC) || 0;
 	const idcSeg = idcN > 0 ? getB2B2CSegment(idcN, idcN * idcBase, idcSegs) : null;
+	// Precio de certificado y de firma dentro de cada IDC: mismo reparto que la propuesta
+	// PDF. El precio del bundle se abre en proporción a la lista de Volumen (cert y firma
+	// sueltos), así cert + cupo × firma suma exactamente el precio por IDC.
+	const listaRef = cfg.volumenBase || { cert: 0, firma: 0 };
+	function idcSplit(s) {
+		const lc = Number(listaRef.cert) || 0;
+		const lf = Number(listaRef.firma) || 0;
+		const cupo = Math.max(0, Number(s.firmasIncluidas) || 0);
+		const lista = lc + cupo * lf;
+		const k = lista > 0 ? (Number(s.precioIDC) || 0) / lista : 0;
+		return { cert: lc * k, firma: lf * k };
+	}
 
 	// ── Distribuidores ──
 	const distTiers = cfg.distribuidorVolTiers || [];
@@ -100,7 +112,7 @@ export function TabNiveles() {
 
 			{tab === "b2b2c" && (
 				<div className="space-y-4">
-					<p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Escala de <strong className="text-foreground">precios</strong> por IDC. El segmento es el mayor entre la <strong className="text-foreground">cantidad total de IDC contratadas</strong> (el año completo con compromiso anual) y su facturación a precio Start Up.{idcSegs[0] ? " Cada IDC incluye " + num(idcSegs[0].firmasIncluidas) + " firmas; la firma extra se cobra USD " + usd(idcSegs[0].precioFirmaExtra) + "." : ""}</p>
+					<p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Escala de <strong className="text-foreground">precios</strong> por IDC. El segmento es el mayor entre la <strong className="text-foreground">cantidad total de IDC contratadas</strong> (el año completo con compromiso anual) y su facturación a precio Start Up.{idcSegs[0] ? " Cada IDC incluye " + num(idcSegs[0].firmasIncluidas) + " firmas; la firma extra se cobra USD " + usd(idcSegs[0].precioFirmaExtra) + ". Certificado y firma abren el precio de la IDC en proporción a la lista suelta (cert USD " + usd(listaRef.cert) + " · firma USD " + usd(listaRef.firma) + "), igual que en la propuesta." : ""}</p>
 					<Lookup color={CHANNELS.b2b2c.color} fields={[{ label: "IDC contratadas", value: idcQ, onChange: setIdcQ }]}
 						result={<ResultChip tier={idcSeg} tiers={idcSegs} text={idcSeg ? "USD " + usd(idcSeg.precioIDC) + " por IDC · total USD " + num(idcN * (Number(idcSeg.precioIDC) || 0)) : ""} />} />
 					<LiveTable accent={CHANNELS.b2b2c.color} caption="Segmentos IDC" rows={idcSegs} rowKey={function (s) { return s.id || s.label; }} isActive={function (s) { return s === idcSeg; }}
@@ -109,6 +121,8 @@ export function TabNiveles() {
 							{ key: "rango", label: "IDC contratadas", align: "right", render: function (s) { return rangeCant(s.idcMin, s.idcMax, "IDC"); } },
 							{ key: "fact", label: "Facturación", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return "USD " + usd(s.precioIDC); } },
+							{ key: "cert", label: "Certificado", align: "right", render: function (s) { return "USD " + usd(idcSplit(s).cert); } },
+							{ key: "firma", label: "Firma (incluida)", align: "right", render: function (s) { return "USD " + usd(idcSplit(s).firma); } },
 						]} />
 				</div>
 			)}
