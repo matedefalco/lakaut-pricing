@@ -5,8 +5,8 @@ import { dealStatus } from "@/lib/dealStatus";
 // Fuente única de verdad para leer números de un deal guardado. Reportes lo usa
 // para facturación, volumen de items y, sobre todo, precios por elemento.
 //
-// Precio por elemento: en Volumen los precios unitarios se guardan limpios
-// (precioIDC y el precio de la firma que excede el cupo del bundle). En Web y
+// Precio por elemento: en IDC y Volumen los precios unitarios se guardan limpios
+// (precioIDC y el precio de la firma). En Web y
 // Distribuidores el precio es de bundle (un pack agrupa certs + firmas incluidas en
 // un precio de lista), así que el "precio por cert" es implícito (lista ÷ certs) y
 // solo las firmas adicionales tienen precio unitario propio (precioFirmaAdic).
@@ -48,10 +48,10 @@ export function dealItems(d) {
 export function dealUnitPrice(d) {
 	const r = d.resumen || {};
 	if (isUnit(d.channel)) {
-		// En IDC el precio es de bundle (certificado + cupo de firmas) y las firmas con
-		// precio unitario propio son las que exceden el cupo. En Volumen no hay cupo:
-		// todas las firmas se facturan por unidad, igual que en las cotizaciones del
-		// modelo anterior a la separación de los dos canales.
+		// Desde oct 2026 IDC no tiene cupo: todas las firmas se facturan por unidad, igual
+		// que en Volumen. Las cotizaciones IDC anteriores guardan el cupo del bundle
+		// (firmasIncluidasPorIDC > 0): su precio de IDC incluye esas firmas y solo las que
+		// lo exceden tienen precio propio.
 		const firmasConPrecio = r.firmasExtra != null ? num(r.firmasExtra) : num(r.firmasTotales || r.firmasTotal);
 		return {
 			channel: resolveChannel(d.channel),
@@ -234,7 +234,7 @@ export function computePriceMetrics(deals) {
 			n: rows.length,
 			cert: aggregateElement(rows.map(function (x) { return { units: x.up.cert.units, price: x.up.cert.price, revenue: dealRevenue(x.deal) }; })),
 			firma: aggregateElement(rows.map(function (x) { return { units: x.up.firma.units, price: x.up.firma.price, revenue: dealRevenue(x.deal) }; })),
-			certBundle: rows.length > 0 && rows[0].up.cert.bundle,
+			certBundle: rows.some(function (x) { return x.up.cert.bundle; }),
 			discount: aggregateDiscount(rows.map(function (x) { return x.deal; })),
 			conversion: conversionByPrice(rows.map(function (x) { return x.deal; })),
 		};

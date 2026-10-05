@@ -10,7 +10,8 @@ import {
 	DISTRIBUIDOR_VOL_BASE,
 	WEB_FIRMA_EXTRA_TIERS,
 	B2B2C_SEGMENTS,
-	B2B2C_FIRMAS_INCLUIDAS,
+	B2B2C_FIRMAS_BIENVENIDA,
+	B2B2C_MODELO,
 	B2B2C_MARKUP_MIN,
 	B2B2C_FACTOR_PUNTUAL,
 	B2B2C_API_TIERS,
@@ -31,8 +32,11 @@ export const DEFAULT_CHANNEL_CONFIG = {
 	// Precio base propio del canal Distribuidores-Volumen (cert bonificado = 0, firma
 	// USD 1,00). No comparte VOLUMEN_BASE: el descuento del nivel pega sobre la firma.
 	distribuidorVolBase: DISTRIBUIDOR_VOL_BASE,
-	// Escala de precios del canal IDC (bundle por IDC mensuales).
+	// Escala de precios del canal IDC (precio por IDC y por firma, por segmento).
 	b2b2cSegments: B2B2C_SEGMENTS,
+	// Firmas bonificadas de bienvenida por cotización IDC (en total, no por IDC).
+	b2b2cFirmasBienvenida: B2B2C_FIRMAS_BIENVENIDA,
+	b2b2cModelo: B2B2C_MODELO,
 	b2b2cMarkupMin: B2B2C_MARKUP_MIN,
 	b2b2cFactorPuntual: B2B2C_FACTOR_PUNTUAL,
 	b2b2cApiTiers: B2B2C_API_TIERS,
@@ -49,23 +53,30 @@ export const DEFAULT_CHANNEL_CONFIG = {
 	abonoDescuentoPct: ABONO_DESCUENTO_PCT,
 };
 
-// ── Migración del canal Volumen al modelo de IDC (Borrador v5) ────────────────
-// Hay tres generaciones de este canal en configs guardadas, y esta función lleva
+// ── Migración del canal IDC ───────────────────────────────────────────────────
+// Hay cuatro generaciones de este canal en configs guardadas, y esta función lleva
 // cualquiera de ellas al modelo vigente:
 //
 //   G1 · precio absoluto por segmento + umbral por cantidad de IDC
-//        { precioIDC, precioFirma, idcMin, idcMax }
+//        { precioIDC, precioFirma (= firma extra), idcMin, idcMax }
 //   G2 · precio base único + % de descuento por segmento, umbral en USD de
 //        compromiso: { compromisoMin, compromisoMax, descuento } + b2b2cBase
-//   G3 · vigente: escala de precios por IDC con cupo de firmas incluidas
-//        { idcMin, idcMax, precioIDC, firmasIncluidas, precioFirmaExtra }
+//   G3 · escala de precios por IDC con cupo de firmas incluidas
+//        { idcMin, idcMax, precioIDC (bundle), firmasIncluidas, precioFirmaExtra }
+//   G4 · vigente (oct 2026): sin cupo. La IDC es solo identidad + certificado y la
+//        firma tiene precio propio: { idcMin, idcMax, precioIDC, precioFirma, precioFirmaExtra }
 //
-// G1 es casi G3 (el modelo volvió a los umbrales por cantidad), así que alcanza con
-// renombrar `precioFirma` y completar el cupo. G2 se convierte preservando la
-// economía cargada: el precio de cada segmento se reconstruye aplicando su descuento
-// al precio base. Sus umbrales en USD no se pueden traducir a cantidades de IDC, así
-// que se cae a la escala por defecto del índice correspondiente.
+// G1 y G2 se llevan primero a G3 (como antes) y G3 a G4 abriendo el bundle. Como G1
+// también usa el nombre `precioFirma` (con otro significado), lo que distingue G4 no
+// es la forma del segmento sino la marca `b2b2cModelo` de la config.
 const FALLBACK_FIRMA_EXTRA = 0.5;
+const FALLBACK_CUPO_G3 = 3;
+// Costos variables vigentes al abrir el bundle (oct 2026). La migración G3 → G4 reparte
+// el precio del bundle en esta proporción, así certificado y firma conservan el markup
+// del segmento. Son constantes a propósito: la migración tiene que dar siempre lo mismo,
+// aunque después cambien los costos en Config.
+const CV_CERT_G4 = 0.375;
+const CV_FIRMA_G4 = 0.1334;
 
 function isG2Segment(s) {
 	return !!s && s.descuento != null && s.precioIDC == null;
@@ -83,9 +94,37 @@ function resolveIdcRange(def, prev) {
 	return { min: 0, max: null };
 }
 
-function migrateB2B2C(segments, base) {
+// G3 → G4: abre el precio del bundle (cert + cupo firmas) en certificado y firma, en
+// proporción al costo. El certificado se redondea a centavos y la firma se lleva el
+// resto, así cert + cupo × firma reproduce el precio del bundle (± 0,0001).
+function splitBundle(precioBundle, cupo, firmaExtra) {
+	const p = Number(precioBundle) || 0;
+	const n = Math.max(0, Math.round(Number(cupo) || 0));
+	if (n === 0) return { precioIDC: p, precioFirma: Number(firmaExtra) || 0 };
+	const cert = Math.round(p * CV_CERT_G4 / (CV_CERT_G4 + n * CV_FIRMA_G4) * 100) / 100;
+	return { precioIDC: cert, precioFirma: Math.round(Math.max(0, p - cert) / n * 10000) / 10000 };
+}
+
+function migrateB2B2C(segments, base, modelo) {
 	const list = Array.isArray(segments) ? segments : [];
 	if (list.length === 0) return B2B2C_SEGMENTS;
+
+	// Config ya en G4: solo se completan los campos que falten.
+	if (modelo === B2B2C_MODELO) {
+		return list.map(function (s, i) {
+			const def = B2B2C_SEGMENTS[i];
+			const range = s.idcMin != null ? { min: Number(s.idcMin) || 0, max: s.idcMax != null ? Number(s.idcMax) : null } : { min: def ? def.idcMin : 0, max: def ? def.idcMax : null };
+			const out = Object.assign({}, s, {
+				idcMin: range.min,
+				idcMax: range.max,
+				precioIDC: s.precioIDC != null ? Number(s.precioIDC) || 0 : (def ? def.precioIDC : 0),
+				precioFirma: s.precioFirma != null ? Number(s.precioFirma) || 0 : (def ? def.precioFirma : 0),
+				precioFirmaExtra: s.precioFirmaExtra != null ? Number(s.precioFirmaExtra) || 0 : (def ? def.precioFirmaExtra : FALLBACK_FIRMA_EXTRA),
+			});
+			delete out.firmasIncluidas;
+			return out;
+		});
+	}
 
 	const baseCert = base && base.cert != null ? Number(base.cert) || 0 : 0;
 	const baseFirma = base && base.firma != null ? Number(base.firma) || 0 : 0;
@@ -96,40 +135,44 @@ function migrateB2B2C(segments, base) {
 		const prev = out[out.length - 1];
 
 		if (isG2Segment(s)) {
-			// G2 → G3: el descuento del segmento se resuelve contra el precio base para
-			// recuperar el precio absoluto que el equipo tenía efectivamente cargado.
+			// G2 → G3 → G4: el descuento del segmento se resuelve contra el precio base para
+			// recuperar el precio absoluto que el equipo tenía cargado. G2 cobraba las firmas
+			// por unidad, así que el precio base es el del certificado y la firma va aparte.
 			const desc = Math.min(1, Math.max(0, Number(s.descuento) || 0));
 			const range = resolveIdcRange(def, prev);
+			const firma = Math.round((baseFirma || FALLBACK_FIRMA_EXTRA) * (1 - desc) * 10000) / 10000;
 			out.push({
 				id: s.id,
 				label: s.label,
 				idcMin: range.min,
 				idcMax: range.max,
+				facturacionMin: s.facturacionMin,
+				facturacionMax: s.facturacionMax,
 				precioIDC: Math.round((baseCert || (def ? def.precioIDC : 0)) * (1 - desc) * 10000) / 10000,
-				// El modelo G2 cobraba las firmas por unidad (cupo cero). Se adopta el cupo
-				// del Borrador v5 igual, porque es el modelo elegido: si el precio no cierra
-				// contra el costo del bundle, la pantalla de Config lo va a marcar.
-				firmasIncluidas: def && def.firmasIncluidas != null ? def.firmasIncluidas : B2B2C_FIRMAS_INCLUIDAS,
-				precioFirmaExtra: Math.round((baseFirma || FALLBACK_FIRMA_EXTRA) * (1 - desc) * 10000) / 10000,
+				precioFirma: firma,
+				precioFirmaExtra: firma,
 			});
 			return;
 		}
 
-		// G1 y G3: mismo esqueleto. Se completan los campos que falten sin tocar los
-		// valores ya cargados.
+		// G1 y G3: mismo esqueleto. G1 no tenía cupo (sus firmas se cobraban por unidad
+		// a `precioFirma`); G3 lo trae explícito. Las dos se abren con splitBundle.
 		const range = s.idcMin != null ? { min: Number(s.idcMin) || 0, max: s.idcMax != null ? Number(s.idcMax) : null } : resolveIdcRange(def, prev);
-		const firmaExtra = s.precioFirmaExtra != null ? s.precioFirmaExtra
-			: (s.precioFirma != null ? s.precioFirma
-				: (def && def.precioFirmaExtra != null ? def.precioFirmaExtra : FALLBACK_FIRMA_EXTRA));
+		const firmaExtra = Number(s.precioFirmaExtra != null ? s.precioFirmaExtra
+			: (s.precioFirma != null ? s.precioFirma : FALLBACK_FIRMA_EXTRA)) || 0;
+		const cupo = s.firmasIncluidas != null ? s.firmasIncluidas : (s.precioFirma != null ? 0 : FALLBACK_CUPO_G3);
+		const precioBundle = Number(s.precioIDC) || (def ? def.precioIDC + FALLBACK_CUPO_G3 * def.precioFirma : 0);
+		const split = splitBundle(precioBundle, cupo, firmaExtra);
 		out.push({
 			id: s.id,
 			label: s.label,
 			idcMin: range.min,
 			idcMax: range.max,
-			precioIDC: Number(s.precioIDC) || (def ? def.precioIDC : 0),
-			firmasIncluidas: s.firmasIncluidas != null ? Math.max(0, Math.round(Number(s.firmasIncluidas) || 0))
-				: (def && def.firmasIncluidas != null ? def.firmasIncluidas : B2B2C_FIRMAS_INCLUIDAS),
-			precioFirmaExtra: Number(firmaExtra) || 0,
+			facturacionMin: s.facturacionMin,
+			facturacionMax: s.facturacionMax,
+			precioIDC: split.precioIDC,
+			precioFirma: split.precioFirma,
+			precioFirmaExtra: firmaExtra,
 		});
 	});
 
@@ -138,7 +181,13 @@ function migrateB2B2C(segments, base) {
 
 export function normalizeChannelConfig(raw) {
 	const merged = Object.assign({}, DEFAULT_CHANNEL_CONFIG, raw);
-	merged.b2b2cSegments = migrateB2B2C(merged.b2b2cSegments, raw && raw.b2b2cBase);
+	// La marca de modelo se lee del raw: el merge con el default la pondría siempre. Sin
+	// segmentos guardados, los del merge son los defaults, que ya están en G4.
+	const rawModelo = raw && Array.isArray(raw.b2b2cSegments) && raw.b2b2cSegments.length > 0 ? raw.b2b2cModelo : B2B2C_MODELO;
+	merged.b2b2cSegments = migrateB2B2C(merged.b2b2cSegments, raw && raw.b2b2cBase, rawModelo);
+	merged.b2b2cModelo = B2B2C_MODELO;
+	if (merged.b2b2cFirmasBienvenida == null || !(Number(merged.b2b2cFirmasBienvenida) >= 0)) merged.b2b2cFirmasBienvenida = B2B2C_FIRMAS_BIENVENIDA;
+	merged.b2b2cFirmasBienvenida = Math.round(Number(merged.b2b2cFirmasBienvenida));
 	// El guardarraíl pasó de margen sobre el precio a markup sobre el costo (ver
 	// B2B2C_MARKUP_MIN). No se deriva del valor viejo: el 20% del Borrador v5 es
 	// markup, así que el default nuevo ya expresa la intención original.

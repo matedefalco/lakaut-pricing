@@ -3,7 +3,7 @@
 Documentación viva de la estructura comercial de la cotizadora. Las tablas numéricas se generan automáticamente desde los valores efectivos del sistema (Supabase + código), así que reflejan siempre lo que el cotizador usa de verdad, no un borrador.
 
 <!-- AUTO:meta:start -->
-> **Última actualización:** 2026-10-02 19:36 · **Fuente:** Supabase (config viva) · **Commit:** `5fb1bd5`
+> **Última actualización:** 2026-10-05 18:49 · **Fuente:** Supabase (config viva) · **Commit:** `6e14a42`
 >
 > Esta sección se genera automáticamente con `npm run docs:pricing`. No editar a mano las tablas dentro de los bloques `AUTO:*`; sí se puede editar la prosa entre bloques.
 <!-- AUTO:meta:end -->
@@ -27,7 +27,7 @@ La estructura se separa en canales según **quién paga, cómo se cotiza y qué 
 |---|---|---|---|
 | **Web** | Pack cerrado | Precio de lista, autoservicio | Único |
 | **Distribuidores** | Firma suelta (certificado bonificado) | Descuento por nivel, el mayor entre facturación (× 12 con compromiso anual, × 1 sin) y certificados activos | Único |
-| **IDC (B2B2C)** | IDC (bundle identidad + firma) | Precio por segmento de volumen | Único (consumo único) o recurrente (compromiso anual) |
+| **IDC (B2B2C)** | IDC (identidad + certificado) + firmas por unidad | Precio por segmento de volumen (IDC y firma) | Único (consumo único) o recurrente (compromiso anual) |
 | **Volumen** | Certificado y firma sueltos | Descuento por compromiso | Único |
 
 ---
@@ -40,14 +40,14 @@ Autoservicio desde el sitio, sin intermediación. Es el **precio de lista**, la 
 | Pack | Segmento | Firmas | Certificados | Precio (USD) | Precio (ARS aprox.) |
 |---|---|---|---|---|---|
 | Cero | Persona | 5 | 1 | gratis | $0 |
-| Smart | Persona | 50 | 1 | USD 40,2 | $62.109 |
-| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $182.681 |
-| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.657 |
-| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $241.561 |
-| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $532.453 |
+| Smart | Persona | 50 | 1 | USD 40,2 | $61.908 |
+| Profesional | Persona | ilimitadas | 1 | USD 118,24 | $182.090 |
+| PyME Smart | Empresa | 300 | 1 | USD 65,15 | $100.331 |
+| PyME ilimitado | Empresa | ilimitadas | 1 | USD 156,35 | $240.779 |
+| Enterprise | Empresa | ilimitadas | 5 | USD 344,63 | $530.730 |
 | Integración API | Empresa | ilimitadas | — | a consultar | — |
 
-TC de referencia usado para derivar ARS: **$1.545** por USD.
+TC de referencia usado para derivar ARS: **$1.540** por USD.
 <!-- AUTO:web:end -->
 
 ---
@@ -75,17 +75,17 @@ Certificados y firmas sueltos: el único modo en que cotizan los distribuidores.
 Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. Con **compromiso anual** el ingreso es recurrente (consumo mensual × 12); con **consumo único**, es el total cotizado.
 
 <!-- AUTO:idc:start -->
-Unidad de venta = **IDC** (Identidad Digital Certificada): bundle con biometría, emisión, custodia y firmas de activación. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). La facturación se compara contra el umbral **anual** con compromiso; en **compra puntual**, contra el de una compra del mes: anual ÷ 12 × un factor de exigencia (default 1,25), así el compromiso anual siempre llega antes al segmento. En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni cupo. La IDC no distingue persona física o jurídica (mismo precio y costo). Las **firmas adicionales** que se piden se cotizan al precio de firma del segmento (su parte del precio de la IDC); la **firma excedente** de la tabla es el precio del consumo no planificado por encima de lo contratado, que va como condición del contrato.
+Unidad de venta = **IDC** (Identidad Digital Certificada): biometría, emisión del certificado y custodia. Las **firmas se cobran por unidad**, al precio de firma del segmento: **no hay cupo de firmas por IDC**. Cada cotización bonifica **3 firmas en total** (no por certificado), simbólicas, para que la persona firme su primer documento sin costo; consuma 3 o 3.000 firmas, se bonifican 3. Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC y por firma. El segmento es el **mayor** entre dos ejes: la **cantidad de IDC** y su **facturación** (IDC y firmas) medida a precios de referencia Start Up (evita la circularidad precio↔segmento). Como en Distribuidores, se elige la modalidad: **consumo único** (la cantidad que se consume en ese momento, facturación × 1) o **compromiso anual** (se cotiza el total del año a pagar de una vez; el consumo se carga por mes o por año). Los umbrales de cantidad se miden sobre el **total de IDC contratadas** (el año completo o la compra puntual). La facturación se compara contra el umbral **anual** con compromiso; en **compra puntual**, contra el de una compra del mes: anual ÷ 12 × un factor de exigencia (default 1,25), así el compromiso anual siempre llega antes al segmento. En una **recompra** (cliente con identidades activas) se cotizan solo firmas, a la lista de Volumen con su descuento por volumen, sin certificado ni firmas de bienvenida. La IDC no distingue persona física o jurídica (mismo precio y costo). La **firma excedente** de la tabla es el precio del consumo no planificado por encima de lo contratado, que va como condición del contrato.
 
-| Segmento | Rango (IDC contratadas) | Facturación anual | Facturación puntual | Precio por IDC | Firmas incluidas | Firma excedente |
+| Segmento | Rango (IDC contratadas) | Facturación anual | Facturación puntual | Precio por IDC | Precio por firma | Firma excedente |
 |---|---|---|---|---|---|---|
-| Start Up | hasta 10.000 IDC | hasta USD 160.000 | hasta USD 16.667 | USD 1,3438 | 3 | USD 0,50 |
-| Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 16.668 – 83.333 | USD 1,2404 | 3 | USD 0,50 |
-| PyME | 50.001 – 200.000 IDC | USD 800.001 – 3.200.000 | USD 83.334 – 333.333 | USD 1,137 | 3 | USD 0,50 |
-| Empresa | 200.001 – 600.000 IDC | USD 3.200.001 – 9.600.000 | USD 333.334 – 1.000.000 | USD 1,0337 | 3 | USD 0,50 |
-| Plataforma | 600.001+ IDC | +USD 9.600.001 | +USD 1.000.001 | USD 0,9303 | 3 | USD 0,50 |
+| Start Up | hasta 10.000 IDC | hasta USD 160.000 | hasta USD 16.667 | USD 0,65 | USD 0,2313 | USD 0,50 |
+| Growth | 10.001 – 50.000 IDC | USD 160.001 – 800.000 | USD 16.668 – 83.333 | USD 0,60 | USD 0,2135 | USD 0,50 |
+| PyME | 50.001 – 200.000 IDC | USD 800.001 – 3.200.000 | USD 83.334 – 333.333 | USD 0,55 | USD 0,1957 | USD 0,50 |
+| Empresa | 200.001 – 600.000 IDC | USD 3.200.001 – 9.600.000 | USD 333.334 – 1.000.000 | USD 0,50 | USD 0,1779 | USD 0,50 |
+| Plataforma | 600.001+ IDC | +USD 9.600.001 | +USD 1.000.001 | USD 0,45 | USD 0,1601 | USD 0,50 |
 
-Guardarraíl de rentabilidad: markup mínimo **1,20x** sobre el costo variable del bundle. Bajo ese piso el cotizador bloquea guardar y exportar.
+Guardarraíl de rentabilidad: markup mínimo **1,20x** sobre el costo variable de la cotización. Bajo ese piso el cotizador bloquea guardar y exportar. Los precios de tabla de la IDC y de la firma cumplen ese mínimo cada uno contra su costo, así ninguna mezcla de firmas por IDC queda debajo.
 <!-- AUTO:idc:end -->
 
 ### Fee de implementación (SDK)
@@ -185,6 +185,7 @@ El plan de soporte se **gana por facturación**: la facturación de la cotizaci�
 
 Notas sobre por qué algunos números difieren del documento estratégico original (Borrador v5), para quien compare ambos:
 
-→ **Precios IDC.** El Borrador v5 fijaba 0,65 → 0,45 por IDC, pero esa columna calculaba el margen contra el costo del certificado solo, ignorando que la IDC incluye 3 firmas. Con el costo real del bundle (~USD 0,77), varios segmentos vendían por debajo del costo. La escala se reconstruyó fijando el piso en 1,20x el costo y subiendo el resto en la misma proporción del documento.
+→ **Precios IDC.** El Borrador v5 fijaba 0,65 → 0,45 por IDC, pero esa columna calculaba el margen contra el costo del certificado solo, ignorando que la IDC incluía 3 firmas. Con el costo real del bundle (~USD 0,77), varios segmentos vendían por debajo del costo. La escala se reconstruyó (jul 2026) fijando el piso en 1,20x el costo y subiendo el resto en la misma proporción del documento.
+→ **IDC sin cupo de firmas (oct 2026).** El cupo de 3 firmas por certificado era confuso para el modelo comercial. Se abrió el bundle: la IDC quedó como identidad + certificado y la firma con precio propio por segmento, repartiendo el precio anterior en proporción al costo variable (cert 0,3750 · firma 0,1334), así los dos conservan el markup del segmento (1,73x → 1,20x) y ninguna mezcla de firmas por IDC queda bajo el piso. Con 3 firmas por IDC el total es el mismo que antes (± USD 0,0001 por redondeo). A cambio del cupo, cada cotización bonifica **3 firmas en total** (no por certificado), simbólicas, para que la persona jurídica firme su primer documento. Las cotizaciones guardadas antes del cambio conservan su cupo en la propuesta exportada; si se reabren y se guardan, se recalculan con el modelo nuevo.
 → **Distribuidores (elementos sueltos).** El certificado va siempre bonificado (precio 0): el socio no paga por el certificado, solo por las firmas, con base USD 1,00. El nivel (y su descuento sobre la firma) lo asigna el compromiso anual de facturación, calculado del volumen cotizado (servicio a precio base × 12), con los rangos y descuentos de la matriz comercial (Azul 10% → Platinum 50%). El descuento se aplica solo cuando la forma de pago es "Con compromiso anual" (pago anticipado, caución, rebate o bonificación en firmas); con "Sin compromiso anual" la firma va a precio base. El fee de implementación es configurable manualmente en todos los niveles. El costo variable del certificado se paga igual y entra al markup del deal. La antigua modalidad packs (descuento sobre la lista web) se descontinuó.
 → **Canal Volumen y formas de liquidación A/B.** No están en el Borrador v5; son construcciones posteriores del cotizador.

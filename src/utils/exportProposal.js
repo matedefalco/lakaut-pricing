@@ -702,7 +702,13 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		if (!lista || lista <= efectivo) return fmUnit(efectivo);
 		return `<span style="text-decoration:line-through;color:${GR};">${fmUnit(lista)}</span> <strong style="color:${B};">${fmUnit(efectivo)}</strong>`;
 	};
-	const precioIDCHtml = precioConLista(precioIDC, listaBase(res.precioIDCLista));
+	// IDC sin cupo (cotizaciones desde oct 2026): la IDC y la firma tienen precio propio por
+	// segmento, y se tachan contra los del primer segmento (lista). Las cotizaciones IDC
+	// anteriores guardaban el cupo de firmas por IDC y se siguen mostrando como bundle.
+	const idcSinCupo = esIDC && !!inp.idcSinCupo;
+	const precioIDCHtml = idcSinCupo
+		? precioConLista(precioIDC, Number(res.idcPrecioBase) || 0)
+		: precioConLista(precioIDC, listaBase(res.precioIDCLista));
 
 	// Un certificado (IDC) es jurídico o físico; la firma es solo la manifestación de
 	// voluntad y cuesta/cotiza igual. El volumen se carga por cantidad de certificados
@@ -783,12 +789,16 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	// cobra. Se resta del subtotal a precio de firma de lista y va antes del descuento
 	// por condiciones, para no descontar dos veces sobre firmas que no se facturan.
 	// El volumen no cambia: el cliente recibe (y el compromiso cuenta) las firmas completas.
-	const firmasBonif = Math.min(firmasFacturables, Math.max(0, Number(inp.firmasBonificadas) || 0));
+	// IDC sin cupo: las firmas de bienvenida (N en total por cotización) van primero; la
+	// bonificación comercial se suma sobre las que quedan por facturar.
+	const firmasBienvenida = idcSinCupo ? Math.min(firmasFacturables, Math.max(0, Number(inp.firmasBienvenida) || 0)) : 0;
+	const bienvenidaMonto = firmasBienvenida * precioFirmaAdicN;
+	const firmasBonif = Math.min(firmasFacturables - firmasBienvenida, Math.max(0, Number(inp.firmasBonificadas) || 0));
 	const bonifMonto = firmasBonif * precioFirmaAdicN;
 	// Descuento por condiciones comerciales (snapshot del deal): aplica sobre el
 	// subtotal de servicio (certs + firmas), no sobre el fee ni el SLA.
 	const servicioBruto = revIDC + revFirmasIncl + revFirmasAdic + revFirmasSueltas + revRecompra;
-	const servicioNeto = servicioBruto - bonifMonto;
+	const servicioNeto = servicioBruto - bienvenidaMonto - bonifMonto;
 	// Modelo "ofrecido": en deals nuevos las condiciones no se restan del subtotal (se
 	// listan aparte). Los deals del modelo anterior las siguen restando.
 	const condOfrecida = !!inp.condOfrecidas;
@@ -825,13 +835,13 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const listaRef = res.idcListaRef || (channelConfig && channelConfig.volumenBase) || { cert: 0.65, firma: 0.5 };
 	const listaCert = Number(listaRef.cert) || 0;
 	const listaFirma = Number(listaRef.firma) || 0;
-	const idcGrupo = esIDC && cupo != null && idc > 0 && (listaCert + cupo * listaFirma) > 0;
+	const idcGrupo = esIDC && !idcSinCupo && cupo != null && idc > 0 && (listaCert + cupo * listaFirma) > 0;
 	const listaBundle = listaCert + (cupo || 0) * listaFirma;
 	const shareCert = listaBundle > 0 ? listaCert / listaBundle : 1;
 	const shareFirma = listaBundle > 0 ? listaFirma / listaBundle : 0;
 	const segsCfg = (channelConfig && channelConfig.b2b2cSegments) || [];
 	const idcListaPrecio = Number(res.idcPrecioBase) || Number((segsCfg[0] || {}).precioIDC) || precioIDC;
-	const idcDescPct = idcGrupo && idcListaPrecio > 0 && precioIDC < idcListaPrecio ? Math.round((1 - precioIDC / idcListaPrecio) * 100) : 0;
+	const idcDescPct = (idcGrupo || idcSinCupo) && idcListaPrecio > 0 && precioIDC < idcListaPrecio ? Math.round((1 - precioIDC / idcListaPrecio) * 100) : 0;
 	const certSubLbl = langApi ? "Validación de identidad + certificado" : "Certificado";
 	const firmaSubLbl = `${firmaCap} incluid${langApi ? "os" : "as"} (${cupo} c/u)`;
 	function idcGroupItem(label, n) {
@@ -842,6 +852,8 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 		return { group: true, l: label, v: n * precioIDC, subs: subs };
 	}
 	const idcLblBase = langApi ? "Validaciones de identidad (IDC)" : "Identidades digitales (IDC)";
+	// Sin cupo, la IDC va como una línea más (cantidad × precio), con su nombre propio.
+	const certLblGenEff = idcSinCupo ? idcLblBase : certLblGen;
 	// El descuento alcanzado va al lado del título del grupo.
 	const segVsBaseHtml = idcDescPct > 0 ? ` <span style="color:${B};font-weight:700;margin-left:0.15cm;">−${idcDescPct}%</span>` : "";
 
@@ -856,7 +868,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			{ l: `${certLbl} (${idcJuridicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcJuridicos * precioIDC, d: true },
 			...(idcFisicos > 0 ? [{ l: `${certLblFis} (${idcFisicos.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: idcFisicos * precioIDC, d: true }] : []),
 		] : idc > 0 ? [
-			{ l: `${certLblGen} (${idc.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: revIDC, d: true },
+			{ l: `${certLblGenEff} (${idc.toLocaleString("es-AR")} × ${precioIDCHtml})`, v: revIDC, d: true },
 		] : []),
 		// Firmas que exceden el cupo del bundle: se atribuyen al tipo de certificado que
 		// las genera. Las que entran en el cupo no llevan línea de cargo (ya están en el
@@ -865,7 +877,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			...(revFirmasInclJuridica > 0 ? [{ l: `${firmaLblJur} (${firmasFacturablesJur.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclJuridica, firmasFacturablesJur)}`, v: revFirmasInclJuridica, d: true }] : []),
 			...(revFirmasInclFisica > 0 ? [{ l: `${firmaLblFis} (${firmasFacturablesFis.toLocaleString("es-AR")} × ${precioFirmaHtml})${firmaLineNota(firmasInclFisica, firmasFacturablesFis)}`, v: revFirmasInclFisica, d: true }] : []),
 		] : [
-			...(revFirmasIncl > 0 ? [{ l: `${firmaCap} ${cupo == null ? `inclu${langApi ? "idos" : "idas"}` : "adicionales"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${idcGrupo ? "" : firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl, d: true }] : []),
+			...(revFirmasIncl > 0 ? [{ l: `${firmaCap}${idcSinCupo ? "" : cupo == null ? ` inclu${langApi ? "idos" : "idas"}` : " adicionales"} (${firmasFacturables.toLocaleString("es-AR")} × ${precioFirmaHtml})${idcGrupo ? "" : firmaLineNota(firmasIncl, firmasFacturables)}`, v: revFirmasIncl, d: true }] : []),
 		]),
 		...(revFirmasAdic > 0 ? [{ l: `${firmaCap} adicionales (${firmasAdicTotal.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasAdic, d: true }] : []),
 		...(revFirmasSueltas > 0 ? [{ l: `${firmaCap} (${firmasSueltas.toLocaleString("es-AR")} × ${precioFirmaHtml})`, v: revFirmasSueltas, d: true }] : []),
@@ -902,7 +914,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			] : [
 				// Cupo 0 = ninguna firma entra sin cargo: el chip "0 firmas incl." se leía
 				// como que el certificado no trae firmas y contradecía el total de firmas.
-				...(cupo === 0 ? [] : [chip(SVG.checkSquare(B, 15), cupo != null
+				...(idcSinCupo ? (firmasBienvenida > 0 ? [chip(SVG.checkSquare(B, 15), `<strong>${firmasBienvenida}</strong> ${firmasBienvenida === 1 ? firmaSing : firmaPlur} de bienvenida`)] : []) : cupo === 0 ? [] : [chip(SVG.checkSquare(B, 15), cupo != null
 					? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. c/u`
 					: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`)]),
 			]),
@@ -924,7 +936,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	// certificados: no aplica cuando hay firmas sueltas (aunque sean el único item).
 	// Con descuento de segmento no se colapsa: el desglose es el único lugar donde se
 	// ve la lista tachada contra el precio vigente, que es lo que muestra el beneficio.
-	const singleItem = !idcGrupo && items.length === 1 && idc > 0 && firmasSueltas <= 0 && descCondPct <= 0 && bonifMonto <= 0 && segDescPts <= 0;
+	const singleItem = !idcGrupo && items.length === 1 && idc > 0 && firmasSueltas <= 0 && descCondPct <= 0 && bonifMonto <= 0 && bienvenidaMonto <= 0 && segDescPts <= 0 && idcDescPct <= 0;
 	const subtotalNota = singleItem ? `${idc.toLocaleString("es-AR")} × ${precioIDCFmt}` : null;
 	// Bonificación: se muestra como línea propia del desglose, arriba del descuento por
 	// condiciones, para que el valor entregado quede a la vista.
@@ -934,8 +946,12 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 	const denso = items.reduce(function (n, it) { return n + 1 + (it.subs ? it.subs.length : 0); }, 0) >= 6;
 	const itemFs = denso ? "10pt" : "13pt";
 	const itemPad = denso ? "0.07cm" : "0.28cm";
+	const bienvenidaLineHtml = bienvenidaMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
+      <span style="color:${GR};">${firmaCap} de bienvenida (${firmasBienvenida.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:9pt;color:${GR};line-height:1.35;">Sin cargo, para que firmes tu primer documento.</span></span>
+      <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(bienvenidaMonto, currency, tc)}</span>
+    </div>` : "";
 	const bonifLineHtml = bonifMonto > 0 ? `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
-      <span style="color:${GR};">${firmaCap} bonificad${langApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:9pt;color:${GR};line-height:1.35;">Sin cargo: recibís ${langApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${Math.max(0, firmasFacturables - firmasBonif).toLocaleString("es-AR")}.</span></span>
+      <span style="color:${GR};">${firmaCap} bonificad${langApi ? "os" : "as"} (${firmasBonif.toLocaleString("es-AR")} × ${precioFirmaFmt})<span style="display:block;font-size:9pt;color:${GR};line-height:1.35;">Sin cargo: recibís ${langApi ? "los" : "las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} y abonás ${Math.max(0, firmasFacturables - firmasBienvenida - firmasBonif).toLocaleString("es-AR")}.</span></span>
       <span style="color:${B};font-weight:700;white-space:nowrap;">−${fm(bonifMonto, currency, tc)}</span>
     </div>` : "";
 	const descCondLineHtml = descCondPct > 0 ? `<div style="display:flex;justify-content:space-between;font-size:${itemFs};">
@@ -1000,7 +1016,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
       ${valorHtml}
     </div>`;
 	}
-	const itemsListHtml = !singleItem ? items.map(itemRow).join("") + bonifLineHtml + descCondLineHtml : "";
+	const itemsListHtml = !singleItem ? items.map(itemRow).join("") + bienvenidaLineHtml + bonifLineHtml + descCondLineHtml : "";
 	const firmaWord = (n) => `${n} ${n === 1 ? firmaSing : firmaPlur}`;
 	// El nombre de la unidad: "validaciones de identidad" (IDC con SDK), "identidades"
 	// (IDC sin SDK) o "certificados" (Volumen).
@@ -1027,6 +1043,8 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			: `Comprás un volumen de ${firmasSueltas.toLocaleString("es-AR")} ${firmasSueltas === 1 ? firmaSing : firmaPlur}, sin certificados asociados.`
 		: !esIDC
 		? volumenTxt
+		: idcSinCupo
+		? `${verboAct} ${idc.toLocaleString("es-AR")} ${unidadPl}${idcAnualExp ? " para el año" : ""}${hayJuridicos ? ` (${idcFisicos.toLocaleString("es-AR")} de persona física y ${idcJuridicos.toLocaleString("es-AR")} de persona jurídica)` : ""}, cada una con su certificado.${firmasIncl <= 0 ? "" : firmasBienvenida >= firmasIncl ? ` ${langApi ? "Los" : "Las"} ${firmaWord(firmasIncl)} van sin cargo, de bienvenida, para que firmes tu primer documento.` : ` ${langApi ? "Los" : "Las"} ${firmasIncl.toLocaleString("es-AR")} ${firmaPlur} se cobran por unidad${firmasBienvenida > 0 ? `, y te bonificamos ${firmaWord(firmasBienvenida)} para que firmes tu primer documento sin costo` : ""}.`}`
 		: cupo != null
 		? `${verboAct} ${idc.toLocaleString("es-AR")} ${unidadPl}${idcAnualExp ? " para el año" : ""}${hayJuridicos ? ` (${idcFisicos.toLocaleString("es-AR")} de persona física y ${idcJuridicos.toLocaleString("es-AR")} de persona jurídica)` : ""}. Cada una incluye su certificado${cupo > 0 ? ` y hasta ${firmaWord(cupo)} sin cargo` : ""}${firmasFacturables > 0 ? `; ${langApi ? "los" : "las"} que superen ese cupo (${firmasFacturables.toLocaleString("es-AR")}) se cobran aparte` : ""}.`
 		: hayJuridicos
@@ -1238,7 +1256,7 @@ function s3B2B2CProyeccion(deal, clientName, currency, tc, pageN, langApi) {
 	const showIva = true;
 	// La proyección es a precio de lista del escenario: la bonificación de la
 	// activación no se arrastra, así que se aclara en la nota al pie.
-	const bonifNota = (Number(inp.firmasBonificadas) || 0) > 0 ? `, ${langApi ? "los" : "las"} ${firmaNpl} bonificad${langApi ? "os" : "as"} de la activación` : "";
+	const bonifNota = (Number(inp.firmasBonificadas) || 0) > 0 || (Number(res.firmasBienvenida) || 0) > 0 ? `, ${langApi ? "los" : "las"} ${firmaNpl} bonificad${langApi ? "os" : "as"} de la activación` : "";
 
 	// Precios unitarios chicos (ej. USD 0.65): se formatean aparte para no perder
 	// decimales que fm/USD redondearía a entero.

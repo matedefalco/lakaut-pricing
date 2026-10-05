@@ -120,13 +120,11 @@ export const DISTRIBUTOR_TIERS = [
 ];
 
 // ── Canal C · IDC ───────────────────────────────────────────────────────────────
-// La unidad de venta es la IDC (Identidad Digital Certificada), no el certificado
-// suelto: un bundle que integra la validación biométrica, la emisión del
-// certificado, su custodia, la firma inicial que requiere la institución y las
-// firmas de activación destinadas a que el usuario descubra la herramienta. Las
-// firmas que superen ese cupo se venden por unidad.
+// La unidad de venta es la IDC (Identidad Digital Certificada): la validación
+// biométrica, la emisión del certificado y su custodia. Las firmas se venden por
+// unidad, al precio de firma del segmento.
 //
-// El segmento sale del VOLUMEN DE IDC MENSUALES, con los umbrales del Borrador v5.
+// El segmento sale de la CANTIDAD DE IDC, con los umbrales del Borrador v5.
 // A diferencia del canal de distribuidores, acá el segmento no da un descuento
 // sobre una lista: cada segmento tiene su propio precio por IDC. Es una escala de
 // precios, no de descuentos, y por eso el precio es un dato del segmento y no una
@@ -134,46 +132,59 @@ export const DISTRIBUTOR_TIERS = [
 //
 // El umbral inferior del primer segmento es 0 y no 1.000: un volumen menor cotiza
 // como Start Up en lugar de quedar sin precio.
-//   - idcMin/idcMax: rango de IDC mensuales; null = sin tope.
-//   - precioIDC: precio unitario de la IDC en USD.
-//   - firmasIncluidas: cupo de firmas que entran en cada IDC sin cargo extra.
-//   - precioFirmaExtra: precio unitario de cada firma por encima del cupo.
+//   - idcMin/idcMax: rango de IDC contratadas; null = sin tope.
+//   - precioIDC: precio unitario de la IDC (identidad + certificado) en USD.
+//   - precioFirma: precio unitario de cada firma cotizada en el segmento.
+//   - precioFirmaExtra: precio del EXCEDENTE no planificado (consumo por encima de
+//     lo contratado). Va como condición del contrato, no se cotiza.
 //
-// ── Por qué estos precios y no los del documento ──
-// La tabla del Borrador v5 (0,65 a 0,45) no cierra contra el costo real del bundle:
-// su columna "MARGEN" está calculada contra el costo del certificado SOLO
-// (USD 0,3741), pero su propia definición de IDC incluye firmas. Con los costos
-// cargados en la app (cert 0,3750 + firma 0,1334) una IDC con 3 firmas cuesta
-// USD 0,7752, y a 0,45 se estaría vendiendo por debajo del costo.
+// ── Sin cupo de firmas (oct 2026) ──
+// Hasta oct 2026 cada IDC era un bundle de certificado + 3 firmas incluidas. El cupo
+// por certificado confundía el modelo comercial, así que se abrió: la IDC pasa a ser
+// solo la identidad con su certificado y TODAS las firmas se cobran por unidad. A
+// cambio, cada cotización bonifica 3 firmas en total (no por certificado), simbólicas,
+// para que la persona firme su primer documento (ver B2B2C_FIRMAS_BIENVENIDA).
 //
-// La escala se reconstruyó (jul 2026) fijando el precio MÁS BAJO en el mínimo
-// viable (1,20x el costo = USD 0,9303) y subiendo el resto en la misma proporción
-// que el documento (Plataforma paga 69% de Start Up, igual que 0,45 vs 0,65). El
-// resultado reproduce casi exacto la columna MARGEN del doc leída como markup:
-// 1,73x / 1,60x / 1,47x / 1,33x / 1,20x, contra el 74/60/47/34/20% que ahí figura.
+// El precio del bundle viejo se repartió entre certificado y firma en proporción al
+// COSTO variable (cert 0,3750 · firma 0,1334), así los dos componentes quedan con el
+// mismo markup que tenía el segmento y ninguna mezcla de firmas por IDC cae bajo el
+// guardarraíl. Quien consume 3 firmas por IDC paga lo mismo que antes (± redondeo).
+// El certificado redondeado reproduce la escala original del Borrador v5 (0,65 → 0,45).
+//
+// ── De dónde sale la escala ──
+// La tabla del Borrador v5 (0,65 a 0,45 por IDC) no cerraba contra el costo real del
+// bundle con 3 firmas (USD 0,7752). La escala se reconstruyó (jul 2026) fijando el
+// bundle más barato en el mínimo viable (1,20x) y subiendo el resto en la proporción
+// del documento: 1,73x / 1,60x / 1,47x / 1,33x / 1,20x. Ese markup es el que conservan
+// hoy el certificado y la firma de cada segmento.
 // Segundo eje (facturacionMin/Max): el segmento también se puede alcanzar por la
 // FACTURACIÓN de la ventana medida a precio de referencia Start Up (ver getB2B2CSegment).
-// Se toma el MAYOR entre el segmento por IDC/mes y el segmento por facturación. Los
-// umbrales default salen de anualizar el tope de IDC/mes de cada segmento al precio
-// Start Up (idcMax × 1,3438 × 12), redondeados; son editables en Config.
+// Se toma el MAYOR entre el segmento por cantidad de IDC y el segmento por facturación.
+// Los umbrales son editables en Config.
 export const B2B2C_SEGMENTS = [
-	{ id: "startup", label: "Start Up", idcMin: 0, idcMax: 10000, facturacionMin: 0, facturacionMax: 160000, precioIDC: 1.3438, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "growth", label: "Growth", idcMin: 10001, idcMax: 50000, facturacionMin: 160001, facturacionMax: 800000, precioIDC: 1.2404, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "pyme", label: "PyME", idcMin: 50001, idcMax: 200000, facturacionMin: 800001, facturacionMax: 3200000, precioIDC: 1.1370, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "empresa", label: "Empresa", idcMin: 200001, idcMax: 600000, facturacionMin: 3200001, facturacionMax: 9600000, precioIDC: 1.0337, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
-	{ id: "plataforma", label: "Plataforma", idcMin: 600001, idcMax: null, facturacionMin: 9600001, facturacionMax: null, precioIDC: 0.9303, firmasIncluidas: 3, precioFirmaExtra: 0.50 },
+	{ id: "startup", label: "Start Up", idcMin: 0, idcMax: 10000, facturacionMin: 0, facturacionMax: 160000, precioIDC: 0.65, precioFirma: 0.2313, precioFirmaExtra: 0.50 },
+	{ id: "growth", label: "Growth", idcMin: 10001, idcMax: 50000, facturacionMin: 160001, facturacionMax: 800000, precioIDC: 0.60, precioFirma: 0.2135, precioFirmaExtra: 0.50 },
+	{ id: "pyme", label: "PyME", idcMin: 50001, idcMax: 200000, facturacionMin: 800001, facturacionMax: 3200000, precioIDC: 0.55, precioFirma: 0.1957, precioFirmaExtra: 0.50 },
+	{ id: "empresa", label: "Empresa", idcMin: 200001, idcMax: 600000, facturacionMin: 3200001, facturacionMax: 9600000, precioIDC: 0.50, precioFirma: 0.1779, precioFirmaExtra: 0.50 },
+	{ id: "plataforma", label: "Plataforma", idcMin: 600001, idcMax: null, facturacionMin: 9600001, facturacionMax: null, precioIDC: 0.45, precioFirma: 0.1601, precioFirmaExtra: 0.50 },
 ];
 
-// Cupo de firmas por IDC: la firma inicial que requiere la institución más las de
-// activación. Es el default de los segmentos nuevos.
-export const B2B2C_FIRMAS_INCLUIDAS = 3;
+// Firmas bonificadas de bienvenida: cada cotización IDC bonifica esta cantidad de firmas
+// en TOTAL, sin importar cuántas IDC o firmas tenga (consuma 3 o 3.000, se bonifican 3).
+// Es simbólico: que la persona jurídica pueda firmar su primer documento sin costo. No
+// aplica a las firmas de recompra (identidades que ya firmaron). Editable en Config.
+export const B2B2C_FIRMAS_BIENVENIDA = 3;
+
+// Modelo vigente del canal IDC en la config guardada. Las configs sin esta marca son del
+// modelo con cupo de firmas por IDC y se migran al cargar (ver channelConfigNormalize).
+export const B2B2C_MODELO = "sin-cupo";
 
 // Guardarraíl de rentabilidad, expresado como MARKUP sobre el costo variable
 // (precio ÷ costo), que es la métrica de la columna "MARGEN" del Borrador v5. Se
-// evalúa sobre el total MEZCLADO (IDC + firmas extra), así una IDC con precio
+// evalúa sobre el total MEZCLADO (IDC + firmas), así una IDC con precio
 // agresivo no dispara la alarma cuando las firmas compensan. Bajo el mínimo no se
-// puede guardar ni exportar. La pantalla de Config muestra el precio mínimo viable
-// de cada segmento contra el costo de su bundle.
+// puede guardar ni exportar. La pantalla de Config muestra el markup del certificado
+// y de la firma de cada segmento contra su costo variable.
 export const B2B2C_MARKUP_MIN = 1.20;
 
 // Compra puntual IDC: el umbral de facturación de cada segmento es el promedio mensual

@@ -56,7 +56,7 @@ export const CHANNELS = {
 		label: "IDC",
 		shortLabel: "IDC",
 		full: "IDC · Identidades Digitales Certificadas",
-		desc: "Empresas y plataformas que integran identidad y firma en sus propios productos. Se cotiza por cantidad de IDC consumidas (persona física o jurídica, sin distinción), con firmas incluidas en el bundle.",
+		desc: "Empresas y plataformas que integran identidad y firma en sus propios productos. Se cotiza por cantidad de IDC consumidas (persona física o jurídica, sin distinción) y firmas por unidad, con 3 firmas de bienvenida por cotización.",
 		badgeVariant: "default",
 		// ── Identidad visual ──
 		// Violeta para el canal de contrato e integración: se diferencia del azul de
@@ -113,8 +113,9 @@ export const CHANNELS = {
 export const PACK_CHANNELS = ["web", "distribuidores"];
 
 // Canales que se cotizan por certificados y firmas (no por packs). Comparten el
-// cotizador, parametrizado por canal: IDC vende un bundle con cupo de firmas,
-// Volumen y Distribuidores-Volumen venden los elementos sueltos.
+// cotizador, parametrizado por canal: IDC vende la identidad y las firmas con precio
+// propio por segmento, Volumen y Distribuidores-Volumen venden los elementos sueltos
+// con descuento sobre una base.
 export const UNIT_CHANNELS = ["b2b2c", "volumen", "distribuidores_vol"];
 
 // Red de seguridad para el canal unificado de julio: las cotizaciones guardadas
@@ -171,7 +172,7 @@ export function isDistribVol(id) { return resolveChannel(id) === "distribuidores
 // el precio base por elemento (Volumen y Distribuidores-Volumen). Es la distinción que
 // le importa a la lectura de números y al display: comparten revenue (compra única),
 // terminología (SDK) y desglose por elemento. Se diferencian solo en el origen del
-// segmento. No incluye IDC, que vende un bundle con cupo y precio por tramo.
+// segmento. No incluye IDC, que tiene precio propio por tramo (no un descuento).
 export function isVolumenLike(id) { return isVolumen(id) || isDistribVol(id); }
 
 // ¿Esta cotización de packs lleva descuentos comerciales (nivel, condiciones,

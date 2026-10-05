@@ -1,7 +1,7 @@
 // Definiciones del glosario de la Introducción (ver Glossary.jsx).
 export const GLOSSARY = {
-	idc: { term: "IDC", def: "Identidad Digital Certificada: el bundle que vende el canal IDC. Incluye validación biométrica, emisión del certificado, custodia y un cupo de firmas." },
-	cupo: { term: "Cupo de firmas", def: "Firmas que entran en el precio de cada IDC sin cargo extra. Las que lo superan se cobran por unidad (firma extra)." },
+	idc: { term: "IDC", def: "Identidad Digital Certificada: lo que vende el canal IDC. Incluye validación biométrica, emisión del certificado y custodia. Las firmas se cobran aparte, por unidad." },
+	bienvenida: { term: "Firmas de bienvenida", def: "Firmas que se bonifican en cada cotización IDC, en total y no por certificado (3 por defecto), para que la persona firme su primer documento sin costo." },
 	segmento: { term: "Segmento", def: "Tramo de volumen que define el precio (IDC) o el descuento (Volumen). Se asigna por el mayor entre la cantidad y la facturación." },
 	nivel: { term: "Nivel", def: "Tramo de un distribuidor (Azul → Platinum). Define el descuento sobre la firma, según su facturación o sus certificados activos." },
 	markup: { term: "Markup", def: "Precio ÷ costo variable. Es el guardarraíl de rentabilidad: debajo del mínimo, el cotizador no deja guardar ni exportar." },

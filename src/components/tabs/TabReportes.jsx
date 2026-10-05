@@ -281,8 +281,8 @@ export function TabReportes({ dealsApi, clientsApi, currency, tc }) {
 									const esIDCCh = ch.key === "b2b2c";
 									const rows = esIDCCh
 										? [
-											{ key: "cert", label: "IDC", note: ch.block.certBundle ? "bundle · incluye el cupo de firmas" : null, stat: ch.block.cert },
-											{ key: "firma", label: "Firma sobre el cupo", note: "se factura por unidad", stat: ch.block.firma },
+											{ key: "cert", label: "IDC", note: ch.block.certBundle ? "incluye cotizaciones previas a oct 2026, con cupo de firmas" : "identidad + certificado", stat: ch.block.cert },
+											{ key: "firma", label: "Firma", note: "se factura por unidad", stat: ch.block.firma },
 										]
 										: [
 											{ key: "cert", label: "Certificado", note: "implícito · precio de bundle", stat: ch.block.cert },

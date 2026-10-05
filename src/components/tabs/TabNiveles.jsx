@@ -65,18 +65,7 @@ export function TabNiveles() {
 	const idcN = Math.max(0, Number(idcQ) || 0);
 	const idcBase = Number((idcSegs[0] || {}).precioIDC) || 0;
 	const idcSeg = idcN > 0 ? getB2B2CSegment(idcN, idcN * idcBase, idcSegs) : null;
-	// Precio de certificado y de firma dentro de cada IDC: mismo reparto que la propuesta
-	// PDF. El precio del bundle se abre en proporción a la lista de Volumen (cert y firma
-	// sueltos), así cert + cupo × firma suma exactamente el precio por IDC.
-	const listaRef = cfg.volumenBase || { cert: 0, firma: 0 };
-	function idcSplit(s) {
-		const lc = Number(listaRef.cert) || 0;
-		const lf = Number(listaRef.firma) || 0;
-		const cupo = Math.max(0, Number(s.firmasIncluidas) || 0);
-		const lista = lc + cupo * lf;
-		const k = lista > 0 ? (Number(s.precioIDC) || 0) / lista : 0;
-		return { cert: lc * k, firma: lf * k };
-	}
+	const idcBienvenida = cfg.b2b2cFirmasBienvenida != null ? cfg.b2b2cFirmasBienvenida : 3;
 
 	// ── Distribuidores ──
 	const distTiers = cfg.distribuidorVolTiers || [];
@@ -114,7 +103,7 @@ export function TabNiveles() {
 
 			{tab === "b2b2c" && (
 				<div className="space-y-4">
-					<p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Escala de <strong className="text-foreground">precios</strong> por IDC. El segmento es el mayor entre la <strong className="text-foreground">cantidad total de IDC contratadas</strong> (el año completo con compromiso anual) y su facturación a precio de lista: anual con compromiso; en compra puntual, la del mes, que tiene que superar el promedio mensual del compromiso (anual ÷ 12 × {idcFactorPuntual.toLocaleString("es-AR")}).{idcSegs[0] ? " Cada IDC incluye " + num(idcSegs[0].firmasIncluidas) + " firmas; las firmas adicionales que se piden se cotizan al precio de firma del segmento (columna Firma) y el excedente no planificado se factura USD " + usd(idcSegs[0].precioFirmaExtra) + ". Certificado y firma abren el precio de la IDC en proporción a la lista suelta (cert USD " + usd(listaRef.cert) + " · firma USD " + usd(listaRef.firma) + "), igual que en la propuesta." : ""}</p>
+					<p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Escala de <strong className="text-foreground">precios</strong> por IDC. El segmento es el mayor entre la <strong className="text-foreground">cantidad total de IDC contratadas</strong> (el año completo con compromiso anual) y su facturación a precio de lista: anual con compromiso; en compra puntual, la del mes, que tiene que superar el promedio mensual del compromiso (anual ÷ 12 × {idcFactorPuntual.toLocaleString("es-AR")}).{idcSegs[0] ? " La IDC (identidad + certificado) y cada firma tienen precio propio por segmento; no hay cupo de firmas por IDC. Cada cotización bonifica " + num(idcBienvenida) + " firmas en total, de bienvenida, y el excedente no planificado se factura USD " + usd(idcSegs[0].precioFirmaExtra) + "." : ""}</p>
 					<Lookup color={CHANNELS.b2b2c.color} fields={[{ label: "IDC contratadas", value: idcQ, onChange: setIdcQ }]}
 						result={<ResultChip tier={idcSeg} tiers={idcSegs} text={idcSeg ? "USD " + usd(idcSeg.precioIDC) + " por IDC · total USD " + num(idcN * (Number(idcSeg.precioIDC) || 0)) : ""} />} />
 					<LiveTable accent={CHANNELS.b2b2c.color} caption="Segmentos IDC" rows={idcSegs} rowKey={function (s) { return s.id || s.label; }} isActive={function (s) { return s === idcSeg; }}
@@ -124,9 +113,8 @@ export function TabNiveles() {
 							{ key: "fact", label: "Facturación anual", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "factp", label: "Facturación puntual", align: "right", render: function (s, i) { const p = idcSegsPuntual[i] || s; return rangeUSD(p.facturacionMin, p.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return "USD " + usd(s.precioIDC); } },
+							{ key: "firma", label: "Precio por firma", align: "right", emphasis: true, render: function (s) { return "USD " + usd(s.precioFirma); } },
 							{ key: "desc", label: "Descuento", align: "right", render: function (s) { const d = idcBase > 0 ? Math.round((1 - (Number(s.precioIDC) || 0) / idcBase) * 100) : 0; return d > 0 ? "−" + d + "%" : <span className="text-muted-foreground">precio de lista</span>; } },
-							{ key: "cert", label: "Certificado", align: "right", render: function (s) { return "USD " + usd(idcSplit(s).cert); } },
-							{ key: "firma", label: "Firma", align: "right", render: function (s) { return "USD " + usd(idcSplit(s).firma); } },
 						]} />
 				</div>
 			)}

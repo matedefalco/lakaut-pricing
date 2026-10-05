@@ -92,7 +92,7 @@ const CHOOSER = [
 	{ id: "distribuidores", q: "Un socio que revende firmas o las integra en su software para sus clientes", channel: "distribuidores",
 		why: <>Es un canal de reventa. El certificado va <Term k="bonificado">bonificado</Term>, se cobran las firmas, y el <Term k="nivel">nivel</Term> del socio define el descuento.</> },
 	{ id: "b2b2c", q: "Una plataforma que quiere validar identidad y firmar dentro de su propio producto", channel: "b2b2c",
-		why: <>Se integra vía SDK y se vende por <Term k="idc">IDC</Term>: identidad + certificado + un <Term k="cupo">cupo de firmas</Term>, con precio por <Term k="segmento">segmento</Term>.</> },
+		why: <>Se integra vía SDK y se vende por <Term k="idc">IDC</Term>: identidad + certificado, y firmas por unidad, con precio por <Term k="segmento">segmento</Term> y <Term k="bienvenida">firmas de bienvenida</Term>.</> },
 	{ id: "volumen", q: "Un cliente que sabe exactamente cuántos certificados y firmas necesita", channel: "volumen",
 		why: "Se cotizan certificados y firmas como items sueltos, sin bundle, con descuento por volumen o compromiso." },
 ];

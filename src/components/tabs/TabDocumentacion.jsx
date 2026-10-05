@@ -41,7 +41,7 @@ function buildChannelRows(cfg) {
 	return [
 		{ id: "web", unidad: "Pack cerrado", precio: "Precio de lista, autoservicio", driver: "No aplica: es la lista", ingreso: "Único", clave: "Precio de lista", claveSub: "la referencia de todos" },
 		{ id: "distribuidores", unidad: "Firma suelta (cert. bonificado)", precio: "Firma base USD " + usd((cfg.distribuidorVolBase || {}).firma != null ? cfg.distribuidorVolBase.firma : 1) + " menos el nivel", driver: "Facturación (× 12 con compromiso) o certificados activos", ingreso: "Único", clave: "hasta " + pct(distMax), claveSub: "de descuento en firma" },
-		{ id: "b2b2c", unidad: "IDC (identidad + firmas)", precio: "Precio propio por segmento", driver: "Cantidad de IDC o su facturación", ingreso: "Único o recurrente", clave: idcMin != null && isFinite(idcMin) ? "USD " + usd(idcMin, 2, 2) : "—", claveSub: "desde, por IDC" },
+		{ id: "b2b2c", unidad: "IDC + firmas por unidad", precio: "Precio propio por segmento", driver: "Cantidad de IDC o su facturación", ingreso: "Único o recurrente", clave: idcMin != null && isFinite(idcMin) ? "USD " + usd(idcMin, 2, 2) : "—", claveSub: "desde, por IDC" },
 		{ id: "volumen", unidad: "Certificado y firma sueltos", precio: "Cert USD " + usd(base.cert) + " · firma USD " + usd(base.firma) + " menos el segmento", driver: "Firmas o compromiso del contrato", ingreso: "Único", clave: "hasta " + pct(volMax), claveSub: "sobre cert y firma" },
 	];
 }
@@ -149,6 +149,7 @@ export function TabDocumentacion({ tc }) {
 
 	const channelRows = useMemo(function () { return buildChannelRows(channelConfig || {}); }, [channelConfig]);
 	const idcSegs = cfg.b2b2cSegments || [];
+	const idcBienvenida = cfg.b2b2cFirmasBienvenida != null ? cfg.b2b2cFirmasBienvenida : 3;
 	const distTiers = cfg.distribuidorVolTiers || [];
 	const distBase = cfg.distribuidorVolBase || { cert: 0, firma: 1 };
 	const volSegs = cfg.volumenSegments || [];
@@ -268,9 +269,9 @@ export function TabDocumentacion({ tc }) {
 
 				{/* ── IDC ── */}
 				<DocSection id="idc" eyebrow="Canal 3 · integración SDK" Icon={C.idc.Icon} color={C.idc.color} title="IDC · Identidades Digitales Certificadas"
-					lead="Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. La unidad de venta es la **IDC**: un bundle con biometría, emisión, custodia y firmas de activación. No distingue persona física o jurídica: cuestan y cotizan igual.">
+					lead="Empresas y plataformas que integran identidad y firma dentro de su propio producto vía SDK. La unidad de venta es la **IDC**: biometría, emisión del certificado y custodia. Las **firmas se cobran por unidad**, sin cupo por certificado. No distingue persona física o jurídica: cuestan y cotizan igual.">
 					<SubHeading id="idc-segmentos">Segmentos y precios</SubHeading>
-					<P>{"Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC. El segmento es el **mayor** entre la **cantidad de IDC** y su **facturación** medida a precio de referencia Start Up (así se evita la circularidad precio ↔ segmento)."}</P>
+					<P>{"Es una **escala de precios**, no de descuentos: cada segmento tiene su propio precio por IDC y por firma. El segmento es el **mayor** entre la **cantidad de IDC** y su **facturación** (IDC y firmas) medida a precios de referencia Start Up (así se evita la circularidad precio ↔ segmento)."}</P>
 					<LiveTable accent={C.idc.color} caption="Segmentos IDC" rows={idcSegs} rowKey={function (s) { return s.id || s.label; }}
 						columns={[
 							{ key: "seg", label: "Segmento", render: function (s) { return <TierBadge tier={s} tiers={idcSegs} size="sm" />; } },
@@ -278,11 +279,14 @@ export function TabDocumentacion({ tc }) {
 							{ key: "fact", label: "Facturación anual", align: "right", render: function (s) { return rangeUSD(s.facturacionMin, s.facturacionMax); } },
 							{ key: "factp", label: "Facturación puntual", align: "right", render: function (s, i) { const p = b2b2cSegmentsPuntual(idcSegs, cfg.b2b2cFactorPuntual)[i] || s; return rangeUSD(p.facturacionMin, p.facturacionMax); } },
 							{ key: "precio", label: "Precio por IDC", align: "right", emphasis: true, render: function (s) { return <span className="inline-flex items-center gap-2"><MagBar value={Number(s.precioIDC) || 0} max={idcPrecioMax} color={C.idc.color} />USD {usd(s.precioIDC)}</span>; } },
-							{ key: "cupo", label: "Firmas incl.", align: "right", render: function (s) { return num(s.firmasIncluidas); } },
+							{ key: "firma", label: "Precio por firma", align: "right", render: function (s) { return "USD " + usd(s.precioFirma); } },
 							{ key: "extra", label: "Firma excedente", align: "right", render: function (s) { return "USD " + usd(s.precioFirmaExtra); } },
 						]} />
+					<Callout type="regla" title="Firmas de bienvenida">
+						{"Cada cotización bonifica **" + num(idcBienvenida) + " firmas en total**, no por certificado: consuma 3 o 3.000, se bonifican " + num(idcBienvenida) + ". Son simbólicas, para que la persona jurídica firme su primer documento sin costo. No aplican a la recompra. Se pueden sumar firmas bonificadas extra como condición comercial."}
+					</Callout>
 					<Callout type="regla" title="Guardarraíl de rentabilidad">
-						{"Markup mínimo **" + usd(markupMin, 2, 2) + "x** sobre el costo variable del bundle. Bajo ese piso, el cotizador bloquea guardar y exportar."}
+						{"Markup mínimo **" + usd(markupMin, 2, 2) + "x** sobre el costo variable de la cotización. Bajo ese piso, el cotizador bloquea guardar y exportar. El precio de tabla de la IDC y el de la firma cumplen ese mínimo cada uno contra su costo, así ninguna mezcla de firmas por IDC queda debajo."}
 					</Callout>
 
 					<SubHeading id="idc-modalidad">Modalidad: consumo único o compromiso anual</SubHeading>
@@ -414,7 +418,10 @@ export function TabDocumentacion({ tc }) {
 					lead="Por qué algunos números difieren del documento estratégico original (Borrador v5), para quien compare ambos.">
 					<div className="space-y-2">
 						<Disclosure title="Precios IDC">
-							<p>El Borrador v5 fijaba 0,65 → 0,45 por IDC, pero esa columna calculaba el margen contra el costo del certificado solo, ignorando que la IDC incluye 3 firmas. Con el costo real del bundle (~USD 0,77), varios segmentos vendían por debajo del costo. La escala se reconstruyó fijando el piso en 1,20x el costo y subiendo el resto en la misma proporción del documento.</p>
+							<p>El Borrador v5 fijaba 0,65 → 0,45 por IDC, pero esa columna calculaba el margen contra el costo del certificado solo, ignorando que la IDC incluía 3 firmas. Con el costo real del bundle (~USD 0,77), varios segmentos vendían por debajo del costo. La escala se reconstruyó (jul 2026) fijando el piso en 1,20x el costo y subiendo el resto en la misma proporción del documento.</p>
+						</Disclosure>
+						<Disclosure title="IDC sin cupo de firmas (oct 2026)">
+							<p>Hasta oct 2026 cada IDC incluía 3 firmas (cupo por certificado), algo confuso para el modelo comercial. Se abrió el bundle: la IDC quedó como identidad + certificado y la firma con precio propio, repartiendo el precio anterior en proporción al costo variable, así los dos conservan el markup del segmento (1,73x → 1,20x). Con 3 firmas por IDC el total es el mismo que antes. A cambio del cupo, cada cotización bonifica 3 firmas en total, de bienvenida. Las cotizaciones guardadas antes del cambio se siguen mostrando y exportando con su cupo.</p>
 						</Disclosure>
 						<Disclosure title="IDC sin distinción de tipo y con modalidad">
 							<p>La IDC se cotiza sin separar persona física o jurídica (mismo precio y costo). Como en Distribuidores, se elige consumo único (la facturación de esa cantidad) o compromiso anual (consumo mensual × 12), cargado por mes o por año.</p>

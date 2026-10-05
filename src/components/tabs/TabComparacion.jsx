@@ -50,19 +50,17 @@ function computeChannels(certs, firmasPorCert, channelConfig, packs, refPackId, 
 	const firmasTotal = certs * firmasPorCert;
 	const cvTotal = certs * cvCert + firmasTotal * cvFirma;
 
-	// ── B2B2C (Volumen) ──────────────────────────────────────────────────
-	// El segmento sale del volumen de IDC y trae su propio precio unitario. Las firmas
-	// que entran en el cupo del bundle no generan ingreso propio; solo las que lo
-	// exceden se facturan por unidad.
+	// ── IDC ──────────────────────────────────────────────────────────────
+	// El segmento sale del volumen de IDC y trae su precio por IDC y por firma. Todas
+	// las firmas se facturan por unidad, menos las de bienvenida (N en total).
+	const bienvenida = Math.min(firmasTotal, Math.max(0, Number(channelConfig.b2b2cFirmasBienvenida != null ? channelConfig.b2b2cFirmasBienvenida : 3) || 0));
 	const seg = getB2B2CSegment(certs, 0, b2b2cSegments) || {};
-	const segPrice = segmentPricing(seg, { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
-	const firmasExtraB2 = certs * Math.max(0, firmasPorCert - segPrice.firmasIncluidas);
-	const revB2 = certs * segPrice.precioIDC + firmasExtraB2 * segPrice.precioFirmaExtra;
-	// Lista del canal = el precio del primer segmento (el más caro), para poder leer
+	const segPrice = segmentPricing(seg, { precioIDC: 0, precioFirma: 0, precioFirmaExtra: 0 });
+	const revB2 = certs * segPrice.precioIDC + (firmasTotal - bienvenida) * segPrice.precioFirma;
+	// Lista del canal = los precios del primer segmento (los más caros), para poder leer
 	// cuánto cede la escala de volumen frente al tramo de entrada.
-	const segEntrada = segmentPricing(b2b2cSegments[0], { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
-	const firmasExtraEntrada = certs * Math.max(0, firmasPorCert - segEntrada.firmasIncluidas);
-	const facturacionB2Lista = certs * segEntrada.precioIDC + firmasExtraEntrada * segEntrada.precioFirmaExtra;
+	const segEntrada = segmentPricing(b2b2cSegments[0], { precioIDC: 0, precioFirma: 0, precioFirmaExtra: 0 });
+	const facturacionB2Lista = certs * segEntrada.precioIDC + (firmasTotal - bienvenida) * segEntrada.precioFirma;
 	const segDesc = facturacionB2Lista > 0 ? Math.max(0, 1 - revB2 / facturacionB2Lista) : 0;
 	const margenB2 = revB2 - cvTotal;
 

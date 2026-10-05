@@ -88,8 +88,8 @@ export function IdcSimulator() {
 			results={<>
 				<Result label="Segmento"><TierBadge tier={seg} tiers={segs} size="sm" /></Result>
 				<Result label="Precio por IDC">USD {usd(p.precioIDC)}</Result>
-				<Result label="Firmas incluidas c/u">{p.firmasIncluidas}</Result>
-				<Result label={modalidad === "anual" ? "Total del año (pago único)" : "Total"} strong>USD {num(modalidad === "anual" ? total * 12 : total)}</Result>
+				<Result label="Precio por firma">USD {usd(p.precioFirma)}</Result>
+				<Result label={modalidad === "anual" ? "IDC del año (pago único, sin firmas)" : "Total IDC (sin firmas)"} strong>USD {num(modalidad === "anual" ? total * 12 : total)}</Result>
 				{modalidad === "anual" && <Result label="IDC en el año">{num(idc * 12)}</Result>}
 			</>} />
 	);

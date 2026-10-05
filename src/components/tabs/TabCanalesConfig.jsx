@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/Toaster";
 import { LEVER_META } from "@/lib/commercialLevers";
-import { segmentPricing, idcBundleCost, markupOf, minPriceForMarkup } from "@/lib/tiers";
+import { segmentViability, markupOf } from "@/lib/tiers";
 import { TierBadge } from "@/components/ui/TierBadge";
 
 function genId(prefix) {
@@ -236,7 +236,7 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 			{/* ── 2 · Volumen · escala de precios por IDC ── */}
 			<CollapsibleSection
 				title="2 · IDC · Escala de precios por IDC"
-				subtitle={"El segmento es el MAYOR entre las IDC contratadas y la facturación medida a precio de lista (rangos anuales abajo; en compra puntual se usan anual ÷ 12 × factor). Cada segmento tiene su precio por IDC, más un cupo de firmas incluidas. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
+				subtitle={"El segmento es el MAYOR entre las IDC contratadas y la facturación medida a precio de lista (rangos anuales abajo; en compra puntual se usan anual ÷ 12 × factor). Cada segmento tiene su precio por IDC y su precio por firma; no hay cupo de firmas por IDC. CV cert = USD " + cvCert.toFixed(4) + " · CV firma = USD " + cvFirma.toFixed(4) + "."}
 			>
 				<div className="mb-5 flex flex-wrap gap-6">
 					<div className="w-52">
@@ -249,6 +249,11 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						<NumCell value={draft.b2b2cFactorPuntual != null ? draft.b2b2cFactorPuntual : 1.25} decimals={2} onChange={function (v) { updDraft({ b2b2cFactorPuntual: v || 1 }); }} className="mt-1.5" />
 						<p className="text-xs text-muted-foreground mt-1">En compra puntual, el umbral de facturación de cada segmento es el anual ÷ 12 × este factor. Con 1,25 la compra del mes tiene que facturar un 25% más que el promedio mensual de un compromiso anual.</p>
 					</div>
+					<div className="w-64">
+						<Label className="text-xs text-muted-foreground uppercase tracking-wide">Firmas de bienvenida</Label>
+						<NumCell value={draft.b2b2cFirmasBienvenida != null ? draft.b2b2cFirmasBienvenida : 3} decimals={0} onChange={function (v) { updDraft({ b2b2cFirmasBienvenida: Math.max(0, Math.round(v || 0)) }); }} className="mt-1.5" />
+						<p className="text-xs text-muted-foreground mt-1">Firmas bonificadas por cotización, en total (no por IDC). Simbólicas: para que la persona firme su primer documento sin costo. No aplican a la recompra.</p>
+					</div>
 				</div>
 
 				<Table>
@@ -256,16 +261,15 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 						<TableRow>
 							<TableHead className="w-[140px]">Se ve así</TableHead>
 							<TableHead>Segmento</TableHead>
-							<TableHead className={thNum}>IDC mín. / mes</TableHead>
-							<TableHead className={thNum}>IDC máx. / mes</TableHead>
+							<TableHead className={thNum}>IDC mín.</TableHead>
+							<TableHead className={thNum}>IDC máx.</TableHead>
 							<TableHead className={thNum}>Fact. mín. USD</TableHead>
 							<TableHead className={thNum}>Fact. máx. USD</TableHead>
 							<TableHead className={thNum}>Precio IDC</TableHead>
-							<TableHead className={thNum}>Firmas incl.</TableHead>
-							<TableHead className={thNum}>Firma s/ cupo</TableHead>
-							<TableHead className={thNum}>CV bundle</TableHead>
-							<TableHead className={thNum}>Markup</TableHead>
-							<TableHead className={thNum}>Mín. viable</TableHead>
+							<TableHead className={thNum}>Precio firma</TableHead>
+							<TableHead className={thNum}>Excedente</TableHead>
+							<TableHead className={thNum}>Markup IDC</TableHead>
+							<TableHead className={thNum}>Markup firma</TableHead>
 							<TableHead className="w-10" />
 						</TableRow>
 					</TableHeader>
@@ -275,11 +279,16 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 								const next = draft.b2b2cSegments.map(function (s, i) { return i === idx ? Object.assign({}, s, { [field]: val }) : s; });
 								updDraft({ b2b2cSegments: next });
 							}
-							const p = segmentPricing(seg, { precioIDC: 0, firmasIncluidas: 0, precioFirmaExtra: 0 });
-							const cvBundle = idcBundleCost(cvCert, cvFirma, p.firmasIncluidas);
-							const markup = markupOf(p.precioIDC, cvBundle);
-							const minViable = minPriceForMarkup(cvBundle, markupMin);
-							const viable = markup == null || markup >= markupMin;
+							const v = segmentViability(seg, cvCert, cvFirma, markupMin, { precioIDC: 0, precioFirma: 0, precioFirmaExtra: 0 });
+							const viable = v.ok;
+							function markupCell(m, ok, minPrice) {
+								return (
+									<TableCell className={cn("text-right tabular-nums font-semibold", m == null ? "" : (ok ? (m >= markupMin * 1.4 ? "text-[var(--success)]" : "text-[var(--warning)]") : "text-destructive"))} title={ok ? undefined : "Mínimo viable: USD " + minPrice.toFixed(4)}>
+										{m == null ? "—" : m.toFixed(2) + "x"}
+										{!ok && <span className="block text-xs font-normal">mín. {minPrice.toFixed(4)}</span>}
+									</TableCell>
+								);
+							}
 							return (
 								<TableRow key={seg.id || idx} className={viable ? "" : "bg-destructive/5"}>
 									<TableCell><TierBadge tier={seg} tiers={draft.b2b2cSegments} size="sm" /></TableCell>
@@ -289,22 +298,19 @@ export function TabCanalesConfig({ channelConfig, updateChannelConfig, costs }) 
 									<TableCell><NumCell value={seg.facturacionMin} decimals={0} onChange={function (v) { upd("facturacionMin", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.facturacionMax} decimals={0} onChange={function (v) { upd("facturacionMax", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.precioIDC} decimals={4} onChange={function (v) { upd("precioIDC", v); }} /></TableCell>
-									<TableCell><NumCell value={seg.firmasIncluidas} decimals={0} onChange={function (v) { upd("firmasIncluidas", v); }} /></TableCell>
+									<TableCell><NumCell value={seg.precioFirma} decimals={4} onChange={function (v) { upd("precioFirma", v); }} /></TableCell>
 									<TableCell><NumCell value={seg.precioFirmaExtra} decimals={4} onChange={function (v) { upd("precioFirmaExtra", v); }} /></TableCell>
-									<TableCell className="text-right tabular-nums text-muted-foreground">{cvBundle.toFixed(4)}</TableCell>
-									<TableCell className={cn("text-right tabular-nums font-semibold", markup == null ? "" : (viable ? (markup >= markupMin * 1.4 ? "text-[var(--success)]" : "text-[var(--warning)]") : "text-destructive"))}>
-										{markup == null ? "—" : markup.toFixed(2) + "x"}
-									</TableCell>
-									<TableCell className={cn("text-right tabular-nums", viable ? "text-muted-foreground" : "font-semibold text-destructive")}>{minViable.toFixed(4)}</TableCell>
+									{markupCell(v.markupCert, v.okCert, v.minCert)}
+									{markupCell(v.markupFirma, v.okFirma, v.minFirma)}
 									<TableCell><DeleteRowButton onClick={function () { removeRow("b2b2cSegments", idx); }} /></TableCell>
 								</TableRow>
 							);
 						})}
 					</TableBody>
 				</Table>
-				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, firmasIncluidas: 4, precioFirmaExtra: 0.5 }); }} />
+				<AddRowButton label="Agregar segmento" onClick={function () { addRow("b2b2cSegments", { id: genId("seg"), label: "Nuevo segmento", idcMin: 0, idcMax: null, facturacionMin: 0, facturacionMax: null, precioIDC: 0, precioFirma: 0, precioFirmaExtra: 0.5 }); }} />
 				<p className="text-xs text-muted-foreground mt-3">
-					El segmento sale del volumen mensual de IDC. <strong>CV bundle</strong> es el costo de lo que se entrega por el precio de la IDC (certificado + las firmas del cupo) y <strong>Mín. viable</strong> el precio más bajo que cumple el markup mínimo: si una fila queda en rojo, ninguna cotización de ese segmento se va a poder guardar. Se resuelve subiendo el precio o bajando el cupo.
+					La IDC y la firma se venden por separado, así que cada una se mide contra su propio costo variable (<strong>Markup IDC</strong> y <strong>Markup firma</strong>). Si los dos cumplen el mínimo, ninguna cotización del segmento queda bajo el piso, tenga las firmas por IDC que tenga. Una celda en rojo muestra el precio mínimo viable. <strong>Excedente</strong> es el precio de la firma no planificada, que va como condición del contrato.
 				</p>
 			</CollapsibleSection>
 

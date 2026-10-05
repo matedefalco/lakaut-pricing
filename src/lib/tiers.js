@@ -81,8 +81,8 @@ export function distributorVolTierDriver(facturacion, certsActivos, conCompromis
 //   · el volumen de IDC MENSUALES → idcMin/idcMax, y
 //   · la FACTURACIÓN de la ventana contemplada, medida a precio de referencia (Start Up)
 //     para romper la circularidad precio↔segmento → facturacionMin/facturacionMax.
-// Cada segmento trae su propio precio por IDC (escala de precios del Borrador v5), su
-// cupo de firmas incluidas y el precio de las firmas extra. Como los segmentos van de
+// Cada segmento trae su propio precio por IDC (escala de precios del Borrador v5), el
+// precio de cada firma y el del excedente no planificado. Como los segmentos van de
 // menor a mayor volumen (y de mayor a menor precio unitario), tomar el índice más alto
 // asigna el segmento más grande (mejor precio), sea por IDC/mes o por facturación.
 // `segments` viene de channelConfig.b2b2cSegments. `facturacion` la calcula el llamador
@@ -142,7 +142,7 @@ export function segmentPricing(seg, fallback) {
 	}
 	return {
 		precioIDC: pick(s.precioIDC, f.precioIDC, 0),
-		firmasIncluidas: Math.max(0, Math.round(pick(s.firmasIncluidas, f.firmasIncluidas, 0))),
+		precioFirma: pick(s.precioFirma, f.precioFirma, 0),
 		precioFirmaExtra: pick(s.precioFirmaExtra, f.precioFirmaExtra, 0),
 	};
 }
@@ -211,12 +211,6 @@ export function webFirmaExtraUnitARS(qty, tiers) {
 // de la columna "MARGEN" del Borrador v5: los 74% de Start Up son 0,65 ÷ 0,3741.
 // No confundir con el margen sobre el precio, que para ese mismo caso es 42%.
 
-// Costo variable del bundle de una IDC: el certificado más las firmas que entran en
-// su cupo. Es el número contra el que se mide si un precio de tabla es viable.
-export function idcBundleCost(cvCert, cvFirma, firmasIncluidas) {
-	return (Number(cvCert) || 0) + (Number(cvFirma) || 0) * Math.max(0, Number(firmasIncluidas) || 0);
-}
-
 // Markup de un ingreso sobre su costo. Devuelve null si no hay costo que medir
 // (sin costo, el markup es infinito y no significa nada como número).
 export function markupOf(revenue, cost) {
@@ -231,17 +225,22 @@ export function minPriceForMarkup(cost, markupMin) {
 	return (Number(cost) || 0) * (Number(markupMin) || 0);
 }
 
-// ¿El precio de este segmento cierra contra su propio costo de bundle? Se usa para
-// la fila de viabilidad de Config y para la alerta del cotizador.
+// ¿Los precios de este segmento cierran contra su costo? Sin cupo, el certificado y la
+// firma se venden por separado, así que cada uno tiene que cumplir el markup mínimo por
+// su cuenta: si los dos lo cumplen, ninguna mezcla de firmas por IDC queda bajo el piso.
+// Se usa para la fila de viabilidad de Config y para la alerta del cotizador.
 export function segmentViability(seg, cvCert, cvFirma, markupMin, fallback) {
 	const p = segmentPricing(seg, fallback);
-	const cost = idcBundleCost(cvCert, cvFirma, p.firmasIncluidas);
-	const markup = markupOf(p.precioIDC, cost);
-	const minPrice = minPriceForMarkup(cost, markupMin);
+	const min = Number(markupMin) || 0;
+	const markupCert = markupOf(p.precioIDC, cvCert);
+	const markupFirma = markupOf(p.precioFirma, cvFirma);
 	return {
-		cost: cost,
-		markup: markup,
-		minPrice: minPrice,
-		ok: markup == null || markup >= (Number(markupMin) || 0),
+		markupCert: markupCert,
+		markupFirma: markupFirma,
+		minCert: minPriceForMarkup(cvCert, min),
+		minFirma: minPriceForMarkup(cvFirma, min),
+		okCert: markupCert == null || markupCert >= min,
+		okFirma: markupFirma == null || markupFirma >= min,
+		ok: (markupCert == null || markupCert >= min) && (markupFirma == null || markupFirma >= min),
 	};
 }
