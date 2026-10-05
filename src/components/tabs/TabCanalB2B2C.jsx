@@ -528,8 +528,13 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 	// Firmas por tipo, para el desglose del resumen.
 	const firmasExtraFisica = nf * ff;
 	const firmasExtraJuridica = nj * fj;
-	const revFirmasFisica = firmasExtraFisica * precioFirmaExtraEff;
-	const revFirmasJuridica = firmasExtraJuridica * precioFirmaExtraEff;
+	// Vista del cliente (panel y propuesta): las firmas de bienvenida salen de la cantidad
+	// cobrada (primero de las jurídicas) y van como línea "Incluido", no como descuento.
+	const bienvJurPanel = Math.min(firmasBienvenida, firmasExtraJuridica);
+	const firmasCobrarJuridica = firmasExtraJuridica - bienvJurPanel;
+	const firmasCobrarFisica = firmasExtraFisica - (firmasBienvenida - bienvJurPanel);
+	const revFirmasFisica = firmasCobrarFisica * precioFirmaExtraEff;
+	const revFirmasJuridica = firmasCobrarJuridica * precioFirmaExtraEff;
 	// Firmas sueltas: mismo precio de firma del segmento, sin atribución de tipo.
 	const revFirmasSueltas = fs * precioFirmaExtraEff;
 	const revFirmas = firmasExtra * precioFirmaExtraEff;
@@ -1106,7 +1111,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								{ff > 0 && <span className="text-xs text-muted-foreground">{nf.toLocaleString("es-AR")} × {ff} firma{ff !== 1 ? "s" : ""}</span>}
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nf.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertFisicos} format={fMoney2} />} accent="primary" />
-							{firmasExtraFisica > 0 && <ResultRow label={"Firmas (" + firmasExtraFisica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasFisica} format={fMoney2} />} />}
+							{firmasCobrarFisica > 0 && <ResultRow label={"Firmas (" + firmasCobrarFisica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasFisica} format={fMoney2} />} />}
 						</div>
 					)}
 					{nj > 0 && (
@@ -1116,7 +1121,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 								{fj > 0 && <span className="text-xs text-muted-foreground">{nj.toLocaleString("es-AR")} × {fj} firma{fj !== 1 ? "s" : ""}</span>}
 							</div>
 							<ResultRow label={(esIDC ? "IDC (" : "Certificados (") + nj.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revCertJuridicos} format={fMoney2} />} accent="primary" />
-							{firmasExtraJuridica > 0 && <ResultRow label={"Firmas (" + firmasExtraJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney2} />} />}
+							{firmasCobrarJuridica > 0 && <ResultRow label={"Firmas (" + firmasCobrarJuridica.toLocaleString("es-AR") + ")"} value={<AnimatedNumber value={revFirmasJuridica} format={fMoney2} />} />}
 						</div>
 					)}
 					{fr > 0 && (
@@ -1141,7 +1146,7 @@ export function TabCanalB2B2C({ channel, costs, currency, tc, dealsApi, clientsA
 					{/* Condiciones comerciales. Las palancas ya no se restan del total: se
 					    ofrecen aparte (bloque debajo del total). */}
 					<div>
-						{firmasBienvenida > 0 && <ResultRow label={"Firmas de bienvenida (" + firmasBienvenida.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bienvenidaMonto} format={fMoney2} /></>} accent="success" valueClass="text-[var(--success)]" />}
+						{firmasBienvenida > 0 && <ResultRow label={"Tus primeras " + firmasBienvenida.toLocaleString("es-AR") + " firmas · de regalo"} value="Incluido" accent="success" valueClass="text-[var(--success)]" />}
 						{firmasBonif > 0 && <ResultRow label={"Firmas bonificadas (" + firmasBonif.toLocaleString("es-AR") + ")"} value={<>−<AnimatedNumber value={bonifMonto} format={fMoney2} /></>} accent="success" valueClass="text-[var(--success)]" />}
 						{conApi && <ResultRow label={"SLA · " + sla.label + (slaMeses > 1 && slaMes > 0 ? " · " + slaMeses + " meses" : "")} value={slaBonificado ? "bonificado" : slaMes > 0 ? <AnimatedNumber value={slaPeriodo} format={fMoney2} /> : (slaIncluido && sla.precioMes ? "incluido por facturación" : "incluido")} />}
 						{conApi && <ResultRow label="Fee de implementación (única vez)" value={<AnimatedNumber value={feeAplicado} format={fMoney2} />} />}
