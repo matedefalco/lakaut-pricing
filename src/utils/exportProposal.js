@@ -22,7 +22,10 @@ const TERMS_PERCEPCION = "Lakaut S.A. es agente de percepción de IIBB C.A.B.A. 
 // facturación se emite en pesos al tipo de cambio del día. El TC que se muestra
 // en la portada es orientativo; el de facturación es el oficial BNA vendedor del
 // día en que se emita la factura.
-const TERMS_FACTURACION_USD = "Los precios se expresan en dólares estadounidenses (USD) a título de referencia. La facturación se realizará en pesos argentinos, convertidos al tipo de cambio del dólar oficial del Banco de la Nación Argentina (BNA), tipo vendedor, vigente al día de facturación.";
+// Versión corta a propósito: va en una tarjeta de alto fijo de la slide de Condiciones.
+// Conserva todas las condiciones (pesos, dólar oficial BNA tipo vendedor del día de
+// facturación, USD como referencia).
+const TERMS_FACTURACION_USD = "En pesos argentinos, al tipo de cambio del dólar oficial del Banco de la Nación Argentina (BNA), tipo vendedor, vigente al día de facturación. Los precios en dólares (USD) son de referencia.";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const IVA_RATE = 0.21; // Alineado a TabCanalWeb: precio ARS c/IVA = precio s/IVA × 1.21
@@ -298,16 +301,24 @@ function commercialSlide({ kicker, title, subtitle, chips, cardsHtml, scheduleHt
 // cliente se hace, a tamaño de cuerpo. `items` = [{ q, a }] (a admite HTML).
 function sCondiciones(items, pageN) {
 	const cols = items.length > 4 ? 3 : 2;
+	// Las tarjetas tienen alto fijo (las filas se reparten la slide) y recortan lo que no
+	// entra. Red de seguridad: si alguna respuesta es larga, toda la slide baja un punto de
+	// letra (parejo, para no mezclar tamaños) en vez de cortar texto a mitad de línea.
+	const plainLen = (h) => String(h || "").replace(/<[^>]*>/g, "").length;
+	const hayLarga = items.some((it) => plainLen(it.a) + plainLen(it.nota) > (cols === 3 ? 180 : 300));
+	const aSizeAll = ((cols === 3 ? 11.5 : 12.5) - (hayLarga ? 1 : 0)) + "pt";
+	const aSize = () => aSizeAll;
 	return `<div class="slide" style="background:${OW};">
   <div style="flex-shrink:0;padding:0.7cm 1.1cm 0.45cm;">
     <div style="font-size:10.5pt;font-weight:700;color:${B};text-transform:uppercase;letter-spacing:1px;margin-bottom:0.12cm;">Condiciones</div>
     <div style="font-size:26pt;font-weight:800;color:${DK};line-height:1.12;">Lo que conviene saber antes de firmar</div>
   </div>
-  <div style="flex:1;display:grid;grid-template-columns:repeat(${cols}, minmax(0, 1fr));grid-auto-rows:1fr;gap:0.45cm;padding:0 1.1cm 0.4cm;overflow:hidden;">
+  <div style="flex:1;display:grid;grid-template-columns:repeat(${cols}, minmax(0, 1fr));grid-auto-rows:minmax(0, 1fr);gap:0.45cm;padding:0 1.1cm 0.4cm;overflow:hidden;">
     ${items.map(it => `<div style="background:${W};border:1px solid ${GRL};border-radius:14px;padding:0.65cm 0.75cm;display:flex;flex-direction:column;gap:0.25cm;overflow:hidden;">
       ${it.icon ? `<div style="width:1.1cm;height:1.1cm;background:#EEF0FD;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-bottom:0.1cm;">${it.icon}</div>` : ""}
       <div style="font-size:16pt;font-weight:700;color:${DK};line-height:1.25;">${it.q}</div>
-      <div style="font-size:${cols === 3 ? "11.5pt" : "12.5pt"};color:${GR};line-height:1.5;">${it.a}</div>
+      <div style="font-size:${aSize(it)};color:${GR};line-height:1.5;">${it.a}</div>
+      ${it.nota ? `<div style="font-size:9.5pt;color:${GR};line-height:1.35;margin-top:auto;">${it.nota}</div>` : ""}
     </div>`).join("")}
   </div>
   <div style="flex-shrink:0;padding:0 1.1cm 0.2cm;font-size:9pt;color:${GR};">Autoridad Certificante Licenciada · Infraestructura de Firma Digital · Ley N° 25.506</div>
@@ -331,7 +342,9 @@ function condicionesItems({ fecha, currency, tc, tcMeta, extra }) {
 		? {
 			icon: SVG.banknote(B, 22),
 			q: "¿En qué moneda pago?",
-			a: `En pesos. ${TERMS_FACTURACION_USD.replace("tipo vendedor, vigente al día de facturación", strong("tipo vendedor, vigente al día de facturación"))}${tc ? ` TC de referencia: $ ${Number(tc).toLocaleString("es-AR")}${tcMeta && tcMeta.lastUpdated ? ` al ${new Date(tcMeta.lastUpdated).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })}` : ""}.` : ""}`,
+			a: TERMS_FACTURACION_USD.replace("tipo vendedor, vigente al día de facturación", strong("tipo vendedor, vigente al día de facturación")),
+			// El TC va como nota aparte (no en el párrafo): era lo que desbordaba la tarjeta.
+			nota: tc ? `TC de referencia: $ ${Number(tc).toLocaleString("es-AR")}${tcMeta && tcMeta.lastUpdated ? ` al ${new Date(tcMeta.lastUpdated).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })}` : ""}.` : null,
 		}
 		: {
 			icon: SVG.banknote(B, 22),
@@ -931,7 +944,7 @@ function s3B2B2C(deal, clientName, currency, tc, channelConfig, pageN, terms) {
 			] : [
 				// Cupo 0 = ninguna firma entra sin cargo: el chip "0 firmas incl." se leía
 				// como que el certificado no trae firmas y contradecía el total de firmas.
-				...(idcSinCupo ? (firmasBienvenida > 0 ? [chip(SVG.checkSquare(B, 15), `<strong>Tus primer${langApi ? "os" : "as"} ${firmasBienvenida}</strong> ${firmasBienvenida === 1 ? firmaSing : firmaPlur}, de regalo`)] : []) : cupo === 0 ? [] : [chip(SVG.checkSquare(B, 15), cupo != null
+				...(idcSinCupo ? (firmasBienvenida > 0 ? [chip(SVG.checkSquare(B, 15), `<strong>${firmasBienvenida} ${firmasBienvenida === 1 ? firmaSing : firmaPlur}</strong> de regalo`)] : []) : cupo === 0 ? [] : [chip(SVG.checkSquare(B, 15), cupo != null
 					? `<strong>${cupo}</strong> ${cupo === 1 ? firmaSing : firmaPlur} incl. c/u`
 					: `<strong>${fPorCertFis}</strong> ${fPorCertFis === 1 ? firmaSing : firmaPlur} incl. c/u`)]),
 			]),
